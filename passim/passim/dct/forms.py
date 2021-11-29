@@ -31,8 +31,6 @@ class ManuidOneWidget(ModelSelect2Widget):
         return qs
 
 
-# ================ FORMS ================================================
-
 class CollOneWidget(ModelSelect2Widget):
     model = Collection
     search_fields = [ 'name__icontains' ]
@@ -74,6 +72,8 @@ class ProfileWidget(ModelSelect2MultipleWidget):
     def get_queryset(self):
         return Profile.objects.all().order_by('user__username').distinct()
 
+
+# ================ FORMS ================================================
 
 class ResearchSetForm(forms.ModelForm):
     profileid = forms.CharField(required=False)
@@ -155,6 +155,10 @@ class ResearchSetForm(forms.ModelForm):
 class SetDefForm(forms.ModelForm):
     """Used for listview and details view of SetDef"""
 
+    manulist = ModelChoiceField(queryset=None, required=False,
+            widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
+    histlist = ModelChoiceField(queryset=None, required=False)
+
     class Meta:
         model = SetDef
         fields = ['name', 'notes']
@@ -176,6 +180,15 @@ class SetDefForm(forms.ModelForm):
             # Some fields are not required
             self.fields['name'].required = False
             self.fields['notes'].required = False
+
+            # Set queryset(s) - for details view
+            self.fields['manulist'].queryset = Manuscript.objects.none()
+
+            # Set the widgets correctly
+            self.fields['histlist'].widget = CollOneHistWidget( attrs={'username': self.username, 'team_group': self.team_group, 'settype': 'hc',
+                        'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
+            # Note: the collection filters must use the SCOPE of the collection
+            self.fields['histlist'].queryset = Collection.get_scoped_queryset('super', self.username, self.team_group, settype="hc")
 
             # Get the instance
             if 'instance' in kwargs:

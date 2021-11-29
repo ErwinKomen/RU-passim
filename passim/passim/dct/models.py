@@ -18,7 +18,7 @@ import json, copy
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
-    Collection, Manuscript, Profile, CollectionSuper, Signature
+    Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
@@ -462,14 +462,25 @@ class SetList(models.Model):
             #   incipit, explicit, HC (if the SSG is part of a historical collection), 
             #   number of SGs contained in the equality set, 
             #   number of links to other SSGs
+            # HC/PD specific:
+            #   name
+            #   description
+            #   size
+            # HC-specific:
+            #   literature
             qs = CollectionSuper.objects.filter(collection=coll).order_by('order').values(
-                'order', 'super', 'super__code', 'super__author__name',
+                'order', 'collection__name', 'collection__descrip', 'collection__settype', 
+                'super', 'super__code', 'super__author__name',
                 'super__incipit', 'super__explicit', 'super__sgcount', 'super__ssgcount')
             lBack = []
             with transaction.atomic():
                 for obj in qs:
                     # Get the order number
                     order = obj['order']
+                    # Get the collection-specific information
+                    name = obj['collection__name']
+                    descr = obj['collection__descrip']
+                    settype = obj['collection__settype']
                     # Get the SSG
                     super = obj['super']
                     code = obj['super__code']
@@ -482,6 +493,10 @@ class SetList(models.Model):
                     lst_hc = CollectionSuper.objects.filter(super=super, collection__settype="hc").values(
                         'collection__id', 'collection__name')
                     hcs = ", ".join( [x['collection__name'] for x in lst_hc])
+                    # ======== DEBUGGING ============
+                    if hcs != "":
+                        iStop = 1
+                    # ===============================
                     # Get a URL for this ssg
                     url = reverse('equalgold_details', kwargs={'pk': super})
                     # Treat signatures for this SSG
@@ -492,6 +507,7 @@ class SetList(models.Model):
                     siglist = get_goldsiglist_dct(super)
                     # Put into object
                     oItem = dict(super=super, sig=sigbest, siglist=siglist,
+                                 name=name, descr=descr, type=settype,
                                  order=order, code=code, url=url, author=authorname,
                                  incipit=incipit, explicit=explicit, sgcount=sgcount, 
                                  ssgcount=ssgcount, hcs=hcs)
@@ -533,7 +549,7 @@ class SetList(models.Model):
             #       (options: attributed author, section title, lectio, title, incipit, explicit, 
             #       postscriptum, feast, bible reference, cod. notes, notes, keywords)
             qs = manu.sermondescr_super.all().order_by('sermon__msitem__order').values(
-                'sermon__msitem__order', 'super', 'super__code', 'super__author__name',
+                'sermon', 'sermon__msitem__order', 'super', 'super__code', 'super__author__name',
                 'super__incipit', 'super__explicit', 'super__sgcount', 'super__ssgcount',
                 'sermon__author__name', 'sermon__sectiontitle', 'sermon__quote', 'sermon__title', 
                 'sermon__incipit', 'sermon__explicit', 'sermon__postscriptum', 'sermon__feast__name', 
@@ -553,6 +569,7 @@ class SetList(models.Model):
                     sgcount = obj['super__sgcount']
                     ssgcount = obj['super__ssgcount']
                     # Sermon characteristics
+                    sermon = obj['sermon']
                     srm_author = obj['sermon__author__name']
                     srm_sectiontitle = obj['sermon__sectiontitle']
                     srm_lectio = obj['sermon__quote']
@@ -565,8 +582,19 @@ class SetList(models.Model):
                     srm_codnotes = obj['sermon__additional']
                     srm_notes = obj['sermon__note']
 
+                    # Get the name(s) of the HC
+                    lst_hc = CollectionSuper.objects.filter(super=super, collection__settype="hc").values(
+                        'collection__id', 'collection__name')
+                    hcs = ", ".join( [x['collection__name'] for x in lst_hc])
+                    # ======== DEBUGGING ============
+                    if hcs != "":
+                        iStop = 1
+                    # ===============================
+
                     # TODO: Get the keywords
-                    # 
+                    lst_kw = SermonDescrKeyword.objects.filter(sermon=sermon).values(
+                        'keyword__name')
+                    kws = ", ".join( [x['keyword__name'] for x in lst_kw])
 
                     # Get a URL for this ssg
                     url = reverse('equalgold_details', kwargs={'pk': super})
@@ -577,8 +605,8 @@ class SetList(models.Model):
                     # Signatures for this SSG: get the full list
                     siglist = get_goldsiglist_dct(super)
                     # Put into object
-                    oItem = dict(super=super, sig=sigbest, siglist=siglist,
-                                 order=order, code=code, url=url, author=authorname,
+                    oItem = dict(super=super, sig=sigbest, siglist=siglist, hcs=hcs, kws=kws,
+                                 order=order, code=code, url=url, author=authorname, type='ms',
                                  incipit=incipit, explicit=explicit, sgcount=sgcount, ssgcount=ssgcount,
                                  srm_author=srm_author, srm_sectiontitle=srm_sectiontitle, srm_lectio=srm_lectio,
                                  srm_title=srm_title, srm_incipit=srm_incipit, srm_explicit=srm_explicit,

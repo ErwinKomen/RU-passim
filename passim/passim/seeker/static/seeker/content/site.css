@@ -1,4 +1,4 @@
-﻿body {
+body {
     padding-top: 50px;
     padding-bottom: 20px;
 }
@@ -1294,12 +1294,20 @@ div > span.twitter-typeahead {
     width: 80%;
     margin: 30px auto;
   }
+.modal-dialog.nodecolorpicker {
+    width: 350px;
+}
 .modal-comment {
     width: 50%;
     margin: 20px auto;
   }
 .modal-header {
   cursor: move;
+}
+
+.nodecolorpicker td {
+    padding-left: 5px;
+    padding-right: 5px;
 }
 
 td.hightlighted {
@@ -1647,6 +1655,36 @@ svg .links {
     stroke: #999;
     stroke-opacity: 0.6;
 }
+svg .links .linktype_eqs:hover {
+    stroke-width: 4;
+    stroke: red;
+}
+svg .links .linktype_prt:hover {
+    stroke-width: 4;
+    stroke: blue;
+}
+svg .links .linktype_sim:hover {
+    stroke-width: 4;
+    stroke: green;
+}
+svg .links .linktype_use:hover {
+    stroke-width: 4;
+    stroke: yellow;
+}
+svg .links .linktype_neq:hover {
+    stroke-width: 4;
+    stroke: orange;
+}
+svg .links .linktype_uns:hover {
+    stroke-width: 4;
+    stroke: purple;
+}
+svg .links .linktype_ech:hover {
+    stroke-width: 4;
+    stroke: pink;
+}
+
+
 svg .nodes {
     stroke: #fff;
     stroke-width: 1.5;
@@ -1826,4 +1864,15 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     background-color: lavenderblush;
 }
 
-
+/* SVG class */
+.node-highlight circle {
+    stroke: goldenrod; 
+    stroke-width: 2px;
+}
+.node-highlight-multi circle {
+    stroke: greenyellow; 
+    stroke-width: 3px;
+}
+.overlap-node {
+    cursor: pointer;
+}

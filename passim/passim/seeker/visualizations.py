@@ -4,6 +4,7 @@ Definition of visualization views for the SEEKER app.
 
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
+from django.template.loader import render_to_string
 import pandas as pd 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -17,7 +18,7 @@ from passim.basic.views import BasicPart
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
-    SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
+    FieldChoice, SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
@@ -84,13 +85,19 @@ def get_ssg_corpus(profile, instance):
     return ssg_corpus, lock_status
 
 def get_ssg_sig(ssg_id):
+
     oErr = ErrHandle()
     sig = ""
+    editype_preferences = ['gr', 'cl', 'ot']
     issue_375 = True
     try:
-        # Get the Signature that is most appropriate
-        sig_obj = Signature.objects.filter(gold__equal__id=ssg_id).order_by('-editype', 'code').first()
-        sig = "" if sig_obj == None else sig_obj.code
+        for editype in editype_preferences:
+            siglist = Signature.objects.filter(gold__equal__id=ssg_id, editype=editype).order_by('code').values('code')
+            if len(siglist) > 0:
+                sig = siglist[0]['code']
+                break
+        # We now have the most appropriate signature, or the empty string, if there is none
+        # The folloing is old code, not quite clear why it was necessary
         if not issue_375 and ',' in sig:
             sig = sig.split(",")[0].strip()
     except:
@@ -116,6 +123,21 @@ def get_ssg_passim(ssg_id, obj=None):
         oErr.DoError("get_ssg_passim")
     return code
 
+def get_watermark():
+    """Create and return a watermark"""
+
+    oErr = ErrHandle()
+    watermark_template = "seeker/passim_watermark.html"
+    watermark = ""
+    try:
+            # create a watermark with the right datestamp
+            context_wm = dict(datestamp=get_crpp_date(get_current_datetime(), True))
+            watermark = render_to_string(watermark_template, context_wm)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_watermark")
+    # Return the result
+    return watermark
 
 
 
@@ -136,7 +158,17 @@ class EqualGoldOverlap(BasicPart):
     def add_to_context(self, context):
 
         oErr = ErrHandle()
+        spec_dict = {}
+        link_dict = {}
+        graph_template = 'seeker/super_graph_hist.html'
+
         try:
+            # Define the linktype and spectype
+            for obj in FieldChoice.objects.filter(field="seeker.spectype"):
+                spec_dict[obj.abbr]= obj.english_name
+            for obj in FieldChoice.objects.filter(field="seeker.linktype"):
+                link_dict[obj.abbr]= obj.english_name
+
             # Need to figure out who I am
             profile = Profile.get_user_profile(self.request.user.username)
             instance = self.obj
@@ -148,24 +180,56 @@ class EqualGoldOverlap(BasicPart):
 
             # Initializations
             ssg_link = {}
+            bUseDirectionality = True
 
             # Read the table with links from SSG to SSG
-            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values('src', 'dst')
+            eqg_link = EqualGoldLink.objects.all().order_by('src', 'dst').values(
+                'src', 'dst', 'spectype', 'linktype', 'alternatives', 'note')
             # Transform into a dictionary with src as key and list-of-dst as value
             for item in eqg_link:
                 src = item['src']
                 dst = item['dst']
-                # Make room for the SRC if needed
-                if not src in ssg_link: ssg_link[src] = []
-                # Add this link to the list
-                ssg_link[src].append(dst)
+                if bUseDirectionality:
+                    spectype = item['spectype']
+                    linktype = item['linktype']
+                    note = item['note']
+                    alternatives = item['alternatives']
+                    if alternatives == None: alternatives = False
+                    # Make room for the SRC if needed
+                    if not src in ssg_link: ssg_link[src] = []
+                    # Add this link to the list
+                    oLink = {   'dst': dst, 
+                                'note': note,
+                                'spectype': "", 
+                                'linktype': linktype,
+                                'spec': "",
+                                'link': link_dict[linktype],
+                                'alternatives': alternatives}
+                    if spectype != None:
+                        oLink['spectype'] = spectype
+                        oLink['spec'] = spec_dict[spectype]
+                    ssg_link[src].append(oLink)
+                else:
+                    # Make room for the SRC if needed
+                    if not src in ssg_link: ssg_link[src] = []
+                    # Add this link to the list
+                    ssg_link[src].append(dst)
 
             # Create the overlap network
-            node_list, link_list, max_value, max_group = self.do_overlap(ssg_link, networkslider)
+            node_list, link_list, hist_set, max_value, max_group = self.do_overlap(ssg_link, networkslider)
+
+            # Create the buttons for the historical collections
+            hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()]
+            hist_list = sorted(hist_list, key=lambda x: x['name']);
+            context = dict(hist_list = hist_list)
+            hist_buttons = render_to_string(graph_template, context, self.request)
 
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
+                                   hist_set=hist_set,
+                                   hist_buttons=hist_buttons,
                                    max_value=max_value,
                                    max_group=max_group,
                                    networkslider=networkslider,
@@ -182,8 +246,12 @@ class EqualGoldOverlap(BasicPart):
 
         def add_nodeset(ssg_id, group):
             node_key = ssg_id
+
+            # ---------- DEBUG --------------
             if node_key == 4968:
                 iStop = 1
+            # -------------------------------
+
             # Possibly add the node to the set
             if not node_key in node_set:
                 code_sig = get_ssg_sig(ssg_id)
@@ -191,13 +259,24 @@ class EqualGoldOverlap(BasicPart):
                 code_pas = get_ssg_passim(ssg_id, ssg)
                 scount = ssg.scount
 
-                node_value = dict(label=code_sig, id=ssg_id, group=group, passim=code_pas, scount=scount)
+                # Get a list of the HCs that this SSG is part of
+                hc_list = ssg.collections.filter(settype="hc").values("id", "name")
+                hcs = []
+                for oItem in hc_list:
+                    id = oItem['id']
+                    if not id in hist_set:
+                        hist_set[id] = oItem['name']
+                    hcs.append(id)
+
+                node_value = dict(label=code_sig, id=ssg_id, group=group, 
+                                  passim=code_pas, scount=scount, hcs=hcs)
                 node_set[node_key] = node_value
                 
         node_list = []
         link_list = []
         node_set = {}
         link_set = {}
+        hist_set = {}
         max_value = 0
         max_group = 1
         oErr = ErrHandle()
@@ -209,6 +288,7 @@ class EqualGoldOverlap(BasicPart):
             ssg_queue = [ ssg_id ]
             ssg_add = []
             group = 1
+            degree -= 1
             while len(ssg_queue) > 0 and degree >= 0:
                 # Get the next available node
                 node_key = ssg_queue.pop()
@@ -219,13 +299,20 @@ class EqualGoldOverlap(BasicPart):
                 # Add links from this SSG to others
                 if node_key in ssg_link:
                     dst_list = ssg_link[node_key]
-                    for dst in dst_list:
+                    for oDst in dst_list:
+                        dst = oDst['dst']
                         # Add this one to the add list
                         ssg_add.append(dst)
                         link_key = "{}_{}".format(node_key, dst)
                         if not link_key in link_set:
                             oLink = dict(source=node_key,
                                          target=dst,
+                                         spectype=oDst['spectype'],
+                                         linktype=oDst['linktype'],
+                                         spec=oDst['spec'],
+                                         link=oDst['link'],
+                                         alternatives = oDst['alternatives'],
+                                         note=oDst['note'],
                                          value=0)
                             # Add the link to the set
                             link_set[link_key] = oLink
@@ -239,6 +326,7 @@ class EqualGoldOverlap(BasicPart):
                 if len(ssg_queue) == 0 and degree >= 0:
                     # Decrement the degree
                     degree -= 1
+
                     group += 1
                     # Add the items from ssg_add into the queue
                     while len(ssg_add) > 0:
@@ -261,7 +349,7 @@ class EqualGoldOverlap(BasicPart):
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldOverlap/do_overlap")
 
-        return node_list, link_list, max_value, max_group
+        return node_list, link_list, hist_set, max_value, max_group
 
 
 class EqualGoldTrans(BasicPart):
@@ -324,6 +412,7 @@ class EqualGoldTrans(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    author_list=author_list,
                                    max_value=max_value,
                                    networkslider=networkslider,
@@ -569,6 +658,7 @@ class EqualGoldGraph(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    max_value=max_value,
                                    networkslider=networkslider,
                                    legend="SSG network")
@@ -664,26 +754,30 @@ class EqualGoldGraph(BasicPart):
                 ssg_list_id = [x['super_id'] for x in ssg_list]
                 # evaluate links between a source and target SSG
                 for idx_s, source_id in enumerate(ssg_list_id):
-                    # Get the title of the source
-                    source = ssg_dict[source_id]
-                    for idx_t in range(idx_s+1, len(ssg_list_id)-1):
-                        target_id = ssg_list_id[idx_t]
-                        # Get the title of the target
-                        target = ssg_dict[target_id]
-                        # Retrieve or create a link from the link_listT
-                        link_code = "{}_{}".format(source_id, target_id)
-                        if link_code in link_dict:
-                            oLink = link_listT[link_dict[link_code]]
-                        else:
-                            oLink = dict(source=source, source_id=source_id,
-                                         target=target, target_id=target_id,
-                                         value=0)
-                            link_listT.append(oLink)
-                            link_dict[link_code] = len(link_listT) - 1
-                        # Now add to the value
-                        oLink['value'] += 1
-                        if oLink['value'] > max_value:
-                            max_value = oLink['value']
+                    # sanity check
+                    if source_id in ssg_dict:
+                        # Get the title of the source
+                        source = ssg_dict[source_id]
+                        for idx_t in range(idx_s+1, len(ssg_list_id)-1):
+                            target_id = ssg_list_id[idx_t]
+                            # Double check
+                            if target_id in ssg_dict:
+                                # Get the title of the target
+                                target = ssg_dict[target_id]
+                                # Retrieve or create a link from the link_listT
+                                link_code = "{}_{}".format(source_id, target_id)
+                                if link_code in link_dict:
+                                    oLink = link_listT[link_dict[link_code]]
+                                else:
+                                    oLink = dict(source=source, source_id=source_id,
+                                                 target=target, target_id=target_id,
+                                                 value=0)
+                                    link_listT.append(oLink)
+                                    link_dict[link_code] = len(link_listT) - 1
+                                # Now add to the value
+                                oLink['value'] += 1
+                                if oLink['value'] > max_value:
+                                    max_value = oLink['value']
             
             # Only accept the links that have a value >= min_value
             node_dict = []
@@ -812,6 +906,7 @@ class EqualGoldPca(BasicPart):
             # Add the information to the context in data
             context['data'] = dict(node_list=node_list, 
                                    link_list=link_list,
+                                   watermark=get_watermark(),
                                    max_value=max_value,
                                    legend="SSG network")
             

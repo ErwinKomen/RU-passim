@@ -44,7 +44,7 @@ class ErrHandle:
         """Retrieve just the error message and the line number itself as a string"""
 
         arInfo = sys.exc_info()
-        if len(arInfo) == 3:
+        if len(arInfo) == 3 and arInfo[0] != None:
             sMsg = str(arInfo[1])
             if arInfo[2] != None:
                 sMsg += " at line " + str(arInfo[2].tb_lineno)

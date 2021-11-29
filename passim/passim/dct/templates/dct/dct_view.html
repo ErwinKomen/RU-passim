@@ -22,26 +22,19 @@
 
       <!-- The parameters and buttons to change the DCT view -->
       <div class="dct-tools row hidden">
-        <!-- Recalc button -->
-        <div class="col-md-1">&nbsp;
-            <a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
-                onclick="ru.dct.dct_pivot(-1);">Pivot</a>
-        </div>
 
-        <!-- VIEW: Which *rows* to show -->
-        <div class="col-md-2">
-          <label class="control-label" >View:
-            <select class="form-control" id="viewmode" name="viewmode" onchange="ru.dct.show_dct();">
+        <div class="col-md-3">
+          <!-- VIEW: Which *rows* to show -->
+          <label class="control-label" >Rows:
+            <select class="form-control input-sm" id="viewmode" name="viewmode" onchange="ru.dct.show_dct();">
               <option value="all"   >View all</option>
               <option value="match" selected>Matches only</option>
             </select>
           </label>
-        </div>
 
-        <!-- COLUMNS: Column order -->
-        <div class="col-md-3">
+          <!-- COLUMNS: Column order -->
           <label class="control-label" >Columns:
-            <select class="form-control" id="colmode" onchange="ru.dct.show_dct();" >
+            <select class="form-control input-sm" id="colmode" onchange="ru.dct.show_dct();" >
               <option value="match_decr"  selected>Matches (decreasing)</option>
               <option value="match_incr"  >Matches (increasing)</option>
               <option value="alpha"       >Alphabetically</option>
@@ -49,23 +42,97 @@
               <option value="custom"      disabled >Custom</option>
             </select>
           </label>
+
         </div>
 
-        <!-- Options -->
-        <div class="col-md-2">
-          <!-- Option #2: show/hide author information per item -->
-          <a class="btn btn-xs jumbo-1" title="Show or hide author information" 
-                onclick="ru.dct.dct_author(this);">Author</a>
+        <!-- Download button -->
+        <div class="col-md-1 container-small align-right">
+          <form action="" method="post" >
+            {{csrf|safe}}
+            <div id="downloadcenter" class="hidden">
+              <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+              <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+            </div>
+            <div>
+              {% include 'dct/download.html' with downloadid="dct" urlname="setdef_download" object_id=object.id %}
+            </div>
+            <!-- Waiting symbol -->
+            <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+          </form>
+        </div>
+
+        <!-- Recalc button -->
+        <div class="col-md-4">
+          <!-- Top part of this area -->
+          <div class="form-inline">
+            <!-- Allow returning to the DCT tools pages -->
+            <div class="form-group"><a class="btn btn-xs jumbo-1" title="back to DCT tool page" 
+                                       href="{{rset_url}}"><< Tool</a></div>
+
+            <!-- Option #1: show/hide author information per item -->
+            <div class="form-group"><a class="btn btn-xs jumbo-1" title="Show or hide author information" 
+                  onclick="ru.dct.dct_author(this);">Author</a></div>
+
+            <!-- Pivot recalculation -->
+            <div class="form-group"><a class="btn btn-xs jumbo-2" title="Re-calculate the pivot" 
+                onclick="ru.dct.dct_pivot(-1);">Pivot</a></div>
+
+            <!-- Expanding -->
+            <span class="hidden dct-expand">
+              <a class="btn btn-xs jumbo-3" title="Show manually hidden lines" 
+                  onclick="ru.dct.dct_expand(this);">Expand</a>
+            </span>
+
+            <div class="form-group dropdown">
+              <button class="btn btn-xs jumbo-1 dropdown-toggle" type="button" title="Add a source list to this DCT..." data-toggle="dropdown">Source...
+              <span class="caret"></span></button>
+              <ul class="dropdown-menu">
+                <li><a source="manu" onclick="ru.dct.dct_source(this);">Manuscript</a></li>
+                <li><a source="coll" onclick="ru.dct.dct_source(this);">Collection</a></li>
+                <li><a source="" onclick="ru.dct.dct_source(this);">-</a></li>
+              </ul>
+            </div>
+
+            <div class="form-group">
+              <a class="btn btn-xs jumbo-4 delete" title="Drop a set list here to delete it from this DCT" 
+                 ondragover="ru.dct.dct_dragenter(event);"
+                 ondragend="ru.dct.dct_dragend(event, 'delete');">
+                <span class="glyphicon glyphicon-trash delete"></span>
+              </a>
+            </div>
+
+            <div class="form-group hidden source-list source-manu source-coll">
+              <form action="" method="post" >
+                {{csrf|safe}}
+                <div id="addcenter" class="hidden">
+                  <input name='addtype' id='addtype' class='form-control' value='' >
+                  <input name="addid" id="addid" class="hidden form-control" value="" />
+                </div>
+                <a class="btn btn-xs jumbo-2" title="Add the selected manuscript" 
+                   ajaxurl="{{dctdetails_url}}"
+                   onclick="ru.dct.dct_addsrc(this);">Add</a>
+                <!-- Waiting symbol -->
+                <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+              </form>
+            </div>
+
+          </div>
+
+          <!-- Bottom Part: adding a source list to the DCT -->
+          <div class="form-inline">
+
+            <!-- Option 1: manucript -->
+            <div class="hidden source-list source-manu ">{{sdefForm.manulist}}</div>
+
+            <!-- Option 2: collection -->
+            <div class="hidden source-list source-coll ">{{sdefForm.histlist}}</div>
+
+          </div>
+
         </div>
 
         <!-- Save buttons -->
         <div class="col-md-4">
-          <!-- Expanding -->
-          <span class="hidden dct-expand">
-            <a class="btn btn-xs jumbo-1" title="Show manually hidden lines" 
-                onclick="ru.dct.dct_expand(this);">Expand</a>
-          </span>
-
           {% if mayedit %}
             <!-- DCT save options -->
             <span class="hidden dct-save-options pull-right">

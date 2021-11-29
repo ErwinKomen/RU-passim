@@ -34,8 +34,8 @@ def user_is_in_team(username, team_group, userplus=None):
             bResult = (owner.user.groups.filter(name=userplus).first() != None)
     return bResult
 
-CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of an Authority file'), ('non', 'Loner: not part of a SSG')]
-AUTHOR_TYPE = [('-', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
+CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+AUTHOR_TYPE = [('', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 
@@ -170,7 +170,7 @@ class CodeWidget(ModelSelect2MultipleWidget):
     search_fields = [ 'code__icontains' ]
 
     def label_from_instance(self, obj):
-        return obj.code
+        return obj.get_code()
 
     def get_queryset(self):
         return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
@@ -363,7 +363,7 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
 
     def label_from_instance(self, obj):
         # sLabel = obj.get_label(do_incexpl = False)
-        sLabel = obj.code
+        sLabel = obj.get_code()
         return sLabel
 
     def get_queryset(self):
@@ -1270,6 +1270,8 @@ class SearchManuForm(PassimModelForm):
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -1371,6 +1373,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['name'].required = False
 
             self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
+            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')

@@ -224,7 +224,131 @@ class ManuscriptUploadExcel(ReaderImport):
 
 
 class ManuscriptUploadJson(ReaderImport):
-    pass
+    import_type = "json"
+    sourceinfo_url = "https://www.ru.nl/passim/upload_json"
+
+
+    def process_files(self, request, source, lResults, lHeader):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        try:
+            # Make sure we have the username
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+
+                        if extension == "json":
+                            # This is a JSON file: Load the file into a variable
+                            sData = data_file.read()
+                            lst_manu = json.loads( sData.decode(encoding="utf8"))
+
+                            # Walk through the manuscripts
+                            for oManu in lst_manu:
+                                # Each manuscript has some stuff of its own
+                                # We have an object with key/value pairs: process it
+                                manu = Manuscript.custom_add(oManu, **kwargs)
+
+                                # Now get the codicological unit that has been automatically created and adapt it
+                                codico = manu.manuscriptcodicounits.first()
+                                if codico != None:
+                                    oManu['manuscript'] = manu
+                                    codico = Codico.custom_add(oManu, **kwargs)
+
+                                oResult['count'] += 1
+                                oResult['obj'] = manu
+                                oResult['name'] = manu.idno
+
+                                # Process all the MsItems into a list of sermons
+                                sermon_list = []
+                                for oMsItem in oManu['msitems']:
+                                    # Get the sermon object
+                                    oSermon = oMsItem['sermon']
+                                    order = oMsItem['order']
+                                    sermon = SermonDescr.custom_add(oSermon, manu, order, **kwargs)
+
+                                    # Keep track of the number of sermons read
+                                    oResult['sermons'] += 1
+
+                                    # Get parent, firstchild, next
+                                    parent = oMsItem['parent']
+                                    firstchild = oMsItem['firstchild']
+                                    nextone = oMsItem['next']
+
+                                    # Add to list
+                                    sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
+                                                        'next': nextone, 'sermon': sermon})
+
+                                # Now process the parent/firstchild/next items
+                                with transaction.atomic():
+                                    for oSermo in sermon_list:
+                                        # Get the p/f/n numbers
+                                        parent_id = oSermo['parent']
+                                        firstchild_id = oSermo['firstchild']
+                                        next_id = oSermo['next']
+                                        # Process parent
+                                        if parent_id != '' and parent_id != None:
+                                            # parent_id = str(parent_id)
+                                            parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
+                                            oSermo['sermon'].msitem.parent = parent.msitem
+                                            oSermo['sermon'].msitem.save()
+                                        # Process firstchild
+                                        if firstchild_id != '' and firstchild_id != None:
+                                            # firstchild_id = str(firstchild_id)
+                                            firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
+                                            oSermo['sermon'].msitem.firstchild = firstchild.msitem
+                                            oSermo['sermon'].msitem.save()
+                                        # Process next
+                                        if next_id != '' and next_id != None:
+                                            # next_id = str(next_id)
+                                            nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
+                                            oSermo['sermon'].msitem.next = nextone.msitem
+                                            oSermo['sermon'].msitem.save()
+
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "ixlsx", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+
+            code = "Imported using the [import_json] function on this file list: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+        return bOkay, code
 
 
 class ManuscriptUploadGalway(ReaderImport):

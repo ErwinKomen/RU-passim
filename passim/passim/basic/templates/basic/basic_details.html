@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
     <script src="{% static 'basic/scripts/html2canvas.js' %}"></script>
+    <script src="{% static 'basic/scripts/htmlsvg2canvas.js' %}"></script>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -32,7 +33,7 @@
             <!-- Any additional buttons here in the topleft -->
             {% for buttonspec in topleftbuttons %}
               <a class="btn jumbo-1" href="{{buttonspec.url}}"
-                 title="{{buttonspec.title}}">{{buttonspec.label}}</a>
+                 title="{{buttonspec.title}}">{{buttonspec.label|safe}}</a>
             {% endfor %}
           </div>
 

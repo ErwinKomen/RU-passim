@@ -4728,16 +4728,17 @@ class SermonListView(BasicList):
     
     model = SermonDescr
     listform = SermonForm
-    prefix = "sermo"
+    has_select2 = True
+    use_team_group = True
     paginate_by = 20
+    bUseFilter = True
+    prefix = "sermo"
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Sermons"
     basic_name = "sermon"
-    use_team_group = True
     template_help = "seeker/filter_help.html"
-    has_select2 = True
-    page_function = "ru.passim.seeker.search_paged_start"
+
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
     order_default = order_cols
     order_heads = [
@@ -4772,8 +4773,9 @@ class SermonListView(BasicList):
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
-                {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
-                {"name": "Authority file",   "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                # Issue #416: Delete the option to search for a GoldSermon personal dataset
+                # {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
+                {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
@@ -4815,7 +4817,8 @@ class SermonListView(BasicList):
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',      'fkfield': 'manu__collections',              'keyFk': 'name', 'keyList': 'collist_m',  'infield': 'id' }, 
             {'filter': 'collsermo',     'fkfield': 'collections',                    'keyFk': 'name', 'keyList': 'collist_s',  'infield': 'id' }, 
-            {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
+            # Issue #416: Delete the option to search for a GoldSermon personal dataset
+            # {'filter': 'collgold',      'fkfield': 'goldsermons__collections',       'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'id' }, 
             {'filter': 'collsuper',     'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }, 
             {'filter': 'collhc',        'fkfield': 'equalgolds__collections',        'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'id' }
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
@@ -6356,8 +6359,7 @@ class ProjectListView(BasicList):
         html = []
         if custom == "manulink":
             # Link to manuscripts in this project
-            #count = instance.project_manuscripts.all().count() 
-            count = instance.project2_manuscripts.all().count() 
+            count = instance.project_manuscripts.exclude(mtype="tem").count()
             url = reverse('search_manuscript')
             if count > 0:
              #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
@@ -8076,6 +8078,7 @@ class CollectionListView(BasicList):
 
     def add_to_context(self, context, initial):
         if self.prefix == "priv":
+            context['prefix'] = self.prefix
             context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
         return context
 
@@ -8615,8 +8618,13 @@ class ManuscriptEdit(BasicDetails):
 
                 # Action depends on template/not
                 if not istemplate:
-                    # Button to download this manuscript
-                    downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
+                    if user_is_superuser(self.request):
+                        # Button to download this manuscript as JSON
+                        lbuttons.append(dict(title="Download manuscript as JSON file", 
+                                             click="manuscript_download_json", label="JSON"))
+
+                    # Button to download this manuscript as EXCEL
+                    # downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
                     lbuttons.append(dict(title="Download manuscript as Excel file", 
                                          click="manuscript_download", label="Download"))
 
@@ -9342,7 +9350,9 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
+    basketview = False
     template_help = "seeker/filter_help.html"
+
     order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
@@ -9371,14 +9381,16 @@ class ManuscriptListView(BasicList):
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
         {"name": "Gryson or Clavis",        "id": "filter_signature",           "enabled": False, "head_id": "filter_sermon"},
         {"name": "Bible reference",         "id": "filter_bibref",              "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
-        {"name": "HC overlap",              "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Sermon Gold",         "id": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
-        #{"name": "Project...",              "id": "filter_other",               "enabled": False, "head_id": "none"},
-       # {"name": "Project",                 "id": "filter_other_project",       "enabled": False, "head_id": "filter_other"}
+        # Issue #416: Delete the option to search for a GoldSermon dataset 
+        # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
+        # {"name": "Manuscript overlap",      "id": "filter_collection_manuptc",  "enabled": False, "head_id": "filter_collection"},
+       # {"name": "Project",                 "id": "filter_project",             "enabled": False, "head_id": "filter_other"},
       ]
 
     searches = [
@@ -9402,19 +9414,26 @@ class ManuscriptListView(BasicList):
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
+            # === Overlap with a specific manuscript ===
+            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id' },
+            #{'filter': 'collection_manuptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
+            # 'title': 'Percentage overlap between the "Comparison manuscript" SSGs and the SSGs referred to in other manuscripts'},
+
             # === Historical Collection ===
             {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
-             'title': 'Percentage overlap between the Historical Collection Authority files and the Authority files referred to in the manuscripts'},
+             'title': 'Percentage overlap between the Historical Collection SSGs and the SSGs referred to in the manuscripts'},
+
             # === Personal Dataset ===
             {'filter': 'collection_manu',  'fkfield': 'collections',                            
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               
              'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
-            {'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
-             'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__goldsermons__equal__collections', 
+            # Issue #416: Delete the option to search for a GoldSermon dataset 
+            #{'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
+            # 'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
             ]},
@@ -9442,11 +9461,23 @@ class ManuscriptListView(BasicList):
         # Possibly add to 'uploads'
         bHasExcel = False
         bHasGalway = False
+        bHasJson = False
         for item in self.uploads:
             if item['title'] == "excel":
                 bHasExcel = True
             elif item['title'] == "galway":
                 bHasGalway = True
+            elif item['title'] == "json":
+                bHasJson = True
+
+        # Should galway be added?
+        if not bHasGalway:
+            # Add a reference to the Excel upload method
+            oGalway = dict(title="galway", label="Galway",
+                          url=reverse('manuscript_upload_galway'),
+                          type="multiple",
+                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oGalway)
 
         # Should excel be added?
         if not bHasExcel:
@@ -9457,14 +9488,14 @@ class ManuscriptListView(BasicList):
                           msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
             self.uploads.append(oExcel)
 
-        # Should galway be added?
-        if not bHasGalway:
+        # Should json be added?
+        if not bHasJson:
             # Add a reference to the Excel upload method
-            oGalway = dict(title="galway", label="Galway",
-                          url=reverse('manuscript_upload_galway'),
+            oJson = dict(title="json", label="Json",
+                          url=reverse('manuscript_upload_json'),
                           type="multiple",
-                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
-            self.uploads.append(oGalway)
+                          msg="Import manuscripts from one or more JSON files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            self.uploads.append(oJson)
 
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
@@ -9553,6 +9584,17 @@ class ManuscriptListView(BasicList):
         return sBack, sTitle
 
     def adapt_search(self, fields):
+
+        def get_overlap_ptc(base_ssgs, comp_ssgs):
+            """Calculate the overlap percentage between base and comp"""
+
+            total = len(base_ssgs)
+            count = 0
+            for ssg_id in comp_ssgs:
+                if ssg_id in base_ssgs: count += 1
+            result = 100 * count / total
+            return result
+
         # Adapt the search to the keywords that *may* be shown
         lstExclude=None
         qAlternative = None
@@ -9631,6 +9673,45 @@ class ManuscriptListView(BasicList):
                             for coll in coll_list:
                                 for manu in manu_list:
                                     ptc = CollOverlap.get_overlap(profile, coll, manu)
+                if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
+                    # The base manuscripts with which the comparison goes
+                    base_manu_list = fields['cmpmanuidlist']
+                    if len(base_manu_list) > 0:
+                        # Yes, overlap specified
+                        if isinstance(overlap, int):
+                            # Make sure the string is interpreted as an integer
+                            overlap = int(overlap)
+                            # Now add a Q expression
+                            # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+
+                            # (1) Get a list of SSGs associated with these manuscripts
+                            base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
+                            base_ssg_list = [x['id'] for x in base_ssg_list]
+                            base_count = len(base_ssg_list)
+                
+                            # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                            lstQ = []
+                            if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                            lstQ.append(Q(mtype="man"))
+                            lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                            manu_list = Manuscript.objects.filter(*lstQ)
+
+                            # We also need to have the profile
+                            profile = Profile.get_user_profile(self.request.user.username)
+                            # Now calculate the overlap for all
+                            manu_include = []
+                            with transaction.atomic():
+                                for manu in manu_list:
+                                    # Get a list of SSG id's associated with this particular manuscript
+                                    manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
+                                    if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
+                                        # Add this manuscript to the list 
+                                        if not manu.id in manu_include:
+                                            manu_include.append(manu.id)
+                            fields['cmpmanuidlist'] = None
+                            fields['cmpmanu'] = Q(id__in=manu_include)
+
 
         # Adapt the manutype filter
         #if 'manutype' in fields and fields['manutype'] != None:
@@ -9731,89 +9812,149 @@ class ManuscriptDownload(BasicPart):
             username = profile.user.username
             team_group = app_editor
 
-            # Start workbook
-            wb = openpyxl.Workbook()
+            # Is this Excel?
+            if dtype == "excel" or dtype == "xlsx":
+                # Start workbook
+                wb = openpyxl.Workbook()
 
-            # First worksheet: MANUSCRIPT itself
-            ws = wb.get_active_sheet()
-            ws.title="Manuscript"
+                # First worksheet: MANUSCRIPT itself
+                ws = wb.get_active_sheet()
+                ws.title="Manuscript"
 
-            # Read the header cells and make a header row in the MANUSCRIPT worksheet
-            headers = ["Field", "Value"]
-            for col_num in range(len(headers)):
-                c = ws.cell(row=1, column=col_num+1)
-                c.value = headers[col_num]
-                c.font = openpyxl.styles.Font(bold=True)
-                # Set width to a fixed size
-                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+                # Read the header cells and make a header row in the MANUSCRIPT worksheet
+                headers = ["Field", "Value"]
+                for col_num in range(len(headers)):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = headers[col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-            # Walk the mainitems
-            row_num = 2
-            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
-            for item in Manuscript.specification:
-                key, value = self.obj.custom_getkv(item, kwargs=kwargs)
-                # Add the K/V row
-                ws.cell(row=row_num, column = 1).value = key
-                ws.cell(row=row_num, column = 2).value = value
-                row_num += 1
+                # Walk the mainitems
+                row_num = 2
+                kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+                for item in Manuscript.specification:
+                    key, value = self.obj.custom_getkv(item, kwargs=kwargs)
+                    # Add the K/V row
+                    ws.cell(row=row_num, column = 1).value = key
+                    ws.cell(row=row_num, column = 2).value = value
+                    row_num += 1
 
-            # Second worksheet: ALL SERMONS in the manuscript
-            ws = wb.create_sheet("Sermons")
+                # Second worksheet: ALL SERMONS in the manuscript
+                ws = wb.create_sheet("Sermons")
 
-            # Read the header cells and make a header row in the SERMON worksheet
-            headers = [x['name'] for x in SermonDescr.specification ]
-            for col_num in range(len(headers)):
-                c = ws.cell(row=1, column=col_num+1)
-                c.value = headers[col_num]
-                c.font = openpyxl.styles.Font(bold=True)
-                # Set width to a fixed size
-                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+                # Read the header cells and make a header row in the SERMON worksheet
+                headers = [x['name'] for x in SermonDescr.specification ]
+                for col_num in range(len(headers)):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = headers[col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
 
-            row_num = 1
-            # Walk all msitems of this manuscript
-            for msitem in self.obj.manuitems.all().order_by('order'):
-                row_num += 1
-                col_num = 1
-                ws.cell(row=row_num, column=col_num).value = msitem.order
-                # Get other stuff
-                parent = "" if msitem.parent == None else msitem.parent.order
-                firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
-                next = "" if msitem.next == None else msitem.next.order
+                row_num = 1
+                # Walk all msitems of this manuscript
+                for msitem in self.obj.manuitems.all().order_by('order'):
+                    row_num += 1
+                    col_num = 1
+                    ws.cell(row=row_num, column=col_num).value = msitem.order
+                    # Get other stuff
+                    parent = "" if msitem.parent == None else msitem.parent.order
+                    firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
+                    next = "" if msitem.next == None else msitem.next.order
 
-                # Process the structural elements
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = parent
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = firstchild
-                col_num += 1
-                ws.cell(row=row_num, column=col_num).value = next
-
-                # What kind of item is this?
-                col_num += 1
-                if msitem.itemheads.count() > 0:
-                    sermonhead = msitem.itemheads.first()
-                    # This is a SermonHead
-                    ws.cell(row=row_num, column=col_num).value = "Structural"
-                    col_num += 2
-                    ws.cell(row=row_num, column=col_num).value = sermonhead.locus
-                    col_num += 4
-                    ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
-                else:
-                    # This is a SermonDescr
-                    ws.cell(row=row_num, column=col_num).value = "Plain"
+                    # Process the structural elements
                     col_num += 1
-                    sermon = msitem.itemsermons.first()
-                    # Walk the items
-                    for item in SermonDescr.specification:
-                        if item['type'] != "":
-                            key, value = sermon.custom_getkv(item, kwargs=kwargs)
-                            ws.cell(row=row_num, column=col_num).value = value
-                            col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = parent
+                    col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = firstchild
+                    col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = next
+
+                    # What kind of item is this?
+                    col_num += 1
+                    if msitem.itemheads.count() > 0:
+                        sermonhead = msitem.itemheads.first()
+                        # This is a SermonHead
+                        ws.cell(row=row_num, column=col_num).value = "Structural"
+                        col_num += 2
+                        ws.cell(row=row_num, column=col_num).value = sermonhead.locus
+                        col_num += 4
+                        ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
+                    else:
+                        # This is a SermonDescr
+                        ws.cell(row=row_num, column=col_num).value = "Plain"
+                        col_num += 1
+                        sermon = msitem.itemsermons.first()
+                        # Walk the items
+                        for item in SermonDescr.specification:
+                            if item['type'] != "":
+                                key, value = sermon.custom_getkv(item, kwargs=kwargs)
+                                ws.cell(row=row_num, column=col_num).value = value
+                                col_num += 1
                 
 
-            # Save it
-            wb.save(response)
-            sData = response
+                # Save it
+                wb.save(response)
+                sData = response
+            elif dtype == "json":
+                # Start a *list* of manuscripts
+                #  (so that we have one generic format for both a single as well as a number of manuscripts)
+                lst_manu = []
+
+                # Start one object for this particular manuscript
+                oManu = dict(msitems=[])
+
+                # Walk the mainitems
+                kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+                for item in Manuscript.specification:
+                    # Only skip key_id items
+                    if item['type'] != "fk_id":
+                        key, value = self.obj.custom_getkv(item, **kwargs)
+                        # Add the K/V row
+                        oManu[key] = value
+
+                # Walk all msitems of this manuscript
+                for msitem in self.obj.manuitems.all().order_by('order'):
+                    # Create an object for this sermon
+                    oMsItem = {}
+
+                    # Add the order of this item as well as he parent, firstchild, next
+                    oMsItem['order'] = msitem.order
+                    oMsItem['parent'] = "" if msitem.parent == None else msitem.parent.order
+                    oMsItem['firstchild'] = "" if msitem.firstchild == None else msitem.firstchild.order
+                    oMsItem['next'] = "" if msitem.next == None else msitem.next.order
+
+                    # Create an object for this sermon
+                    oSermon = {}
+
+                    # What kind of item is this?
+                    if msitem.itemheads.count() > 0:
+                        sermonhead = msitem.itemheads.first()
+                        # This is a SermonHead
+                        oSermon['type'] = "Structural"
+                        oSermon['locus'] = sermonhead.locus
+                        oSermon['title'] = sermonhead.title.strip()
+                    else:
+                        # This is a SermonDescr
+                        oSermon['type'] = "Plain"
+
+                        # Get the actual sermon
+                        sermon = msitem.itemsermons.first()
+                        # Walk the items of this sermon (defined in specification)
+                        for item in SermonDescr.specification:
+                            if item['type'] != "" and item['type'] != "fk_id":
+                                key, value = sermon.custom_getkv(item, **kwargs)
+                                oSermon[key] = value
+                    # Add sermon to msitem
+                    oMsItem['sermon'] = oSermon
+                    # Add this sermon to the list of sermons within the manuscript
+                    oManu['msitems'].append(oMsItem)
+
+                # Add object to the list
+                lst_manu.append(oManu)
+                # Make sure to return this list
+                sData = json.dumps( lst_manu, indent=2)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDownload/get_data")
@@ -11001,6 +11142,19 @@ class EqualGoldEdit(BasicDetails):
                     if reverse == None:
                         # Create the reversal 
                         reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if obj.spectype != None and obj.spectype != "":
+                          reverse.spectype = get_reverse_spec(obj.spectype)
+                          bNeedSaving = True
+                        # Possibly copy note
+                        if obj.note != None and obj.note != "":
+                          reverse.note = obj.note
+                          bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                          reverse.save()
 
             # (3) 'keywords'
             kwlist = form.cleaned_data['kwlist']
@@ -11209,19 +11363,19 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Use the 'graph' function or not?
                 use_network_graph = True
 
-                # Add a custom button to the manuscript listview: to trigger showing a graph
-                html = []
-                if use_network_graph:
-                    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
-                    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
-                    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
-                    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
-                    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
-                    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                #html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                #html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
-                custombutton = "\n".join(html)
-                manuscripts['custombutton'] = custombutton
+                ## Add a custom button to the manuscript listview: to trigger showing a graph
+                #html = []
+                #if use_network_graph:
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
+                #    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
+                #    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
+                #    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
+                #    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
+                ##html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
+                ##html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
+                #custombutton = "\n".join(html)
+                #manuscripts['custombutton'] = custombutton
 
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
@@ -11341,7 +11495,9 @@ class EqualGoldListView(BasicList):
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' }, 
-            {'filter': 'collsermo', 'fkfield': 'equal_goldsermons__sermondescr__collections',        
+            {'filter': 'collsermo', 'fkfield': 'equalgold_sermons__sermondescr_col__collection',        
+            # issue #466: fkfield was 'equal_goldsermons__sermondescr__collections'
+            #             changed into 'equalgold_sermons__sermondescr_col__collection'
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
             {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
@@ -12550,7 +12706,7 @@ class BasketUpdate(BasicPart):
 
         # Note: only operations in either of these two lists will be executed
         lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd", "rsetcreate"]
+        lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
 
         # Get our profile
         profile = Profile.get_user_profile(self.request.user.username)
@@ -12676,6 +12832,16 @@ class BasketUpdate(BasicPart):
                     name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
                     rset.name = name
                     rset.save()
+                elif operation == "dctlaunch":
+                    # Save the current basket as a research-set that needs to receive a name
+                    rset = ResearchSet.objects.create(
+                        name="tijdelijk",
+                        notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
+                        profile=profile)
+                    # Assign it a name based on its ID number and the owner
+                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                    rset.name = name
+                    rset.save()
                 elif oFields['collone']:
                     coll = oFields['collone']
 
@@ -12693,9 +12859,13 @@ class BasketUpdate(BasicPart):
                                                        setlisttype="manu",
                                                        manuscript=item.manu)
 
-                    # Make sure to redirect to this instance -- but only for RSETCREATE
+                    # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
                     if operation == "rsetcreate":
                         self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                    elif operation == "dctlaunch":
+                        # Get the default DCT for this ad-hoc ResearchSet
+                        dct = rset.researchset_setdefs.first()
+                        self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
                 elif coll == None:
                     # TODO: provide some kind of error??
                     pass

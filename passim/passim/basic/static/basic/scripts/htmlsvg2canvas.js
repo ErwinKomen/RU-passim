@@ -9,9 +9,9 @@
 	else if(typeof define === 'function' && define.amd)
 		define([], factory);
 	else if(typeof exports === 'object')
-		exports["html2canvas"] = factory();
+		exports["htmlsvg2canvas"] = factory();
 	else
-		root["html2canvas"] = factory();
+		root["htmlsvg2canvas"] = factory();
 })(this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -861,7 +861,7 @@ var getImage = function getImage(node, resourceLoader) {
             var canvas = node;
             return resourceLoader.loadCanvas(canvas);
         case 'IFRAME':
-            var iframeKey = node.getAttribute('data-html2canvas-internal-iframe-key');
+            var iframeKey = node.getAttribute('data-htmlsvg2canvas-internal-iframe-key');
             if (iframeKey) {
                 return iframeKey;
             }
@@ -2105,7 +2105,7 @@ var inlineListItemElement = exports.inlineListItemElement = function inlineListI
     }
 
     var style = node.ownerDocument.defaultView.getComputedStyle(node, null);
-    var wrapper = node.ownerDocument.createElement('html2canvaswrapper');
+    var wrapper = node.ownerDocument.createElement('htmlsvg2canvaswrapper');
     (0, _Util.copyCSSStyles)(style, wrapper);
 
     wrapper.style.position = 'absolute';
@@ -2671,7 +2671,7 @@ var Logger = function () {
                     args[_key] = arguments[_key];
                 }
 
-                Function.prototype.bind.call(window.console.log, window.console).apply(window.console, [Date.now() - this.start + 'ms', this.id ? 'html2canvas (' + this.id + '):' : 'html2canvas:'].concat([].slice.call(args, 0)));
+                Function.prototype.bind.call(window.console.log, window.console).apply(window.console, [Date.now() - this.start + 'ms', this.id ? 'htmlsvg2canvas (' + this.id + '):' : 'htmlsvg2canvas:'].concat([].slice.call(args, 0)));
             }
         }
 
@@ -2685,7 +2685,7 @@ var Logger = function () {
                     args[_key2] = arguments[_key2];
                 }
 
-                Function.prototype.bind.call(window.console.error, window.console).apply(window.console, [Date.now() - this.start + 'ms', this.id ? 'html2canvas (' + this.id + '):' : 'html2canvas:'].concat([].slice.call(args, 0)));
+                Function.prototype.bind.call(window.console.error, window.console).apply(window.console, [Date.now() - this.start + 'ms', this.id ? 'htmlsvg2canvas (' + this.id + '):' : 'htmlsvg2canvas:'].concat([].slice.call(args, 0)));
             }
         }
     }]);
@@ -2922,7 +2922,7 @@ var reformatInputBounds = exports.reformatInputBounds = function reformatInputBo
 var inlineFormElement = function inlineFormElement(value, node, container, allowLinebreak) {
     var body = node.ownerDocument.body;
     if (value.length > 0 && body) {
-        var wrapper = node.ownerDocument.createElement('html2canvaswrapper');
+        var wrapper = node.ownerDocument.createElement('htmlsvg2canvaswrapper');
         (0, _Util.copyCSSStyles)(node.ownerDocument.defaultView.getComputedStyle(node, null), wrapper);
         wrapper.style.position = 'absolute';
         wrapper.style.left = container.bounds.left + 'px';
@@ -3007,7 +3007,7 @@ var parseTextBounds = exports.parseTextBounds = function parseTextBounds(value, 
 };
 
 var getWrapperBounds = function getWrapperBounds(node, scrollX, scrollY) {
-    var wrapper = node.ownerDocument.createElement('html2canvaswrapper');
+    var wrapper = node.ownerDocument.createElement('htmlsvg2canvaswrapper');
     wrapper.appendChild(node.cloneNode(true));
     var parentNode = node.parentNode;
     if (parentNode) {
@@ -3349,13 +3349,13 @@ var _Window = __webpack_require__(28);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var html2canvas = function html2canvas(element, conf) {
+var htmlsvg2canvas = function htmlsvg2canvas(element, conf) {
     var config = conf || {};
     var logger = new _Logger2.default(typeof config.logging === 'boolean' ? config.logging : true);
-    logger.log('html2canvas ' + "1.0.0-alpha.11");
+    logger.log('htmlsvg2canvas ' + "1.0.0-alpha.11");
 
     if (true && typeof config.onrendered === 'function') {
-        logger.error('onrendered option is deprecated, html2canvas returns a Promise with the canvas as the value');
+        logger.error('onrendered option is deprecated, htmlsvg2canvas returns a Promise with the canvas as the value');
     }
 
     var ownerDocument = element.ownerDocument;
@@ -3393,9 +3393,9 @@ var html2canvas = function html2canvas(element, conf) {
     return result;
 };
 
-html2canvas.CanvasRenderer = _CanvasRenderer2.default;
+htmlsvg2canvas.CanvasRenderer = _CanvasRenderer2.default;
 
-module.exports = html2canvas;
+module.exports = htmlsvg2canvas;
 
 /***/ }),
 /* 28 */
@@ -6112,7 +6112,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var IGNORE_ATTRIBUTE = 'data-html2canvas-ignore';
+var IGNORE_ATTRIBUTE = 'data-htmlsvg2canvas-ignore';
 
 var DocumentCloner = exports.DocumentCloner = function () {
     function DocumentCloner(element, options, logger, copyInline, renderer) {
@@ -6244,7 +6244,7 @@ var DocumentCloner = exports.DocumentCloner = function () {
             if (node instanceof HTMLIFrameElement) {
                 var tempIframe = node.cloneNode(false);
                 var iframeKey = generateIframeKey();
-                tempIframe.setAttribute('data-html2canvas-internal-iframe-key', iframeKey);
+                tempIframe.setAttribute('data-htmlsvg2canvas-internal-iframe-key', iframeKey);
 
                 var _parseBounds = (0, _Bounds.parseBounds)(node, 0, 0),
                     width = _parseBounds.width,
@@ -6459,7 +6459,7 @@ var inlinePseudoElement = function inlinePseudoElement(node, clone, style, conte
         return;
     }
 
-    var anonymousReplacedElement = clone.ownerDocument.createElement('html2canvaspseudoelement');
+    var anonymousReplacedElement = clone.ownerDocument.createElement('htmlsvg2canvaspseudoelement');
     (0, _Util.copyCSSStyles)(style, anonymousReplacedElement);
 
     if (contentItems) {
@@ -6494,8 +6494,8 @@ var inlinePseudoElement = function inlinePseudoElement(node, clone, style, conte
 var URL_REGEXP = /^url\((.+)\)$/i;
 var PSEUDO_BEFORE = ':before';
 var PSEUDO_AFTER = ':after';
-var PSEUDO_HIDE_ELEMENT_CLASS_BEFORE = '___html2canvas___pseudoelement_before';
-var PSEUDO_HIDE_ELEMENT_CLASS_AFTER = '___html2canvas___pseudoelement_after';
+var PSEUDO_HIDE_ELEMENT_CLASS_BEFORE = '___htmlsvg2canvas___pseudoelement_before';
+var PSEUDO_HIDE_ELEMENT_CLASS_AFTER = '___htmlsvg2canvas___pseudoelement_after';
 
 var PSEUDO_HIDE_ELEMENT_STYLE = '{\n    content: "" !important;\n    display: none !important;\n}';
 
@@ -6557,7 +6557,7 @@ var getIframeDocumentElement = function getIframeDocumentElement(node, options) 
 var createIframeContainer = function createIframeContainer(ownerDocument, bounds) {
     var cloneIframeContainer = ownerDocument.createElement('iframe');
 
-    cloneIframeContainer.className = 'html2canvas-container';
+    cloneIframeContainer.className = 'htmlsvg2canvas-container';
     cloneIframeContainer.style.visibility = 'hidden';
     cloneIframeContainer.style.position = 'fixed';
     cloneIframeContainer.style.left = '-10000px';

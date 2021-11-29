@@ -5,7 +5,10 @@
 <ul class="dropdown-menu" role="menu" style="position: relative;">
   <li><a onclick="document.getElementById('create_new_coll_m').submit();">Manuscript</a></li>
   <li><a onclick="document.getElementById('create_new_coll_s').submit();">Sermon</a></li>
-  <li><a onclick="document.getElementById('create_new_coll_sg').submit();">Sermon Gold</a></li>
+  {% if prefix != "priv" %}
+    <!-- Note: no SG private dataset-->
+    <li><a onclick="document.getElementById('create_new_coll_sg').submit();">Sermon Gold</a></li>
+  {% endif %}
   <li><a onclick="document.getElementById('create_new_coll_ssg').submit();">Super Sermon Gold</a></li>
 </ul>
 
@@ -23,12 +26,14 @@
   </form>
 </div>
 
-<div class="hidden" >
-  <form action="{% url 'collpriv_details' %}" method="post" id="create_new_coll_sg">
-    {% csrf_token %}
-    <input id="id_datasettype" name="datasettype" value="gold" />
-  </form>
-</div>
+{% if prefix != "priv" %}
+  <div class="hidden" >
+    <form action="{% url 'collpriv_details' %}" method="post" id="create_new_coll_sg">
+      {% csrf_token %}
+      <input id="id_datasettype" name="datasettype" value="gold" />
+    </form>
+  </div>
+{% endif %}
 
 <div class="hidden" >
   <form action="{% url 'collpriv_details' %}" method="post" id="create_new_coll_ssg">

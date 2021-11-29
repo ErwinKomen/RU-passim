@@ -66,7 +66,7 @@ else:
 # FORCE_SCRIPT_NAME = admin.site.site_url
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None
-
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
    
 
 # Quick-start development settings - unsuitable for production

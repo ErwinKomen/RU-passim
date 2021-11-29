@@ -17,7 +17,9 @@ from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
+from io import StringIO
 import json
+import csv
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -186,31 +188,6 @@ def dct_manulist(lst_manu, bDebug=False):
         msg = oErr.get_error_message()
         oErr.DoError("dct_manulist")
     return lBack
-
-def test_dct(request):
-
-    oErr = ErrHandle()
-    # Specify the template
-    template_name = 'dct/dct.html'
-    context = {'title': 'DCT','pfx': APP_PREFIX }
-    try:
-        assert isinstance(request, HttpRequest)
-
-        context['year'] = get_current_datetime().year
-        context['site_url'] = admin.site.site_url
-
-        manu_ids = [1909, 1912, 1813, 1796]
-        manus = Manuscript.objects.filter(id__in=manu_ids)
-        lBack = dct_manulist(manus, True)
-        context['setlist'] = lBack
-
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("test_dct")
-
-    sHtml = render_to_string(template_name, context, request)
-    response = HttpResponse(sHtml)
-    return response
 
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
@@ -622,7 +599,8 @@ class ResearchSetDetails(ResearchSetEdit):
 
                 if bMayEdit:
                     # Actions that can be performed on this item
-                    add_one_item(rel_item, self.get_actions())
+                    # Was (see issue #393): add_one_item(rel_item, self.get_actions())
+                    add_one_item(rel_item, self.get_field_value("setlist", obj, "buttons"), False)
 
                 # Add this line to the list
                 rel_list.append(dict(id=obj.id, cols=rel_item))
@@ -758,6 +736,10 @@ class ResearchSetDetails(ResearchSetEdit):
             elif custom == "name":
                 url = reverse("setdef_details", kwargs={'pk': instance.id})
                 sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
+        elif type == "setlist":
+            if custom == "buttons":
+                # Create the remove button
+                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
 
         return sBack
 
@@ -873,11 +855,14 @@ class SetDefEdit(BasicDetails):
         rset = instance.researchset
         if rset  != None:
             topleftlist = []
-            buttonspecs = {'label': "M", 
-                    'title': "Back to my research set {}".format(rset.name), 
-                    'url': reverse('researchset_details', kwargs={'pk': rset.id})}
+            rset_url = reverse('researchset_details', kwargs={'pk': rset.id})
+            buttonspecs = {'label': "<span class='glyphicon glyphicon-wrench'></span>", 
+                    'title': "Back to my research set: '{}'".format(rset.name), 
+                    'url': rset_url}
             topleftlist.append(buttonspecs)
             context['topleftbuttons'] = topleftlist
+            # ALso make the rset url availabl
+            context['rset_url'] = rset_url
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
@@ -916,6 +901,109 @@ class SetDefDetails(SetDefEdit):
     rtype = "html"
     listviewtitle = "All my DCTs"
 
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Check if we get any addtype and addid values
+            addtype = self.qd.get("addtype", None)
+            addid = self.qd.get("addid", None)
+            if addtype != None and addid != None:
+                # We have something to add
+                researchset = instance.researchset
+                order = researchset.researchset_setlists.count() + 1
+                setlisttype = ""
+                setlist = None
+                # Note: are we creating or adding an existing one?
+                mode = ""
+                if addtype == "manu":
+                    # Add a manuscript
+                    setlisttype = "manu"
+                    # Check existence
+                    obj = SetList.objects.filter(
+                        researchset=researchset, setlisttype=setlisttype, manuscript_id=addid).first()
+                    if obj == None:
+                        # Create this setlist
+                        setlist = SetList.objects.create(
+                            researchset=researchset, order = order,
+                            setlisttype=setlisttype, manuscript_id=addid)
+                        mode = "create"
+                    else:
+                        # Pick up its correct order
+                        order = obj.order
+                        # Adapt mode
+                        mode = "exists"
+                elif addtype == "coll":
+                    # Add a collection
+                    setlisttype = "hist"
+                    # Check existence
+                    obj = SetList.objects.filter(
+                        researchset=researchset, setlisttype=setlisttype, collection_id=addid).first()
+                    if obj == None:
+                        # Create this setlist
+                        setlist = SetList.objects.create(
+                            researchset=researchset, order = order,
+                            setlisttype=setlisttype, collection_id=addid)
+                        mode = "create"
+                    else:
+                        # Pick up its correct order
+                        order = obj.order
+                        # Adapt mode
+                        mode = "exists"
+                elif addtype == "ssgd":
+                    # Add a collection
+                    setlisttype = "ssgd"
+                    pass
+
+                if mode == "create":
+                    # Make sur ssglists are re-calculated for this researchset
+                    researchset.update_ssglists(True)
+                    # Walk all SetDefs in this research set
+                    with transaction.atomic():
+                        for sdef in researchset.researchset_setdefs.all():
+                            bNeedSaving = False
+                            # Is this the setdef I am in?
+                            if sdef.id == instance.id:
+                                # Yes, this is my setdef: add it to the include list
+                                contents = json.loads(sdef.contents)
+                                lst_order = contents.get("lst_order", None)
+                                if lst_order != None and not order in lst_order:
+                                    lst_order.append(order)
+                                    sdef.contents = json.dumps(contents)
+                                    bNeedSaving = True
+                            else:
+                                # No, this is not my setdef: switch it off here
+                                contents = json.loads(sdef.contents)
+                                lst_exclude = contents.get("lst_exclude", [])
+                                if not order in lst_exclude:
+                                    lst_exclude.append(order)
+                                    contents['lst_exclude'] = lst_exclude
+                                    sdef.contents = json.dumps(contents)
+                                    bNeedSaving = True
+                            # IN all cases: save results
+                            if bNeedSaving: sdef.save()
+                elif mode == "exists":
+                    # This particular list already exists.
+                    # It needs to be switched 'on' in the current Sdef
+                    contents = json.loads(instance.contents)
+                    # If needed, add in lst_order
+                    lst_order = contents.get("lst_order", None)
+                    if lst_order != None and not order in lst_order:
+                        lst_order.append(order)
+                        contents['lst_order'] = lst_order
+                    # If needed, take it out of exclude
+                    lst_exclude = contents.get("lst_exclude", None)
+                    if lst_exclude != None and order in lst_exclude:
+                        lst_exclude.pop(lst_exclude.index(order))
+                        contents['lst_exclude'] = lst_exclude
+                    # Adapt changes
+                    instance.contents = json.dumps(contents)
+                    instance.save()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefDetails/custom_init")
+        return None
+
     def add_to_context(self, context, instance):
         # Perform the standard initializations:
         context = super(SetDefDetails, self).add_to_context(context, instance)
@@ -940,6 +1028,7 @@ class SetDefDetails(SetDefEdit):
             context['setlist'] = [ 1, 2, 3]
 
             context['dctdata_url'] = reverse('setdef_data', kwargs={'pk': instance.id})
+            context['dctdetails_url'] = reverse('setdef_details', kwargs={'pk': instance.id})
             context['csrf'] = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
                 get_token(self.request))
             context['mayedit'] = bMayEdit
@@ -949,6 +1038,11 @@ class SetDefDetails(SetDefEdit):
 
             # Add the visualisation we made
             context['add_to_details'] = dct_view
+
+            # Define navigation buttons
+            self.custombuttons = [
+                {"name": "dct_tools", "title": "Back to DCT tool page", "icon": "wrench", "template_name": "seeker/scount_histogram.html" }
+                ]
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SetDefDetails/add_to_context")
@@ -1010,3 +1104,99 @@ class SetDefData(BasicPart):
         # FIll in the [data] part of the context with all necessary information
         context['data'] = data
         return context
+
+
+class SetDefDownload(BasicPart):
+    """Downloading for DCTs"""
+
+    MainModel = SetDef
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = ""
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        oErr = ErrHandle()
+
+        try:
+
+            if dtype == "json":
+                # Retrieve the actual data from self.data
+                sData = self.qd.get('downloaddata', "[]")
+                # Load it as object (from JSON)
+                oData = json.loads(sData)
+                # Save it as string, but with indentation for easy reading
+                sData = json.dumps(oData, indent=2)
+            elif dtype == "dct-svg":
+                # Note: this does not occur - no SVG is used
+                pass
+            elif dtype == "dct-png":
+                # Note: the Javascript routine provides the needed information
+                pass
+            elif dtype == "csv" or dtype == "xlsx":
+                # Retrieve the actual data from self.data
+                sData = self.qd.get('downloaddata', "[]")
+                # Load it as object (from JSON)
+                lst_rows = json.loads(sData)
+
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+
+                # Headers: the column names are largely determined by the first row in the JSON information
+                row = lst_rows[0]
+                header_fields = ['top', 'middle', 'main', 'size']
+                for field in header_fields:
+                    headers = []
+                    # First column processing
+                    if field == "top": 
+                        headers.append("Gryson/Clavis")
+                    else:
+                        headers.append("")
+                    # Processing of the remaining columns
+                    for item in row[1:]:
+                        oHeader = item['header']
+                        if field in oHeader:
+                            headers.append(oHeader[field])
+                        else:
+                            headers.append("")
+                    # Output this header row
+                    csvwriter.writerow(headers)
+
+                # Process the remaining rows in the list of input rows
+                for lst_row in lst_rows[1:]:
+                    # Start an output row
+                    row = []
+                    # Walk through the columns
+                    for idx, col in enumerate(lst_row):
+                        if idx == 0:
+                            # THis is the first column: get the siglist
+                            siglist = ", ".join(col['siglist'])
+                            row.append(siglist)
+                        else:
+                            # This is a different column
+                            row.append(col['txt'])
+                    # Output this row
+                    csvwriter.writerow(row)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefDownload/get_data")
+
+        return sData
+

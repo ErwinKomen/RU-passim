@@ -528,6 +528,95 @@ var ru = (function ($, ru) {
 
       },
 
+      svgLoadD3: function (elStart) {
+        var html = null,
+            imgsrc = "",
+            image = null,
+            canvas = null,
+            a = null,
+            context = null;
+
+        try {
+          html = d3.select("svg")
+                .attr("version", 1.1)
+                .attr("xmlns", "http://www.w3.org/2000/svg")
+                .node().parentNode.innerHTML;
+
+          imgsrc = 'data:image/svg+xml;base64,' + btoa(html);
+          var image = new Image;
+
+          image.onload = function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            var context = canvas.getContext('2d');
+            context.fillStyle = "#FFFFFF";
+            context.fillRect(0,0,image.width,image.height);
+            context.drawImage(image, 0, 0);
+
+            var a = document.createElement('a');
+            a.download = "sampleidvgraph.png";
+            a.href = canvas.toDataURL('image/png', 1);
+            document.body.appendChild(a);
+            a.click().attr('target', '_blank');
+          }
+
+          image.src = imgsrc;
+
+        } catch (ex) {
+          private_methods.errMsg("svgLoadD3", ex);
+        }
+      },
+
+      /**
+       * svgLoad - Load an SVG as PNG image
+       *
+       */
+      svgLoad: function (elStart) {
+        var svg = null,
+            svgData = "",
+            canvas = null,
+            svgSize = null,
+            ctx = null,
+            url = "",
+            img = null;
+
+        try {
+          svg = $(elStart)[0].querySelector("svg");
+          svgData = new XMLSerializer().serializeToString(svg);
+          canvas = document.createElement("canvas");
+          svgSize = svg.getBoundingClientRect();
+          canvas.width = svgSize.width * 3;
+          canvas.height = svgSize.height * 3;
+          canvas.style.width = svgSize.width;
+          canvas.style.height = svgSize.height;
+          ctx = canvas.getContext("2d");
+          ctx.scale(3, 3);
+
+          img = document.createElement("img");
+
+          img.onload = function () {
+            var canvasdata = null,
+              pngimg = null,
+              a = null;
+
+            ctx.drawImage(img, 0, 0);
+            canvasdata = canvas.toDataURL("image/png", 1);
+            //pngimg = '<img src="' + canvasdata + '">';
+            //d3.select("#pngdataurl").html(pngimg);
+            a = document.createElement("a");
+            a.download = "download_img" + ".png";
+            a.href = canvasdata;
+            document.body.appendChild(a);
+            a.click();
+          }
+          // Actually load the image
+          img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
+        } catch (ex) {
+          private_methods.errMsg("svgLoad", ex);
+        }
+      },
+
       /**
        * converts an svg string to base64 png using the domUrl
        * @param {string} svgText the svgtext
@@ -548,7 +637,7 @@ var ru = (function ($, ru) {
             // can use the domUrl function from the browser
             var domUrl = window.URL || window.webkitURL || window;
             if (!domUrl) {
-              throw new Error("(browser doesnt support this)")
+              throw new Error("(browser doesn't support this)")
             }
         
             // figure out the height and width from svg text
@@ -618,7 +707,7 @@ var ru = (function ($, ru) {
             img.src = url;
         
           } catch (err) {
-            reject('failed to convert svg to png ' + err);
+            private_methods.errMsg('failed to convert svg to png ', err);
           }
         });
       },
@@ -2189,7 +2278,7 @@ var ru = (function ($, ru) {
         *   Trigger creating and downloading a result CSV / XLSX / JSON
         *
         */
-      post_download: function (elStart) {
+      post_download: function (elStart, options) {
         var ajaxurl = "",
             action = "",
             contentid = null,
@@ -2200,11 +2289,14 @@ var ru = (function ($, ru) {
             canvas = null,
             elData = null,
             sHtml = "",
+            x = 0,
+            y = 0,
             oBack = null,
-            options = {},
+            // options = {},
             dtype = "",
             sMsg = "",
             svgText = "",
+            waitclass = null,
             method = "normal",
             data = [];
 
@@ -2215,6 +2307,10 @@ var ru = (function ($, ru) {
           // obligatory parameter: ajaxurl
           ajaxurl = $(elStart).attr("ajaxurl");
           contentid = $(elStart).attr("contentid");
+
+          if (options !== undefined && "waitclass" in options) {
+            waitclass = "." + options.waitclass;
+          }
 
           // Gather the information
           frm = $(elStart).closest(".container-small").find("form");
@@ -2259,21 +2355,92 @@ var ru = (function ($, ru) {
                 elData = $(frm).find("#downloaddata");
                 // Process download data
                 switch (dtype) {
-                  case "hist-png":  // Download histogram as PNG
-                    // Convert the HTML into a canvas and turn the canvas into a PNG
-                    el = $(contentid).first().get(0);
+                  case "hist-png":  // Download (histogram) as PNG
+                    // Need to show waiting?
+                    if (waitclass !== null) {
+                      // Start waiting
+                      $(frm).find(waitclass).removeClass("hidden");
+                      $(frm).find(".dropdown-menu").addClass("hidden");
+                    }
 
-                    el.scrollIntoView();
-                    html2canvas(el, { scale: scaleFactor, y: window.scrollY  })
-                      .then(function (canvas) {
-                        // Convert to data
-                        var imageData = canvas.toDataURL("image/png");
-                        if (elData.length > 0) {
-                          $(elData).val(imageData);
-                        }
-                        // Now submit the form
-                        oBack = frm.submit();
-                      });
+                    // Check if this is SVG to PNG or strict HTML:
+                    if ($(contentid).find("svg").length > 0) {
+                      // Convert the SVG part
+                      if (true) {
+                        // Convert html to canvas
+                        el = $(contentid).first().get(0);
+
+                        htmlsvg2canvas(el, { scale: scaleFactor })
+                          .then(function (canvas) {
+                            // Convert to data
+                            var imageData = canvas.toDataURL("image/png");
+                            $(frm).find("#downloaddata").val(imageData);
+                            // Now submit the form
+                            oBack = frm.submit();
+                          });
+
+                      } else {
+                        // Convert the HTML into a canvas and turn the canvas into a PNG
+                        el = $(contentid).first().get(0);
+
+                        el.scrollIntoView();
+
+                        html2canvas(el, {
+                          scale: scaleFactor, y: window.scrollY, x: window.scrollX,
+                          logging: true, foreignObjectRendering: true,
+                          removeContainer: true
+                        })
+                          .then(function (canvas) {
+                            // Convert to data
+                            var imageData = canvas.toDataURL("image/png");
+                            if (elData.length > 0) {
+                              $(elData).val(imageData);
+                            }
+
+                            // Need to stop showing waiting?
+                            if (waitclass !== null) {
+                              // Start waiting
+                              $(frm).find(waitclass).addClass("hidden");
+                            }
+
+                            // Now submit the form
+                            oBack = frm.submit();
+
+                          });
+
+                      }
+ 
+
+                    } else {
+                      // Convert the HTML into a canvas and turn the canvas into a PNG
+                      el = $(contentid).first().get(0);
+
+                      el.scrollIntoView();
+
+                      html2canvas(el, {
+                        scale: scaleFactor, y: window.scrollY, x: window.scrollX,
+                        logging: true, foreignObjectRendering: true,
+                        removeContainer: true
+                      })
+                        .then(function (canvas) {
+                          // Convert to data
+                          var imageData = canvas.toDataURL("image/png");
+                          if (elData.length > 0) {
+                            $(elData).val(imageData);
+                          }
+
+                          // Need to stop showing waiting?
+                          if (waitclass !== null) {
+                            // Start waiting
+                            $(frm).find(waitclass).addClass("hidden");
+                          }
+
+                          // Now submit the form
+                          oBack = frm.submit();
+
+                        });
+
+                    }
                     break;
                   case "hist-svg":
                     sHtml = private_methods.prepend_styles(contentid, "svg");
@@ -2285,6 +2452,7 @@ var ru = (function ($, ru) {
                     oBack = frm.submit();
                     break;
                   case "json":
+                  case "xlsx":
                     // Now submit the form
                     oBack = frm.submit();
                     break;

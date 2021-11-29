@@ -9,4 +9,16 @@
 
     </div>
   </form>
+
+  <form>
+    {% csrf_token %}
+    <input type="text" id="downloadtype" name="downloadtype" value="" />
+    <div id="manuscript_download_json"
+         onclick="ru.basic.post_download(this);"
+         ajaxurl="{{ajaxurl}}"
+         downloadtype="json">
+
+    </div>
+  </form>
+
 </div>

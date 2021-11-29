@@ -31,7 +31,10 @@ var ru = (function ($, ru) {
         loc_vscrolling = 0,
         loc_simulation = null,
         loc_network_options = {},
+        loc_network_linktypes = null,
         loc_newSermonNumber = 0,
+        loc_clicked_nodeid = "",
+        loc_manual_colors = [],
         loc_progr = [],         // Progress tracking
         loc_urlStore = "",      // Keep track of URL to be shown
         loc_goldlink_td = null, // Where the goldlink selection should go
@@ -81,6 +84,8 @@ var ru = (function ($, ru) {
           { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
         ];
+
+    const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
 
 
     // Private methods specification
@@ -1577,10 +1582,12 @@ var ru = (function ($, ru) {
             factor,
             width,
             height,
+            watermark,
             gravityvalue = 10,
             gravityid = "#gravityvalue",
             p = {},
             g = null,
+            gwm = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1602,6 +1609,7 @@ var ru = (function ($, ru) {
           width = options['width'];
           height = options['height'];
           factor = options['factor'];
+          watermark = options['watermark'];
 
           // Define the SVG element and the color scheme
           divSvg = "#" + options['target'] + " svg";
@@ -1680,6 +1688,12 @@ var ru = (function ($, ru) {
           // Add popup title to links: this provides the actual weight
           link.append("title")
                   .text(function (d) { return d.value; });
+
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + options['width'] / 2 + "," + (options['height'] - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
 
           // Defind the 'zoomed' function
           function zoomed(event) {
@@ -1782,15 +1796,17 @@ var ru = (function ($, ru) {
        * @returns {Boolean}
        */
       draw_network_overlap: function (options) {
-        var svg,      // the SVG element within the DOM that is being used
-            divSvg,   // The target svg div
-            color,    // D3 color scheme
-            grayrange,  // D3 gray color
-            widthrange, // D3 width range
-            colrange,   // D3 color range (attempt) for node coloring
+        var svg,          // the SVG element within the DOM that is being used
+            divSvg,       // The target svg div
+            color,        // D3 color scheme
+            // grayrange,    // D3 gray color
+            opacityrange, // D3 opacity range
+            widthrange,   // D3 width range
+            colrange,     // D3 color range (attempt) for node coloring
             factor,
             width,
             height,
+            watermark,
             calcW,
             calcH,
             i,
@@ -1799,12 +1815,15 @@ var ru = (function ($, ru) {
             max_value = 1,
             max_group = 1,
             bDoTransform = true,
+            linktypes = ["prt", "neq", "ech", "uns"],
+            sLinktype = "",
             maxcount = 0,
             gravityvalue = 100,
             gravityid = "#gravity_overlap_value",
             degree = 1,
             p = {},
             g = null,
+            gwm = null,
             link,
             node;
         const scale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -1829,11 +1848,16 @@ var ru = (function ($, ru) {
           degree = options['degree'];
           max_value = options['max_value'];
           max_group = options['max_group'];
+          watermark = options['watermark'];
 
           // Create a grayscale color range
-          grayrange = d3.scaleLinear()
+          //grayrange = d3.scaleLinear()
+          //  .domain([1, max_value])
+          //  .range(["#DDD", "#000"]);
+
+          opacityrange = d3.scaleLinear()
             .domain([1, max_value])
-            .range(["#999", "000"]);
+            .range([0.1, 0.9]);
 
           widthrange = d3.scaleLinear()
             .domain([1, max_value])
@@ -1920,27 +1944,69 @@ var ru = (function ($, ru) {
 
           // Define a d3 function based on the information in 'nodes' and 'links'
           link = g.append("g")
-                    .attr("class", "links")
-                    .selectAll("line")
-                    .data(options['links'])
-                    .join("line")
-                    .attr("stroke", function (d) {
-                      return grayrange(d.value);
-                    })
-                    .attr("stroke-width", function (d) {
-                      // return (max_width * d.value / max_value);
-                      return widthrange(d.value);
-                    })
-                    .attr("marker-end", function (d) {
-                      var m = ru.passim.seeker.overlap_marker_end(d);
-                      return m;
-                    });
+                  .attr("class", "links")
+                  .selectAll("line")
+                  .data(options['links'])
+                  .join("line")
+                  .attr("class", function (d) {
+                    var m = "linktype_" + d.linktype;
+                    return m;
+                  })
+                  .attr("stroke", function (d) {
+                    var m = ru.passim.seeker.overlap_stroke(d);
+                    return m;
+                  })
+                  .attr("stroke-opacity", function (d, or) {
+                    var m = "";
+                    if ("overlap_linktypes" in loc_network_options &&
+                      loc_network_options["overlap_linktypes"] === true &&
+                      loc_network_linktypes !== null &&
+                      loc_network_linktypes.indexOf(d.linktype) < 0) {
+                      // Hide it by using a low opacity
+                      m = "0.02";
+                    } else {
+                      // Calculate the opacity
+                      m = ru.passim.seeker.overlap_stroke_opacity(d, opacityrange);
+                    }
+                    return m;
+                  })
+                  .attr("stroke-opacity-copy", function (d, or) {
+                    var m = ru.passim.seeker.overlap_stroke_opacity(d, opacityrange);
+                    return m;
+                  })
+                  .attr("stroke-width", function (d) {
+                    // return (max_width * d.value / max_value);
+                    return widthrange(d.value);
+                  })
+                  .attr("marker-end", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  })
+                  .attr("marker-end-copy", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  })
+                  //.on("mousover", function (d) {
+                  //  return 5;
+                  //})
+                  //.on("mouseout", function (d) {
+                  //  // return (max_width * d.value / max_value);
+                  //  return widthrange(d.value);
+                  //})
+          ;
           node = g.append("g")
-                    .attr("class", "nodes")
-                    .selectAll("g")
-                    .data(options['nodes'])
-                    .join("g")
-                    .call(network_drag(loc_simulation));
+                  .attr("class", "nodes")
+                  .selectAll("g")
+                  .data(options['nodes'])
+                  .join("g")
+                  .attr("hcs", function (d) {
+                    return d.hcs;
+                  })
+                  .attr("nodeid", function (d) { return d.id;})
+                  .attr("data-toggle", "modal")
+                  .attr("data-target", "#modal-nodecolor")
+                  .attr("class", "overlap-node")
+                  .call(network_drag(loc_simulation));
 
           // Add the circle below the <g>
           node.append("circle")
@@ -1967,15 +2033,58 @@ var ru = (function ($, ru) {
 
           // Add popup title to nodes;
           node.append("title")
-            .text(function (d) { return d.passim + " (id=" + d.id + " S=" + d.scount + ")"; });
+            .text(function (d) {
+              return "Authority File(s): " + d.passim + "\n Linked manifestations: " + d.scount + " (id=" + d.id + ")";
+            });
           // Add popup title to links: this provides the actual weight
           link.append("title")
-            .text(function (d) { return d.value; });
+            .text(function (d) {
+              var sTitle = "";
+              // Construct what is shown: link type, spec type, notes
+              if (d.link !== undefined && d.link !== null && d.link !== "") {
+                sTitle = "Link type: " + d.link;
+              }
+              if (d.spec !== undefined && d.spec !== null && d.spec !== "") {
+                sTitle = sTitle + "\nSpecification: " + d.spec;
+              }
+              if (d.note !== undefined && d.note !== null && d.note !== "") {
+                sTitle = sTitle + "\n\nnote: " + d.note;
+              }
+              return sTitle
+            });
+
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
+
+          // Link a handler to select the right color
+          $(".overlap-node").on("click", function (event) {
+            var el = $(this),
+                color = "";
+            // Get the color
+            color = $(el).find("circle").first().attr("fill");
+            // Set the color
+            $("#nodecolor").val(rgb2hex(color));
+            // Remember this node
+            loc_clicked_nodeid = $(el).attr("nodeid");
+          });
 
           // ====================== HELP FUNCTIONS =============================
           function get_radius(d) {
-            var scount = d.scount;
-            var iSize = Math.max(5, scount / 4);
+            var scount = 0,
+                iSize = 4;
+            if (d !== undefined) {
+              scount = d.scount;
+            }
+            if ("overlap_scount" in loc_network_options && loc_network_options["overlap_scount"] === true) {
+              // Need to pay more attention to the scount
+              iSize = Math.max(4, scount+1);
+            } else {
+              // This is usually [5]
+              iSize = Math.max(5, scount / 4);
+            }
             return iSize;
           }
 
@@ -2004,7 +2113,8 @@ var ru = (function ($, ru) {
             });
 
             link.style("stroke", function (d) {
-              return grayrange(d.value);
+              var m = ru.passim.seeker.overlap_stroke(d);
+              return m;
             });
 
             // Make sure that the circle retain their size by dividing by the scale factor
@@ -2279,6 +2389,7 @@ var ru = (function ($, ru) {
             size = 10,  //Size of each author selection square
             width,
             height,
+            watermark = "",
             i,
             count,
             maxcount = 0,
@@ -2287,6 +2398,7 @@ var ru = (function ($, ru) {
             gravityid = "#gravity_trans_value",
             p = {},
             g = null,
+            gwm = null,
             author,
             link,
             node;
@@ -2309,6 +2421,7 @@ var ru = (function ($, ru) {
           width = options['width'];
           height = options['height'];
           factor = options['factor'];
+          watermark = options['watermark'];
 
           // Calculate the maxcount
           for (i = 0; i < options['nodes'].length; i++) {
@@ -2453,6 +2566,12 @@ var ru = (function ($, ru) {
                 .attr("text-anchor", "left")
                 .style("alignment-baseline", "middle");
 
+          // Now add the watermark
+          gwm = svg.append("g");
+          gwm.attr("class", "watermark-main")
+             .attr("transform", "translate(" + width / 2 + "," + (height - 33) + ") scale(2.0)");
+          $(".watermark-main").html(watermark);
+
           // ====================== HELP FUNCTIONS =============================
           // Defind the 'zoomed' function
           function zoomed(event) {
@@ -2587,6 +2706,49 @@ var ru = (function ($, ru) {
         var elWait = $(".main-wait").first();
         if (elWait !== undefined && elWait !== null) {
           $(elWait).addClass("hidden");
+        }
+      },
+
+      /*
+       * sticky_switch - switch visualization
+       */
+      sticky_switch: function (elStart) {
+        var sStatus = "",
+            divNetwork = "";
+
+        try {
+          // Figure out what course of action to take
+          if ($(elStart).hasClass("sticky-visualization")) {
+            // Need to do switching on/off
+            if ($(elStart).hasClass("jumbo-1")) {
+              // Close all visualizations
+              $(".sticky-visualization").each(function (idx, el) {
+
+                // Switch off everything
+                $(el).addClass("jumbo-1");
+                $(el).removeClass("jumbo-2");
+                // Close the network area
+                $($(el).attr("data-target")).addClass("hidden");
+              });
+              // Show that the button has been clicked
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-2");
+              sStatus = "continue";
+            } else {
+              // We are switching OFF
+              $(elStart).addClass("jumbo-1");
+              $(elStart).removeClass("jumbo-2");
+              // Now CLOSE this visualization
+              divNetwork = $(elStart).attr("data-target");
+              $(divNetwork).addClass("hidden");
+              // And leave
+              sStatus = "leave";
+            }
+          }
+          // REturn the status
+          return sStatus;
+        } catch (ex) {
+          private_methods.errMsg("sticky_switch", ex);
         }
       },
 
@@ -6045,6 +6207,7 @@ var ru = (function ($, ru) {
             options = {},
             link_list = null,
             node_list = null,
+            watermark = "",
             lock_status = "",
             iWidth = 800,
             iHeight = 500,
@@ -6054,6 +6217,10 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_graph";
 
         try {
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");
@@ -6076,6 +6243,7 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['watermark'] = response.watermark;
                   if ("networkslider" in response) {
                     $("#networkslidervalue").html(response.networkslider);
                   }
@@ -6117,14 +6285,106 @@ var ru = (function ($, ru) {
        *
        */
       network_overlap_option: function (elStart, type) {
-        var status = elStart.checked;
+        var status = elStart.checked,
+            bShow = false,
+            idx = -1,
+            linktype = "";
 
         try {
+          //loc_network_linktypes = null;
+          // Action depends on [type]
+          switch (type) {
+            case "overlap_linktypes":
+              // Hide or show the link types
+              if ($(".linktypes").hasClass("hidden")) {
+                // Show them
+                $(".linktypes").removeClass("hidden");
+                // Make sure to store this status
+                loc_network_options[type] = true;
+                // Push all the linktypes
+                loc_network_linktypes = [];
+                loc_network_linktypes.push("neq");
+                loc_network_linktypes.push("prt");
+                loc_network_linktypes.push("ech");
+                loc_network_linktypes.push("uns");
+              } else {
+                // Hide and reset them
+                $(".linktypes input").prop("checked", true);
+                $(".linktypes").addClass("hidden");
+                // And make sure all linktypes are shown again
+                $("svg line").removeClass("hidden");
+                // Make sure to store this status
+                loc_network_options[type] = false;
+                // Set the list to null again
+                loc_network_linktypes = null;
+              }
+              // No need to continue
+              return;
+            case "overlap_linktype_change":
+              ru.passim.seeker.network_overlap_linktype_changed(elStart);
+              // No need to continue
+              return;
+            case "overlap_histcoll":
+              // Hide or show the historical collection buttons
+              if ($(".histcolls").hasClass("hidden")) {
+                // Show the historical collection buttons
+                $(".histcolls").removeClass("hidden");
+              } else {
+                // Unset the buttons
+                $(".histcolls .badge.signature.gr").each(function (idx, el) {
+                  $(el).removeClass("gr");
+                  $(el).addClass("ot");
+                });
+                // Re-set what needs to be shown
+                $(".overlap-node").each(function (idx, el) {
+                  $(el).attr("class", "overlap-node");
+                });
+                // Hide the historical collection buttons
+                $(".histcolls").addClass("hidden");
+              }
+              // No need to continue
+              return;
+          }
           loc_network_options[type] = status;
           // Redraw
           ru.passim.seeker.network_overlap(elStart);
+ 
         } catch (ex) {
           private_methods.errMsg("network_overlap_option", ex);
+        }
+      },
+
+      /**
+       * network_overlap_linktype_changed
+       *   Hide or show a particular linktype
+       *
+       */
+      network_overlap_linktype_changed: function (elStart) {
+        var linktype, bShow, idx;
+        try {
+          linktype = $(elStart).val();
+          bShow = $(elStart)[0].checked;
+          if (bShow) {
+            $("svg line." + linktype).each(function (idx, el) {
+              var opacity = $(el).attr("stroke-opacity-copy"),
+                  marker_end = $(el).attr("marker-end-copy");
+              $(el).attr("stroke-opacity", opacity);
+              $(el).attr("marker-end", marker_end);
+            });
+            loc_network_linktypes.push(linktype.replace("linktype_", ""));
+          } else {
+            $("svg line." + linktype)
+              .attr("stroke-opacity", "0.02")
+              .attr("marker-end", "");
+            // Remove it from the list
+            idx = loc_network_linktypes.indexOf(linktype.replace("linktype_", ""));
+            if (idx >= 0) {
+              loc_network_linktypes.splice(idx, 1);
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_linktype_changed", ex);
         }
       },
 
@@ -6134,14 +6394,150 @@ var ru = (function ($, ru) {
        *
        */
       overlap_marker_end: function (d) {
+        var sArrow = "url(#arrow_uses)",
+            sResponse = "";
+
         try {
           if (loc_network_options['overlap_direction'] === true) {
-            return "url(#arrow_uses)";
+            // Check what kind of value is returned
+            switch (d.spectype) {
+              case "usd":
+              case "usi":
+                sResponse = "";
+                break;
+              case "udd":
+              case "udi":
+                sResponse = sArrow;
+                break;
+              default:
+                sResponse = "";
+                break;
+            }
+            return sResponse;
           } else {
             return "";
           }
         } catch (ex) {
           private_methods.errMsg("overlap_marker_end", ex);
+        }
+      },
+
+      /**
+       * overlap_stroke
+       *   Helper function for network overlap
+       *
+       */
+      overlap_stroke: function (d) {
+        var m = "#222";  // Default blackish
+        try {
+          if ('overlap_alternatives' in loc_network_options &&
+            loc_network_options['overlap_alternatives'] === true && 
+            d.alternatives === "true") {
+            m = "#00F";
+          }
+          return m;
+        } catch (ex) {
+          private_methods.errMsg("overlap_stroke", ex);
+        }
+      },
+
+      /**
+       * overlap_stroke_opacity
+       *   Helper function for network overlap
+       *
+       */
+      overlap_stroke_opacity: function (d, or) {
+        var m = "0.2";  // Default black
+        try {
+          if ('overlap_direction' in loc_network_options && loc_network_options['overlap_direction'] === true) {
+            // Check what kind of value is returned
+            switch (d.spectype) {
+              case "usi":
+              case "udi":
+                m = "0.8";
+                break;
+            }
+          } else {
+            m = or(d.value).toString();
+          }
+          return m;
+        } catch (ex) {
+          private_methods.errMsg("overlap_stroke_opacity", ex);
+        }
+      },
+
+      /**
+       * network_overlap_setcolor
+       *   Apply the color that has just been selected to the clicked node
+       *
+       */
+      network_overlap_setcolor: function (elStart) {
+        var color = "",
+            elNode = null;
+
+        try {
+          // Get the selected color
+          color = $(elStart).closest(".modal-dialog").find("input[type=color]").first().val();
+          // Apply it to the currently selected node
+          elNode = $("g[nodeid=" + loc_clicked_nodeid + "]").find("circle").first().attr("fill", color);
+          // Somehow remember this list of manually defined colors
+          loc_manual_colors.push({nodeid: loc_clicked_nodeid, color: color});
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_setcolor", ex);
+        }
+      },
+
+      /**
+       * network_overlap_hist
+       *   Color particular historical collections
+       *
+       */
+      network_overlap_hist: function (elStart) {
+        var dataid = 0,
+            lst_data = [];
+
+        try {
+          if (elStart !== undefined) {
+            // Perform switching on/off 
+            if ($(elStart).hasClass("ot")) {
+              // Switch 'on': transition from [gr] to [ot]
+              $(elStart).removeClass("ot");
+              $(elStart).addClass("gr");
+            } else {
+              // Switch 'off': transition from [ot] to [gr]
+              $(elStart).removeClass("gr");
+              $(elStart).addClass("ot");
+            }
+          }
+
+          // Get the list of those that are switched on
+          $(".histcolls span.gr").each(function (idx, el) {
+            lst_data.push($(el).attr("data-id"));
+          });
+
+          // Re-visit what needs to be shown
+          $(".overlap-node").each(function (idx, el) {
+            var i = 0,
+                count = 0,
+                lst_ids = $(el).attr("hcs").split(",");
+            // Check how many are matching
+            for (i = 0; i < lst_ids.length; i++) {
+              if (lst_data.indexOf(lst_ids[i]) >= 0) {
+                count += 1;
+              }
+            }
+            // Highlighting depends on the number of matches
+            if (count === 0) {
+              $(el).attr("class", "overlap-node");
+            } else if (count === 1) {
+              $(el).attr("class", "overlap-node node-highlight");
+            } else if (count > 1) {
+              $(el).attr("class", "overlap-node node-highlight-multi");
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("network_overlap_hist", ex);
         }
       },
 
@@ -6167,6 +6563,11 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_overlap";
 
         try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");
@@ -6189,6 +6590,8 @@ var ru = (function ($, ru) {
                   // Then retrieve the data here: two lists
                   options['nodes'] = response.node_list;
                   options['links'] = response.link_list;
+                  options['watermark'] = response.watermark;
+                  options['hcset'] = response.hist_set;
                   options['degree'] = 1;
                   if ("networkslider" in response) {
                     $("#network_overlap_slider_value").html(response.networkslider);
@@ -6198,6 +6601,11 @@ var ru = (function ($, ru) {
                   iWidth = $("#" + divTarget).width();
                   // iHeight = iWidth / fFactor - 100;
                   iHeight = $("#" + divTarget).height();
+
+                  // Process the hist coll buttons
+                  if (response.hist_buttons !== undefined) {
+                    $(".histcolls").first().html(response.hist_buttons);
+                  }
 
                   // Other data
                   max_value = response.max_value;
@@ -6263,6 +6671,11 @@ var ru = (function ($, ru) {
             divNetwork = "#ssg_network_trans";
 
         try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
           // Show what we can about the network
           $(divNetwork).removeClass("hidden");
           $(divWait).removeClass("hidden");
@@ -6302,6 +6715,7 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['watermark'] = response.watermark;
 
                   loc_network_options = options;
 
@@ -6377,6 +6791,7 @@ var ru = (function ($, ru) {
                   options['height'] = iHeight;
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
+                  options['watermark'] = response.watermark;
 
                   loc_network_options = options;
 
