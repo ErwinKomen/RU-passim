@@ -18,18 +18,20 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, CodicoKeyword, ProvenanceCod, \
+    Codico, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
+    CollectionProject, EqualGoldProject, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
-                        'feastupdate', 'codicocopy'],
-    'sermon_list': ['nicknames', 'biblerefs'],
+                        'feastupdate', 'codicocopy', 'passim_project_name_manu'],
+    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code'],
-    'provenance_list': ['manuprov_m2m']
+                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal'],
+    'provenance_list': ['manuprov_m2m'],
+    "collhist_list": ['passim_project_name_hc'] 
     }
 
 
@@ -663,3 +665,147 @@ def adapt_manuprov_m2m():
         msg = oErr.get_error_message()
     return bResult, msg
 
+
+def adapt_passim_project_name_sermo():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+   # name = "Passim"
+    # Issue 412: give all items in the current database the Project name "Passim"
+    # aanpassen, moet via MsItems
+         
+    try:
+        # Iterate over all Manuscripts in the database:  
+        for manu in Manuscript.objects.all():            
+            # Create empty list of projects for each manuscript 
+            project_list = []
+            # Find all project names linked to this manuscript
+            for mp in ManuscriptProject.objects.filter(manuscript = manu):
+                # Add the projects to the list
+                project_list.append(mp.project) 
+       
+            # Now iterate over the sermons that are part of the manuscript                    
+            for sermon in SermonDescr.objects.filter(msitem__manu = manu):              
+                # And iterate over the project list taken from the manuscript
+                for project in project_list:
+                    #print(project.name)
+                    # Get the name of the project
+                    name_project = project.name
+                    # Find out of the project already exists TH: this step is not necessary or is it?
+                    projectfound = Project2.objects.filter(name__iexact = name_project).first()
+                    # Test if the project has already been linked to the sermon 
+                    sermoprojlink = SermonDescrProject.objects.filter(sermon = sermon, project = projectfound).first()
+                    # If this is not the case then a link must be made between the sermon and the project
+                    if sermoprojlink == None: 
+                        SermonDescrProject.objects.create(project = projectfound, sermon = sermon)
+                   
+       
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+def adapt_passim_project_name_manu(): 
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    # Issue 412: give all items in the current database the Project name "Passim"
+    # This means: Manuscript, SSG/AF, Historical collection
+    # Sermon: NO, is done in a separate method
+    try:
+        # Iterate over all Manuscripts in the database:  
+        for manu in Manuscript.objects.all():
+            # Try to find if the project already exists:        
+            projectfound = Project2.objects.filter(name__iexact = name).first()
+            if projectfound == None:
+                # If the project does not already exist, it needs to be added to the database
+                project = Project2.objects.create(name = name)
+                # And a link should be made between this new project and the manuscript
+                ManuscriptProject.objects.create(project = project, manuscript = manu)
+            else:               
+                manuprojlink = ManuscriptProject.objects.filter(project = projectfound, manuscript = manu).first()
+                if manuprojlink == None:
+                    # If the project already exists, but not the link, than only a link should be 
+                    # made between the manuscript and the project
+                    ManuscriptProject.objects.create(project = projectfound, manuscript = manu)
+                    #print(manu, projectfound)
+            # When iterating over Manuscript, make sure to iterate over Sermons too, how to access them?
+            # Sermons belong to 1 manu
+            # take project of Manuscript, 
+            # SermonDescrProject (project = projectmanu, sermon = sermon)
+
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_passim_project_name_hc(): 
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    # Issue 412: give all items in the current database the Project name "Passim"
+    # This means: Manuscript, SSG/AF, Historical collection
+
+    # Ok, eigenlijk alleen de hc collections:
+    # settype == "hc"
+
+    try:
+        # Iterate over all Collections in the database:  
+        for coll in Collection.objects.all():     
+            # Try to find if the project already exists:        
+            projectfound = Project2.objects.filter(name__iexact = name).first()
+            if projectfound == None:
+                # If the project does not already exist, it needs to be added to the database
+                project = Project2.objects.create(name = name)
+                # And a link should be made between this new project and the collection
+                # Only when the collection is an Historical Collection"
+                if coll.settype == "hc":
+                    CollectionProject.objects.create(project = project, collection = coll)
+            else:               
+                collprojlink = CollectionProject.objects.filter(project = projectfound, collection = coll).first()
+                if collprojlink == None:
+                    # If the project already exists, but not the link, than only a link should be 
+                    # made between the collection and the project
+                    # Only when the collection is an Historical Collection"
+                    if coll.settype == "hc":
+                        CollectionProject.objects.create(project = projectfound, collection = coll)
+                        print(coll.name, projectfound)    
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+def adapt_passim_project_name_equal():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    # Issue 412: give all items in the current database the Project name "Passim"
+    # This means: Manuscript, SSG/AF, Historical collection
+
+    try:
+        # Iterate over all SSGs/AFs in the database:  
+        for equal in EqualGold.objects.all():     
+            # Try to find if the project already exists:        
+            projectfound = Project2.objects.filter(name__iexact = name).first()
+            if projectfound == None:
+                # If the project does not already exist, it needs to be added to the database
+                project = Project2.objects.create(name = name)
+                # And a link should be made between this new project and the SSG/AF
+                EqualGoldProject.objects.create(project = project, equal = equal)
+            else:               
+                equalprojlink = EqualGoldProject.objects.filter(project = projectfound, equal = equal).first()
+                if equalprojlink == None:
+                    # If the project already exists, but not the link, than only a link should be 
+                    # made between the collection and the project
+                    EqualGoldProject.objects.create(project = projectfound, equal = equal)
+                    print(equal, projectfound)
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg

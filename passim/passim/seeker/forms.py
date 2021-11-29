@@ -34,7 +34,7 @@ def user_is_in_team(username, team_group, userplus=None):
             bResult = (owner.user.groups.filter(name=userplus).first() != None)
     return bResult
 
-CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of an Authority file'), ('non', 'Loner: not part of a SSG')]
 AUTHOR_TYPE = [('-', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
@@ -706,6 +706,7 @@ class ProjectOneWidget(ModelSelect2Widget):
         return Project.objects.all().order_by('name').distinct()
 
 
+
 class ProjectWidget(ModelSelect2MultipleWidget):
     model = Project
     search_fields = [ 'name__icontains' ]
@@ -715,6 +716,30 @@ class ProjectWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return Project.objects.all().order_by('name').distinct()
+
+
+class Project2Widget(ModelSelect2MultipleWidget):
+    model = Project2
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        qs = Project2.objects.all().order_by('name').distinct()
+        return qs
+
+class Project2OneWidget(ModelSelect2Widget):
+    model = Project2
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        qs = Project2.objects.all().order_by('name').distinct()
+        return qs
+
 
 
 class ProfileWidget(ModelSelect2MultipleWidget):
@@ -1277,6 +1302,8 @@ class SearchManuForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
@@ -1347,6 +1374,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
@@ -1442,11 +1470,13 @@ class SermonForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     feastlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
-                                                  'placeholder': 'Linked super sermons gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+                                                  'placeholder': 'Linked Authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -1570,6 +1600,7 @@ class SermonForm(PassimModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             if user_is_in_team(username, team_group):
@@ -1608,7 +1639,7 @@ class SermonForm(PassimModelForm):
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'pd',
-                        'data-placeholder': 'Select multiple super sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
                         'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSermoWidget( attrs={'username': username, 'team_group': team_group,
@@ -1645,6 +1676,7 @@ class SermonForm(PassimModelForm):
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
 
                 # Determine the initial collections
                 self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]
@@ -1878,16 +1910,18 @@ class ProfileForm(forms.ModelForm):
 class ProjectForm(forms.ModelForm):
     """Project list"""
 
-    project_ta = forms.CharField(label=_("Keyword"), required=False,
+    project_ta = forms.CharField(label=_("Project"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
-    prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["projects"]
-
+    
+    # Typeahead werkt niet
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-        model = Project
+        #model = Project
+        model = Project2
         fields = ['name']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
@@ -1897,11 +1931,13 @@ class ProjectForm(forms.ModelForm):
         super(ProjectForm, self).__init__(*args, **kwargs)
         # Some fields are not required
         self.fields['name'].required = False
-        self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+        #self.fields['prjlist'].queryset = Project.objects.all().order_by('name') 
+        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
-
+    
+    
 
 class CollectionForm(PassimModelForm):
     """Collection list"""
@@ -1923,6 +1959,8 @@ class CollectionForm(PassimModelForm):
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefColWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2040,6 +2078,9 @@ class CollectionForm(PassimModelForm):
         self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
+        # Project2:
+        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+
         # SSG section
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
         self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name')
@@ -2115,7 +2156,7 @@ class CollectionForm(PassimModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']
             self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
-
+            self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
 
 class SermonDescrSignatureForm(forms.ModelForm):
     """The link between SermonDescr and manually identified Signature"""
@@ -2236,7 +2277,7 @@ class SermonDescrSuperForm(forms.ModelForm):
     # For the method "nodistance"
     newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
                 widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
-                                                  'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+                                                  'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
     # For the method "superdist"
     #newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
     #            widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
@@ -2351,6 +2392,8 @@ class SermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwnew       = forms.CharField(label=_("New keyword"), required=False, 
@@ -2378,7 +2421,7 @@ class SermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneGoldWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
-    typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits"]
+    typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits", "projects"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2389,7 +2432,7 @@ class SermonGoldForm(PassimModelForm):
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'bibliography':forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace', 'class': 'searching'}),
-                 'equal':       SuperOneWidget(attrs={'data-placeholder': 'Select one Super Sermon Gold...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'equal':       SuperOneWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -2416,6 +2459,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['codelist'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() # moet dit anders? ivm SSG/AF als bron?
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
@@ -2465,6 +2509,7 @@ class SermonGoldForm(PassimModelForm):
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.gold_userkeywords.filter(profile=profile).order_by('keyword__name')]
+                self.fields['projlist'].initial = [x.pk for x in instance.gold_projects.all().order_by('name')] # moet dit anders? ivm SSG/AF als bron?
                 self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('-editype', 'code')]
                 self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
                 self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
@@ -2573,6 +2618,8 @@ class SuperSermonGoldForm(PassimModelForm):
                                                        'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     scount      = forms.IntegerField(min_value=-1, required=False,
@@ -2637,6 +2684,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
@@ -2685,6 +2733,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 qs = instance.equalgold_dst.all()
@@ -2731,7 +2780,7 @@ class EqualGoldLinkForm(forms.ModelForm):
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
                     'title': 'Direction specification (optional)'}))
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one super sermon gold...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
                 widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
                     'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
@@ -2809,7 +2858,7 @@ class EqualGoldLinkForm(forms.ModelForm):
                 if existing.count() > 0:
                     # This combination already exists
                     raise forms.ValidationError(
-                            "This Super Sermon Gold is already linked"
+                            "This Authority file is already linked"
                         )
         # Make sure to return the correct cleaned data again
         return cleaned_data
@@ -3379,6 +3428,47 @@ class ManuscriptKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
+#ManuscriptProjForm zoals Keywords / Prov?
+
+class ManuscriptProjectForm(forms.ModelForm):
+    # kan nog niet toevoegen, mag sowieso niet, moet via Tools etc.
+    proj_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget = Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    #name = forms.CharField(label=_("Project"), required=False, 
+    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project...',  'style': 'width: 100%;'}))
+    #newproj = forms.CharField(label=_("Project (new)"), required=False, help_text="editable", 
+    #           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Project...',  'style': 'width: 100%;'}))
+    #typeaheads = ["projects"]
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptProject
+        fields = ['manuscript', 'project']
+        widgets={'project':     Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}),
+ 
+                 }
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(ManuscriptProjectForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['project'].required = False
+        #self.fields['name'].required = False
+        #self.fields['newproj'].required = False
+        self.fields['proj_new'].queryset = Project2.objects.all().order_by('name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.projects != None:
+                self.fields['name'].initial = instance.project.name
+                #proj = instance.projects.name
+                #self.fields['name'].initial = proj
+
+
+
+
 
 class OriginForm(forms.ModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
@@ -3643,6 +3733,8 @@ class ManuscriptForm(PassimModelForm):
                 widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -3658,7 +3750,7 @@ class ManuscriptForm(PassimModelForm):
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
-                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'datelist']
+                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'datelist', 'projlist'] 
     exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
@@ -3701,6 +3793,7 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
@@ -3767,20 +3860,24 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['collist'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['litlist'].initial = [x.pk for x in instance.manuscript_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
                 #self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
                 # issue #289 - below was innovation, but that is now turned back. Above is current
                 # self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
+      
                 self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
                 self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
+                
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
                 #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
                 self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
+
 
                 #self.fields['provlist'].widget.manu = instance
                 self.fields['mprovlist'].widget.manu = instance

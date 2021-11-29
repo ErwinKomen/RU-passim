@@ -219,9 +219,9 @@ urlpatterns = [
     url(r'^profile/details(?:/(?P<pk>\d+))?/$', ProfileDetails.as_view(), name='profile_details'),
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
 
-    url(r'^project/list', ProjectListView.as_view(), name='project_list'),
-    url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project_details'),
-    url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project_edit'),
+    url(r'^project/list', ProjectListView.as_view(), name='project2_list'), 
+    url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project2_details'), 
+    url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project2_edit'), 
 
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
     # url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),

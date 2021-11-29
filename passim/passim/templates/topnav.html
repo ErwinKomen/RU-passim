@@ -30,7 +30,7 @@
                           <li><a href="{% url 'library_search' %}">Library</a></li>
                           <li><a href="{% url 'author_search' %}">Author</a></li>
                           <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'equalgold_list' %}">Super sermon gold</a></li>
+                          <li><a href="{% url 'equalgold_list' %}">Authority file</a></li>
                           <li><a href="{% url 'search_gold' %}">Gold-Sermon</a></li>
                           
                         </ul>
@@ -74,7 +74,7 @@
                           {% endif %}
                           {% if is_app_uploader %}
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'project_list' %}" title="Projects">Projects</a></li> 
+                            <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>  
                           {% endif %}
                           {% if is_app_moderator %}
                             <li role="separator" class="divider"></li>
@@ -117,7 +117,8 @@
 
                             <li role="separator" class="divider"></li>
                             <li><a href_was="#" href="{% url 'do_huwa' %}" title="Analyse HUWA database">HUWA analysis</a></li>
-                            
+                                                      
+
                            <!--
                             <li role="separator" class="divider"></li>
                             <li><a href="#" href_was="{% url 'do_goldsearch' %}" title="Re-make gold sermon srchincipit/srchexplicit">Gold re-index searching</a></li>

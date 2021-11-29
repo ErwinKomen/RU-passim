@@ -2887,6 +2887,43 @@ class Litref(models.Model):
             self.read_zotero()
         return adapt_markdown(self.short, lowercase=False)
 
+class Project2(models.Model):
+    """Manuscripts may belong to the one or more projects (Passim or others)"""
+    
+    # Editor status? zie punt 4 bij https://github.com/ErwinKomen/RU-passim/issues/412
+
+    # [1] Obligatory name for a project
+    name = models.CharField("Name", max_length=LONG_STRING)
+  
+    def __str__(self):
+        sName = self.name
+        if sName == None or sName == "":
+            sName = "(unnamed)"
+        return sName
+
+    #def get_default(username):
+    #    """Determine the default project for this user""" # TH: dit niet voor de toekomstige oplossing 
+    #    # maar wel voor alles wat er nu in de database staan               
+
+    #    obj = Project2.objects.filter(name__iexact = "passim").first()
+    #    if obj == None:
+    #        obj = Project2.objects.all().first()
+    #    return obj
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # First do the normal saving
+        response = super(Project2, self).save(force_insert, force_update, using, update_fields)
+        # Check if this is the first project object
+        qs = Project2.objects.all()
+        if qs.count() == 1:
+            # Set this as default project for all manuscripts
+            prj = qs.first()
+            with transaction.atomic():
+                for obj in Manuscript.objects.all():
+                    obj.project = prj
+                    obj.save()
+
+        return response
 
 class Project(models.Model):
     """manuscripts may belong to the project 'Passim' or to something else"""
@@ -2901,7 +2938,7 @@ class Project(models.Model):
         return sName
 
     def get_default(username):
-        """Determine the default project for this user"""
+        """Determine the default project for this user""" # TH: dit niet voor de toekomstige oplossing               
 
         obj = Project.objects.filter(name__iexact = "passim").first()
         if obj == None:
@@ -3028,7 +3065,7 @@ class Comment(models.Model):
 
     def get_otype(self):
         otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
-                      super="Super Sermon Gold", codi="Codicological Unit")
+                      super="Authority file", codi="Codicological Unit")
         return otypes[self.otype]
 
 
@@ -3101,7 +3138,8 @@ class Manuscript(models.Model):
     #    Note: deletion of a sourceinfo sets the manuscript.source to NULL
     source = models.ForeignKey(SourceInfo, null=True, blank=True, on_delete = models.SET_NULL, related_name="sourcemanuscripts")
 
-    # [0-1] Each manuscript should belong to a particular project
+    # [0-1] Each manuscript should belong to a particular project TH this needs to be changed to a MANYTOMANY
+    # in order to be able to link on manuscript to multiple 
     project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
 
     # ============== MANYTOMANY connections
@@ -3113,8 +3151,14 @@ class Manuscript(models.Model):
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+    
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
+
+    # [m] Many-to-many: one manuscript can belong to one or more projects
+    projects = models.ManyToManyField(Project2, through="ManuscriptProject", related_name="project2_manuscripts")
+
+   
 
     # Scheme for downloading and uploading
     specification = [
@@ -3164,6 +3208,36 @@ class Manuscript(models.Model):
 
         # Return the response when saving
         return response
+       
+    def adapt_projects(self):
+        """Adapt sermon-project connections for all sermons under me""" 
+        oErr = ErrHandle()
+        bBack = False
+        try:
+            project_list = self.projects.all() 
+            # Walk the sermons for this manuscript
+            for sermon in SermonDescr.objects.filter(msitem__manu=self): 
+                # Check for sermon-project relations
+                sermon_project_list = sermon.projects.all() 
+                with transaction.atomic():
+                    for project in project_list:
+                        if not project in sermon_project_list: 
+                            sermon.projects.add(project)
+                delete_id = []
+                for project in sermon_project_list: 
+                    if not project in project_list: 
+                        delete_id.append(project.id) 
+                # Delete them
+                if len(delete_id) > 0: 
+                    # They are deleted all at once using the FK's of the project that is to 
+                    # be deleted and the id of the record in SermonDescrProject
+                    SermonDescrProject.objects.filter(project__id__in=delete_id).delete() 
+   
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_projects")
+        return bBack
+
 
     def adapt_hierarchy():
         bResult = True
@@ -3250,7 +3324,7 @@ class Manuscript(models.Model):
             if idno == None:
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
-                # Get the standard project
+                # Get the standard project TH: hier naar kijken voor punt 4
                 project = Project.get_default(username)
                 # Retrieve or create a new manuscript with default values
                 if source == None:
@@ -3651,10 +3725,10 @@ class Manuscript(models.Model):
 
         return oBack
 
-    def get_keywords_markdown(self, plain=False):
+    def get_keywords_markdown(self, plain=False): 
         lHtml = []
         # Visit all keywords
-        for keyword in self.keywords.all().order_by('name'):
+        for keyword in self.keywords.all().order_by('name'): # zo bij get_project_markdown
             if plain:
                 lHtml.append(keyword.name)
             else:
@@ -3759,6 +3833,17 @@ class Manuscript(models.Model):
         sBack = "-"
         if self.project:
             sBack = '<span class="project">{}</span>'.format(self.project.name)
+        return sBack
+
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.projects.all().order_by('name'):           
+            # Determine where clicking should lead to
+            url = "{}?manu-projlist={}".format(reverse('manuscript_list'), project2.id) 
+            # Create a display for this topic
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))    
+        sBack = ", ".join(lHtml)
         return sBack
 
     def get_provenance_markdown(self, plain=False, table=True):
@@ -5607,6 +5692,9 @@ class EqualGold(models.Model):
     # [m] Many-to-many: one sermon can be a part of a series of collections
     collections = models.ManyToManyField("Collection", through="CollectionSuper", related_name="collections_super")
 
+    # [m] Many-to-many: one EqualGold can belong to one or more projects
+    projects = models.ManyToManyField(Project2, through="EqualGoldProject", related_name="project2_equalgold")
+
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_super")
     
@@ -5916,6 +6004,17 @@ class EqualGold(models.Model):
         # REturn the information
         return sBack
 
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.projects.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id) 
+            # Create a display for this topic
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_goldsigfirst(self):
         sBack = ""
         # Calculate the first signature
@@ -5947,7 +6046,7 @@ class EqualGold(models.Model):
         # Add the PASSIM code
         code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         url = reverse('equalgold_details', kwargs={'pk': self.id})
-        sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, code)
+        sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Authority file'>{}</a></span>".format(url, code)
         #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
         #sBack = " ".join(lHtml)
         return sBack
@@ -6333,7 +6432,7 @@ class SermonGold(models.Model):
         html = []
         # Make available the set of Gold Sermons that belongs to the same EqualGold
         if self.equal == None:
-            html.append("<i>This Sermon Gold is not part of a Super Sermon Gold</i>")
+            html.append("<i>This Sermon Gold is not part of an Authority file</i>")
         else:
             qs = SermonGold.objects.filter(equal=self.equal).exclude(id=self.id)
             for item in qs:
@@ -6429,6 +6528,30 @@ class SermonGold(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("get_keywords_ssg_markdown")
         return sBack
+        
+    def get_project_ssg_markdown2(self):
+        """Get all the projects attached to the SSG of which I am part"""
+
+        lHtml = []
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            if self.equal != None:
+                # Get all projects attached to these SGs
+                qs = Project2.objects.filter(equal_proj__equal__id=self.equal.id).order_by("name").distinct() 
+                # Visit all project items:                               
+                for project2 in qs:
+                    # Determine where clicking should lead to
+                    url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id)                   
+                    # Create a display for this topic                   
+                    lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_keywords_ssg_markdown")
+        return sBack
+
+
 
     def get_label(self, do_incexpl=False):
         """Get a string view of myself to be put on a label"""
@@ -6948,6 +7071,15 @@ class EqualGoldKeyword(models.Model):
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
+class EqualGoldProject(models.Model):
+    """Relation between an EqualGold and a Project"""
+
+    # [1] The link is between a EqualGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equal_proj", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="equal_proj", on_delete=models.CASCADE)     
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -6982,6 +7114,7 @@ class SermonGoldKeyword(models.Model):
         if self.gold and self.keyword_id:
             response = super(SermonGoldKeyword, self).save(force_insert, force_update, using, update_fields)
         return response
+
 
 
 class Ftextlink(models.Model):
@@ -7051,6 +7184,9 @@ class Collection(models.Model):
     # [0-n] Many-to-many: references per collection
     litrefs = models.ManyToManyField(Litref, through="LitrefCol", related_name="litrefs_collection")
 
+    # [m] Many-to-many: one (historical) collection can belong to one or more projects
+    projects = models.ManyToManyField(Project2, through="CollectionProject", related_name="project2_collection")
+
     
     def __str__(self):
         return self.name
@@ -7095,7 +7231,7 @@ class Collection(models.Model):
                 html.append("<span class='authorname' title='{}'>{}{}</span>".format(author.name, author.name[:20], dots))
         sBack = ", ".join(html)
         return sBack
-
+        
     def get_created(self):
         """REturn the creation date in a readable form"""
 
@@ -7186,6 +7322,18 @@ class Collection(models.Model):
             # Combine response
             sBack = "\n".join(html)
         return sBack
+
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.projects.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?hist-projlist={}".format(reverse('collhist_list'), project2.id) 
+            # Create a display for this topic            
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
+        sBack = ", ".join(lHtml)
+        return sBack
+
 
     def get_readonly_display(self):
         response = "yes" if self.readonly else "no"
@@ -7518,6 +7666,9 @@ class SermonDescr(models.Model):
     # [m] Many-to-many: distances
     distances = models.ManyToManyField(EqualGold, through="SermonEqualDist", related_name="distances_sermons")
 
+    # [m] Many-to-many: one manuscript can belong to one or more projects
+    projects = models.ManyToManyField(Project2, through="SermonDescrProject", related_name="project2_sermons")
+
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
@@ -7616,6 +7767,55 @@ class SermonDescr(models.Model):
             msg = oErr.get_error_message()
             bOkay = False
         return bOkay, msg
+
+    def adapt_projects(self):
+        """Adapt sermon-project connections for new sermon under manuscript"""         
+        oErr = ErrHandle()
+        bBack = False
+        try:
+            sermon = self
+            # First get the manuscript starting from the sermon
+            manu = self.msitem.manu                      
+            # Get all projects connected to this manuscript
+            qs_project = manu.projects.all()                      
+            # Add all these projects to the sermon
+            with transaction.atomic():
+                for project in qs_project:
+                    # Add the projects to the sermon.
+                    self.projects.add(project)   
+
+            # OLD: KAN WEG            
+            
+            ## First get the manuscript by using the MsItem of the sermon
+            #msitem = self.msitem                      
+            
+            ## Get the id of the manuscript from the MsItem
+            #manuid = msitem.manu_id
+            
+            ## Create empty list to store the project(s) of the manuscript 
+            #project_list = []
+
+            ## Find the manuscript to which the new sermon belongs 
+            #for manu in Manuscript.objects.filter(id = manuid):
+
+            #    # Find all project names linked to this manuscript
+            #    for mp in ManuscriptProject.objects.filter(manuscript = manu):
+            #        # Add the projects to the list
+            #        project_list.append(mp.project)                    
+                
+            ## Now that we have the projects, we should link them to the new sermon           
+            ## Get the sermon
+            #sermon = self
+            
+            ## Iterate over the project list
+            #for project in project_list:
+            #    # Add the projects to the sermon
+            #     sermon.projects.add(project)   
+   
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_projects")
+        return bBack
 
     def adapt_verses(self):
         """Re-calculated what should be in [verses], and adapt if needed"""
@@ -8451,6 +8651,17 @@ class SermonDescr(models.Model):
         """Get the contents of the note field using markdown"""
         return adapt_markdown(self.note)
 
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.projects.all().order_by('name'):
+            # Determine where clicking should lead to
+            url = "{}?sermo-projlist={}".format(reverse('sermon_list'), project2.id) 
+            # Create a display for this topic            
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_passimcode_markdown(self):
         """Get the Passim code (and a link to it)"""
 
@@ -8459,7 +8670,7 @@ class SermonDescr(models.Model):
         equal = self.equalgolds.all().order_by('code', 'author__name', 'number').first()
         if equal != None and equal.code != "":
             url = reverse('equalgold_details', kwargs={'pk': equal.id})
-            sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Super Sermon Gold'>{}</a></span>".format(url, equal.code)
+            sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Authority file'>{}</a></span>".format(url, equal.code)
         return sBack
 
     def get_postscriptum_markdown(self):
@@ -8699,6 +8910,7 @@ class SermonDescr(models.Model):
         # Get the URL to edit this sermon
         sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
         return sUrl
+          
 
 
 class Range(models.Model):
@@ -9120,6 +9332,17 @@ class SermonDescrKeyword(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
 
 
+class SermonDescrProject(models.Model):
+    """Relation between a SermonDescr and a Project"""
+
+    # [1] The link is between a SermonDescr instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermondescr_proj", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="sermondescr_proj", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -9127,6 +9350,17 @@ class ManuscriptKeyword(models.Model):
     manuscript = models.ForeignKey(Manuscript, related_name="manuscript_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
     keyword = models.ForeignKey(Keyword, related_name="manuscript_kw", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class ManuscriptProject(models.Model):
+    """Relation between a Manuscript and a Project"""
+
+    # [1] The link is between a Manuscript instance ...
+    manuscript = models.ForeignKey(Manuscript, related_name="manuscript_proj", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="manuscript_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
@@ -9599,7 +9833,7 @@ class BasketGold(models.Model):
 class BasketSuper(models.Model):
     """The basket is the user's vault of search results (of super sermon gold items)"""
     
-    # [1] The super sermon gold
+    # [1] The super sermon gold / Authority file
     super = models.ForeignKey(EqualGold, related_name="basket_contents_super", on_delete=models.CASCADE)
     # [1] The user
     profile = models.ForeignKey(Profile, related_name="basket_contents_super", on_delete=models.CASCADE)
@@ -9864,6 +10098,15 @@ class CollectionSuper(models.Model):
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
+class CollectionProject(models.Model):
+    """Relation between a Collection and a Project"""
+
+    # [1] The link is between a Collection instance ...
+    collection = models.ForeignKey(Collection, related_name="collection_proj", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="collection_proj", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
 
 class Template(models.Model):
     """A template to construct a manuscript"""
