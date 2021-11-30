@@ -65,17 +65,6 @@ class AuthorWidget(ModelSelect2MultipleWidget):
         return Author.objects.all().order_by('name').distinct()
 
 
-#class AutypeWidget(ModelSelect2Widget):
-#    model = FieldChoice
-#    search_fields = [ 'english_name__icontains']
-
-#    def label_from_instance(self, obj):
-#        return obj.english_name
-
-#    def get_queryset(self):
-#        return FieldChoice.objects.filter(field=CERTAINTY_TYPE).order_by("english_name")
-
-
 class BibrefWidget(ModelSelect2MultipleWidget):
     model = BibRange
     search_fields = ['book__name__icontains', 'book__latname__icontains']
@@ -481,6 +470,7 @@ class KeywordWidget(ModelSelect2MultipleWidget):
 
 
 class KeywordAllWidget(KeywordWidget):
+    """All keywords"""
     is_team = False
 
 
@@ -704,8 +694,7 @@ class ProjectOneWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return Project.objects.all().order_by('name').distinct()
-
-
+    
 
 class ProjectWidget(ModelSelect2MultipleWidget):
     model = Project
@@ -729,6 +718,7 @@ class Project2Widget(ModelSelect2MultipleWidget):
         qs = Project2.objects.all().order_by('name').distinct()
         return qs
 
+
 class Project2OneWidget(ModelSelect2Widget):
     model = Project2
     search_fields = [ 'name__icontains' ]
@@ -740,8 +730,7 @@ class Project2OneWidget(ModelSelect2Widget):
         qs = Project2.objects.all().order_by('name').distinct()
         return qs
 
-
-
+    
 class ProfileWidget(ModelSelect2MultipleWidget):
     model = Profile
     search_fields = [ 'user__username__icontains' ]
@@ -1938,8 +1927,7 @@ class ProjectForm(forms.ModelForm):
         self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
         # Get the instance
         if 'instance' in kwargs:
-            instance = kwargs['instance']
-    
+            instance = kwargs['instance']    
     
 
 class CollectionForm(PassimModelForm):
@@ -2160,6 +2148,7 @@ class CollectionForm(PassimModelForm):
             instance = kwargs['instance']
             self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
             self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+
 
 class SermonDescrSignatureForm(forms.ModelForm):
     """The link between SermonDescr and manually identified Signature"""
@@ -3431,18 +3420,13 @@ class ManuscriptKeywordForm(forms.ModelForm):
                 kw = instance.keyword.name
                 self.fields['name'].initial = kw
 
-#ManuscriptProjForm zoals Keywords / Prov?
 
 class ManuscriptProjectForm(forms.ModelForm):
+    """ManuscriptProjForm zoals Keywords / Prov?"""
+
     # kan nog niet toevoegen, mag sowieso niet, moet via Tools etc.
     proj_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget = Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}))
-
-    #name = forms.CharField(label=_("Project"), required=False, 
-    #                       widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project...',  'style': 'width: 100%;'}))
-    #newproj = forms.CharField(label=_("Project (new)"), required=False, help_text="editable", 
-    #           widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Project...',  'style': 'width: 100%;'}))
-    #typeaheads = ["projects"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -3452,13 +3436,12 @@ class ManuscriptProjectForm(forms.ModelForm):
         widgets={'project':     Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}),
  
                  }
+
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ManuscriptProjectForm, self).__init__(*args, **kwargs)
         # Set the keyword to optional for best processing
         self.fields['project'].required = False
-        #self.fields['name'].required = False
-        #self.fields['newproj'].required = False
         self.fields['proj_new'].queryset = Project2.objects.all().order_by('name')
         # Get the instance
         if 'instance' in kwargs:
@@ -3466,11 +3449,6 @@ class ManuscriptProjectForm(forms.ModelForm):
             # Check if the initial name should be added
             if instance.projects != None:
                 self.fields['name'].initial = instance.project.name
-                #proj = instance.projects.name
-                #self.fields['name'].initial = proj
-
-
-
 
 
 class OriginForm(forms.ModelForm):
