@@ -4149,7 +4149,6 @@ class Manuscript(models.Model):
         # Note: this doesn't copy relations that are not part of Manuscript proper
 
         # Copy all the sermons:
-        # obj.load_sermons_from(manu_src, mtype="man", profile=profile)
         obj.load_sermons_from(manu_src, mtype=mtype, profile=profile)
 
         # Make sure the body of [obj] works out correctly
@@ -4268,9 +4267,10 @@ class Manuscript(models.Model):
                     sermon_dst.stype = "imp"   # Imported
 
                     # Issue #315: clear some fields after copying
-                    if mtype == "man":
-                        sermon_dst.locus = ""
+                    if mtype == "man":                        
                         sermon_dst.additional = ""
+                    # Issue #420: 'locus' also for template creation
+                    sermon_dst.locus = ""
 
                     # Save the copy
                     sermon_dst.save()
@@ -4282,6 +4282,9 @@ class Manuscript(models.Model):
                         head_dst.pk = None
                         head_dst.msitem = dst
                         # NOTE: a SermonHead does *not* have an mtype or stype
+
+                        # Issue #420: 'locus' also for template creation
+                        head_dst.locus = ""
 
                         # Save the copy
                         head_dst.save()

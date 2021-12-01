@@ -9391,8 +9391,6 @@ class ManuscriptListView(BasicList):
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
-        # {"name": "Manuscript overlap",      "id": "filter_collection_manuptc",  "enabled": False, "head_id": "filter_collection"},
-       # {"name": "Project",                 "id": "filter_project",             "enabled": False, "head_id": "filter_other"},
       ]
 
     searches = [
