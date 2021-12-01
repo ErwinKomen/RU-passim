@@ -6312,7 +6312,7 @@ class ProjectEdit(BasicDetails):
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
-        # Only moderators are to be allowed
+        # Only moderators and superusers are to be allowed to create and delete project labels
         if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
             # Define the main items to show and edit
             context['mainitems'] = [{'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': "name"}]       
@@ -6335,7 +6335,7 @@ class ProjectListView(BasicList):
     prefix = "proj"
     has_select2 = True
     paginate_by = 20
-    sg_name = "Project"     # THis is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
+    sg_name = "Project"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Projects"
     # page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
@@ -10637,8 +10637,8 @@ class SermonGoldEdit(BasicDetails):
                  'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[4], 'template_selection': 'ru.passim.litref_template'},
                 {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
                  'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
-                  # Project2 HIER zie keyword! Die worden 
-                {'type': 'plain', 'label': "Project (SSG):",     'value': instance.get_project_ssg_markdown2()}, # 'field_list': 'projlist'},
+                  # Project2 HIER, aanpassen want mag geen optie zijn om te editen, wel het geval, of het lijkt iig
+                {'type': 'plain', 'label': "Project (SSG):",     'value': instance.get_project_ssg_markdown2()},
                 ]
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
