@@ -8964,11 +8964,7 @@ class ManuscriptEdit(BasicDetails):
 
     def get_history(self, instance):
         return passim_get_history(instance)
-
-
     
-
-
 
 class ManuscriptDetails(ManuscriptEdit):
     rtype = "html"
@@ -9384,7 +9380,8 @@ class ManuscriptListView(BasicList):
         {"name": "Project",         "id": "filter_project",          "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
-        {"name": "Gryson or Clavis",        "id": "filter_signature",           "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Gryson or Clavis: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Gryson or Clavis: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
         {"name": "Bible reference",         "id": "filter_bibref",              "enabled": False, "head_id": "filter_sermon"},
         {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
@@ -9443,8 +9440,10 @@ class ManuscriptListView(BasicList):
             # ===================
             ]},
         {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+            {'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' },
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefbk'},
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},
