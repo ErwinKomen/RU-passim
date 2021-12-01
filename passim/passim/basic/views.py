@@ -378,8 +378,8 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                                 val = adapt_search(val, regex_function)
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
-                    elif has_Q_value(keyS, oFields):
-                        if not "$" in dbfield:
+                    elif has_Q_value(keyS, oFields) and len(oFields[keyS]) > 0:
+                        if "$" in dbfield:
                             s_q = oFields[keyS]
                         enable_filter(filter_type, head_id)
 
@@ -1176,17 +1176,22 @@ class BasicList(ListView):
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
-                        qs = self.model.objects.exclude(*lstExclude)
+                        if qAlternative:
+                            qs = self.model.objects.filter(qAlternative).exclude(*lstExclude).distinct()
+                        else:
+                            qs = self.model.objects.exclude(*lstExclude)
                     else:
-                        # Just show everything
-                        qs = self.model.objects.all()
+                        if qAlternative:
+                            qs = self.model.objects.filter(qAlternative).distinct()
+                        else:
+                            # Just show everything
+                            qs = self.model.objects.all()
                 else:
                     # There is a filter, so build it up
                     filter = lstQ[0]
                     for item in lstQ[1:]:
                         filter = filter & item
                     if qAlternative:
-                        # filter = ( filter ) | ( ( qAlternative ) & filter )
                         filter = ( ( qAlternative ) & filter )
 
                     # Check if excluding is needed
@@ -1195,11 +1200,11 @@ class BasicList(ListView):
                     else:
                         qs = self.model.objects.filter(filter).distinct()
 
-                    # Only set the [bFilter] value if there is an overt specified filter
-                    for filter in self.filters:
-                        if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
-                            self.bFilter = True
-                            break
+                # Only set the [bFilter] value if there is an overt specified filter
+                for filter in self.filters:
+                    if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
+                        self.bFilter = True
+                        break
                     # OLD self.bFilter = True
             elif not self.none_on_empty:
                 # Just show everything
@@ -1250,8 +1255,8 @@ class BasicList(ListView):
                         oHead['colwrap'] = True
 
         # Determine the length
-        self.entrycount = len(qs)
-
+        self.entrycount = 0 if qs is None else qs.count()   # len(qs)
+        
         # Allow doing something additionally with the queryset
         self.view_queryset(qs)
 
