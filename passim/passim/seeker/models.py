@@ -6665,7 +6665,13 @@ class SermonGold(models.Model):
                 # Visit all project items:                               
                 for project2 in qs:
                     # Determine where clicking should lead to
-                    url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id)                   
+
+                    # Original code (TH): it leads to the SSG listview
+                    # url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id)                   
+
+                    # Corrected code (EK): it leads to the SG listview, filtered on he project
+                    url = "{}?gold-projlist={}".format(reverse('gold_list'), project2.id)
+
                     # Create a display for this topic                   
                     lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
                 sBack = ", ".join(lHtml)
@@ -6673,9 +6679,7 @@ class SermonGold(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("get_keywords_ssg_markdown")
         return sBack
-
-
-
+    
     def get_label(self, do_incexpl=False):
         """Get a string view of myself to be put on a label"""
 

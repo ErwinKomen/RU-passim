@@ -536,7 +536,10 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         #    qs = qs.reverse()
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("make_ordering")
+        # Show what the order_default and the order_heads is (as strings)
+        oErr.Status("order_heads = {}\norder_default = {}".format(
+            json.dumps(order_heads), json.dumps(order_default)))
+        oErr.DoError("basic/view/make_ordering")
         lstQ = []
 
     return qs, order_heads, colnum

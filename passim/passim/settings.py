@@ -78,7 +78,7 @@ SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.rich.ru.nl', 'testserver' ]
+ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.rich.ru.nl', 'testserver', '131.174.114.236' ]
 
 # Caching
 if USE_REDIS:

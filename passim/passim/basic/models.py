@@ -61,6 +61,9 @@ class UserSearch(models.Model):
                 # Get and adapt the history
                 history = json.loads(obj.history)
                 history['count'] = count
+                # Make sure there are users
+                if not 'users' in history:
+                    history['users'] = []
                 bFound = False
                 for oUser in history['users']:
                     if oUser['username'] == username:

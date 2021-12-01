@@ -2451,11 +2451,12 @@ class SermonGoldForm(PassimModelForm):
             self.fields['codelist'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() # moet dit anders? ivm SSG/AF als bron?
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['edilist'].queryset = EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['litlist'].queryset = LitrefSG.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['ftxtlist'].queryset = Ftextlink.objects.all().order_by('url')
+            # see issue #482: this is needed for the LISTVIEW only
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() # moet dit anders? ivm SSG/AF als bron?
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
@@ -2488,7 +2489,6 @@ class SermonGoldForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "gold"
-            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
             self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
         
             # Get the instance
@@ -2501,12 +2501,16 @@ class SermonGoldForm(PassimModelForm):
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.gold_userkeywords.filter(profile=profile).order_by('keyword__name')]
-                self.fields['projlist'].initial = [x.pk for x in instance.gold_projects.all().order_by('name')] # moet dit anders? ivm SSG/AF als bron?
                 self.fields['siglist'].initial = [x.pk for x in instance.goldsignatures.all().order_by('-editype', 'code')]
                 self.fields['edilist'].initial = [x.pk for x in instance.sermon_gold_editions.all().order_by('reference__full', 'pages')]
                 self.fields['litlist'].initial = [x.pk for x in instance.sermon_gold_litrefs.all().order_by('reference__full', 'pages')]
                 self.fields['collist_sg'].initial = [x.pk for x in instance.collections.all().order_by('name')]
                 self.fields['ftxtlist'].initial = [x.pk for x in instance.goldftxtlinks.all().order_by('url')]
+
+                # See issue #482: this may NOT be here, because it would have been for the details view, and there it must
+                #                 not be, since SGs are not allowed to have their 'own' connection with projects
+                #                 (their project connection, instead, is via the SSG)
+                #self.fields['projlist'].initial = [x.pk for x in instance.gold_projects.all().order_by('name')] # moet dit anders? ivm SSG/AF als bron?
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonGoldForm-init")

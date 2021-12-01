@@ -443,7 +443,7 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
             qs = qs.reverse()
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("make_ordering")
+        oErr.DoError("seeker/views/make_ordering")
         lstQ = []
 
     return qs, order_heads, colnum
@@ -7971,6 +7971,9 @@ class CollectionListView(BasicList):
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
                 self.order_heads.append({'name': 'Manuscript', 'order': '', 'type': 'str', 'custom': 'manuscript'})
+                # Must also add to the order_cols and he order_default
+                self.order_cols.append("")
+                self.order_default.append("")
             self.filters = [ 
                 {"name": "Collection",             "id": "filter_collection",  "enabled": False},
                 {"name": "Project",                "id": "filter_project",     "enabled": False},
@@ -8077,8 +8080,6 @@ class CollectionListView(BasicList):
         listview_adaptations("collhist_list")
         
         return None
-
-
 
     def add_to_context(self, context, initial):
         if self.prefix == "priv":
@@ -10637,7 +10638,7 @@ class SermonGoldEdit(BasicDetails):
                 {'type': 'line', 'label': "Full text links:",       'value': instance.get_ftxtlinks_markdown(), 
                  'multiple': True, 'field_list': 'ftxtlist', 'fso': self.formset_objects[5]},
                   # Project2 HIER zie keyword! Die worden 
-                {'type': 'plain', 'label': "Project (SSG):",     'value': instance.get_project_ssg_markdown2(), 'field_list': 'projlist'},
+                {'type': 'plain', 'label': "Project (SSG):",     'value': instance.get_project_ssg_markdown2()}, # 'field_list': 'projlist'},
                 ]
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
