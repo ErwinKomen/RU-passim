@@ -2489,6 +2489,7 @@ var ru = (function ($, ru) {
                     .data(options['links'])
                     .join("path")
                     // .attr("stroke", "black")
+                    .attr("style", "stroke: #999;")
                     .attr("stroke-width", function (d) {
                       return Math.sqrt(2 * d.value);
                     });

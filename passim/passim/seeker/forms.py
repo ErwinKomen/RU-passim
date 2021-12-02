@@ -1283,10 +1283,19 @@ class SearchManuForm(PassimModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                                      widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
-                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 
+                                                          'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    signaturea  = forms.CharField(label=_("Signature"), required=False,
+                            widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 
+                                                          'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
+    signatureaid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+                                                          'style': 'width: 100%;', 'class': 'searching'}))
+    siglist_a   = ModelMultipleChoiceField(queryset=None, required=False, 
+                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...',
+                                                          'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1364,6 +1373,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
