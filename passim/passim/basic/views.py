@@ -379,8 +379,8 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                             else:
                                 s_q = Q(**{"{}__iexact".format(dbfield): val})
                     elif has_Q_value(keyS, oFields) and len(oFields[keyS]) > 0:
-                        if "$" in dbfield:
-                            s_q = oFields[keyS]
+                        # See issue #484: if "$" in dbfield:
+                        s_q = oFields[keyS]
                         enable_filter(filter_type, head_id)
 
                 elif keyS != "" and has_string_value(keyS, oFields):
