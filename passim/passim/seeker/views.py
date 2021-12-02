@@ -6322,6 +6322,7 @@ class ProjectEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
+
 class ProjectDetails(ProjectEdit):
     """Just the HTML page"""
     rtype = "html"
@@ -8001,8 +8002,8 @@ class CollectionListView(BasicList):
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
                 self.order_heads.append({'name': 'Manuscript', 'order': '', 'type': 'str', 'custom': 'manuscript'})
                 # Must also add to the order_cols and he order_default
-                self.order_cols.append("")
-                self.order_default.append("")
+                if len(self.order_default) < len(self.order_heads):
+                    self.order_default.append("")
             self.filters = [ 
                 {"name": "Collection",             "id": "filter_collection",  "enabled": False},
                 {"name": "Project",                "id": "filter_project",     "enabled": False},
