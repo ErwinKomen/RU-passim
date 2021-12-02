@@ -6340,8 +6340,12 @@ class ProjectListView(BasicList):
     # page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
     order_default = order_cols
-    order_heads = [{'name': 'Project', 'order': 'o=1', 'type': 'str', 'custom': 'project', 'main': True, 'linkdetails': True},
-                   {'name': '', 'order': '', 'type': 'str', 'custom': 'manulink' }]
+    order_heads = [{'name': 'Project',                'order': 'o=1', 'type': 'str', 'custom': 'project',   'main': True, 'linkdetails': True},
+                   {'name': 'Manuscripts',            'order': 'o=2', 'type': 'str', 'custom': 'manulink',  'align': 'right' },
+                   {'name': 'Sermons',                'order': 'o=3', 'type': 'str', 'custom': 'sermolink', 'align': 'right'},
+                   {'name': 'Authority files',        'order': 'o=4', 'type': 'str', 'custom': 'ssglink',   'align': 'right'},
+                   {'name': 'Historical collections', 'order': 'o=5', 'type': 'str', 'custom': 'hclink',    'align': 'right'}]
+                   
     filters = [ {"name": "Project",         "id": "filter_project",     "enabled": False},
                 {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
@@ -6359,7 +6363,7 @@ class ProjectListView(BasicList):
         oErr = ErrHandle()
         try:
             if custom == "manulink":
-                # Link to manuscripts in this project
+                # Link to the manuscripts in this project
                 count = instance.project2_manuscripts.exclude(mtype="tem").count()
                 url = reverse('search_manuscript')
                 if count > 0:
@@ -6367,6 +6371,31 @@ class ProjectListView(BasicList):
                  #       url, instance.id, count, count)) 
                     html.append("<a href='{}?manu-projlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
                         url, instance.id, count, count))
+
+            elif custom == "sermolink":
+                # Link to the sermons in this project
+                count = instance.project2_sermons.count() 
+                url = reverse('search_sermon')
+                if count > 0:                 
+                    html.append("<a href='{}?sermo-projlist={}'><span class='badge jumbo-3 clickable' title='{} sermons in this project'>{}</span></a>".format(
+                        url, instance.id, count, count))
+            
+            elif custom == "ssglink":
+                # Link to the authority files in this project
+                count = instance.project2_equalgold.count() 
+                url = reverse('equalgold_list')
+                if count > 0:                 
+                    html.append("<a href='{}?ssg-projlist={}'><span class='badge jumbo-3 clickable' title='{} authority files in this project'>{}</span></a>".format(
+                        url, instance.id, count, count))
+
+            elif custom == "hclink":
+                # Link to the historical collections in this project
+                count = instance.project2_collection.exclude(settype="pd").count() # Nog expliciet met HC rekening houden?
+                url = reverse('collhist_list')
+                if count > 0:                 
+                    html.append("<a href='{}?hist-projlist={}'><span class='badge jumbo-3 clickable' title='{} historical collections in this project'>{}</span></a>".format(
+                        url, instance.id, count, count))
+
             elif custom == "project":
                 sName = instance.name
                 if sName == "": sName = "<i>(unnamed)</i>"
