@@ -5416,39 +5416,45 @@ class Daterange(models.Model):
         return response
 
     def adapt_manu_dates(self):
-        manu_start = self.manuscript.yearstart
-        manu_finish = self.manuscript.yearfinish
-        current_start = 3000
-        current_finish = 0
-        for dr in self.manuscript.manuscript_dateranges.all():
-            if dr.yearstart < current_start: current_start = dr.yearstart
-            if dr.yearfinish > current_finish: current_finish = dr.yearfinish
+        oErr = ErrHandle()
+        bBack = False
+        try:
+            manu_start = self.manuscript.yearstart
+            manu_finish = self.manuscript.yearfinish
+            current_start = 3000
+            current_finish = 0
+            for dr in self.manuscript.manuscript_dateranges.all():
+                if dr.yearstart < current_start: current_start = dr.yearstart
+                if dr.yearfinish > current_finish: current_finish = dr.yearfinish
 
-        # Need any changes in *MANUSCRIPT*?
-        bNeedSaving = False
-        if manu_start != current_start:
-            self.manuscript.yearstart = current_start
-            bNeedSaving = True
-        if manu_finish != current_finish:
-            self.manuscript.yearfinish = current_finish
-            bNeedSaving = True
-        if bNeedSaving: self.manuscript.save()
-
-        # Need any changes in *CODICO*?
-        bNeedSaving = False
-        if self.codico != None:
-            codi_start = self.codico.yearstart
-            codi_finish = self.codico.yearfinish
-            if codi_start != current_start:
-                self.codico.yearstart = current_start
+            # Need any changes in *MANUSCRIPT*?
+            bNeedSaving = False
+            if manu_start != current_start:
+                self.manuscript.yearstart = current_start
                 bNeedSaving = True
-            if codi_finish != current_finish:
-                self.codico.yearfinish = current_finish
+            if manu_finish != current_finish:
+                self.manuscript.yearfinish = current_finish
                 bNeedSaving = True
-            if bNeedSaving: self.codico.save()
+            if bNeedSaving: self.manuscript.save()
 
-
-        return True
+            # Need any changes in *CODICO*?
+            bNeedSaving = False
+            if self.codico != None:
+                codi_start = self.codico.yearstart
+                codi_finish = self.codico.yearfinish
+                if codi_start != current_start:
+                    self.codico.yearstart = current_start
+                    bNeedSaving = True
+                if codi_finish != current_finish:
+                    self.codico.yearfinish = current_finish
+                    bNeedSaving = True
+                if bNeedSaving: self.codico.save()
+            bBack = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Daterange/adapt_manu_dates")
+            
+        return bBack
 
 
 class Author(models.Model):

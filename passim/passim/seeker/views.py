@@ -4361,7 +4361,8 @@ class SermonEdit(BasicDetails):
             idno)]
         #    ... as well as the *title* of the Codico to which I belong
         codico = instance.msitem.codico
-        #codi_title = "?" if codico == None or codico.name == "" else codico.name
+
+        # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
         # Issue #422: change the text of the [codi_title]
         codi_title = "cod. unit. {}".format(codico.order)
         title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
