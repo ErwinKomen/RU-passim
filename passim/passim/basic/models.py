@@ -72,7 +72,7 @@ class UserSearch(models.Model):
                         bFound = True
                         break
                 if not bFound:
-                    oUser['users'].append(dict(username=username, count=1))
+                    history['users'].append(dict(username=username, count=1))
                 obj.history = json.dumps(history)
                 obj.save()
 

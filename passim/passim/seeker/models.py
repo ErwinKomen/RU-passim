@@ -7328,6 +7328,7 @@ class Collection(models.Model):
         return self.name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        oErr = ErrHandle()
         # Double check the number of authors, if this is settype HC
         if self.settype == "hc":
             ssg_id = self.super_col.all().values('super__id')
@@ -7335,8 +7336,14 @@ class Collection(models.Model):
             self.ssgauthornum = authornum
         # Adapt the save date
         self.saved = get_current_datetime()
-        respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
-        return respons
+
+        # Double checking for issue #484 ========================================================
+        if self.name == "" or self.owner_id == "" or self.owner == None:
+            oErr.Status("Collection/save issue484: name=[{}] type=[{}]".format(self.name, self.type))
+        # =======================================================================================
+
+        response = super(Collection, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def freqsermo(self):
         """Frequency in manifestation sermons"""
