@@ -12739,7 +12739,7 @@ class BasketUpdate(BasicPart):
     s_form = SermonForm
     s_field = "sermon"
     colltype = "sermo"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def add_to_context(self, context):
         # Reset the redirect page
@@ -13008,7 +13008,7 @@ class BasketUpdateManu(BasketUpdate):
     s_form = SearchManuForm
     s_field = "manu"
     colltype = "manu"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -13028,7 +13028,7 @@ class BasketUpdateGold(BasketUpdate):
     s_form = SermonGoldForm
     s_field = "gold"
     colltype = "gold"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -13040,7 +13040,7 @@ class BasketUpdateGold(BasketUpdate):
     
 
 class BasketUpdateSuper(BasketUpdate):
-    """Update contents of the sermondescr basket"""
+    """Update contents of the EqualGold basket"""
 
     MainModel = EqualGold
     clsBasket = BasketSuper
@@ -13048,7 +13048,7 @@ class BasketUpdateSuper(BasketUpdate):
     s_form = SuperSermonGoldForm
     s_field = "super"
     colltype = "super"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
