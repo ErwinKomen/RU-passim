@@ -25,7 +25,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
-                        'feastupdate', 'codicocopy', 'passim_project_name_manu'],
+                        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -746,6 +746,74 @@ def adapt_passim_project_name_manu():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_doublecodico():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    # Change the codicological unit for manuscripts that appear to have more than one
+    try:
+        codico_id = []
+
+        # Walk all codicological units in order
+        qs = Codico.objects.all().order_by('id')
+        for codico in qs:
+            # Get the manuscript for this codicological unit
+            manuscript = codico.manuscript
+            manu_other = []
+            manu_codico = {}
+            # Get all the MsItems for this codico
+            for obj in codico.codicoitems.exclude(manu=manuscript).order_by('manu__id'):
+                # Add the id of the corresponding manuscript
+                manu_id = obj.manu.id
+                if not manu_id in manu_other:
+                    manu_other.append(manu_id)
+                # Possibly get the relation from manuscript to the proper codico
+                if not manu_id in manu_codico:
+                    manu_codico[manu_id] = Codico.objects.filter(manuscript=obj.manu).first()
+            if len(manu_other) > 0:
+                # Move all the relevant MSitems to the proper Codico
+                with transaction.atomic():
+                    for manu_id in manu_other:
+                        correct_codico = manu_codico[manu_id]
+                        for obj in MsItem.objects.filter(codico=codico, manu_id=manu_id):
+                            obj.codico = correct_codico
+                            obj.save()
+
+        ## Walk all manuscripts in order
+        #qs = Manuscript.objects.all().order_by('id')
+        #for manu in qs:
+        #    if manu.id == 2951:
+        #        iStop = 1
+        #    # Walk all the codicological units connected to this manuscript
+        #    order = 0
+        #    for codi in manu.manuscriptcodicounits.all().order_by('id'):
+        #        if codi.id == 717:
+        #            iStop = 1
+        #        order += 1
+        #        if codi.id in codico_id:
+        #            # Need to create a new codicological unit based on the existing one
+        #            codi_new = Codico.objects.create(
+        #                name=codi.name, support=codi.support, extent=codi.extent,
+        #                format=codi.format, order=order, pagefirst=codi.pagefirst, pagelast=codi.pagelast,
+        #                origin=codi.origin, manuscript=manu
+        #                )
+        #            # Now re-locate all MsItems tied to the wrong codicological unit
+        #            with transaction.atomic():
+        #                for obj in MsItem.objects.filter(codico=codico_id, manu=manu):
+        #                    obj.codico = codi_new
+        #                    obj.save()
+
+        #        else:
+        #            codico_id.append(codi.id)
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 
 def adapt_passim_project_name_hc(): 
     oErr = ErrHandle()

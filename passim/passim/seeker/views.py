@@ -8121,11 +8121,21 @@ class CollectionListView(BasicList):
         return context
 
     def get_own_list(self):
-        # Get the user
-        username = self.request.user.username
-        user = User.objects.filter(username=username).first()
-        # Get to the profile of this user
-        qs = Profile.objects.filter(user=user)
+        oErr = ErrHandle()
+        qs = None
+        try:
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Get to the profile of this user
+            if user is None:
+                qs = Profile.objects.none()
+                oErr.Status("CollectionListView/get_own_list: unknown user is [{}]".format(username))
+            else:
+                qs = Profile.objects.filter(user=user)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/get_own_list")
         return qs
 
     def adapt_search(self, fields):
@@ -8237,7 +8247,10 @@ class CollectionListView(BasicList):
         elif custom == "created":
             sBack = get_crpp_date(instance.created, True)
         elif custom == "owner":
-            sBack = instance.owner.user.username
+            if instance.owner is None:
+                sBack = "(no user)"
+            else:
+                sBack = instance.owner.user.username
         elif custom == "authors":
             sBack = instance.get_authors_markdown()
         elif custom == "authcount":
@@ -9111,6 +9124,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
             id = None if obj == None else obj.id
             return id
 
+        # Note: use [errHandle]
         try:
             # Make sure to set the correct redirect page
             if instance:
@@ -9121,10 +9135,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
             if 'manu-hlist' in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
+                # Debugging:
+                str_hlist = json.dumps(hlist, indent=2)
 
-                #if method == "july2020":
-                # The new July20920 method that uses different parameters and uses MsItem
-                    
                 # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                 head_to_id = {}
                 deletables = []
@@ -9171,6 +9184,10 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             if codi == None or codi.id != codi_id:
                                 codi = Codico.objects.filter(id=codi_id).first()
 
+                        # Safe guarding
+                        if codi is None:
+                            errHandle.Status("ManuscriptHierarchy: codi is none")
+                            x = msitem.itemsermons.first()
                         # Possibly set the msitem codi
                         if msitem.codico != codi:
                             msitem.codico = codi
@@ -9185,10 +9202,10 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         # Possibly adapt the [shead] title and locus
                         itemhead = msitem.itemheads.first()
                         if itemhead and 'title' in item and 'locus' in item:
-                            title= item['title']
+                            title= item['title'].strip()
                             locus = item['locus']
                             if itemhead.title != title or itemhead.locus != locus:
-                                itemhead.title = title
+                                itemhead.title = title.strip()
                                 itemhead.locus = locus
                                 # Save the itemhead
                                 itemhead.save()
@@ -10077,7 +10094,7 @@ class CodicoEdit(BasicDetails):
                 {'type': 'plain', 'label': "Title:",        'value': instance.name,                     'field_key': 'name'},
                 {'type': 'safe',  'label': "Order:",        'value': instance.order},
                 {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
+                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0]},   #, 'template_selection': 'ru.passim.litref_template' },
                 {'type': 'plain', 'label': "Support:",      'value': instance.support,                  'field_key': 'support'},
                 {'type': 'plain', 'label': "Extent:",       'value': instance.extent,                   'field_key': 'extent'},
                 {'type': 'plain', 'label': "Format:",       'value': instance.format,                   'field_key': 'format'},

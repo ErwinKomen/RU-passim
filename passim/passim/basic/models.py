@@ -64,6 +64,7 @@ class UserSearch(models.Model):
                 # Make sure there are users
                 if not 'users' in history:
                     history['users'] = []
+                    oErr.Status("Usersearch/add_search: added 'users' to history: {}".format(json.dumps(history)))
                 bFound = False
                 for oUser in history['users']:
                     if oUser['username'] == username:

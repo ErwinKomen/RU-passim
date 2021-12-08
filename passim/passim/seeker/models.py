@@ -3198,8 +3198,7 @@ class Manuscript(models.Model):
 
     # [m] Many-to-many: one manuscript can belong to one or more projects
     projects = models.ManyToManyField(Project2, through="ManuscriptProject", related_name="project2_manuscripts")
-
-   
+       
 
     # Scheme for downloading and uploading
     specification = [
@@ -3278,7 +3277,6 @@ class Manuscript(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("adapt_projects")
         return bBack
-
 
     def adapt_hierarchy():
         bResult = True
@@ -4228,6 +4226,9 @@ class Manuscript(models.Model):
         manu_dst = self
         repair = ['parent', 'firstchild', 'next']
 
+        # Figure out what the codico of me is
+        codico = Codico.objects.filter(manuscript=self).first()
+
         # copy all the sermons...
         msitems = []
         with transaction.atomic():
@@ -4238,6 +4239,8 @@ class Manuscript(models.Model):
                 dst.pk = None
                 dst.manu = manu_dst     # This sets the destination's FK for the manuscript
                                         # Does this leave the original unchanged? I hope so...:)
+                # Make sure the codico is set correctly
+                dst.codico = codico
                 dst.save()
                 src = MsItem.objects.filter(id=src_id).first()
                 msitems.append(dict(src=src, dst=dst))
@@ -5391,6 +5394,7 @@ class Daterange(models.Model):
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
     manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+    # [0-1] Well actually each daterange belongs (or should belong) to exactly one Codico
     codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
 
     def __str__(self):
@@ -5836,7 +5840,7 @@ class EqualGold(models.Model):
                 self.srchexplicit = srchexplicit
 
             # Double check the number and the code
-            if self.author:
+            if self != None and self.author_id != None and self.author != None:
                 # Get the author number
                 auth_num = self.author.get_number()
                 
@@ -7482,7 +7486,6 @@ class Collection(models.Model):
             lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
         sBack = ", ".join(lHtml)
         return sBack
-
 
     def get_readonly_display(self):
         response = "yes" if self.readonly else "no"

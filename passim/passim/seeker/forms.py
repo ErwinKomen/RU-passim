@@ -317,6 +317,7 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
     model = Daterange
     search_fields = [ 'yearstart__icontains', 'yearfinish__icontains' ]
     addonly = False
+    codico = None
 
     def label_from_instance(self, obj):
         if obj.yearstart == obj.yearfinish:
@@ -327,7 +328,10 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         if self.addonly:
-            qs = Daterange.objects.none()
+            if self.codico is None:
+                qs = Daterange.objects.none()
+            else:
+                qs = self.codico.codico_dateranges.all()
         else:
             qs = Daterange.objects.all().order_by('yearstart').distinct()
         return qs
@@ -3704,6 +3708,7 @@ class CodicoForm(PassimModelForm):
                 self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
                 self.fields['cprovlist'].widget.manu = instance
+                self.fields['datelist'].widget.codico = instance
 
         except:
             msg = oErr.get_error_message()
