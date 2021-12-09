@@ -5533,8 +5533,8 @@ class ProvenanceDetails(ProvenanceEdit):
         sort_end = '</span>'
 
         # List of Manuscripts that use this provenance
-        sermons = dict(title="Manuscripts with this provenance", prefix="mprov")
-        if resizable: sermons['gridclass'] = "resizable"
+        manuscripts = dict(title="Manuscripts with this provenance", prefix="mprov")
+        if resizable: manuscripts['gridclass'] = "resizable"
 
         rel_list =[]
         qs = instance.manuscripts_provenances.all().order_by('manuscript__idno')
@@ -5560,14 +5560,58 @@ class ProvenanceDetails(ProvenanceEdit):
             # Add this line to the list
             rel_list.append(dict(id=item.id, cols=rel_item))
 
-        sermons['rel_list'] = rel_list
+        manuscripts['rel_list'] = rel_list
 
-        sermons['columns'] = [
+        manuscripts['columns'] = [
             '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
             '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
             '{}<span>Note</span>{}'.format(sort_start, sort_end)
             ]
-        related_objects.append(sermons)
+        related_objects.append(manuscripts)
+
+        # List of Codicos that use this provenance
+        codicos = dict(title="Codicological units with this provenance", prefix="mcodi")
+        if resizable: codicos['gridclass'] = "resizable"
+
+        rel_list =[]
+        qs = instance.codico_provenances.all().order_by('codico__manuscript__idno', 'codico__order')
+        for item in qs:
+            codico = item.codico
+            manu = codico.manuscript
+            url = reverse('manuscript_details', kwargs={'pk': manu.id})
+            url_c = reverse('codico_details', kwargs={'pk': codico.id})
+            url_pc = reverse('provenancecod_details', kwargs={'pk': item.id})
+            rel_item = []
+
+            # S: Order number for this manuscript
+            add_rel_item(rel_item, index, False, align="right")
+            index += 1
+
+            # Manuscript
+            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
+            add_rel_item(rel_item, manu_full, False, main=False, link=url)
+
+            # Codico
+            codico_full = "<span class='badge signature ot'>{}</span>".format(codico.order)
+            add_rel_item(rel_item, codico_full, False, main=False, link=url_c)
+
+            # Note for this provenance
+            note = "(none)" if item.note == None or item.note == "" else item.note
+            add_rel_item(rel_item, note, False, nowrap=False, main=True, link=url_pc,
+                         title="Note for this provenance-codico relation")
+
+            # Add this line to the list
+            rel_list.append(dict(id=item.id, cols=rel_item))
+
+        codicos['rel_list'] = rel_list
+
+        codicos['columns'] = [
+            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Codicological unit</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Note</span>{}'.format(sort_start, sort_end)
+            ]
+        related_objects.append(codicos)
 
         # Add all related objects to the context
         context['related_objects'] = related_objects
