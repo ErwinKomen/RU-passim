@@ -15,6 +15,7 @@ from django.db.models.query import QuerySet
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory, ValidationError
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
@@ -8754,15 +8755,13 @@ class ManuscriptEdit(BasicDetails):
 
                 # Action depends on template/not
                 if not istemplate:
-                    if user_is_superuser(self.request):
-                        # Button to download this manuscript as JSON
-                        lbuttons.append(dict(title="Download manuscript as JSON file", 
-                                             click="manuscript_download_json", label="JSON"))
-
-                    # Button to download this manuscript as EXCEL
-                    # downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
-                    lbuttons.append(dict(title="Download manuscript as Excel file", 
-                                         click="manuscript_download", label="Download"))
+                    # Also add the manuscript download code
+                    local_context = dict(
+                        ajaxurl     = reverse("manuscript_download", kwargs={'pk': instance.id}),
+                        is_superuser=user_is_superuser(self.request),
+                        csrf        = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
+                                                get_token(self.request)))
+                    lbuttons.append(dict(html=render_to_string('seeker/manuscript_download.html', local_context, self.request)))
 
                     if instance.mtype != "rec":
                         # Add a button so that the user can import sermons + hierarchy from an existing template
@@ -8778,31 +8777,30 @@ class ManuscriptEdit(BasicDetails):
                 lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
 
                 # Build the HTML on the basis of the above
-                lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+                lhtml.append("<div class='row'><div class='col-md-12 container-small' align='right'><form method='post'>")
                 for item in lbuttons:
-                    idfield = ""
-                    if 'click' in item:
-                        ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
-                    elif 'submit' in item:
-                        ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
-                    elif 'open' in item:
-                        ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                    if 'html' in item:
+                        lhtml.append(item['html'])
                     else:
-                        ref = " href='{}'".format(item['href'])
-                    if 'id' in item:
-                        idfield = " id='{}'".format(item['id'])
-                    lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
-                    lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
-                lhtml.append("</div></div>")
+                        idfield = ""
+                        if 'click' in item:
+                            ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
+                        elif 'submit' in item:
+                            ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                        elif 'open' in item:
+                            ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                        else:
+                            ref = " href='{}'".format(item['href'])
+                        if 'id' in item:
+                            idfield = " id='{}'".format(item['id'])
+                        lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
+                        lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
+                lhtml.append("</form></div></div>")
 
                 if not istemplate:
                     # Add HTML to allow for the *creation* of a template from this manuscript
                     local_context = dict(manubase=instance.id)
                     lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
-
-                    # Also add the manuscript download code
-                    local_context = dict(ajaxurl = reverse("manuscript_download", kwargs={'pk': instance.id}))
-                    lhtml.append(render_to_string('seeker/manuscript_download.html', local_context, self.request))
 
                     # Add HTML to allow the user to choose sermons from a template
                     local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
