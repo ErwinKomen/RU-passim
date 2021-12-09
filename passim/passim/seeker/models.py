@@ -10091,7 +10091,7 @@ class ProvenanceCod(models.Model):
         prov = self.provenance
         sName = ""
         sLoc = ""
-        url = reverse("provenance_details", kwargs={'pk': self.id})
+        url = reverse("provenance_details", kwargs={'pk': prov.id})
         if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
         if prov.location != None: sLoc = prov.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
@@ -10113,7 +10113,7 @@ class OriginCod(models.Model):
         ori = self.origin
         sName = ""
         sLoc = ""
-        url = reverse("origin_details", kwargs={'pk': self.id})
+        url = reverse("origin_details", kwargs={'pk': origin.id})
         if ori.name != None and ori.name != "": sName = "{}: ".format(ori.name)
         if ori.location != None: sLoc = ori.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
