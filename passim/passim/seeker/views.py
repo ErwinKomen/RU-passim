@@ -12799,7 +12799,9 @@ class BasketUpdate(BasicPart):
                         with transaction.atomic():
                             for item in search_id:
                                 kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.create(**kwargs)
+                                obj = self.clsBasket.objects.filter(**kwargs).first()
+                                if obj == None:
+                                    self.clsBasket.objects.create(**kwargs)
                         # Process history
                         profile.history(operation, self.colltype, oFields)
                     elif search_count > 0  and operation == "remove":
