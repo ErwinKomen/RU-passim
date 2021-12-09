@@ -18,14 +18,15 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
+    Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
-                        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico'],
+                        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
+                        'codico_origin'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -413,6 +414,39 @@ def add_codico_to_manuscript(manu):
         msg = oErr.get_error_message()
         oErr.DoError("add_codico_to_manuscript")
         bResult = False
+    return bResult, msg
+
+def adapt_codico_origin():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    # Issue #427:
+    #   Create one OriginCod object for each Origin that is part of a Codico
+    #   Then set the 'origin' field of that Codico to None
+    try:
+        qs = Codico.objects.all()
+        lst_codico = []
+        with transaction.atomic():
+            for codico in qs:
+                # Does this one have an origin set?
+                if not codico.origin is None:
+                    # Check if an appropriate OriginCod is already there
+                    obj = OriginCod.objects.filter(codico=codico).first()
+                    if obj is None:
+                        # Create one
+                        obj = OriginCod.objects.create(codico=codico, origin=codico.origin)
+                    lst_codico.append(codico)
+        # Set the 'origin' field to none
+        with transaction.atomic():
+            for codico in lst_codico:
+                codico.origin = None
+                codico.save()
+ 
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
     return bResult, msg
 
 # =========== Part of sermon_list ==================

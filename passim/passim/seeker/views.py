@@ -69,7 +69,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
-    CodicoForm, CodicoProvForm, ProvenanceCodForm 
+    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -80,7 +80,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, ProvenanceCod, CodicoKeyword, Reconstruction, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
@@ -4158,6 +4158,47 @@ class OriginDetails(OriginEdit):
     """Like Origin Edit, but then html output"""
     rtype = "html"
     
+
+class OriginCodEdit(BasicDetails):
+    """The details of one 'origin'"""
+
+    model = OriginCod
+    mForm = OriginCodForm
+    prefix = 'cori'
+    title = "CodicoOrigin"
+    history_button = False # True
+    # rtype = "json"
+    # mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Origin:",   'value': instance.get_origin()},
+            {'type': 'plain', 'label': "Note:",         'value': instance.note,   'field_key': 'note'     },
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        context['listview'] = reverse("codico_details", kwargs={'pk': instance.codico.id})
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class OriginCodDetails(OriginCodEdit):
+    """Like OriginCod Edit, but then html output"""
+    rtype = "html"
+        
 
 class SermonEdit(BasicDetails):
     """The editable part of one sermon description (manifestation)"""
@@ -8812,10 +8853,17 @@ class ManuscriptEdit(BasicDetails):
         lkv.append(dict(label="Extent", value=codico.extent))
         lkv.append(dict(label="Format", value=codico.format))
         lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
-        lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
+        lkv.append(dict(label="Origin", value=self.get_codiorigin_markdown(codico)))
         lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
         lkv.append(dict(label="Notes", value=codico.get_notes_markdown()))
         return lkv
+
+    def get_codiorigin_markdown(self, codico):
+        """Calculate a collapsable table view of the origins for this codico, for Codico details view"""
+
+        context = dict(codi=codico)
+        sBack = render_to_string("seeker/codi_origins.html", context, self.request)
+        return sBack
 
     def get_codiprovenance_markdown(self, codico):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
@@ -9452,7 +9500,8 @@ class ManuscriptListView(BasicList):
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origin',                 
+            {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origins__location|manuscriptcodicounits__origins', 
+             # Issue #427. This was: 'manuscriptcodicounits__origin',                 
              'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
             {'filter': 'project',       'fkfield': 'projects',               'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
@@ -10038,13 +10087,19 @@ class CodicoEdit(BasicDetails):
                                          form=CodicoProvForm, min_num=0,
                                          fk_name = "codico",
                                          extra=0, can_delete=True, can_order=False)
+    CoriFormSet = inlineformset_factory(Codico, OriginCod,
+                                         form=CodicoOriginForm, min_num=0, max_num=1,
+                                         fk_name = "codico",
+                                         extra=0, can_delete=True, can_order=False)
 
     formset_objects = [{'formsetClass': CdrFormSet,   'prefix': 'cdr',   'readonly': False, 'noinit': True, 'linkfield': 'codico'},
-                       {'formsetClass': CprovFormSet, 'prefix': 'cprov', 'readonly': False, 'noinit': True, 'linkfield': 'codico'}]
+                       {'formsetClass': CprovFormSet, 'prefix': 'cprov', 'readonly': False, 'noinit': True, 'linkfield': 'codico'},
+                       {'formsetClass': CoriFormSet,  'prefix': 'cori',  'readonly': False, 'noinit': True, 'linkfield': 'codico'}]
 
     stype_edi_fields = ['name', 'order', 'origin', 'support', 'extent', 'format', 
                         'Daterange', 'datelist',
-                        'ProvenanceCod', 'cprovlist']
+                        'ProvenanceCod', 'cprovlist',
+                        'OriginCod', 'corilist']
     
     def custom_init(self, instance):
         if instance != None:
@@ -10105,9 +10160,12 @@ class CodicoEdit(BasicDetails):
             team_group = app_editor
             mainitems_m2m = [
                 {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),  'field_list': 'kwlist'},
-                {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                # Was: (see issue #427)
+                #      {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                {'type': 'plain', 'label': "Origin:",       'value': self.get_origin_markdown(instance),    
+                 'multiple': True, 'field_list': 'corilist', 'fso': self.formset_objects[2]},
                 {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                    'multiple': True, 'field_list': 'cprovlist', 'fso': self.formset_objects[1] }
+                 'multiple': True, 'field_list': 'cprovlist', 'fso': self.formset_objects[1] }
                 ]
             for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -10167,6 +10225,13 @@ class CodicoEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_origin_markdown(self, instance):
+        """Calculate a collapsable table view of the origins for this codico, for Codico details view"""
+
+        context = dict(codi=instance)
+        sBack = render_to_string("seeker/codi_origins.html", context, self.request)
+        return sBack
+
     def get_provenance_markdown(self, instance):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
 
@@ -10212,7 +10277,18 @@ class CodicoEdit(BasicDetails):
                     if prov_new != None:
                         form.instance.provenance = prov_new
                         form.instance.note = note
-
+                elif prefix == "cori":
+                    # Don't allow more than one origin
+                    count = instance.origins.count()
+                    if count < 1:
+                        # See issue #427
+                        note = cleaned.get("note")
+                        origin_new = cleaned.get("origin_new")
+                        if origin_new != None:
+                            form.instance.origin = origin_new
+                            form.instance.note = note
+                    else:
+                        errors.append("A codicological unit may not have more than one Origin")
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -10243,6 +10319,10 @@ class CodicoEdit(BasicDetails):
             # (2) 'provenances'
             cprovlist = form.cleaned_data['cprovlist']
             adapt_m2m(ProvenanceCod, instance, "codico", cprovlist, "provenance", extra=['note'], related_is_through = True)
+
+            # (3) 'origins'
+            corilist = form.cleaned_data['corilist']
+            adapt_m2m(OriginCod, instance, "codico", corilist, "origin", extra=['note'], related_is_through = True)
 
             # Process many-to-ONE changes
             # (1) links from Daterange to Codico

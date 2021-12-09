@@ -1653,9 +1653,12 @@ class BasicDetails(DetailView):
                                             # Signal that the *FORM* needs refreshing, because the formset changed
                                             bFormsetChanged = True
                                         except:
-                                            msg = oErr.get_error_message()
-                                            oErr.DoError("BasicDetails/get_context_data")
-                                            context['errors'] = {'subform':  msg }
+                                            if hasattr(subform, "warning"):
+                                                context['errors'] = getattr(subform, "warning")
+                                            else:
+                                                msg = oErr.get_error_message()
+                                                oErr.DoError("BasicDetails/get_context_data")
+                                                context['errors'] = {'subform':  msg }
 
                                 if formset.is_valid():
                                     # Load an explicitly empty formset

@@ -110,6 +110,8 @@ urlpatterns = [
     url(r'^origin/list', OriginListView.as_view(), name='origin_list'),
     url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetails.as_view(), name='origin_details'),
     url(r'^origin/edit(?:/(?P<pk>\d+))?/$', OriginEdit.as_view(), name='origin_edit'),
+    url(r'^origincod/details(?:/(?P<pk>\d+))?/$', OriginCodDetails.as_view(), name='origincod_details'),
+    url(r'^origincod/edit(?:/(?P<pk>\d+))?/$', OriginCodEdit.as_view(), name='origincod_edit'),
 
     url(r'^library/list', LibraryListView.as_view(), name='library_list'),
     url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetails.as_view(), name='library_details'),

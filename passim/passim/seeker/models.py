@@ -4902,6 +4902,9 @@ class Codico(models.Model):
     # ============== MANYTOMANY connections
     # [m] Many-to-many: one codico can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceCod")
+    # [m] Many-to-many: one codico can have a series of origins (though this series is limited to one)
+    #                   and each of these can have its own note attached to it
+    origins = models.ManyToManyField("Origin", through="OriginCod")
      # [m] Many-to-many: keywords per Codico
     keywords = models.ManyToManyField(Keyword, through="CodicoKeyword", related_name="keywords_codi")
     # [m] Many-to-many: one codico can have a series of user-supplied comments
@@ -5041,7 +5044,9 @@ class Codico(models.Model):
                     dates.append(obj.__str__())
                 sBack = json.dumps(dates)
             elif path == "origin":
-                sBack = self.get_origin()
+                # sBack = self.get_origin()
+                # See issue #427
+                sBack = self.get_origin_markdown(plain=True)
             elif path == "provenances":
                 sBack = self.get_provenance_markdown(plain=True)
         except:
@@ -5269,18 +5274,54 @@ class Codico(models.Model):
                 sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
         return sBack
 
-    def get_origin_markdown(self):
+    def get_origin_markdown(self, plain=False, table=True):
         sBack = "-"
-        if self.origin:
-            # Just take the bare name of the origin
-            sBack = self.origin.name
-            if self.origin.location:
-                # Add the actual location if it is known
-                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
-            # Get the url to it
-            url = reverse('origin_details', kwargs={'pk': self.origin.id})
-            # Adapt what we return
-            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
+
+        lHtml = []
+        # Visit all origins
+        order = 0
+        if not plain: 
+            if table: lHtml.append("<table><tbody>")
+        # for prov in self.origins.all().order_by('name'):
+        for codori in self.codico_origins.all().order_by('origin__name'):
+            order += 1
+            # Get the URL
+            origin = codori.origin
+            url = reverse("origin_details", kwargs = {'pk': origin.id})
+            sNote = codori.note
+            if sNote == None: sNote = ""
+
+            if not plain: 
+                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+            sLocName = "" 
+            if origin.location!=None:
+                if plain:
+                    sLocName = origin.location.name
+                else:
+                    sLocName = " ({})".format(origin.location.name)
+            sName = "-" if origin.name == "" else origin.name
+            sLoc = "{} {}".format(sName, sLocName)
+
+            if plain:
+                sCodOri = dict(origin=origin.name, location=sLocName)
+            else:
+                sOriLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                if table:
+                    sCodOri = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        sOriLink, sNote)
+                else:
+                    sCodOri = sOriLink
+
+            lHtml.append(sCodOri)
+
+        if not plain: 
+            if table: lHtml.append("</tbody></table>")
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            # sBack = ", ".join(lHtml)
+            sBack = "".join(lHtml)
         return sBack
 
     def get_project_markdown(self):
@@ -5291,7 +5332,7 @@ class Codico(models.Model):
 
     def get_provenance_markdown(self, plain=False, table=True):
         lHtml = []
-        # Visit all literature references
+        # Visit all provenances
         order = 0
         if not plain: 
             if table: lHtml.append("<table><tbody>")
@@ -10053,6 +10094,28 @@ class ProvenanceCod(models.Model):
         url = reverse("provenance_details", kwargs={'pk': self.id})
         if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
         if prov.location != None: sLoc = prov.location.name
+        sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
+        return sBack
+
+
+class OriginCod(models.Model):
+    """Link between Origin and Codico"""
+
+    # [1] The origin
+    origin = models.ForeignKey(Origin, related_name = "codico_origins", on_delete=models.CASCADE)
+    # [1] The codico this origin is written on 
+    codico = models.ForeignKey(Codico, related_name = "codico_origins", on_delete=models.CASCADE)
+    # [0-1] Further details are required too
+    note = models.TextField("Codico-specific origin note", blank=True, null=True)
+
+    def get_origin(self):
+        sBack = ""
+        ori = self.origin
+        sName = ""
+        sLoc = ""
+        url = reverse("origin_details", kwargs={'pk': self.id})
+        if ori.name != None and ori.name != "": sName = "{}: ".format(ori.name)
+        if ori.location != None: sLoc = ori.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
         return sBack
 
