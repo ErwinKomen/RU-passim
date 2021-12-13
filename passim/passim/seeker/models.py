@@ -1479,6 +1479,21 @@ class Profile(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("profile/add_visit")
 
+    def get_editor_status(self, project, is_editor=False, is_developer=False, is_moderator=False, is_superuser=False):
+        """What are the rights for this person for the given [project]??"""
+
+        # Get the overal status of this person
+        rights = ""
+        if is_editor or is_developer or is_moderator or is_superuser:
+            # Check the rights level for the particular project
+            obj = ProjectEditor.objects.filter(project=project, profile=self).first()
+            if not obj is None:
+                # Some relationship exists...
+                rights = obj.rights
+
+        # Return the rights level that was found
+        return rights
+
     def get_stack(username):
         """Get the stack as a list from the current user"""
 
