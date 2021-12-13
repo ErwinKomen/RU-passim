@@ -63,6 +63,7 @@ CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 YESNO_TYPE = "seeker.yesno"
+RIGHTS_TYPE = "seeker.rights"
 VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
@@ -1409,17 +1410,18 @@ class Profile(models.Model):
     # [1] Current size of the user's basket (super sermons gold)
     basketsize_super = models.IntegerField("Basket size super sermons gold", default=0)
     
+    # ------------------- MANY_TO_MANY fields ==========================================================
     # Many-to-many field for the contents of a search basket per user (sermons)
-    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
-    
+    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")    
     # Many-to-many field for the contents of a search basket per user (manuscripts)
     basketitems_manu = models.ManyToManyField("Manuscript", through="BasketMan", related_name="basketitems_user_manu")
-
     # Many-to-many field for the contents of a search basket per user (sermons gold)
     basketitems_gold = models.ManyToManyField("SermonGold", through="BasketGold", related_name="basketitems_user_gold")
-
     # Many-to-many field for the contents of a search basket per user (super sermons gold)
     basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
+
+    # Many-to-many field that links this person/profile with particular projects
+    projects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="projects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -10457,6 +10459,26 @@ class CollectionProject(models.Model):
     project = models.ForeignKey(Project2, related_name="collection_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+
+class ProjectEditor(models.Model):
+    """Relation between a Profile (=person) and a Project"""
+
+    # [1] The link is between a Profile instance ...
+    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+
+    # [1] The rights for this person. Right now that is by default "edi" = editing
+    rights = models.CharField("Rights", choices=build_abbr_list(RIGHTS_TYPE), max_length=5, default="edi")
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.profile.user.username, self.project.name)
+        return sBack
 
 
 class Template(models.Model):
