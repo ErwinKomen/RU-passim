@@ -2222,7 +2222,11 @@ class BasicPart(View):
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
                     modelname = self.MainModel.__name__
                     obj_id = "n" if self.obj == None else self.obj.id
-                    extension = "xlsx" if self.dtype == "excel" else self.dtype
+                    extension = self.dtype
+                    if self.dtype == "excel":
+                        extension = "xlsx"
+                    elif self.dtype == "tei" or self.dtype == "xml-tei":
+                        extension = "xml"
                     sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":

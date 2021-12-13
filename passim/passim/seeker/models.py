@@ -38,6 +38,8 @@ from pyzotero import zotero
 # import xmltodict
 from xml.dom import minidom
 
+re_number = r'\d+'
+
 STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
@@ -283,6 +285,23 @@ def get_crpp_date(dtThis, readable=False):
         # Model: yyyy-MM-dd'T'HH:mm:ss
         sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
     return sDate
+
+def get_locus_range(locus):
+    num_one = 0
+    num_two = 3000
+    oErr = ErrHandle()
+    try:
+        if locus != None and locus != "":
+            lst_locus = re.findall(r'\d+', locus)
+            if len(lst_locus) > 0:
+                num_one = lst_locus[0]
+                num_two = num_one
+                if len(lst_locus) > 1:
+                    num_two = lst_locus[-1]
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_locus_range")
+    return num_one, num_two
 
 def get_now_time():
     """Get the current time"""
@@ -2225,6 +2244,8 @@ class Origin(models.Model):
     def get_location(self):
         if self.location:
             sBack = self.location.name
+        elif self.name:
+            sBack = self.name
         else:
             sBack = "-"
 
@@ -3727,6 +3748,28 @@ class Manuscript(models.Model):
             oErr.DoError("get_country")
         return country
 
+    def get_dates(self):
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " (see {})".format(obj.reference.get_full_markdown())
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "{} {}".format(years, ref)
+            lhtml.append(item)
+
+        return ", ".join(lhtml)
+
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
 
@@ -3847,6 +3890,14 @@ class Manuscript(models.Model):
         else:
             lib = "-"
         return lib
+
+    def get_library_city(self):
+        sBack = ""
+        if self.lcity != None:
+            sBack = self.lcity.name
+        elif self.library != None:
+            sBack = self.library.lcity.name
+        return sBack
 
     def get_library_markdown(self):
         sBack = "-"
@@ -5169,6 +5220,28 @@ class Codico(models.Model):
             oErr.DoError("Codico/custom_set")
             bResult = False
         return bResult
+
+    def get_dates(self):
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.codico_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " (see {})".format(obj.reference.get_full_markdown())
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "{} {}".format(years, ref)
+            lhtml.append(item)
+
+        return ", ".join(lhtml)
 
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
@@ -7761,6 +7834,11 @@ class MsItem(models.Model):
                     oBack = self.codico
         return oBack
 
+    def get_children(self):
+        """Get all my children in the correct order"""
+
+        return self.sermon_parent.all().order_by("order")
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""
@@ -7775,6 +7853,17 @@ class SermonHead(models.Model):
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
     #           when the MsItem is removed, its SermonHead is too
     msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemheads")
+
+    def get_locus_range(self):
+        return get_locus_range(self.locus)
+
+    def locus_first(self):
+        first, last = self.get_locus_range()
+        return first
+
+    def locus_last(self):
+        first, last = self.get_locus_range()
+        return last
 
 
 class SermonDescr(models.Model):
@@ -8851,6 +8940,9 @@ class SermonDescr(models.Model):
         sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, locus)
         return sBack
 
+    def get_locus_range(self):
+        return get_locus_range(self.locus)
+
     def get_manuscript(self):
         """Get the manuscript that links to this sermondescr"""
 
@@ -9027,6 +9119,14 @@ class SermonDescr(models.Model):
                 if self.msitem.codico.order == 1:
                     sResult = self.msitem.codico.id
         return sResult
+
+    def locus_first(self):
+        first, last = self.get_locus_range()
+        return first
+
+    def locus_last(self):
+        first, last = self.get_locus_range()
+        return last
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit

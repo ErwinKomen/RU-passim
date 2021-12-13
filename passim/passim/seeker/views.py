@@ -23,6 +23,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
+from lxml import etree as ET
 
 # General imports
 from datetime import datetime
@@ -9955,6 +9956,9 @@ class ManuscriptDownload(BasicPart):
             username = profile.user.username
             team_group = app_editor
 
+            # Make sure we only look at lower-case Dtype
+            dtype = dtype.lower()
+
             # Is this Excel?
             if dtype == "excel" or dtype == "xlsx":
                 # Start workbook
@@ -10098,6 +10102,21 @@ class ManuscriptDownload(BasicPart):
                 lst_manu.append(oManu)
                 # Make sure to return this list
                 sData = json.dumps( lst_manu, indent=2)
+            elif dtype == "tei" or dtype== "xml-tei":
+                # Prepare a context for the XML creation
+                context = dict(details_id=self.obj.id, download_person=username)
+                context['details_url'] = 'https://passim.rich.ru.nl{}'.format(reverse('manuscript_details', kwargs={'pk': self.obj.id}))
+                context['download_date_ymd'] = get_current_datetime().strftime("%Y-%m-%d")
+                context['download_date'] = get_current_datetime().strftime("%d/%b/%Y")
+                context['manu'] = self.obj
+
+                # Convert into string
+                sData = render_to_string("seeker/tei-template.xml", context, self.request)
+
+                # Perform pretty printing
+                tree = ET.fromstring(sData, parser=ET.XMLParser(encoding='utf-8', remove_blank_text=True))
+                pretty = ET.tostring(tree, encoding="utf-8", pretty_print=True, xml_declaration=True)
+                sData = pretty
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDownload/get_data")
