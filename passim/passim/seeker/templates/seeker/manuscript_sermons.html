@@ -10,7 +10,7 @@
         <span id="add_search_criteria" class="pull-right">
           <!-- Completely manual sermon adding -->
           <a class="btn btn-xs jumbo-3" role="button" 
-              onclick="document.getElementById('create_new_sermon').submit();"
+             onclick="document.getElementById('create_new_sermon').submit();"             
               >
             <span class="glyphicon glyphicon-plus"></span>Add a sermon to this manuscript
           </a>
@@ -18,14 +18,20 @@
       {% endif %}
     </h3>
 
-    <!-- Room to have the form-link to create a new sermon for this manuscript -->
-    <div class="hidden" >
-      <form id="create_new_sermon" action="{% url 'sermon_details' %}" method="post" >
-        {% csrf_token %}
-        <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
-        <input type="text" name="sermo-mtype" value="{{manuForm.instance.mtype}}" />
-      </form>
-    </div>
+    {% if is_app_editor %}
+      <!-- Room to have the form-link to create a new sermon for this manuscript -->
+      <div class="row">
+        <div class="hidden col-md-offset-6 col-md-6" >
+          <form id="create_new_sermon" action="{% url 'sermon_details' %}" method="post" >
+            {% csrf_token %}
+            <div class="hidden" >
+              <input type="text" name="sermo-manu" value="{{manuForm.instance.id}}" />
+              <input type="text" name="sermo-mtype" value="{{manuForm.instance.mtype}}" />
+            </div>
+          </form>
+        </div>
+      </div>
+    {% endif %}
 
     <!-- Hidden hierarchy submit form -->
     <div class="hidden">

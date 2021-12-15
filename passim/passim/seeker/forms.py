@@ -765,7 +765,10 @@ class Project2Widget(ModelSelect2MultipleWidget):
         return obj.name
 
     def get_queryset(self):
-        qs = Project2.objects.all().order_by('name').distinct()
+        if self.queryset == None:
+            qs = Project2.objects.all().order_by('name').distinct()
+        else:
+            qs = self.queryset
         return qs
 
 
@@ -1655,7 +1658,9 @@ class SermonForm(PassimModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             if user_is_in_team(username, team_group):
@@ -1926,6 +1931,8 @@ class ProvenanceManForm(forms.ModelForm):
 class ProfileForm(forms.ModelForm):
     """Profile list and details"""
 
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1942,18 +1949,31 @@ class ProfileForm(forms.ModelForm):
         # Start by executing the standard handling
         super(ProfileForm, self).__init__(*args, **kwargs)
 
-        # Some fields are not required
-        self.fields['user'].required = False
-        self.fields['ptype'].required = False
-        self.fields['affiliation'].required = False
-        # Initialize choices for linktype
-        init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            self.fields['ptype'].initial = instance.ptype
-            self.fields['user'].initial = instance.user
-            self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['user'].required = False
+            self.fields['ptype'].required = False
+            self.fields['affiliation'].required = False
+
+            # Initialize a queryset for orglist
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
+
+            # Initialize choices for linktype
+            init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['ptype'].initial = instance.ptype
+                self.fields['user'].initial = instance.user
+                self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileForm-init")
+        # We are okay
+        return None
 
     def clean_user(self):
         data = self.cleaned_data.get("user")
@@ -2133,7 +2153,9 @@ class CollectionForm(PassimModelForm):
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
         # Project2:
-        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+        self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
         # SSG section
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -2743,7 +2765,9 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
@@ -3911,9 +3935,11 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # Set the dependent fields for [lcity]
             if self.prefix != "":

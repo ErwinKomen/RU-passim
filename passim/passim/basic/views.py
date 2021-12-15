@@ -1323,6 +1323,7 @@ class BasicDetails(DetailView):
     afterdelurl = None
     listview = None
     listviewtitle = None
+    has_select2 = False
     backbutton = True
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
@@ -1531,6 +1532,9 @@ class BasicDetails(DetailView):
                 self.permission = "write"
         context['permission'] = self.permission
 
+        if self.has_select2:
+            context['has_select2'] = True
+
         # Possibly define where a listview is
         classname = self.model._meta.model_name
         if self.basic_name == None or self.basic_name == "":
@@ -1644,7 +1648,8 @@ class BasicDetails(DetailView):
 
                                             # Log the SAVE action
                                             details = {'id': instance.id}
-                                            details["savetype"] = "add" # if bNew else "change"
+                                            details["savetype"] = "add_sub" # if bNew else "change"
+                                            details["form"] = subform.__class__.__name__
                                             details['model'] = subform.instance.__class__.__name__
                                             if subform.changed_data != None and len(subform.changed_data) > 0:
                                                 details['changes'] = action_model_changes(subform, subform.instance)
@@ -1888,16 +1893,24 @@ class BasicDetails(DetailView):
                     if bResult:
                         # Now save it for real
                         obj.save()
+
+                        # Make sure the form is actually saved completely
+                        # Issue #426: put it up here
+                        frm.save()
+                        instance = obj
+                    
                         # Log the SAVE action
                         details = {'id': obj.id}
                         details["savetype"] = "new" if bNew else "change"
+                        details["form"] = frm.__class__.__name__
                         if frm.changed_data != None and len(frm.changed_data) > 0:
                             details['changes'] = action_model_changes(frm, obj)
                         self.action_add(obj, details, "save")
 
-                        # Make sure the form is actually saved completely
-                        frm.save()
-                        instance = obj
+                        # Issue #426: comment this
+                        ## Make sure the form is actually saved completely
+                        #frm.save()
+                        #instance = obj
                     
                         # Any action(s) after saving
                         bResult, msg = self.after_save(frm, obj)

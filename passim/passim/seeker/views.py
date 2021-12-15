@@ -81,7 +81,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
@@ -2367,42 +2367,52 @@ def user_is_in_team(request):
 def passim_action_add(view, instance, details, actiontype):
     """User can fill this in to his/her liking"""
 
-    # Check if this needs processing
-    stype_edi_fields = getattr(view, "stype_edi_fields", None)
-    if stype_edi_fields:
-        # Get the username: 
-        username = view.request.user.username
-        # Process the action
-        cls_name = instance.__class__.__name__
-        Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
-        # Check the details:
-        if 'changes' in details:
-            changes = details['changes']
-            if 'stype' not in changes or len(changes) > 1:
-                # Check if the current STYPE is *not* 'Edited*
-                stype = getattr(instance, "stype", "")
-                if stype != STYPE_EDITED:
-                    bNeedSaving = False
-                    key = ""
-                    if 'model' in details:
-                        bNeedSaving = details['model'] in stype_edi_fields
-                    if not bNeedSaving:
-                        # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
-                        for k,v in changes.items():
-                            if k in stype_edi_fields:
-                                bNeedSaving = True
-                                key = k
-                                break
+    oErr = ErrHandle()
+    try:
+        # Check if this needs processing
+        stype_edi_fields = getattr(view, "stype_edi_fields", None)
+        if stype_edi_fields and not instance is None:
+            # Get the username: 
+            username = view.request.user.username
+            # Process the action
+            cls_name = instance.__class__.__name__
+            Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
 
-                    if bNeedSaving:
-                        # Need to set the stype to EDI
-                        instance.stype = STYPE_EDITED
-                        # Adapt status note
-                        snote = json.loads(instance.snote)
-                        snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
-                        instance.snote = json.dumps(snote)
-                        # Save it
-                        instance.save()
+            # -------- DEBGGING -------
+            # print("Passim_action_add type={}".format(actiontype))
+            # -------------------------
+
+            # Check the details:
+            if 'changes' in details:
+                changes = details['changes']
+                if 'stype' not in changes or len(changes) > 1:
+                    # Check if the current STYPE is *not* 'Edited*
+                    stype = getattr(instance, "stype", "")
+                    if stype != STYPE_EDITED:
+                        bNeedSaving = False
+                        key = ""
+                        if 'model' in details:
+                            bNeedSaving = details['model'] in stype_edi_fields
+                        if not bNeedSaving:
+                            # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
+                            for k,v in changes.items():
+                                if k in stype_edi_fields:
+                                    bNeedSaving = True
+                                    key = k
+                                    break
+
+                        if bNeedSaving:
+                            # Need to set the stype to EDI
+                            instance.stype = STYPE_EDITED
+                            # Adapt status note
+                            snote = json.loads(instance.snote)
+                            snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
+                            instance.snote = json.dumps(snote)
+                            # Save it
+                            instance.save()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("passim_action_add")
     # Now we are ready
     return None
 
@@ -4598,10 +4608,36 @@ class SermonEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if hasattr(form, 'cleaned_data') and 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
-            autype = form.cleaned_data['autype']
-            form.instance.autype = autype
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if hasattr(form, 'cleaned_data'):
+                # Make sure the author type is processed correctly
+                if 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
+                    autype = form.cleaned_data['autype']
+                    form.instance.autype = autype
+
+                # Issue #421: check how many projects are attached to the manuscript
+                if not instance is None and not instance.msitem is None and not instance.msitem.manu is None:
+                    # There is a sermon and a manuscript
+                    manu = instance.msitem.manu
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count > 1:
+                        # There are multiple projects attached to the manuscript
+                        # This means that the user *must* have specified one project
+                        qs_empty = Project2.objects.none()
+                        projlist = form.cleaned_data.get("projlist", qs_empty)
+                        if len(projlist) == 0:
+                            # Add a warning that the user must manually provide a project
+                            msg = "Add a project: A sermon must belong to at least one project"
+                            bBack = False
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
@@ -4641,7 +4677,17 @@ class SermonEdit(BasicDetails):
 
                 # When sermons have been added to the manuscript, the sermons need to be updated 
                 # with the existing project names 
-                instance.adapt_projects() # Gaat direct naar adapt_projects in SermDescr
+                # Issue #412: do *NOT* do automatic adjustment to other sermons or to manuscript
+                # instance.adapt_projects() # Gaat direct naar adapt_projects in SermDescr
+
+                # Issue #412: when a sermon doesn't yet have a project, it gets the project of the manuscript
+                if instance.projects.count() == 0:
+                    manu = instance.msitem.manu
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count == 1:
+                        project = manu.projects.first()
+                        SermonDescrProject.objects.create(sermon=instance, project=project)
 
                 # Process many-to-ONE changes
                 # (1) links from bibrange to sermon
@@ -6317,6 +6363,7 @@ class ProfileEdit(BasicDetails):
     prefix = "prof"
     title = "ProfileEdit"
     rtype = "json"
+    has_select2 = True
     history_button = True
     no_delete = True
     mainitems = []
@@ -6336,11 +6383,27 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
             {'type': 'plain', 'label': "Last login:",   'value': instance.user.last_login.strftime("%d/%b/%Y %H:%M"), },
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(), 'field_key': 'ptype'},
-            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,         'field_key': 'affiliation'}
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
+            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,                  'field_key': 'affiliation'},
+            {'type': 'line',  'label': "Editing rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
         # Return the context we have made
         return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # (6) 'projects'
+            projlist = form.cleaned_data['projlist']
+            adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileEdit/after_save")
+            bResult = False
+        return bResult, msg
 
     def get_history(self, instance):
         return passim_get_history(instance)
@@ -6358,13 +6421,14 @@ class ProfileListView(BasicList):
     listform = ProfileForm
     prefix = "prof"
     new_button = False      # Do not allow adding new ones here
-    order_cols = ['user__username', '', 'ptype', 'affiliation', '']
+    order_cols = ['user__username', '', 'ptype', 'affiliation', '', '']
     order_default = order_cols
     order_heads = [
         {'name': 'Username',    'order': 'o=1', 'type': 'str', 'custom': 'name', 'default': "(unnamed)", 'linkdetails': True},
         {'name': 'Email',       'order': '',    'type': 'str', 'custom': 'email', 'linkdetails': True},
         {'name': 'Status',      'order': 'o=3', 'type': 'str', 'custom': 'status', 'linkdetails': True},
         {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
+        {'name': 'Editor',      'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
 
     def get_field_value(self, instance, custom):
@@ -6378,6 +6442,12 @@ class ProfileListView(BasicList):
             sBack = instance.get_ptype_display()
         elif custom == "affiliation":
             sBack = "-" if instance.affiliation == None else instance.affiliation
+        elif custom == "projects":
+            lHtml = []
+            for g in instance.projects.all():
+                name = g.name
+                lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
+            sBack = ", ".join(lHtml)
         elif custom == "groups":
             lHtml = []
             for g in instance.user.groups.all():
@@ -6405,7 +6475,10 @@ class ProjectEdit(BasicDetails):
         # Only moderators and superusers are to be allowed to create and delete project labels
         if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
             # Define the main items to show and edit
-            context['mainitems'] = [{'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': "name"}]       
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
+                {'type': 'line',  'label': "Editors:",  'value': instance.get_editor_markdown()}
+                ]       
         # Return the context we have made
         return context
     
@@ -6833,33 +6906,41 @@ class CollAnyEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # The collection type is now a parameter
-            type = form.cleaned_data.get("type", "")
-            if type == "":
-                if self.prefix == "hist":
-                    form.instance.type = "super"
-                elif self.prefix == "publ":
-                    form.instance.type = self.datasettype
-                elif self.prefix == "priv":
-                    type = self.qd.get("datasettype", "")
-                    if type == "": type = self.datasettype
-                    if type == "": type = "super"
-                    form.instance.type = type
-                else:
-                    form.instance.type = self.prefix
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if form != None and instance != None:
+                # Search the user profile
+                profile = Profile.get_user_profile(self.request.user.username)
+                form.instance.owner = profile
+                # The collection type is now a parameter
+                type = form.cleaned_data.get("type", "")
+                if type == "":
+                    if self.prefix == "hist":
+                        form.instance.type = "super"
+                    elif self.prefix == "publ":
+                        form.instance.type = self.datasettype
+                    elif self.prefix == "priv":
+                        type = self.qd.get("datasettype", "")
+                        if type == "": type = self.datasettype
+                        if type == "": type = "super"
+                        form.instance.type = type
+                    else:
+                        form.instance.type = self.prefix
 
-            # Check out the name, if this is not in use elsewhere
-            if instance.id != None:
-                name = form.instance.name
-                if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
-                    # The name is already in use, so refuse it.
-                    msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
-                    return False, msg
-        return True, ""
+                # Check out the name, if this is not in use elsewhere
+                if instance.id != None:
+                    name = form.instance.name
+                    if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
+                        # The name is already in use, so refuse it.
+                        msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
+                        return False, msg
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -6943,6 +7024,62 @@ class CollHistEdit(CollAnyEdit):
     settype = "hc"
     basic_name = "collhist"
     title = "Historical collection"
+
+    def before_save(self, form, instance):
+        # Make sure the [CollAnyEdit] is executed
+        response = super(CollHistEdit, self).before_save(form, instance)
+
+        # Now do the remainder
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # Issue #473: automatic assignment of project for particular editor(s)
+                projlist = form.cleaned_data.get("projlist")
+                if projlist is None or len(projlist) == 0:
+                    # The user has not selected a project (yet): try default assignment
+                    user_projects = profile.projects.all()
+                    if user_projects.count() != 1:
+                        # We cannot assign the default project
+                        bBack = False
+                        msg = "Make sure to assign this historical collection to one project before saving it"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollHistEdit/before_save")
+            bBack = False
+        return bBack, msg
+
+    def after_save(self, form, instance):
+        # Make sure the [CollAnyEdit] is executed
+        response = super(CollHistEdit, self).after_save(form, instance)
+
+        # Now do the remainder
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Issue #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    CollectionProject.objects.create(collection=instance, project=project)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
 
 
 class CollManuEdit(CollAnyEdit):
@@ -8080,7 +8217,7 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', 'ssgauthornum', 'created', '']
+            self.order_cols = ['name', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
@@ -9020,17 +9157,37 @@ class ManuscriptEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if instance != None:
-            # If there is no source, then create a source for this one
-            if instance.source == None:
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
                 username = self.request.user.username
                 profile = Profile.get_user_profile(username)
-                source = SourceInfo.objects.create(
-                    code="Manually created",
-                    collector=username, 
-                    profile=profile)
-                instance.source = source
-        return True, ""
+
+                # If there is no source, then create a source for this one
+                if instance.source == None:
+                    source = SourceInfo.objects.create(
+                        code="Manually created",
+                        collector=username, 
+                        profile=profile)
+                    instance.source = source
+
+                # Issue #473: automatic assignment of project for particular editor(s)
+                projlist = form.cleaned_data.get("projlist")
+                if projlist is None or len(projlist) == 0:
+                    # The user has not selected a project (yet): try default assignment
+                    user_projects = profile.projects.all()
+                    if user_projects.count() != 1:
+                        # We cannot assign the default project
+                        bBack = False
+                        msg = "Make sure to assign this manuscript to one project before saving it"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -9066,7 +9223,21 @@ class ManuscriptEdit(BasicDetails):
 
             # When projects have been added to the manuscript, the sermons need to be updated too 
             # or vice versa
-            instance.adapt_projects() 
+            # Issue #412: do *NOT* call this any more
+            #             when the project of a manuscript changes, underlying sermons are *not* automatically affected
+            # instance.adapt_projects() 
+
+            # Issue #412 + #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -10390,6 +10561,8 @@ class CodicoEdit(BasicDetails):
             datelist = form.cleaned_data['datelist']
             adapt_m2o(Daterange, instance, "codico", datelist)
 
+            # Make sure to process changes
+            instance.refresh_from_db()
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -11290,12 +11463,35 @@ class EqualGoldEdit(BasicDetails):
         return oBack
            
     def before_save(self, form, instance):
-        # Check for author
-        if instance.author == None:
-            # Set to "undecided" author if possible
-            author = Author.get_undecided()
-            instance.author = author
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # Check for author
+                if instance.author == None:
+                    # Set to "undecided" author if possible
+                    author = Author.get_undecided()
+                    instance.author = author
+
+                # Issue #473: automatic assignment of project for particular editor(s)
+                projlist = form.cleaned_data.get("projlist")
+                if projlist is None or len(projlist) == 0:
+                    # The user has not selected a project (yet): try default assignment
+                    user_projects = profile.projects.all()
+                    if user_projects.count() != 1:
+                        # We cannot assign the default project
+                        bBack = False
+                        msg = "Make sure to assign this Autority File to one project before saving it"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -11362,6 +11558,18 @@ class EqualGoldEdit(BasicDetails):
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
             adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project")
+
+            # Issue #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    EqualGoldProject.objects.create(equal=instance, project=project)
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG

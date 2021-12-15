@@ -2992,6 +2992,29 @@ var ru = (function ($, ru) {
       },
 
       /**
+       *  do_new_sermon
+       *      Open up the possibility to add a new sermon
+       *
+       */
+      do_new_sermon: function (divname) {
+        var elStart = null;
+
+        try {
+          elStart = $("#" + divname).closest("div");
+          if (elStart !== null) {
+            if ($(elStart).hasClass("hidden")) {
+              $(elStart).removeClass("hidden");
+            } else {
+              $(elStart).addClass("hidden");
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("do_new_sermon", ex);
+        }
+      },
+
+      /**
        * postsubmit
        *    Submit nearest form as POST
        *

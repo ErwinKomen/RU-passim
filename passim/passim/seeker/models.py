@@ -1538,6 +1538,21 @@ class Profile(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_projects_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for project in self.projects.all().order_by('name'):
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
 
@@ -2975,6 +2990,11 @@ class Project2(models.Model):
 
     # [1] Obligatory name for a project
     name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] Description of this project
+    description = models.TextField("Description", blank=True, null=True)
+
+    # [1] Date created (automatically done)
+    created = models.DateTimeField(default=get_current_datetime)
   
     def __str__(self):
         sName = self.name
@@ -3002,6 +3022,22 @@ class Project2(models.Model):
         #    oErr.DoError("Project2/save")
 
         return response
+
+    def get_editor_markdown(self):
+        """List of users (=profiles) that have editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for profile in self.projects_profile.all().order_by('user__username'):
+            # Find the URL to access this user (profile)
+            url = reverse('profile_details', kwargs={'pk': profile.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, profile.user.username))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
 
 
 class Project(models.Model):
@@ -3268,7 +3304,7 @@ class Manuscript(models.Model):
         self.saved = get_current_datetime()
         response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
 
-        # If this is a new manuscript there is no codi conncted yet
+        # If this is a new manuscript there is no codi connected yet
         # Check if the codico exists
         codi = Codico.objects.filter(manuscript=self).first()
         if codi == None:
@@ -3288,7 +3324,11 @@ class Manuscript(models.Model):
         return response
        
     def adapt_projects(self):
-        """Adapt sermon-project connections for all sermons under me""" 
+        """Adapt sermon-project connections for all sermons under me
+        
+        Issue #412: this must *not* be called from the ManuscriptEdit view
+        """ 
+
         oErr = ErrHandle()
         bBack = False
         try:
@@ -5026,6 +5066,11 @@ class Codico(models.Model):
         # Show that this overwriting took place
         details = dict(id=self.id, savetype="change", old={path: old_value}, changes={path: new_value})
         Action.add(username, "Codico", self.id, actiontype, json.dumps(details))
+
+        # -------- DEBGGING -------
+        # print("Codico action_add type={}".format(actiontype))
+        # -------------------------
+
 
     def custom_add(oCodico, **kwargs):
         """Add a codico according to the specifications provided"""
