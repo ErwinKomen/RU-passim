@@ -1553,6 +1553,12 @@ class Profile(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_project_ids(self):
+        """List of id's this person had editing rights for"""
+
+        id_list = [x['id'] for x in self.projects.all().values('id')]
+        return id_list
+
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
 

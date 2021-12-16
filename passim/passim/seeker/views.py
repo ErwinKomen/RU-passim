@@ -292,6 +292,64 @@ def adapt_m2o_sig(instance, qs):
         msg = errHandle.get_error_message()
         return False
 
+def project_dependant_delete(request, to_be_deleted):
+    """Delete items from the linktable, provided the user has the right to"""
+
+    oErr = ErrHandle()
+    bBack = True
+    try:
+        # Find out who this is
+        profile = Profile.get_user_profile(request.user.username)
+        # Get the editing rights for this person
+        project_id = [x['id'] for x in profile.projects.all().values("id")]
+
+        # CHeck all deletables
+        delete = []
+        for obj in to_be_deleted:
+            # Get the project id of the deletables
+            obj_id = obj.id
+            prj_id = obj.project.id
+            if prj_id in project_id:
+                # The user may delete this project relation
+                # Therefore: delete the OBJ that holde this relation!
+                delete.append(obj_id)
+        # Is anything left?
+        if len(delete) > 0:
+            # Get the class of the deletables
+            cls = to_be_deleted[0].__class__
+            # Delete all that need to be deleted
+            cls.objects.filter(id__in=delete).delete()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("project_dependant_delete")
+        bBack = False
+    return bBack
+
+def may_edit_project(request, profile, instance):
+    """Check if the user is allowed to edit this project"""
+
+    bBack = False
+    # Is the user an editor?
+    if user_is_ingroup(request, app_editor):
+        # Get the projects this user has authority for
+        user_projects = profile.get_project_ids()
+        if len(user_projects) > 0:
+            # True: the user may indeed edit *some* projects
+            bBack = True
+
+            # The following is now superfluous
+            use_superfluous = False
+            if use_superfluous:
+                # Get the projects associated with [instance']
+                project_ids = [x['id'] for x in instance.projects.all().values('id')]
+                # See if there is any match
+                for project_id in user_projects:
+                    if project_id in project_ids:
+                        bBack = True
+                        break
+    return bBack
+
 def is_empty_form(form):
     """Check if the indicated form has any cleaned_data"""
 
@@ -4673,7 +4731,9 @@ class SermonEdit(BasicDetails):
 
                 # (6) 'projects'
                 projlist = form.cleaned_data['projlist']
-                adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project")
+                sermo_proj_deleted = []
+                adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project", deleted=sermo_proj_deleted)
+                project_dependant_delete(self.request, sermo_proj_deleted)
 
                 # When sermons have been added to the manuscript, the sermons need to be updated 
                 # with the existing project names 
@@ -6586,6 +6646,7 @@ class CollAnyEdit(BasicDetails):
     manu = None
     codico = None
     datasettype = ""
+    use_team_group = True
     mainitems = []
     hlistitems = [
         {'type': 'manu',    'clsColl': CollectionMan,   'field': 'manuscript'},
@@ -6692,6 +6753,9 @@ class CollAnyEdit(BasicDetails):
         prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
         prefix_elevate = ['any', 'super', 'priv', 'publ']
 
+        # Need to know who this is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
@@ -6756,7 +6820,10 @@ class CollAnyEdit(BasicDetails):
         
         # Historical collections have a project assigned to them
         if instance.settype == "hc":
-            context['mainitems'].append( {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'})
+            oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
+            if may_edit_project(self.request, profile, instance):
+                oProject['field_list'] = 'projlist'
+            context['mainitems'].append(oProject)        
                         
 
         # Any dataset may optionally be elevated to a historical collection
@@ -6955,7 +7022,9 @@ class CollAnyEdit(BasicDetails):
             
             # (2) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(CollectionProject, instance, "collection", projlist, "project")
+            col_proj_deleted = []
+            adapt_m2m(CollectionProject, instance, "collection", projlist, "project", deleted=col_proj_deleted)
+            project_dependant_delete(self.request, col_proj_deleted)
 
         except:
             msg = oErr.get_error_message()
@@ -7079,7 +7148,6 @@ class CollHistEdit(CollAnyEdit):
             msg = oErr.get_error_message()
             bResult = False
         return bResult, msg
-
 
 
 class CollManuEdit(CollAnyEdit):
@@ -8858,7 +8926,7 @@ class ManuscriptEdit(BasicDetails):
                     #{'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
 
                     # Project2 HIER
-                    {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+                    {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
 
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
                         'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
@@ -8876,6 +8944,13 @@ class ManuscriptEdit(BasicDetails):
                 context['mainitems'].append(
                     {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
+
+                # Check if this is an editor with permission for this project
+                if may_edit_project(self.request, profile, instance):
+                    for oItem in context['mainitems']:
+                        if oItem['label'] == "Project:":
+                            # Add the list
+                            oItem['field_list'] = "projlist"
 
             # Signal that we have select2
             context['has_select2'] = True
@@ -9219,7 +9294,9 @@ class ManuscriptEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(ManuscriptProject, instance, "manuscript", projlist, "project")
+            manu_proj_deleted = []
+            adapt_m2m(ManuscriptProject, instance, "manuscript", projlist, "project", deleted=manu_proj_deleted)
+            project_dependant_delete(self.request, manu_proj_deleted)
 
             # When projects have been added to the manuscript, the sermons need to be updated too 
             # or vice versa
@@ -9815,6 +9892,9 @@ class ManuscriptListView(BasicList):
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
             self.downloads = []
+        if not user_is_authenticated(self.request) or not (user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)):
+            # Do *not* unnecessarily show the custombuttons
+            self.custombuttons = []
 
         # ======== One-time adaptations ==============
         listview_adaptations("manuscript_list")
@@ -11318,7 +11398,7 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
             # Project2 HIER
-            {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+            {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
             
             {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
                 'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
@@ -11334,6 +11414,14 @@ class EqualGoldEdit(BasicDetails):
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+
+        # Special processing for moderator
+        if may_edit_project(self.request, profile, instance):
+            for oItem in context['mainitems']:
+                if oItem['label'] == "Project:":
+                    # Add the list
+                    oItem['field_list'] = "projlist"
 
         # THe SSG items that have a value in *moved* may not be editable
         editable = (instance.moved == None)
@@ -11557,7 +11645,9 @@ class EqualGoldEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project")
+            equal_proj_deleted = []
+            adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project", deleted=equal_proj_deleted)
+            project_dependant_delete(self.request, equal_proj_deleted)
 
             # Issue #473: default project assignment
             if instance.projects.count() == 0:

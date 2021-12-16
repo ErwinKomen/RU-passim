@@ -2123,6 +2123,10 @@ class CollectionForm(PassimModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        ## Obligatory for this type of form!!!
+        #self.username = kwargs.pop('username', "")
+        #self.team_group = kwargs.pop('team_group', "")
+        #self.userplus = kwargs.pop('userplus', "")
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
         username = self.username
@@ -2156,7 +2160,10 @@ class CollectionForm(PassimModelForm):
 
         # Project2:
         # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-        self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+        if profile is None:
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        else:
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
         self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
         # SSG section
