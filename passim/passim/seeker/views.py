@@ -5990,7 +5990,7 @@ class BibRangeListView(BasicList):
             lstQ.append(Q(bibrangeverses__bkchvs__lte=einde))
             sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibref'] = Q(id__in=sermonlist)
+            fields['bibrefbk'] = Q(id__in=sermonlist)
 
         return fields, lstExclude, qAlternative
 

@@ -2127,6 +2127,8 @@ class CollectionForm(PassimModelForm):
         super(CollectionForm, self).__init__(*args, **kwargs)
         username = self.username
         team_group = self.team_group
+        profile = Profile.get_user_profile(username)
+
         # Get the prefix
         prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
         # Some fields are not required
