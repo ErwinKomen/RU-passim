@@ -326,6 +326,48 @@ def project_dependant_delete(request, to_be_deleted):
         bBack = False
     return bBack
 
+def get_non_editable_projects(profile, projects):
+    """Get the number of projects that I do not have editing rights for"""
+
+    oErr = ErrHandle()
+    iCount = 0
+    try:
+        id_list = []
+        current_project_ids = [x['id'] for x in projects.values('id')]
+        profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        # Walk all the projects I need to evaluate
+        for prj_id in current_project_ids:
+            if not prj_id in profile_project_ids:
+                # I have*NO*  editing rights for this one
+                id_list.append(prj_id)
+        iCount = len(id_list)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_non_editable_projects")
+        iCount = 0
+
+    return iCount
+
+def evaluate_projlist(profile, instance, projlist, sText):
+    bBack = True
+    msg = ""
+    try:
+        if projlist is None or len(projlist) == 0:
+            # Check how many projects the user does *NOT* have rights for
+            non_editable_projects = get_non_editable_projects(profile, instance.projects.all())
+            if non_editable_projects == 0:
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() != 1:
+                    # We cannot assign the default project
+                    bBack = False
+                    msg = "Make sure to assign this {} to one project before saving it".format(sText)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("evaluate_projlist")
+        bBack = False
+    return bBack, msg
+
 def may_edit_project(request, profile, instance):
     """Check if the user is allowed to edit this project"""
 
@@ -7110,13 +7152,7 @@ class CollHistEdit(CollAnyEdit):
 
                 # Issue #473: automatic assignment of project for particular editor(s)
                 projlist = form.cleaned_data.get("projlist")
-                if projlist is None or len(projlist) == 0:
-                    # The user has not selected a project (yet): try default assignment
-                    user_projects = profile.projects.all()
-                    if user_projects.count() != 1:
-                        # We cannot assign the default project
-                        bBack = False
-                        msg = "Make sure to assign this historical collection to one project before saving it"
+                bBack, msg = evaluate_projlist(profile, instance, projlist, "Historical collection")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollHistEdit/before_save")
@@ -9251,13 +9287,7 @@ class ManuscriptEdit(BasicDetails):
 
                 # Issue #473: automatic assignment of project for particular editor(s)
                 projlist = form.cleaned_data.get("projlist")
-                if projlist is None or len(projlist) == 0:
-                    # The user has not selected a project (yet): try default assignment
-                    user_projects = profile.projects.all()
-                    if user_projects.count() != 1:
-                        # We cannot assign the default project
-                        bBack = False
-                        msg = "Make sure to assign this manuscript to one project before saving it"
+                bBack, msg = evaluate_projlist(profile, instance, projlist, "Manuscript")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptEdit/before_save")
@@ -11568,13 +11598,7 @@ class EqualGoldEdit(BasicDetails):
 
                 # Issue #473: automatic assignment of project for particular editor(s)
                 projlist = form.cleaned_data.get("projlist")
-                if projlist is None or len(projlist) == 0:
-                    # The user has not selected a project (yet): try default assignment
-                    user_projects = profile.projects.all()
-                    if user_projects.count() != 1:
-                        # We cannot assign the default project
-                        bBack = False
-                        msg = "Make sure to assign this Autority File to one project before saving it"
+                bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldEdit/before_save")
