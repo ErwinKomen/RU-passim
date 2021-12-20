@@ -4720,6 +4720,13 @@ class SermonEdit(BasicDetails):
 
                 # Issue #421: check how many projects are attached to the manuscript
                 if not instance is None and not instance.msitem is None and not instance.msitem.manu is None:
+                    # Need to know who is 'talking'...
+                    username = self.request.user.username
+                    profile = Profile.get_user_profile(username)
+
+                    # Always get the project list
+                    projlist = form.cleaned_data.get("projlist")
+
                     # There is a sermon and a manuscript
                     manu = instance.msitem.manu
                     # How many projects are attached to this manuscript
@@ -4727,12 +4734,17 @@ class SermonEdit(BasicDetails):
                     if manu_project_count > 1:
                         # There are multiple projects attached to the manuscript
                         # This means that the user *must* have specified one project
-                        qs_empty = Project2.objects.none()
-                        projlist = form.cleaned_data.get("projlist", qs_empty)
-                        if len(projlist) == 0:
-                            # Add a warning that the user must manually provide a project
-                            msg = "Add a project: A sermon must belong to at least one project"
-                            bBack = False
+
+                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+
+                        #if len(projlist) == 0:
+                        #    # Add a warning that the user must manually provide a project
+                        #    msg = "Add a project: A sermon must belong to at least one project"
+                        #    bBack = False
+                    else:
+                        # It would seem that this kind of check is needed anyway...
+                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/before_save")
@@ -11484,6 +11496,19 @@ class EqualGoldEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_goldset_html(goldlist):
+        context = {}
+        template_name = 'seeker/super_goldset.html'
+        sBack = ""
+        if goldlist != None:
+            # Add to context
+            context['goldlist'] = SermonGold.objects.filter(id__in=goldlist).order_by('siglist')
+            context['is_app_editor'] = False
+            context['object_id'] = None
+            # Calculate with the template
+            sBack = render_to_string(template_name, context)
+        return sBack
 
     def get_goldset_markdown(self, instance):
         context = {}

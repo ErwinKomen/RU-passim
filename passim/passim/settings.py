@@ -110,6 +110,7 @@ INSTALLED_APPS = [
     # Add your apps here to enable them
     'django_select2',
     'passim.basic',
+    'passim.approve',
     'passim.bible',
     'passim.reader',
     'passim.seeker',

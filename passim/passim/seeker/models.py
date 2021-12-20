@@ -110,6 +110,15 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
+
+    def get_english(field, abbr):
+        """Get the english name of the abbr"""
+
+        sBack = "-"
+        obj = FieldChoice.objects.filter(field=field, abbr=abbr).first()
+        if obj != None:
+            sBack = obj.english_name
+        return sBack
         
 
 class HelpChoice(models.Model):
