@@ -9,7 +9,7 @@ from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
-from django.db.models import Q, Prefetch, Count, F
+from django.db.models import Q, Prefetch, Count, F, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory, ValidationError
@@ -6586,6 +6586,24 @@ class ProjectEdit(BasicDetails):
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        def get_singles(lst_id, clsThis, field):
+            """Get a list of occurrances that have only one project id"""
+
+            # Get all singles
+            lst_singles = clsThis.objects.all().values(field).annotate(total=Count("project")).filter(total=1).values(field, "total")
+            # Turn them into a dictionary - but only the singular ones
+            dict_singles = { x[field]:x['total'] for x in lst_singles}
+            # Count the ones that overlap: those are the singular ones
+            count = 0
+            attr = "{}__id".format(field)
+            for oItem in lst_id:
+                id = oItem[attr]
+                if id in dict_singles:
+                    count += 1
+            return count
+            
+
         # Only moderators and superusers are to be allowed to create and delete project labels
         if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
             # Define the main items to show and edit
@@ -6593,6 +6611,28 @@ class ProjectEdit(BasicDetails):
                 {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
                 {'type': 'line',  'label': "Editors:",  'value': instance.get_editor_markdown()}
                 ]       
+
+            # Also add a delete Warning Statistics message (see issue #485)
+            lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
+            lst_proj_hc = CollectionProject.objects.filter(project=instance).values('collection__id')
+            lst_proj_s = SermonDescrProject.objects.filter(project=instance).values('sermon__id')
+            lst_proj_ssg = EqualGoldProject.objects.filter(project=instance).values('equal__id')
+
+            count_m =  len(lst_proj_m)
+            count_hc =  len(lst_proj_hc)
+            count_s =  len(lst_proj_s)
+            count_ssg = len(lst_proj_ssg)
+            single_m = get_singles(lst_proj_m, ManuscriptProject, "manuscript")
+            single_hc = get_singles(lst_proj_hc, CollectionProject, "collection")
+            single_s = get_singles(lst_proj_s, SermonDescrProject, "sermon")
+            single_ssg = get_singles(lst_proj_ssg, EqualGoldProject, "equal")
+            
+            local_context = dict(
+                project=instance, 
+                count_m=count_m, count_hc=count_hc, count_s=count_s, count_ssg=count_ssg,
+                single_m=single_m, single_hc=single_hc, single_s=single_s, single_ssg=single_ssg,
+                )
+            context['delete_message'] = render_to_string('seeker/project_statistics.html', local_context, self.request)
         # Return the context we have made
         return context
     

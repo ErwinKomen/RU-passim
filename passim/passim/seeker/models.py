@@ -3277,7 +3277,7 @@ class Manuscript(models.Model):
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")       
     # [m] Many-to-many: one manuscript can have a series of literature references
     litrefs = models.ManyToManyField("Litref", through="LitrefMan")
-     # [0-n] Many-to-many: keywords per SermonDescr
+    # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
@@ -7417,6 +7417,15 @@ class EqualGoldProject(models.Model):
     project = models.ForeignKey(Project2, related_name="equal_proj", on_delete=models.CASCADE)     
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.equal.projects.count()
+        if count > 1:
+            response = super(EqualGoldProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
     
 
 class SermonGoldSame(models.Model):
@@ -9730,6 +9739,15 @@ class SermonDescrProject(models.Model):
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.sermon.projects.count()
+        if count > 1:
+            response = super(SermonDescrProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
+
 
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
@@ -9751,6 +9769,15 @@ class ManuscriptProject(models.Model):
     project = models.ForeignKey(Project2, related_name="manuscript_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.manuscript.projects.count()
+        if count > 1:
+            response = super(ManuscriptProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
 
 
 class CodicoKeyword(models.Model):
@@ -10534,6 +10561,15 @@ class CollectionProject(models.Model):
     project = models.ForeignKey(Project2, related_name="collection_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.collection.projects.count()
+        if count > 1:
+            response = super(CollectionProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
 
 
 class ProjectEditor(models.Model):
