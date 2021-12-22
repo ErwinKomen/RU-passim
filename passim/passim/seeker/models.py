@@ -64,6 +64,7 @@ PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 YESNO_TYPE = "seeker.yesno"
 RIGHTS_TYPE = "seeker.rights"
+PROJ_DEFAULT = "seeker.prjdeftype"
 VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
@@ -1487,6 +1488,42 @@ class Profile(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("profile/add_visit")
+
+    def defaults_update(self, deflist):
+        """Update the 'status' field with the default incl/excl"""
+
+        bBack = True
+        oErr = ErrHandle()
+        try:
+            if not deflist is None:
+                with transaction.atomic():
+                    for obj in self.project_editor.all():
+                        project = obj.project
+                        if project in deflist:
+                            obj.status = "incl"
+                        else:
+                            obj.status = "excl"
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("defaults_update")
+        return bBack
+
+    def get_defaults_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
+            project = obj.project
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
 
     def get_editor_status(self, project, is_editor=False, is_developer=False, is_moderator=False, is_superuser=False):
         """What are the rights for this person for the given [project]??"""
@@ -3054,7 +3091,6 @@ class Project2(models.Model):
         return sBack
 
 
-
 class Project(models.Model):
     """manuscripts may belong to the project 'Passim' or to something else"""
 
@@ -3467,6 +3503,8 @@ class Manuscript(models.Model):
                 if obj == None:
                     # Doesn't exist: create it
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
+                    if not Source is None:
+                        obj.source = source
                 else:
                     # We are overwriting
                     oErr.Status("Overwriting manuscript [{}]".format(idno))
@@ -10582,6 +10620,9 @@ class ProjectEditor(models.Model):
 
     # [1] The rights for this person. Right now that is by default "edi" = editing
     rights = models.CharField("Rights", choices=build_abbr_list(RIGHTS_TYPE), max_length=5, default="edi")
+
+    # [1] Whether this project is to be included ('incl') or not ('excl') by default project assignment
+    status = models.CharField("Default assignment", choices=build_abbr_list(PROJ_DEFAULT), max_length=5, default="incl")
 
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)

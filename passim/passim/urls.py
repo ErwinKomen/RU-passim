@@ -220,6 +220,8 @@ urlpatterns = [
     url(r'^profile/list', ProfileListView.as_view(), name='profile_list'),
     url(r'^profile/details(?:/(?P<pk>\d+))?/$', ProfileDetails.as_view(), name='profile_details'),
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
+    url(r'^default/details(?:/(?P<pk>\d+))?/$', DefaultDetails.as_view(), name='default_details'), 
+    url(r'^default/edit(?:/(?P<pk>\d+))?/$', DefaultEdit.as_view(), name='default_edit'), 
 
     url(r'^project/list', ProjectListView.as_view(), name='project2_list'), 
     url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project2_details'), 

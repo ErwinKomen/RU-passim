@@ -1933,6 +1933,8 @@ class ProfileForm(forms.ModelForm):
 
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1956,8 +1958,9 @@ class ProfileForm(forms.ModelForm):
             self.fields['ptype'].required = False
             self.fields['affiliation'].required = False
 
-            # Initialize a queryset for orglist
+            # Initialize a queryset for projlist and deflist
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['deflist'].queryset = Project2.objects.all().order_by('name')
 
             # Initialize choices for linktype
             init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
@@ -1968,7 +1971,12 @@ class ProfileForm(forms.ModelForm):
                 self.fields['user'].initial = instance.user
                 self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
 
+                self.fields['deflist'].queryset = instance.projects.all().order_by('name')
+                self.fields['deflist'].widget.queryset = self.fields['deflist'].queryset
+
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
+                # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
+                self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileForm-init")

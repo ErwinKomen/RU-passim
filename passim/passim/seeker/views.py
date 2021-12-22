@@ -6571,6 +6571,58 @@ class ProfileListView(BasicList):
         return sBack, sTitle
 
 
+class DefaultEdit(BasicDetails):
+    """User-definable defaults for this user-profile"""
+
+    model = Profile
+    mForm = ProfileForm
+    prefix = "def"
+    title = "DefaultEdit"
+    titlesg = "Default"
+    basic_name = "default"
+    has_select2 = True
+    history_button = False
+    no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+        self.listview = reverse('mypassim')
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "User",              'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Username:",         'value': instance.user.username, },
+            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_projects_markdown()},
+            {'type': 'line',  'label': 'Default projects:', 'value': instance.get_defaults_markdown(), 'field_list': 'deflist'}
+            ]
+        # Return the context we have made
+        return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # (6) 'default projects'
+            deflist = form.cleaned_data['deflist']
+            instance.defaults_update(deflist)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("DefaultEdit/after_save")
+            bResult = False
+        return bResult, msg
+
+
+class DefaultDetails(DefaultEdit):
+    """Like Default Edit, but then html output"""
+
+    rtype = "html"
+
+
 class ProjectEdit(BasicDetails):
     """Details and editing of a project (nov 2021 version)"""
 

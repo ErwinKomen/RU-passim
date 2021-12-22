@@ -202,8 +202,33 @@ def mypassim(request):
     context = get_application_context(request, context)
 
     profile = Profile.get_user_profile(request.user.username)
+    context['profile'] = profile
     context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
     context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
+    context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+
+    # Figure out any editing rights
+    qs = profile.projects.all()
+    context['edit_projects'] = "(none)"
+    if context['is_app_editor'] and qs.count() > 0:
+        html = []
+        for obj in qs:
+            url = reverse('project2_details', kwargs={'pk': obj.id})
+            html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
+        context['edit_projects'] = ", ".join(html)
+
+    # Figure out which projects this editor may handle
+    if context['is_app_editor']:
+        qs = profile.project_editor.filter(status="incl")
+        if qs.count() == 0:
+            sDefault = "(none)"
+        else:
+            html = []
+            for obj in qs:
+                url = reverse('project2_details', kwargs={'pk': obj.project.id})
+                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.project.name))
+            sDefault = ", ".join(html)
+        context['default_projects'] = sDefault
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
