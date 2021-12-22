@@ -78,7 +78,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
-    Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
+    Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
@@ -9968,7 +9968,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
+            #{'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             {'filter': 'source',    'fkfield': 'source',   'keyS': 'source',  'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id' },
             {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
             ]}
@@ -10138,7 +10138,7 @@ class ManuscriptListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        prjlist = None # old
+        #prjlist = None # old
         projlist = None
 
         # Check if a list of keywords is given
@@ -10159,26 +10159,15 @@ class ManuscriptListView(BasicList):
             # Get the list
             projlist = fields['projlist']
 
-        ## Check if the projlist is identified
-        #if fields['projlist'] == None or len(fields['projlist']) == 0:
+        ## Check if the prjlist is identified
+        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
         #    # Get the default project
-        #    qs = Project2.objects.all()
+        #    qs = Project.objects.all()
         #    if qs.count() > 0:
-        #        proj_default = qs.first()
-        #        qs = Project2.objects.filter(id=proj_default.id)
-        #        fields['projlist'] = qs
-        #        projlist = qs
-
-
-        # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-                prjlist = qs
+        #        prj_default = qs.first()
+        #        qs = Project.objects.filter(id=prj_default.id)
+        #        fields['prjlist'] = qs
+        #        prjlist = qs
 
         # Check if an overlap percentage is specified
         if 'overlap' in fields and fields['overlap'] != None:
@@ -10200,7 +10189,7 @@ class ManuscriptListView(BasicList):
                 
                         # (1) Possible manuscripts only filter on: mtype=man, prjlist
                         lstQ = []
-                        if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                        # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                         lstQ.append(Q(mtype="man"))
                         lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                         manu_list = Manuscript.objects.filter(*lstQ)
@@ -10231,7 +10220,7 @@ class ManuscriptListView(BasicList):
                 
                             # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
                             lstQ = []
-                            if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                            # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                             lstQ.append(Q(mtype="man"))
                             lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
@@ -10251,10 +10240,6 @@ class ManuscriptListView(BasicList):
                             fields['cmpmanuidlist'] = None
                             fields['cmpmanu'] = Q(id__in=manu_include)
 
-
-        # Adapt the manutype filter
-        #if 'manutype' in fields and fields['manutype'] != None:
-        #    fields['manutype'] = fields['manutype'].abbr
 
         # Adapt the bible reference list
         bibrefbk = fields.get("bibrefbk", "")
@@ -10874,7 +10859,7 @@ class CodicoListView(BasicList):
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'project',   'fkfield': 'manuscript__project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' }
+            #{'filter': 'project',   'fkfield': 'manuscript__project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' }
             ]}
          ]
 
@@ -10917,7 +10902,7 @@ class CodicoListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        prjlist = None
+        # prjlist = None
         # Check if a list of keywords is given
         if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
             # Get the list
@@ -10931,15 +10916,15 @@ class CodicoListView(BasicList):
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
 
-        # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-                prjlist = qs
+        ## Check if the prjlist is identified
+        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+        #    # Get the default project
+        #    qs = Project.objects.all()
+        #    if qs.count() > 0:
+        #        prj_default = qs.first()
+        #        qs = Project.objects.filter(id=prj_default.id)
+        #        fields['prjlist'] = qs
+        #        prjlist = qs
 
         return fields, lstExclude, qAlternative
 
