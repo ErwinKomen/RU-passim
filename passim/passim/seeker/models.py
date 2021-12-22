@@ -10614,9 +10614,16 @@ class NewsItem(models.Model):
         now = timezone.now()
         oErr = ErrHandle()
         try:
-            with transaction.atomic():
-                for obj in NewsItem.objects.all():
-                    if obj.until and obj.until < now:
+            lst_id = []
+            for obj in NewsItem.objects.all():
+                if not obj.until is None:
+                    until_time = obj.until
+                    if until_time < now:
+                        lst_id.append(obj.id)
+            # Need any changes??
+            if len(lst_id) > 0:
+                with transaction.atomic():
+                    for obj in NewsItem.objects.filter(id__in=lst_id):
                         # This should be set invalid
                         obj.status = "ext"
                         obj.save()

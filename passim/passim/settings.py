@@ -67,6 +67,15 @@ else:
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
+
+BLOCKED_IPS = ['40.77.167.57',      '161.35.188.242',
+               '46.229.168.133',    '54.202.172.244',
+               '88.198.17.136',     '34.222.29.95',
+               '157.55.39.235',     '37.9.13.199',
+               '157.55.39.199',     '61.119.158.79',
+               '54.36.148.',        '54.36.149.'
+               '45.146.164.110',
+               ]
    
 
 # Quick-start development settings - unsuitable for production
@@ -120,6 +129,7 @@ INSTALLED_APPS = [
 
 # MIDDLEWARE_CLASSES = [
 MIDDLEWARE = [
+    'passim.utils.BlockedIpMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
