@@ -9042,14 +9042,9 @@ class ManuscriptEdit(BasicDetails):
                  'title': 'City, village or abbey (monastery) of the library'},
                 {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
                 {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
-                #{'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-                #{'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-                # 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
-                #{'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
-                #{'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
-                #{'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
-                #{'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
+                # Project assignment: see below
+                # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
+                # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
             if not istemplate:
@@ -9063,7 +9058,6 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                    #{'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
 
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
@@ -9571,9 +9565,13 @@ class ManuscriptDetails(ManuscriptEdit):
 
     def before_save(self, form, instance):
         if instance != None:
-            # If no project has been selected, then select the default project: Passim TH aanpassen
-            if instance.project == None:
-                instance.project = Project.get_default(self.request.user.username)
+            # If no project has been selected, then select the default project(s) - see issue #479
+            count = instance.projects.count()
+            if count == 0:
+                # Set the default projects
+                profile = Profile.get_user_profile(self.request.user.username)
+                projects = profile.get_defaults()
+                instance.set_projects(projects)
         return True, ""
 
     def process_formset(self, prefix, request, formset):
@@ -9999,28 +9997,40 @@ class ManuscriptListView(BasicList):
         # Should galway be added?
         if not bHasGalway:
             # Add a reference to the Excel upload method
+            html = []
+            html.append("Import manuscripts from Galway using one or more CSV files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oGalway = dict(title="galway", label="Galway",
                           url=reverse('manuscript_upload_galway'),
-                          type="multiple",
-                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple",msg=msg)
             self.uploads.append(oGalway)
 
         # Should excel be added?
         if not bHasExcel:
             # Add a reference to the Excel upload method
+            html = []
+            html.append("Import manuscripts from one or more Excel files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oExcel = dict(title="excel", label="Excel",
                           url=reverse('manuscript_upload_excel'),
-                          type="multiple",
-                          msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple", msg=msg)
             self.uploads.append(oExcel)
 
         # Should json be added?
         if not bHasJson:
-            # Add a reference to the Excel upload method
+            # Add a reference to the Json upload method
+            html = []
+            html.append("Import manuscripts from one or more JSON files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oJson = dict(title="json", label="Json",
                           url=reverse('manuscript_upload_json'),
-                          type="multiple",
-                          msg="Import manuscripts from one or more JSON files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple", msg=msg)
             self.uploads.append(oJson)
 
         # Possibly *NOT* show the downloads
@@ -10599,7 +10609,7 @@ class CodicoEdit(BasicDetails):
                 {'type': 'plain', 'label': "Support:",      'value': instance.support,                  'field_key': 'support'},
                 {'type': 'plain', 'label': "Extent:",       'value': instance.extent,                   'field_key': 'extent'},
                 {'type': 'plain', 'label': "Format:",       'value': instance.format,                   'field_key': 'format'},
-                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown()}
+                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown2()}
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
             username = profile.user.username

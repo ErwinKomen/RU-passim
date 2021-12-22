@@ -1509,6 +1509,20 @@ class Profile(models.Model):
             oErr.DoError("defaults_update")
         return bBack
 
+    def get_defaults(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        # Get a list of project id's that are my default
+        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
+        # Select all the relevant projects
+        if len(lst_id) == 0:
+            # Try to at least include the PASSIM project as a default
+            qs = Project2.objects.filter(name__icontains="passim").first()
+        else:
+            qs = Project2.objects.filter(id__in=lst_id)
+        # Return the list
+        return qs
+
     def get_defaults_markdown(self):
         """List of projects to which this user (profile) has editing rights"""
 
@@ -3494,22 +3508,28 @@ class Manuscript(models.Model):
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
                 # Get the standard project TH: hier naar kijken voor punt 4
-                project = Project.get_default(username)
+                # OLD: project = Project.get_default(username)
+
                 # Retrieve or create a new manuscript with default values
                 if source == None:
-                    obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                    obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
                 else:
-                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man", project=project).first()
+                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
                 if obj == None:
                     # Doesn't exist: create it
-                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
-                    if not Source is None:
+                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                    if not source is None:
                         obj.source = source
                 else:
                     # We are overwriting
                     oErr.Status("Overwriting manuscript [{}]".format(idno))
                     bOverwriting = True
-                        
+
+                # Issue #479: get the default project(s) - may be more than one
+                projects = profile.get_defaults()
+                # Link the manuscript to the projects, if not already done
+                obj.set_projects(projects)
+
                 country = ""
                 city = ""
                 library = ""
@@ -4071,15 +4091,24 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
-    def get_project(self):
-        sBack = "-" if self.project == None else self.project.name
+    #def get_project(self):
+    #    sBack = "-" if self.project == None else self.project.name
+    #    return sBack
+
+    def get_projects(self):
+        sBack = "-" 
+        if self.projects.count() > 0:
+            html = []
+            for obj in self.projects.all().order_by("name"):
+                html.append(obj.name)
+            sBack = ", ".join(html)
         return sBack
 
-    def get_project_markdown(self):
-        sBack = "-"
-        if self.project:
-            sBack = '<span class="project">{}</span>'.format(self.project.name)
-        return sBack
+    #def get_project_markdown(self):
+    #    sBack = "-"
+    #    if self.project:
+    #        sBack = '<span class="project">{}</span>'.format(self.project.name)
+    #    return sBack
 
     def get_project_markdown2(self): 
         lHtml = []
@@ -5015,6 +5044,24 @@ class Manuscript(models.Model):
 
         # Return the object that has been created
         return oBack
+
+    def set_projects(self, projects):
+        """Make sure there are connections between myself and the projects"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            for project in projects:
+                # Create a connection between this project and the manuscript
+                obj_pm = ManuscriptProject.objects.filter(project=project, manuscript=self).first()
+                if obj_pm is None:
+                    # Create this link
+                    obj_pm = ManuscriptProject.objects.create(manuscript=self, project=project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/set_projects")
+            bBack = False
+        return bBack
         
 
 class Codico(models.Model):
@@ -5119,11 +5166,6 @@ class Codico(models.Model):
         # Show that this overwriting took place
         details = dict(id=self.id, savetype="change", old={path: old_value}, changes={path: new_value})
         Action.add(username, "Codico", self.id, actiontype, json.dumps(details))
-
-        # -------- DEBGGING -------
-        # print("Codico action_add type={}".format(actiontype))
-        # -------------------------
-
 
     def custom_add(oCodico, **kwargs):
         """Add a codico according to the specifications provided"""
@@ -5512,10 +5554,21 @@ class Codico(models.Model):
             sBack = "".join(lHtml)
         return sBack
 
-    def get_project_markdown(self):
-        sBack = "-"
-        if self.manuscript != None and self.manuscript.project != None:
-            sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
+    #def get_project_markdown(self):
+    #    sBack = "-"
+    #    if self.manuscript != None and self.manuscript.project != None:
+    #        sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
+    #    return sBack
+
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.manuscript.projects.all().order_by('name'):           
+            # Determine where clicking should lead to
+            url = "{}?manu-projlist={}".format(reverse('manuscript_list'), project2.id) 
+            # Create a display for this topic
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))    
+        sBack = ", ".join(lHtml)
         return sBack
 
     def get_provenance_markdown(self, plain=False, table=True):
@@ -7822,7 +7875,6 @@ class Collection(models.Model):
             return None
 
         # Now we know that we're okay...
-        project = Project.get_default(username)
         profile = Profile.get_user_profile(username)
         source = SourceInfo.objects.create(
             code="Copy of Historical Collection [{}] (id={})".format(self.name, self.id), 
@@ -7830,7 +7882,12 @@ class Collection(models.Model):
             profile=profile)
 
         # Create an empty Manuscript
-        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
+        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source)
+
+        # Issue #479: a new manuscript gets assigned to a user's default project(s)
+        projects = profile.get_defaults()
+        manu.set_projects(projects)
+
         # Figure out  what the automatically created codico is
         codico = Codico.objects.filter(manuscript=manu).first()
         
@@ -8239,7 +8296,7 @@ class SermonDescr(models.Model):
         return bStatus, msg
 
     def custom_add(oSermo, manuscript, order=None, **kwargs):
-        """Add a manuscript according to the specifications provided"""
+        """Add a sermon to a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
         obj = None
@@ -8248,6 +8305,7 @@ class SermonDescr(models.Model):
         try:
             # Understand where we are coming from
             keyfield = kwargs.get("keyfield", "name")
+            profile = kwargs.get("profile")
 
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
@@ -8310,8 +8368,14 @@ class SermonDescr(models.Model):
                             # Set the KV in a special way
                             obj.custom_set(path, value)
 
-            # Make sure the updae the object
+            # Make sure the update the object
             obj.save()
+
+            # Figure out if project assignment should be done
+            if type.lower() != "structural" and not profile is None and obj.projects.count() == 0:
+                # Assign the default projects
+                projects = profile.get_defaults()
+                obj.set_projects(projects)
 
         except:
             msg = oErr.get_error_message()
@@ -9284,6 +9348,24 @@ class SermonDescr(models.Model):
                 # Only now do the actual saving...
                 response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
+
+    def set_projects(self, projects):
+        """Make sure there are connections between myself and the projects"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            for project in projects:
+                # Create a connection between this project and the manuscript
+                obj_ps = SermonDescrProject.objects.filter(project=project, sermon=self).first()
+                if obj_ps is None:
+                    # Create this link
+                    obj_ps = SermonDescrProject.objects.create(sermon=self, project=project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/set_projects")
+            bBack = False
+        return bBack
 
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""

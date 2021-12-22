@@ -225,8 +225,9 @@ def mypassim(request):
         else:
             html = []
             for obj in qs:
-                url = reverse('project2_details', kwargs={'pk': obj.project.id})
-                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.project.name))
+                project = obj.project
+                url = reverse('project2_details', kwargs={'pk': project.id})
+                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
             sDefault = ", ".join(html)
         context['default_projects'] = sDefault
 
