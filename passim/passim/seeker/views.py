@@ -88,6 +88,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
+from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -11614,68 +11615,86 @@ class EqualGoldEdit(BasicDetails):
         errors = []
         bResult = True
         instance = formset.instance
+        # Need to know who is 'talking'...
+        username = self.request.user.username
+        profile = Profile.get_user_profile(username)
         for form in formset:
             if form.is_valid():
-                cleaned = form.cleaned_data
-                # Action depends on prefix
+                oErr = ErrHandle()
+                try:
+                    cleaned = form.cleaned_data
+                    # Action depends on prefix
                 
-                # Note: eqgcol can be either settype 'pd' or 'hc'
-                if prefix == "eqgcol":
-                    # Keyword processing
-                    if 'newcol' in cleaned and cleaned['newcol'] != "":
-                        newcol = cleaned['newcol']
-                        # Is the COL already existing?
-                        obj = Collection.objects.filter(name=newcol).first()
-                        if obj == None:
-                            # TODO: add profile here
-                            profile = Profile.get_user_profile(request.user.username)
-                            obj = Collection.objects.create(name=newcol, type='super', owner=profile)
-                        # Make sure we set the keyword
-                        form.instance.collection = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "ssglink":
-                    # SermonDescr-To-EqualGold processing
-                    if 'newsuper' in cleaned and cleaned['newsuper'] != "":
-                        newsuper = cleaned['newsuper']
-                        # There also must be a linktype
-                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
-                            linktype = cleaned['newlinktype']
-                            # Get optional parameters
-                            note = cleaned.get('note', None)
-                            spectype = cleaned.get('newspectype', None)
-                            # Alternatives: this is true if it is in there, and false otherwise
-                            alternatives = cleaned.get("newalt", None)
-                            # Check existence
-                            obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
+                    # Note: eqgcol can be either settype 'pd' or 'hc'
+                    if prefix == "eqgcol":
+                        # Keyword processing
+                        if 'newcol' in cleaned and cleaned['newcol'] != "":
+                            newcol = cleaned['newcol']
+                            # Is the COL already existing?
+                            obj = Collection.objects.filter(name=newcol).first()
                             if obj == None:
-                                super = EqualGold.objects.filter(id=newsuper.id).first()
-                                if super != None:
-                                    # Set the right parameters for creation later on
-                                    form.instance.linktype = linktype
-                                    form.instance.dst = super
-                                    if note != None and note != "": 
-                                        form.instance.note = note
-                                    if spectype != None and len(spectype) > 1:
-                                        form.instance.spectype = spectype
-                                    form.instance.alternatives = alternatives
+                                # TODO: add profile here
+                                profile = Profile.get_user_profile(request.user.username)
+                                obj = Collection.objects.create(name=newcol, type='super', owner=profile)
+                            # Make sure we set the keyword
+                            form.instance.collection = obj
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "ssglink":
+                        # SermonDescr-To-EqualGold processing
+                        if 'newsuper' in cleaned and cleaned['newsuper'] != "":
+                            newsuper = cleaned['newsuper']
+                            # There also must be a linktype
+                            if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                                linktype = cleaned['newlinktype']
+                                # Get optional parameters
+                                note = cleaned.get('note', None)
+                                spectype = cleaned.get('newspectype', None)
+                                # Alternatives: this is true if it is in there, and false otherwise
+                                alternatives = cleaned.get("newalt", None)
+                                # Check existence
+                                obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
+                                if obj == None:
+                                    super = EqualGold.objects.filter(id=newsuper.id).first()
+                                    if super != None:
+                                        # See if this can be accepted right away or needs waiting
+                                        new_data = dict(linktype=linktype, note=note, spectype=spectype, alternatives=alternatives, dst=super.id)
+                                        iCount = approval_parse_formset(profile, prefix, new_data, instance)
 
-                                    # Double check reverse
-                                    if linktype in LINK_BIDIR:
-                                        rev_link = EqualGoldLink.objects.filter(src=super, dst=instance).first()
-                                        if rev_link == None:
-                                            # Add it
-                                            rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                        # Only proceed if changes don't need to be reviewed by others
+                                        if iCount == 0:
+
+                                            # Set the right parameters for creation later on
+                                            form.instance.linktype = linktype
+                                            form.instance.dst = super
+                                            if note != None and note != "": 
+                                                form.instance.note = note
+                                            if spectype != None and len(spectype) > 1:
+                                                form.instance.spectype = spectype
+                                            form.instance.alternatives = alternatives
+
+                                            # Double check reverse
+                                            if linktype in LINK_BIDIR:
+                                                rev_link = EqualGoldLink.objects.filter(src=super, dst=instance).first()
+                                                if rev_link == None:
+                                                    # Add it
+                                                    rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                                else:
+                                                    # Double check the linktype
+                                                    if rev_link.linktype != linktype:
+                                                        rev_link.linktype = linktype
+                                                if note != None and note != "": 
+                                                    rev_link.note = note
+                                                if spectype != None and len(spectype) > 1:
+                                                    rev_link.spectype = get_reverse_spec(spectype)
+                                                rev_link.alternatives = alternatives
+                                                rev_link.save()
                                         else:
-                                            # Double check the linktype
-                                            if rev_link.linktype != linktype:
-                                                rev_link.linktype = linktype
-                                        if note != None and note != "": 
-                                            rev_link.note = note
-                                        if spectype != None and len(spectype) > 1:
-                                            rev_link.spectype = get_reverse_spec(spectype)
-                                        rev_link.alternatives = alternatives
-                                        rev_link.save()
-                    # Note: it will get saved with form.save()
+                                            # Make sure this one does not get saved!
+                                            setattr(form, 'do_not_save', True)
+                        # Note: it will get saved with form.save()
+                except:
+                    msg = oErr.get_error_message()
+                    oErr.DoError("EqualGoldEdit/process_formset")
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -11708,9 +11727,24 @@ class EqualGoldEdit(BasicDetails):
                     author = Author.get_undecided()
                     instance.author = author
 
-                # Issue #473: automatic assignment of project for particular editor(s)
-                projlist = form.cleaned_data.get("projlist")
-                bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
+                # Get the cleaned data: this is the new stuff
+                cleaned_data = form.cleaned_data
+
+                # See if and how many changes are suggested
+                iCount = approval_parse_changes(profile, cleaned_data, instance)
+
+                # Only proceed if changes don't need to be reviewed by others
+                if iCount == 0:
+
+                    # Issue #473: automatic assignment of project for particular editor(s)
+                    projlist = form.cleaned_data.get("projlist")
+                    bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
+                else:
+                    # The changes may *NOT* be committed
+                    msg = None   # "The suggested changes will be reviewed by the other projects' editors"
+                    bBack = False
+                    # Make sure redirection takes place
+                    self.redirect_to = reverse('equalgold_details', kwargs={'pk': instance.id})
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldEdit/before_save")
@@ -11990,20 +12024,6 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Use the 'graph' function or not?
                 use_network_graph = True
 
-                ## Add a custom button to the manuscript listview: to trigger showing a graph
-                #html = []
-                #if use_network_graph:
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
-                #    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
-                #    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
-                #    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                ##html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                ##html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
-                #custombutton = "\n".join(html)
-                #manuscripts['custombutton'] = custombutton
-
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
 
@@ -12021,6 +12041,8 @@ class EqualGoldDetails(EqualGoldEdit):
                     lHtml.append(context['after_details'])
                 if context['object'] == None:
                     context['object'] = instance
+                context['approval_pending'] = approval_pending(instance)
+                context['approval_pending_list'] = approval_pending_list(instance)
                 lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
                 context['after_details'] = "\n".join(lHtml)
 

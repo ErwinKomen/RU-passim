@@ -1,6 +1,12 @@
 <div class="row">
   <div class="md-col-12">
     <span class="pull-right" style="margin-bottom: 10px;">
+      {% if is_app_editor and approval_pending.count > 0 %}
+        <!-- Allow the editor user to review the pending approvals -->
+        <a class="btn btn-xs jumbo-1" title="Show all changes pending approval"
+           data-toggle="collapse" 
+           data-target="#equalchange_pendings">Pending changes ({{approval_pending.count}})</a>
+      {% endif %}
       <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network" 
          data-target="#ssg_network_overlap"
          onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>
@@ -13,6 +19,30 @@
     </span>
   </div>
 
+</div>
+
+<div id="equalchange_pendings" class="collapse container-small">
+  <h4>Suggested changes</h4>
+  <table class="func-view compact-simple " style="width: 100%;">
+    <thead>
+      <tr>
+        <th class="tdnowrap">Editor</th>
+        <th class="tdnowrap">Field</th>
+        <th class="tdnowrap">Suggested change</th>
+        <th class="tdnowrap">Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for obj in approval_pending_list %}
+        <tr class="form-row">
+          <td>{{obj.editor}}</td>
+          <td class="hoverable">{{obj.field}}</td>
+          <td class="hoverable">{{obj.change|safe}}</td>
+          <td align="right">{{obj.created}}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <div id="ssg_network_trans" class="hidden container-small">

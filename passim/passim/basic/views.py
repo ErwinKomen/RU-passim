@@ -1401,6 +1401,8 @@ class BasicDetails(DetailView):
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:
                 data['afternewurl'] = context['afternewurl']
+            if hasattr(self, "redirect_to"):
+                data['afternewurl'] = getattr(self,"redirect_to")
             # Check if 'afterdelurl' needs adding
             if 'afterdelurl' in context:
                 data['afterdelurl'] = context['afterdelurl']
@@ -1641,11 +1643,11 @@ class BasicDetails(DetailView):
                         
                                 # Process all the correct forms in the formset
                                 for subform in formset:
-                                    if subform.is_valid():
+                                    if subform.is_valid() and not hasattr(subform, 'do_not_save'):
                                         # DO the actual saving - but that will only work if all is *actually* valid
                                         try:
                                             subform.save()
-
+                                            
                                             # Log the SAVE action
                                             details = {'id': instance.id}
                                             details["savetype"] = "add_sub" # if bNew else "change"
@@ -1915,7 +1917,8 @@ class BasicDetails(DetailView):
                         # Any action(s) after saving
                         bResult, msg = self.after_save(frm, obj)
                     else:
-                        context['errors'] = {'save': msg }
+                        if not msg is None:
+                            context['errors'] = {'save': msg }
                 elif frm.errors:
                     # We need to pass on to the user that there are errors
                     context['errors'] = frm.errors

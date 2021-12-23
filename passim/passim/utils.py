@@ -77,7 +77,7 @@ class BlockedIpMiddleware(object):
 
         if response == None:
             # No problem: we can do what we want
-            oErr.Status("Honoring request")
+            # oErr.Status("Honoring request")
             response = self.get_response(request)
         else:
             oErr.Status("Denying request")
