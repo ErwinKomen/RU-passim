@@ -11,6 +11,7 @@ from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, get_crp
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
     Keyword, SermonGold, EqualGoldLink, FieldChoice
 from passim.approve.models import EqualChange
+from passim.basic.views import BasicList, BasicDetails
 
 import json, copy
 
@@ -284,14 +285,102 @@ def approval_pending_list(super):
     try:
         qs = approval_pending(super)
         for obj in qs:
+            saved = obj.created.strftime("%d/%b/%Y %H:%M") if not obj.saved else obj.saved.strftime("%d/%b/%Y %H:%M")
             oApproval = dict(
-                field=obj.field,
+                field=obj.get_display_name(),
                 editor=obj.profile.user.username,
+                atype=obj.get_atype_display(),
                 created=obj.created.strftime("%d/%b/%Y %H:%M"),
+                saved=saved,
                 change=equalchange_json_to_html(obj, "change"))
             html.append(oApproval)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("approval_pending_list")
     return html
+
+
+# ========================================================= MODEL views =========================================================
+
+class EqualChangeListView(BasicList):
+    """Listview of EqualChange"""
+
+    model = EqualChange
+    listform = EqualChangeForm
+    has_select2 = True
+    bUseFilter = True
+    new_button = False
+    #basic_name = "report"
+    order_cols = ['saved', 'profile__user__username', 'atype', 'super__code', 'field']
+    order_default = ['-saved', 'profile__user__username', 'atype', 'super__code', 'field']
+    order_heads = [
+        {'name': 'Date', 'order': 'o=1', 'type': 'str', 'custom': 'date', 'linkdetails': True, 'align': 'right'},
+        {'name': 'User', 'order': 'o=2', 'type': 'str', 'custom': 'user', 'linkdetails': True},
+        {'name': 'Type', 'order': 'o=3', 'type': 'str', 'custom': 'atype','linkdetails': True, 'main': True},
+        {'name': 'User', 'order': 'o=4', 'type': 'str', 'custom': 'code', 'linkdetails': True},
+        {'name': 'User', 'order': 'o=5', 'type': 'str', 'custom': 'field','linkdetails': True},
+        ]
+    filters = [ 
+        {"name": "User",       "id": "filter_user",      "enabled": False} 
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'user', 'fkfield': 'profile__user', 'keyFk': 'username', 'keyList': 'userlist', 'infield': 'id'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            saved = instance.created if instance.saved is None else instance.saved
+            sBack = saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "user":
+            sBack = instance.profile.user.username
+        elif custom == "atype":
+            sBack = instance.get_atype_display()
+        elif custom == "code":
+            sBack = instance.get_code()
+        elif custom == "field":
+            sBack = instance.get_display_name()
+        return sBack, sTitle
+
+
+class EqualChangeEdit(BasicDetails):
+    model = EqualChange
+    mForm = EqualChangeForm
+    prefix = "eqc"
+    title = "ReportDetails"
+    no_delete = True            # Don't allow users to remove a report
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+            {'type': 'line',  'label': "User:",         'value': instance.user.username         },
+            {'type': 'line',  'label': "Report type:",  'value': instance.get_reptype_display() },
+            # {'type': 'safe',  'label': "Download:",     'value': self.get_download_html(instance)},
+            {'type': 'safe',  'label': "Raw data:",     'value': self.get_raw(instance)}
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class EqualChangeDetails(EqualChangeEdit):
+    """HTML output for an EqualChange object"""
+
+    rtype = "html"
+
+
+
+
+
+
 

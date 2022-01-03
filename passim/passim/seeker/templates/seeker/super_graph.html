@@ -5,7 +5,8 @@
         <!-- Allow the editor user to review the pending approvals -->
         <a class="btn btn-xs jumbo-1" title="Show all changes pending approval"
            data-toggle="collapse" 
-           data-target="#equalchange_pendings">Pending changes ({{approval_pending.count}})</a>
+           data-target="#equalchange_pendings">Pending changes ({{approval_pending.count}}) <span 
+              class="glyphicon glyphicon-envelope" style="color: orangered;" title="Show all changes pending approval"></span></a>
       {% endif %}
       <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network" 
          data-target="#ssg_network_overlap"
@@ -29,16 +30,18 @@
         <th class="tdnowrap">Editor</th>
         <th class="tdnowrap">Field</th>
         <th class="tdnowrap">Suggested change</th>
-        <th class="tdnowrap">Created</th>
+        <th class="tdnowrap">Status</th>
+        <th class="tdnowrap" align="right">Updated</th>
       </tr>
     </thead>
     <tbody>
       {% for obj in approval_pending_list %}
         <tr class="form-row">
-          <td>{{obj.editor}}</td>
-          <td class="hoverable">{{obj.field}}</td>
+          <td >{{obj.editor}}</td>
+          <td class="tdnowrap hoverable">{{obj.field}}</td>
           <td class="hoverable">{{obj.change|safe}}</td>
-          <td align="right">{{obj.created}}</td>
+          <td class="hoverable">{{obj.atype}}</td>
+          <td class="tdnowrap" align="right" style="font-size: smaller;">{{obj.saved}}</td>
         </tr>
       {% endfor %}
     </tbody>

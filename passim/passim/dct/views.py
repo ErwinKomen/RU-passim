@@ -215,7 +215,7 @@ def mypassim(request):
         for obj in qs:
             url = reverse('project2_details', kwargs={'pk': obj.id})
             html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
-        context['edit_projects'] = ", ".join(html)
+        context['edit_projects'] = ",".join(html)
 
     # Figure out which projects this editor may handle
     if context['is_app_editor']:

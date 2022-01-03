@@ -48,15 +48,16 @@ class EqualChange(models.Model):
 
     # Fields for which changes need to be monitored
     approve_fields = [
-        {'field': 'author',             'tofld': 'author',   'type': 'fk'},
-        {'field': 'incipit',            'tofld': 'incipit',  'type': 'string'},
-        {'field': 'explicit',           'tofld': 'explicit', 'type': 'string'},
-        {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist'},
+        {'field': 'author',             'tofld': 'author',   'type': 'fk', 'display': 'Author'},
+        {'field': 'incipit',            'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
+        {'field': 'explicit',           'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+        {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
         #{'field': 'projects',           'tofld': 'projects', 'type': 'm2m-inline',  'listfield': 'projlist'},
         {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
-         'lstQ': [Q(settype="hc") & (Q(scope='publ') | Q(scope='team'))] },
-        {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist'},
-        {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist',
+         # 'lstQ': [Q(settype="hc") & (Q(scope='publ') | Q(scope='team'))], 'display': 'Historical collections' },
+         'lstQ': [Q(settype="hc")], 'display': 'Historical collections' },
+        {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist', 'display': 'Sermons Gold'},
+        {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist', 'display': 'Links',
          'prefix': 'ssglink', 'formfields': [
              {'field': 'linktype',      'type': 'string'},
              {'field': 'spectype',      'type': 'string'},
@@ -69,7 +70,7 @@ class EqualChange(models.Model):
     def __str__(self):
         """Show who proposes what kind of change"""
         sBack = "{}: [{}] on ssg {}".format(
-            self.profile.user.name, self.field, self.super.id)
+            self.profile.user.username, self.field, self.super.id)
         return sBack
 
     def add_item(super, profile, field, oChange, oCurrent=None):
@@ -85,15 +86,79 @@ class EqualChange(models.Model):
             else:
                 current = json.dumps(oCurrent, sort_keys=True)
 
+            # Look for this particular change, supposing it has not changed yet
             obj = EqualChange.objects.filter(super=super, profile=profile, field=field, current=current, change=change).first()
-            if obj == None:
-                obj = EqualChange.objects.create(super=super, profile=profile, field=field, current=current, change=change)
+            if obj == None or obj.changeapprovals.count() > 0:
+                # Less restricted: look for any suggestion for a change on this field that has not been reviewed by anyone yet.
+                bFound = False
+                for obj in EqualChange.objects.filter(super=super, profile=profile, field=field, atype="def"):
+                    if obj.changeapprovals.count() == 0:
+                        # We can use this one
+                        bFound = True
+                        obj.current = current
+                        obj.change = change
+                        obj.save()
+                        break
+                # What if nothing has been found?
+                if not bFound:
+                    # Only in that case do we make a new suggestion
+                    obj = EqualChange.objects.create(super=super, profile=profile, field=field, current=current, change=change)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChange/add_item")
         return obj
 
+    def get_display_name(self):
+        """Get the display name of this field"""
+
+        sBack = self.field
+        for oItem in self.approve_fields:
+            if self.field == oItem['tofld']:
+                sBack = oItem['display']
+                break
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualChange, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
 
 
+class EqualApproval(models.Model):
+    """THis is one person (profile) approving one particular change suggestion"""
 
+    # [1] obligatory link to the SSG
+    change = models.ForeignKey(EqualChange, on_delete=models.CASCADE, related_name="changeapprovals")
+    # [1] an approval belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileapprovals")
+
+    # [1] The approval status of this proposed change
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+    # [0-1] A comment on the reason for rejecting a proposal
+    comment = models.TextField("Comment", null=True, blank=True)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        """Show this approval"""
+        sBack = "{}: [{}] on ssg {}={}".format(
+            self.profile.user.name, self.change.field, self.change.super.id, self.atype)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualApproval, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
 

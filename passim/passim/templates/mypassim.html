@@ -57,13 +57,43 @@
       {% if is_app_editor %}
         <section>
           <h3>Edit actions</h3>
-          <p>You are an editor within Passim for these projects:</p>
-          <p>{{edit_projects|safe}}</p>
           <p>Importing projects can be done by an editor via JSON, Excel and some other ways.
             The items an editor can import are: Manuscript, Sermon, Historical Collection and Authority File.</p>
-          <p>By default assign all items that I import to the following project(s):</p>
-          <p>{{default_projects|safe}}</p>
-          <p><a href="{% url 'default_details' profile.id  %}" role="button" class="btn btn-xs jumbo-1">Edit default project assignment</a></p>
+
+          <table>
+            <!-- Edit privileges-->
+            <tr>
+              <td valign="top"class="hangingindent">You are an editor within Passim for these projects:</td>
+              <td valign="top">{% spaceless %}{{edit_projects|safe}}{% endspaceless %}</td>
+              <td></td>
+            </tr>
+
+            <!-- Default project assignment -->
+            <tr>
+              <td valign="top" class="hangingindent">By default assign all items that I import to the following project(s):</td>
+              <td valign="top">{{default_projects|safe}}</td>
+              <td>
+                <a href="{% url 'default_details' profile.id  %}" role="button" title="Edit default project assignment" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-pencil" title="Edit default project assignment"></span>
+                </a>
+              </td>
+            </tr>
+
+            <!-- Submitted changes -->
+            <tr>
+              <td valign="top"class="hangingindent">My SSG change suggestions:</td>
+              <td valign="top">all</td>
+              <td valign="top">pending</td>
+            </tr>
+
+            <!-- For me to review -->
+            <tr>
+              <td valign="top"class="hangingindent">Suggestions of others that I need to review:</td>
+              <td valign="top">all</td>
+              <td valign="top">pending</td>
+            </tr>
+          </table>
+
         </section>
       {% endif %}
 
