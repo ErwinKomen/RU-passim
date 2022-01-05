@@ -81,9 +81,17 @@
 
             <!-- Submitted changes -->
             <tr>
-              <td valign="top"class="hangingindent">My SSG change suggestions:</td>
-              <td valign="top">all</td>
-              <td valign="top">pending</td>
+              <td valign="top"class="hangingindent">My Authority File change suggestions:</td>
+              <td valign="top">
+                <a href="{% url 'equalchangeuser_list' %}" role="button" title="View all my Authority File suggestions" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-check" title="View all my Authority File suggestions"></span>
+                </a>
+              </td>
+              <td valign="top">
+                <a href="{% url 'equalchangeuser_list' %}?user-atype=def" role="button" title="View my pending Authority File suggestions" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-edit" title="View my pending Authority File suggestions"></span>
+                </a>
+              </td>
             </tr>
 
             <!-- For me to review -->

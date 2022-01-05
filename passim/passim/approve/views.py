@@ -11,6 +11,7 @@ from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, get_crp
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
     Keyword, SermonGold, EqualGoldLink, FieldChoice
 from passim.approve.models import EqualChange
+from passim.approve.forms import EqualChangeForm
 from passim.basic.views import BasicList, BasicDetails
 
 import json, copy
@@ -310,24 +311,61 @@ class EqualChangeListView(BasicList):
     has_select2 = True
     bUseFilter = True
     new_button = False
-    #basic_name = "report"
-    order_cols = ['saved', 'profile__user__username', 'atype', 'super__code', 'field']
-    order_default = ['-saved', 'profile__user__username', 'atype', 'super__code', 'field']
+    use_team_group = True
+    prefix = "any"
+    basic_name_prefix = "equalchange"
+    order_cols = ['profile__user__username', 'saved', 'super__code', 'field', 'atype']
+    order_default = ['profile__user__username', '-saved', 'super__code', 'field', 'atype']
     order_heads = [
-        {'name': 'Date', 'order': 'o=1', 'type': 'str', 'custom': 'date', 'linkdetails': True, 'align': 'right'},
-        {'name': 'User', 'order': 'o=2', 'type': 'str', 'custom': 'user', 'linkdetails': True},
-        {'name': 'Type', 'order': 'o=3', 'type': 'str', 'custom': 'atype','linkdetails': True, 'main': True},
-        {'name': 'User', 'order': 'o=4', 'type': 'str', 'custom': 'code', 'linkdetails': True},
-        {'name': 'User', 'order': 'o=5', 'type': 'str', 'custom': 'field','linkdetails': True},
+        {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
+        {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
+        {'name': 'Field',           'order': 'o=4', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
-        {"name": "User",       "id": "filter_user",      "enabled": False} 
+        {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+        {"name": "User",            "id": "filter_user",      "enabled": False},
         ]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'user', 'fkfield': 'profile__user', 'keyFk': 'username', 'keyList': 'userlist', 'infield': 'id'}
+            {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
+             'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
             ]}
          ]
+
+    def initializations(self):
+        if self.prefix == "any":
+            # Provide all changes
+            self.plural_name = "All field changes"
+            self.sg_name = "Field change"
+        elif self.prefix == "user":
+            # Restricted to a particular user...
+            self.plural_name = "User field changes"
+            self.sg_name = "User field change"
+            self.order_cols = ['saved', 'super__code', 'field', 'atype']
+            self.order_default = ['saved', 'super__code', 'field', 'atype']
+            self.order_heads = [
+                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
+                {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                ]
+            self.filters = [{"name": "Authority File",       "id": "filter_code",      "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
+                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    ]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    ]}
+                 ]
+        return None
 
     def get_field_value(self, instance, custom):
         sBack = ""
@@ -346,11 +384,18 @@ class EqualChangeListView(BasicList):
         return sBack, sTitle
 
 
+class EqualChangeUserListview(EqualChangeListView):
+    """User-specific view of proposed changes"""
+
+    prefix = "user"
+
+
 class EqualChangeEdit(BasicDetails):
     model = EqualChange
     mForm = EqualChangeForm
-    prefix = "eqc"
-    title = "ReportDetails"
+    prefix = "any"
+    basic_name_prefix = "equalchange"
+    title = "Field details"
     no_delete = True            # Don't allow users to remove a report
     mainitems = []
 
@@ -358,13 +403,19 @@ class EqualChangeEdit(BasicDetails):
         """Add to the existing context"""
 
         # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
-            {'type': 'line',  'label': "User:",         'value': instance.user.username         },
-            {'type': 'line',  'label': "Report type:",  'value': instance.get_reptype_display() },
-            # {'type': 'safe',  'label': "Download:",     'value': self.get_download_html(instance)},
-            {'type': 'safe',  'label': "Raw data:",     'value': self.get_raw(instance)}
-            ]
+        context['mainitems'] = []
+
+        # Add user or not?
+        if self.prefix == "user":
+            context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
+
+        # Add the normal information
+        context['mainitems'].append({'type': 'plain', 'label': "Authority File:",'value': instance.get_code()})
+        context['mainitems'].append({'type': 'plain', 'label': "Field:",'value': instance.get_display_name()})
+        context['mainitems'].append({'type': 'plain', 'label': "Date:",'value': instance.get_saved()})
+        context['mainitems'].append({'type': 'plain', 'label': "Status:",'value': instance.get_atype_display()})
+        context['mainitems'].append({'type': 'safe', 'label': "Current:",'value': equalchange_json_to_html(instance, "current")})
+        context['mainitems'].append({'type': 'safe', 'label': "Proposed:",'value': equalchange_json_to_html(instance, "change")})
 
         # Signal that we do have select2
         context['has_select2'] = True
@@ -379,8 +430,16 @@ class EqualChangeDetails(EqualChangeEdit):
     rtype = "html"
 
 
+class EqualChangeUserEdit(EqualChangeEdit):
+    """User-specific equal change editing"""
+    
+    prefix = "user"
+    title = "Field details"
 
 
+class EqualChangeUserDetails(EqualChangeUserEdit):
+    """HTML output for an EqualChangeUser object"""
 
+    rtype = "html"
 
 

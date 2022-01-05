@@ -506,9 +506,9 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         else:
             orderings = []
             for idx, order_item in enumerate(order_default):
-                if idx == 0 and order_item[0] == "-":
-                    bAscending = False
-                    order_item = order_item[1:]
+                #if idx == 0 and order_item[0] == "-":
+                #    bAscending = False
+                #    order_item = order_item[1:]
                 # Get the type
                 sType = order_heads[idx]['type']
                 if ";" in order_item:
@@ -520,10 +520,27 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                 sType = item['type']
                 order_item = item['item']
                 if order_item != "":
-                    if sType == "int":
-                        order.append(order_item)
+                    if order_item[0] == "-":
+                        bAscending = False
+                        order_item = order_item[1:]
                     else:
-                        order.append(Lower(order_item))
+                        bAscending = True
+                    # USED TO BE:
+                    #if sType == "int":
+                    #    order.append(order_item)
+                    #else:
+                    #    order.append(Lower(order_item))
+                    if bAscending:
+                        if sType == "str":
+                            order.append(Lower(order_item).asc(nulls_last=True))
+                        else:
+                            order.append(F(order_item).asc(nulls_last=True))
+                    else:
+                        if sType == "str":
+                            order.append(Lower(order_item).desc(nulls_last=True))
+                        else:
+                            order.append(F(order_item).desc(nulls_last=True))
+
 
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':

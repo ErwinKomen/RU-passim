@@ -9171,7 +9171,7 @@ class ManuscriptEdit(BasicDetails):
                 url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
                 # Add the information to the codico list
                 codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
-                context['codico_list'] = codico_list
+            context['codico_list'] = codico_list
 
             # Make sure to add the mtype to the context
             context['mtype'] = instance.mtype

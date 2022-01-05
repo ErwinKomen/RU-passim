@@ -108,6 +108,12 @@ class EqualChange(models.Model):
             oErr.DoError("EqualChange/add_item")
         return obj
 
+    def get_code(self):
+        """Get the passim code for this object"""
+
+        sBack = self.super.get_code()
+        return sBack
+
     def get_display_name(self):
         """Get the display name of this field"""
 
@@ -116,6 +122,13 @@ class EqualChange(models.Model):
             if self.field == oItem['tofld']:
                 sBack = oItem['display']
                 break
+        return sBack
+
+    def get_saved(self):
+        """Get the date of saving"""
+
+        saved = self.created if self.saved is None else self.saved
+        sBack = saved.strftime("%d/%b/%Y %H:%M")
         return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
