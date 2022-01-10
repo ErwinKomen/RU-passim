@@ -395,12 +395,15 @@ class EqualChangeEdit(BasicDetails):
     mForm = EqualChangeForm
     prefix = "any"
     basic_name_prefix = "equalchange"
-    title = "Field details"
-    no_delete = True            # Don't allow users to remove a report
+    title = "Field change"
+    no_delete = True            # Don't allow users to remove a field change that they have entered
     mainitems = []
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
 
         # Define the main items to show and edit
         context['mainitems'] = []
@@ -410,12 +413,22 @@ class EqualChangeEdit(BasicDetails):
             context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
 
         # Add the normal information
-        context['mainitems'].append({'type': 'plain', 'label': "Authority File:",'value': instance.get_code()})
-        context['mainitems'].append({'type': 'plain', 'label': "Field:",'value': instance.get_display_name()})
-        context['mainitems'].append({'type': 'plain', 'label': "Date:",'value': instance.get_saved()})
-        context['mainitems'].append({'type': 'plain', 'label': "Status:",'value': instance.get_atype_display()})
-        context['mainitems'].append({'type': 'safe', 'label': "Current:",'value': equalchange_json_to_html(instance, "current")})
-        context['mainitems'].append({'type': 'safe', 'label': "Proposed:",'value': equalchange_json_to_html(instance, "change")})
+        mainitems_main = [
+            # -------- HIDDEN field values (these are defined in [EqualChangeForm] ---------------
+            {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Super id",      'value': instance.super.id, 'field_key': "super",   'empty': 'hide'},
+            {'type': 'plain', 'label': "Field val",     'value': instance.field,    'field_key': "field",   'empty': 'hide'},
+            {'type': 'plain', 'label': "Atype val",     'value': instance.atype,    'field_key': "atype",   'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'plain', 'label': "Authority File:",'value': instance.get_code()}, #,          'field_key': 'super'},
+            {'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()}, #,   'field_key': 'field'},
+            {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()}, #,  'field_key': 'atype'},
+            {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current")},
+            {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance, "change")},
+            ]
+        for item in mainitems_main: 
+            context['mainitems'].append(item)
 
         # Signal that we do have select2
         context['has_select2'] = True
@@ -434,7 +447,7 @@ class EqualChangeUserEdit(EqualChangeEdit):
     """User-specific equal change editing"""
     
     prefix = "user"
-    title = "Field details"
+    title = "Field change"
 
 
 class EqualChangeUserDetails(EqualChangeUserEdit):
