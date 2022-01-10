@@ -79,6 +79,9 @@
               </td>
             </tr>
 
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+
             <!-- Submitted changes -->
             <tr>
               <td valign="top"class="hangingindent">My Authority File change suggestions:</td>
@@ -94,11 +97,18 @@
               </td>
             </tr>
 
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+
             <!-- For me to review -->
             <tr>
               <td valign="top"class="hangingindent">Suggestions of others that I need to review:</td>
               <td valign="top">all</td>
-              <td valign="top">pending</td>
+              <td valign="top">
+                <a href="{% url 'equalchangerev_list' %}?user-atype=def" role="button" title="View my pending Authority File reviews" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-edit" title="View my pending Authority File reviews"></span>
+                </a>
+              </td>
             </tr>
           </table>
 

@@ -365,6 +365,30 @@ class EqualChangeListView(BasicList):
                     {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
                     ]}
                  ]
+        elif self.prefix == "rev":
+            # Restricted to the changes a user needs to review...
+            self.plural_name = "User field reviews"
+            self.sg_name = "User field review"
+            self.order_cols = ['saved', 'super__code', 'field', 'atype']
+            self.order_default = ['saved', 'super__code', 'field', 'atype']
+            self.order_heads = [
+                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
+                {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                ]
+            self.filters = [{"name": "Authority File",       "id": "filter_code",      "enabled": False}]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
+                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    ]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'atype',     'dbfield': 'atype',     'keyS': 'atype'},
+                    {'filter': 'review',    'dbfield': '$dummy',    'keyS': 'review'},
+                    # {'filter': 'review',    'dbfield': 'id',        'keyList': 'reviewlist', 'infield': 'id'},
+                    ]}
+                 ]
         return None
 
     def get_field_value(self, instance, custom):
@@ -382,6 +406,28 @@ class EqualChangeListView(BasicList):
         elif custom == "field":
             sBack = instance.get_display_name()
         return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=[]
+        qAlternative = None
+        oErr = ErrHandle()
+
+        try:
+            if self.prefix == "rev":
+                # Figure out who is asking
+                profile = Profile.get_user_profile(self.request.user.username)
+                # Get the queryset of objects that this user needs to review
+
+                id_list = EqualChange.get_review_list(profile, all=False)
+                fields['review'] = Q(id__in=id_list)
+                
+                # fields['reviewlist'] = EqualChange.get_review_list(profile, all=False)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeListView/adapt_search")
+
+        return fields, lstExclude, qAlternative
 
 
 class EqualChangeUserListview(EqualChangeListView):
@@ -455,4 +501,10 @@ class EqualChangeUserDetails(EqualChangeUserEdit):
 
     rtype = "html"
 
+
+class EqualChangeReviewListview(EqualChangeListView):
+    """Reviews for a particular user"""
+
+    # basic_name = "equalreview"
+    prefix = "rev"
 

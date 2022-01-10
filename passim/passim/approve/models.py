@@ -19,7 +19,7 @@ from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, \
     APPROVAL_TYPE, \
-    EqualGold, Profile
+    EqualGold, Profile, ProjectEditor
 
 STANDARD_LENGTH=255
 LONG_STRING=255
@@ -108,6 +108,33 @@ class EqualChange(models.Model):
             oErr.DoError("EqualChange/add_item")
         return obj
 
+    def get_approver_list(self, excl=None):
+        """Get the list of editors that need to approve this change
+        
+        If [excl] is specified, then this object is excluded from the list of Profile objects returned
+        """
+
+        oErr = ErrHandle()
+        lstBack = None
+        try:
+            # Default: return the empty list
+            lstBack = Profile.objects.none()
+            # Get all the projects to which this SSG 'belongs'
+            lst_project = self.super.projects.all().values("id")
+            # Note: only SSGs that belong to more than one project need to be reviewed
+            if len(lst_project) > 1:
+                # Get all the editors associated with these projects
+                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(id__in=lst_project).values('profile_id')]
+                if len(lst_profile_id) > 0:
+                    if excl == None:
+                        lstBack = Profile.models.filter(id__in=lst_profile_id)
+                    else:
+                        lstBack = Profile.models.filter(id__in=lst_profile_id).exclude(id=excl.id)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_approver_list")
+        return lstBack
+
     def get_code(self):
         """Get the passim code for this object"""
 
@@ -123,6 +150,29 @@ class EqualChange(models.Model):
                 sBack = oItem['display']
                 break
         return sBack
+
+    def get_review_list(profile, all=False):
+        """Get the list of objects this editor needs to review"""
+
+        oErr = ErrHandle()
+        lstBack = []
+        try:
+            # Default: return the empty list
+            # lstBack = EqualChange.objects.none()
+            # Get the list of projects for this user
+            lst_project_id = profile.projects.all().values("id")
+            if len(lst_project_id) > 0:
+                # Get the list of EqualChange objects linked to any of these projects
+                lstQ = []
+                lstQ.append(Q(super__equal_proj__project__id__in=lst_project_id))
+                if not all:
+                    lstQ.append(Q(atype='def'))
+                lstBack = [x['id'] for x in EqualChange.objects.exclude(profile=profile).filter(*lstQ).distinct().values('id')]
+                # lstBack = EqualChange.objects.exclude(profile=profile).filter(*lstQ).distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_review_list")
+        return lstBack
 
     def get_saved(self):
         """Get the date of saving"""
