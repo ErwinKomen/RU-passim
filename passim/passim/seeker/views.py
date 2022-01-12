@@ -13211,7 +13211,7 @@ class LitRefListView(ListView):
     paginate_by = 2000
     template_name = 'seeker/literature_list.html'
     entrycount = 0    
-    plural_name = "Projects"
+    # EK: nee dus, dit zijn geen projecten. plural_name = "Projects"
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
