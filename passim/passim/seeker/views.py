@@ -4982,7 +4982,7 @@ class SermonListView(BasicList):
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
                 # Issue #416: Delete the option to search for a GoldSermon personal dataset
                 # {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
-                {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Authority file",   "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
@@ -8991,7 +8991,7 @@ class ManuscriptEdit(BasicDetails):
                         # 'CollectionMan', 'collist',
                         # 'ProvenanceMan', 'mprovlist'
                         # 'Daterange', 'datelist',
-                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', 'project',
+                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
                         'hierarchy',
                         'LitrefMan', 'litlist',
                         'ManuscriptExt', 'extlist']
@@ -9912,7 +9912,7 @@ class ManuscriptListView(BasicList):
         {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Authority file",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
       ]
 
     searches = [
@@ -13210,7 +13210,8 @@ class LitRefListView(ListView):
     model = Litref
     paginate_by = 2000
     template_name = 'seeker/literature_list.html'
-    entrycount = 0
+    entrycount = 0    
+    plural_name = "Projects"
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context

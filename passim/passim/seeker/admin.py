@@ -216,7 +216,7 @@ class ManuscriptAdmin(admin.ModelAdmin):
     """Manuscript"""
     list_display = ['id', 'name', 'idno', 'mtype']
     search_fields = ['name', 'idno']
-    list_filter = ['mtype'] 
+    list_filter = ['project'] 
     formfield_overrides = {
         models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
         }
