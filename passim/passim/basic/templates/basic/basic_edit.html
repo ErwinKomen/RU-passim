@@ -58,6 +58,7 @@
             {% if is_app_editor or permission == "write"  %}
               <div class="delete-confirm hidden selected">
                 <span>Are you sure you would like to delete this item?</span>
+                {{delete_message}}
                 <span>
                   <!-- The button to cancel deletion -->
                   <a title="Cancel deletion" class="btn btn-xs jumbo-1"

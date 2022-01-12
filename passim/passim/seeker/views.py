@@ -9,12 +9,13 @@ from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
-from django.db.models import Q, Prefetch, Count, F
+from django.db.models import Q, Prefetch, Count, F, Sum
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms import formset_factory, modelformset_factory, inlineformset_factory, ValidationError
 from django.forms.models import model_to_dict
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse, FileResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
@@ -22,6 +23,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
+from lxml import etree as ET
 
 # General imports
 from datetime import datetime
@@ -69,7 +71,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
-    CodicoForm, CodicoProvForm, ProvenanceCodForm 
+    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -79,13 +81,14 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
-    Codico, ProvenanceCod, CodicoKeyword, Reconstruction, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
+from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -289,6 +292,106 @@ def adapt_m2o_sig(instance, qs):
     except:
         msg = errHandle.get_error_message()
         return False
+
+def project_dependant_delete(request, to_be_deleted):
+    """Delete items from the linktable, provided the user has the right to"""
+
+    oErr = ErrHandle()
+    bBack = True
+    try:
+        # Find out who this is
+        profile = Profile.get_user_profile(request.user.username)
+        # Get the editing rights for this person
+        project_id = [x['id'] for x in profile.projects.all().values("id")]
+
+        # CHeck all deletables
+        delete = []
+        for obj in to_be_deleted:
+            # Get the project id of the deletables
+            obj_id = obj.id
+            prj_id = obj.project.id
+            if prj_id in project_id:
+                # The user may delete this project relation
+                # Therefore: delete the OBJ that holde this relation!
+                delete.append(obj_id)
+        # Is anything left?
+        if len(delete) > 0:
+            # Get the class of the deletables
+            cls = to_be_deleted[0].__class__
+            # Delete all that need to be deleted
+            cls.objects.filter(id__in=delete).delete()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("project_dependant_delete")
+        bBack = False
+    return bBack
+
+def get_non_editable_projects(profile, projects):
+    """Get the number of projects that I do not have editing rights for"""
+
+    oErr = ErrHandle()
+    iCount = 0
+    try:
+        id_list = []
+        current_project_ids = [x['id'] for x in projects.values('id')]
+        profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        # Walk all the projects I need to evaluate
+        for prj_id in current_project_ids:
+            if not prj_id in profile_project_ids:
+                # I have*NO*  editing rights for this one
+                id_list.append(prj_id)
+        iCount = len(id_list)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_non_editable_projects")
+        iCount = 0
+
+    return iCount
+
+def evaluate_projlist(profile, instance, projlist, sText):
+    bBack = True
+    msg = ""
+    try:
+        if projlist is None or len(projlist) == 0:
+            # Check how many projects the user does *NOT* have rights for
+            non_editable_projects = get_non_editable_projects(profile, instance.projects.all())
+            if non_editable_projects == 0:
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() != 1:
+                    # We cannot assign the default project
+                    bBack = False
+                    msg = "Make sure to assign this {} to one project before saving it".format(sText)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("evaluate_projlist")
+        bBack = False
+    return bBack, msg
+
+def may_edit_project(request, profile, instance):
+    """Check if the user is allowed to edit this project"""
+
+    bBack = False
+    # Is the user an editor?
+    if user_is_ingroup(request, app_editor):
+        # Get the projects this user has authority for
+        user_projects = profile.get_project_ids()
+        if len(user_projects) > 0:
+            # True: the user may indeed edit *some* projects
+            bBack = True
+
+            # The following is now superfluous
+            use_superfluous = False
+            if use_superfluous:
+                # Get the projects associated with [instance']
+                project_ids = [x['id'] for x in instance.projects.all().values('id')]
+                # See if there is any match
+                for project_id in user_projects:
+                    if project_id in project_ids:
+                        bBack = True
+                        break
+    return bBack
 
 def is_empty_form(form):
     """Check if the indicated form has any cleaned_data"""
@@ -2365,42 +2468,52 @@ def user_is_in_team(request):
 def passim_action_add(view, instance, details, actiontype):
     """User can fill this in to his/her liking"""
 
-    # Check if this needs processing
-    stype_edi_fields = getattr(view, "stype_edi_fields", None)
-    if stype_edi_fields:
-        # Get the username: 
-        username = view.request.user.username
-        # Process the action
-        cls_name = instance.__class__.__name__
-        Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
-        # Check the details:
-        if 'changes' in details:
-            changes = details['changes']
-            if 'stype' not in changes or len(changes) > 1:
-                # Check if the current STYPE is *not* 'Edited*
-                stype = getattr(instance, "stype", "")
-                if stype != STYPE_EDITED:
-                    bNeedSaving = False
-                    key = ""
-                    if 'model' in details:
-                        bNeedSaving = details['model'] in stype_edi_fields
-                    if not bNeedSaving:
-                        # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
-                        for k,v in changes.items():
-                            if k in stype_edi_fields:
-                                bNeedSaving = True
-                                key = k
-                                break
+    oErr = ErrHandle()
+    try:
+        # Check if this needs processing
+        stype_edi_fields = getattr(view, "stype_edi_fields", None)
+        if stype_edi_fields and not instance is None:
+            # Get the username: 
+            username = view.request.user.username
+            # Process the action
+            cls_name = instance.__class__.__name__
+            Action.add(username, cls_name, instance.id, actiontype, json.dumps(details))
 
-                    if bNeedSaving:
-                        # Need to set the stype to EDI
-                        instance.stype = STYPE_EDITED
-                        # Adapt status note
-                        snote = json.loads(instance.snote)
-                        snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
-                        instance.snote = json.dumps(snote)
-                        # Save it
-                        instance.save()
+            # -------- DEBGGING -------
+            # print("Passim_action_add type={}".format(actiontype))
+            # -------------------------
+
+            # Check the details:
+            if 'changes' in details:
+                changes = details['changes']
+                if 'stype' not in changes or len(changes) > 1:
+                    # Check if the current STYPE is *not* 'Edited*
+                    stype = getattr(instance, "stype", "")
+                    if stype != STYPE_EDITED:
+                        bNeedSaving = False
+                        key = ""
+                        if 'model' in details:
+                            bNeedSaving = details['model'] in stype_edi_fields
+                        if not bNeedSaving:
+                            # We need to do stype processing, if any of the change fields is in [stype_edi_fields]
+                            for k,v in changes.items():
+                                if k in stype_edi_fields:
+                                    bNeedSaving = True
+                                    key = k
+                                    break
+
+                        if bNeedSaving:
+                            # Need to set the stype to EDI
+                            instance.stype = STYPE_EDITED
+                            # Adapt status note
+                            snote = json.loads(instance.snote)
+                            snote.append(dict(date=get_crpp_date(get_current_datetime()), username=username, status=STYPE_EDITED, reason=key))
+                            instance.snote = json.dumps(snote)
+                            # Save it
+                            instance.save()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("passim_action_add")
     # Now we are ready
     return None
 
@@ -4159,6 +4272,47 @@ class OriginDetails(OriginEdit):
     rtype = "html"
     
 
+class OriginCodEdit(BasicDetails):
+    """The details of one 'origin'"""
+
+    model = OriginCod
+    mForm = OriginCodForm
+    prefix = 'cori'
+    title = "CodicoOrigin"
+    history_button = False # True
+    # rtype = "json"
+    # mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Origin:",   'value': instance.get_origin()},
+            {'type': 'plain', 'label': "Note:",         'value': instance.note,   'field_key': 'note'     },
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        context['listview'] = reverse("codico_details", kwargs={'pk': instance.codico.id})
+
+        # Return the context we have made
+        return context
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class OriginCodDetails(OriginCodEdit):
+    """Like OriginCod Edit, but then html output"""
+    rtype = "html"
+        
+
 class SermonEdit(BasicDetails):
     """The editable part of one sermon description (manifestation)"""
     
@@ -4361,7 +4515,10 @@ class SermonEdit(BasicDetails):
             idno)]
         #    ... as well as the *title* of the Codico to which I belong
         codico = instance.msitem.codico
-        codi_title = "?" if codico == None or codico.name == "" else codico.name
+
+        # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
+        # Issue #422: change the text of the [codi_title]
+        codi_title = "cod. unit. {}".format(codico.order)
         title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
         context['title_right'] = "".join(title_right)
 
@@ -4552,10 +4709,48 @@ class SermonEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if hasattr(form, 'cleaned_data') and 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
-            autype = form.cleaned_data['autype']
-            form.instance.autype = autype
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if hasattr(form, 'cleaned_data'):
+                # Make sure the author type is processed correctly
+                if 'autype' in form.cleaned_data and form.cleaned_data['autype'] != "":
+                    autype = form.cleaned_data['autype']
+                    form.instance.autype = autype
+
+                # Issue #421: check how many projects are attached to the manuscript
+                if not instance is None and not instance.msitem is None and not instance.msitem.manu is None:
+                    # Need to know who is 'talking'...
+                    username = self.request.user.username
+                    profile = Profile.get_user_profile(username)
+
+                    # Always get the project list
+                    projlist = form.cleaned_data.get("projlist")
+
+                    # There is a sermon and a manuscript
+                    manu = instance.msitem.manu
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count > 1:
+                        # There are multiple projects attached to the manuscript
+                        # This means that the user *must* have specified one project
+
+                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+
+                        #if len(projlist) == 0:
+                        #    # Add a warning that the user must manually provide a project
+                        #    msg = "Add a project: A sermon must belong to at least one project"
+                        #    bBack = False
+                    else:
+                        # It would seem that this kind of check is needed anyway...
+                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
@@ -4591,11 +4786,23 @@ class SermonEdit(BasicDetails):
 
                 # (6) 'projects'
                 projlist = form.cleaned_data['projlist']
-                adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project")
+                sermo_proj_deleted = []
+                adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project", deleted=sermo_proj_deleted)
+                project_dependant_delete(self.request, sermo_proj_deleted)
 
                 # When sermons have been added to the manuscript, the sermons need to be updated 
                 # with the existing project names 
-                instance.adapt_projects() # Gaat direct naar adapt_projects in SermDescr
+                # Issue #412: do *NOT* do automatic adjustment to other sermons or to manuscript
+                # instance.adapt_projects() # Gaat direct naar adapt_projects in SermDescr
+
+                # Issue #412: when a sermon doesn't yet have a project, it gets the project of the manuscript
+                if instance.projects.count() == 0:
+                    manu = instance.msitem.manu
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count == 1:
+                        project = manu.projects.first()
+                        SermonDescrProject.objects.create(sermon=instance, project=project)
 
                 # Process many-to-ONE changes
                 # (1) links from bibrange to sermon
@@ -4807,7 +5014,7 @@ class SermonListView(BasicList):
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'atype',                                         'keyS': 'authortype',  'help': 'authorhelp'},
             {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
-                                        'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+                                        'keyS': 'signature_a', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist_a', 'infield': 'code' },
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
             #                            'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
@@ -5489,8 +5696,8 @@ class ProvenanceDetails(ProvenanceEdit):
         sort_end = '</span>'
 
         # List of Manuscripts that use this provenance
-        sermons = dict(title="Manuscripts with this provenance", prefix="mprov")
-        if resizable: sermons['gridclass'] = "resizable"
+        manuscripts = dict(title="Manuscripts with this provenance", prefix="mprov")
+        if resizable: manuscripts['gridclass'] = "resizable"
 
         rel_list =[]
         qs = instance.manuscripts_provenances.all().order_by('manuscript__idno')
@@ -5516,14 +5723,58 @@ class ProvenanceDetails(ProvenanceEdit):
             # Add this line to the list
             rel_list.append(dict(id=item.id, cols=rel_item))
 
-        sermons['rel_list'] = rel_list
+        manuscripts['rel_list'] = rel_list
 
-        sermons['columns'] = [
+        manuscripts['columns'] = [
             '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
             '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
             '{}<span>Note</span>{}'.format(sort_start, sort_end)
             ]
-        related_objects.append(sermons)
+        related_objects.append(manuscripts)
+
+        # List of Codicos that use this provenance
+        codicos = dict(title="Codicological units with this provenance", prefix="mcodi")
+        if resizable: codicos['gridclass'] = "resizable"
+
+        rel_list =[]
+        qs = instance.codico_provenances.all().order_by('codico__manuscript__idno', 'codico__order')
+        for item in qs:
+            codico = item.codico
+            manu = codico.manuscript
+            url = reverse('manuscript_details', kwargs={'pk': manu.id})
+            url_c = reverse('codico_details', kwargs={'pk': codico.id})
+            url_pc = reverse('provenancecod_details', kwargs={'pk': item.id})
+            rel_item = []
+
+            # S: Order number for this manuscript
+            add_rel_item(rel_item, index, False, align="right")
+            index += 1
+
+            # Manuscript
+            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
+            add_rel_item(rel_item, manu_full, False, main=False, link=url)
+
+            # Codico
+            codico_full = "<span class='badge signature ot'>{}</span>".format(codico.order)
+            add_rel_item(rel_item, codico_full, False, main=False, link=url_c)
+
+            # Note for this provenance
+            note = "(none)" if item.note == None or item.note == "" else item.note
+            add_rel_item(rel_item, note, False, nowrap=False, main=True, link=url_pc,
+                         title="Note for this provenance-codico relation")
+
+            # Add this line to the list
+            rel_list.append(dict(id=item.id, cols=rel_item))
+
+        codicos['rel_list'] = rel_list
+
+        codicos['columns'] = [
+            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Codicological unit</span>{}'.format(sort_start, sort_end), 
+            '{}<span>Note</span>{}'.format(sort_start, sort_end)
+            ]
+        related_objects.append(codicos)
 
         # Add all related objects to the context
         context['related_objects'] = related_objects
@@ -5854,7 +6105,7 @@ class BibRangeListView(BasicList):
             lstQ.append(Q(bibrangeverses__bkchvs__lte=einde))
             sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibref'] = Q(id__in=sermonlist)
+            fields['bibrefbk'] = Q(id__in=sermonlist)
 
         return fields, lstExclude, qAlternative
 
@@ -6227,6 +6478,7 @@ class ProfileEdit(BasicDetails):
     prefix = "prof"
     title = "ProfileEdit"
     rtype = "json"
+    has_select2 = True
     history_button = True
     no_delete = True
     mainitems = []
@@ -6246,11 +6498,27 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
             {'type': 'plain', 'label': "Last login:",   'value': instance.user.last_login.strftime("%d/%b/%Y %H:%M"), },
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(), 'field_key': 'ptype'},
-            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,         'field_key': 'affiliation'}
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
+            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,                  'field_key': 'affiliation'},
+            {'type': 'line',  'label': "Editing rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
         # Return the context we have made
         return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # (6) 'projects'
+            projlist = form.cleaned_data['projlist']
+            adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileEdit/after_save")
+            bResult = False
+        return bResult, msg
 
     def get_history(self, instance):
         return passim_get_history(instance)
@@ -6268,13 +6536,14 @@ class ProfileListView(BasicList):
     listform = ProfileForm
     prefix = "prof"
     new_button = False      # Do not allow adding new ones here
-    order_cols = ['user__username', '', 'ptype', 'affiliation', '']
+    order_cols = ['user__username', '', 'ptype', 'affiliation', '', '']
     order_default = order_cols
     order_heads = [
         {'name': 'Username',    'order': 'o=1', 'type': 'str', 'custom': 'name', 'default': "(unnamed)", 'linkdetails': True},
         {'name': 'Email',       'order': '',    'type': 'str', 'custom': 'email', 'linkdetails': True},
         {'name': 'Status',      'order': 'o=3', 'type': 'str', 'custom': 'status', 'linkdetails': True},
         {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
+        {'name': 'Editor',      'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
 
     def get_field_value(self, instance, custom):
@@ -6288,6 +6557,12 @@ class ProfileListView(BasicList):
             sBack = instance.get_ptype_display()
         elif custom == "affiliation":
             sBack = "-" if instance.affiliation == None else instance.affiliation
+        elif custom == "projects":
+            lHtml = []
+            for g in instance.projects.all():
+                name = g.name
+                lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
+            sBack = ", ".join(lHtml)
         elif custom == "groups":
             lHtml = []
             for g in instance.user.groups.all():
@@ -6295,6 +6570,58 @@ class ProfileListView(BasicList):
                 lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
             sBack = ", ".join(lHtml)
         return sBack, sTitle
+
+
+class DefaultEdit(BasicDetails):
+    """User-definable defaults for this user-profile"""
+
+    model = Profile
+    mForm = ProfileForm
+    prefix = "def"
+    title = "DefaultEdit"
+    titlesg = "Default"
+    basic_name = "default"
+    has_select2 = True
+    history_button = False
+    no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+        self.listview = reverse('mypassim')
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "User",              'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
+            {'type': 'plain', 'label': "Username:",         'value': instance.user.username, },
+            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_projects_markdown()},
+            {'type': 'line',  'label': 'Default projects:', 'value': instance.get_defaults_markdown(), 'field_list': 'deflist'}
+            ]
+        # Return the context we have made
+        return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # (6) 'default projects'
+            deflist = form.cleaned_data['deflist']
+            instance.defaults_update(deflist)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("DefaultEdit/after_save")
+            bResult = False
+        return bResult, msg
+
+
+class DefaultDetails(DefaultEdit):
+    """Like Default Edit, but then html output"""
+
+    rtype = "html"
 
 
 class ProjectEdit(BasicDetails):
@@ -6312,10 +6639,53 @@ class ProjectEdit(BasicDetails):
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
+
+        def get_singles(lst_id, clsThis, field):
+            """Get a list of occurrances that have only one project id"""
+
+            # Get all singles
+            lst_singles = clsThis.objects.all().values(field).annotate(total=Count("project")).filter(total=1).values(field, "total")
+            # Turn them into a dictionary - but only the singular ones
+            dict_singles = { x[field]:x['total'] for x in lst_singles}
+            # Count the ones that overlap: those are the singular ones
+            count = 0
+            attr = "{}__id".format(field)
+            for oItem in lst_id:
+                id = oItem[attr]
+                if id in dict_singles:
+                    count += 1
+            return count
+            
+
         # Only moderators and superusers are to be allowed to create and delete project labels
         if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
             # Define the main items to show and edit
-            context['mainitems'] = [{'type': 'plain', 'label': "Name:", 'value': instance.name, 'field_key': "name"}]       
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
+                {'type': 'line',  'label': "Editors:",  'value': instance.get_editor_markdown()}
+                ]       
+
+            # Also add a delete Warning Statistics message (see issue #485)
+            lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
+            lst_proj_hc = CollectionProject.objects.filter(project=instance).values('collection__id')
+            lst_proj_s = SermonDescrProject.objects.filter(project=instance).values('sermon__id')
+            lst_proj_ssg = EqualGoldProject.objects.filter(project=instance).values('equal__id')
+
+            count_m =  len(lst_proj_m)
+            count_hc =  len(lst_proj_hc)
+            count_s =  len(lst_proj_s)
+            count_ssg = len(lst_proj_ssg)
+            single_m = get_singles(lst_proj_m, ManuscriptProject, "manuscript")
+            single_hc = get_singles(lst_proj_hc, CollectionProject, "collection")
+            single_s = get_singles(lst_proj_s, SermonDescrProject, "sermon")
+            single_ssg = get_singles(lst_proj_ssg, EqualGoldProject, "equal")
+            
+            local_context = dict(
+                project=instance, 
+                count_m=count_m, count_hc=count_hc, count_s=count_s, count_ssg=count_ssg,
+                single_m=single_m, single_hc=single_hc, single_s=single_s, single_ssg=single_ssg,
+                )
+            context['delete_message'] = render_to_string('seeker/project_statistics.html', local_context, self.request)
         # Return the context we have made
         return context
     
@@ -6423,6 +6793,7 @@ class CollAnyEdit(BasicDetails):
     manu = None
     codico = None
     datasettype = ""
+    use_team_group = True
     mainitems = []
     hlistitems = [
         {'type': 'manu',    'clsColl': CollectionMan,   'field': 'manuscript'},
@@ -6529,6 +6900,9 @@ class CollAnyEdit(BasicDetails):
         prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
         prefix_elevate = ['any', 'super', 'priv', 'publ']
 
+        # Need to know who this is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
@@ -6593,7 +6967,10 @@ class CollAnyEdit(BasicDetails):
         
         # Historical collections have a project assigned to them
         if instance.settype == "hc":
-            context['mainitems'].append( {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'})
+            oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
+            if may_edit_project(self.request, profile, instance):
+                oProject['field_list'] = 'projlist'
+            context['mainitems'].append(oProject)        
                         
 
         # Any dataset may optionally be elevated to a historical collection
@@ -6743,33 +7120,41 @@ class CollAnyEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if form != None:
-            # Search the user profile
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.owner = profile
-            # The collection type is now a parameter
-            type = form.cleaned_data.get("type", "")
-            if type == "":
-                if self.prefix == "hist":
-                    form.instance.type = "super"
-                elif self.prefix == "publ":
-                    form.instance.type = self.datasettype
-                elif self.prefix == "priv":
-                    type = self.qd.get("datasettype", "")
-                    if type == "": type = self.datasettype
-                    if type == "": type = "super"
-                    form.instance.type = type
-                else:
-                    form.instance.type = self.prefix
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if form != None and instance != None:
+                # Search the user profile
+                profile = Profile.get_user_profile(self.request.user.username)
+                form.instance.owner = profile
+                # The collection type is now a parameter
+                type = form.cleaned_data.get("type", "")
+                if type == "":
+                    if self.prefix == "hist":
+                        form.instance.type = "super"
+                    elif self.prefix == "publ":
+                        form.instance.type = self.datasettype
+                    elif self.prefix == "priv":
+                        type = self.qd.get("datasettype", "")
+                        if type == "": type = self.datasettype
+                        if type == "": type = "super"
+                        form.instance.type = type
+                    else:
+                        form.instance.type = self.prefix
 
-            # Check out the name, if this is not in use elsewhere
-            if instance.id != None:
-                name = form.instance.name
-                if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
-                    # The name is already in use, so refuse it.
-                    msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
-                    return False, msg
-        return True, ""
+                # Check out the name, if this is not in use elsewhere
+                if instance.id != None:
+                    name = form.instance.name
+                    if Collection.objects.filter(name__iexact=name).exclude(id=instance.id).exists():
+                        # The name is already in use, so refuse it.
+                        msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
+                        return False, msg
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -6784,7 +7169,9 @@ class CollAnyEdit(BasicDetails):
             
             # (2) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(CollectionProject, instance, "collection", projlist, "project")
+            col_proj_deleted = []
+            adapt_m2m(CollectionProject, instance, "collection", projlist, "project", deleted=col_proj_deleted)
+            project_dependant_delete(self.request, col_proj_deleted)
 
         except:
             msg = oErr.get_error_message()
@@ -6853,6 +7240,55 @@ class CollHistEdit(CollAnyEdit):
     settype = "hc"
     basic_name = "collhist"
     title = "Historical collection"
+
+    def before_save(self, form, instance):
+        # Make sure the [CollAnyEdit] is executed
+        response = super(CollHistEdit, self).before_save(form, instance)
+
+        # Now do the remainder
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # Issue #473: automatic assignment of project for particular editor(s)
+                projlist = form.cleaned_data.get("projlist")
+                bBack, msg = evaluate_projlist(profile, instance, projlist, "Historical collection")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollHistEdit/before_save")
+            bBack = False
+        return bBack, msg
+
+    def after_save(self, form, instance):
+        # Make sure the [CollAnyEdit] is executed
+        response = super(CollHistEdit, self).after_save(form, instance)
+
+        # Now do the remainder
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Issue #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    CollectionProject.objects.create(collection=instance, project=project)
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
 
 
 class CollManuEdit(CollAnyEdit):
@@ -7990,7 +8426,7 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', 'ssgauthornum', 'created', '']
+            self.order_cols = ['name', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
@@ -8118,11 +8554,21 @@ class CollectionListView(BasicList):
         return context
 
     def get_own_list(self):
-        # Get the user
-        username = self.request.user.username
-        user = User.objects.filter(username=username).first()
-        # Get to the profile of this user
-        qs = Profile.objects.filter(user=user)
+        oErr = ErrHandle()
+        qs = None
+        try:
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Get to the profile of this user
+            if user is None:
+                qs = Profile.objects.none()
+                oErr.Status("CollectionListView/get_own_list: unknown user is [{}]".format(username))
+            else:
+                qs = Profile.objects.filter(user=user)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/get_own_list")
         return qs
 
     def adapt_search(self, fields):
@@ -8234,7 +8680,10 @@ class CollectionListView(BasicList):
         elif custom == "created":
             sBack = get_crpp_date(instance.created, True)
         elif custom == "owner":
-            sBack = instance.owner.user.username
+            if instance.owner is None:
+                sBack = "(no user)"
+            else:
+                sBack = instance.owner.user.username
         elif custom == "authors":
             sBack = instance.get_authors_markdown()
         elif custom == "authcount":
@@ -8594,14 +9043,9 @@ class ManuscriptEdit(BasicDetails):
                  'title': 'City, village or abbey (monastery) of the library'},
                 {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
                 {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
-                #{'type': 'plain', 'label': "Title:",        'value': instance.name,                 'field_key': 'name'},
-                #{'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-                # 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
-                #{'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
-                #{'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
-                #{'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-                #{'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}, PROJECT_MOD_HERE
-                #{'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
+                # Project assignment: see below
+                # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
+                # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
             if not istemplate:
@@ -8615,8 +9059,10 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
-                    #{'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
-                    {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+
+                    # Project2 HIER
+                    {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
+
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
                         'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
                     ]
@@ -8634,6 +9080,13 @@ class ManuscriptEdit(BasicDetails):
                     {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
 
+                # Check if this is an editor with permission for this project
+                if may_edit_project(self.request, profile, instance):
+                    for oItem in context['mainitems']:
+                        if oItem['label'] == "Project:":
+                            # Add the list
+                            oItem['field_list'] = "projlist"
+
             # Signal that we have select2
             context['has_select2'] = True
 
@@ -8650,15 +9103,13 @@ class ManuscriptEdit(BasicDetails):
 
                 # Action depends on template/not
                 if not istemplate:
-                    if user_is_superuser(self.request):
-                        # Button to download this manuscript as JSON
-                        lbuttons.append(dict(title="Download manuscript as JSON file", 
-                                             click="manuscript_download_json", label="JSON"))
-
-                    # Button to download this manuscript as EXCEL
-                    # downloadurl = reverse("manuscript_download", kwargs={'pk': instance.id})
-                    lbuttons.append(dict(title="Download manuscript as Excel file", 
-                                         click="manuscript_download", label="Download"))
+                    # Also add the manuscript download code
+                    local_context = dict(
+                        ajaxurl     = reverse("manuscript_download", kwargs={'pk': instance.id}),
+                        is_superuser=user_is_superuser(self.request),
+                        csrf        = '<input type="hidden" name="csrfmiddlewaretoken" value="{}" />'.format(
+                                                get_token(self.request)))
+                    lbuttons.append(dict(html=render_to_string('seeker/manuscript_download.html', local_context, self.request)))
 
                     if instance.mtype != "rec":
                         # Add a button so that the user can import sermons + hierarchy from an existing template
@@ -8674,31 +9125,30 @@ class ManuscriptEdit(BasicDetails):
                 lbuttons.append(dict(title="Open a list of locations", href=reverse('location_list'), label="Locations..."))
 
                 # Build the HTML on the basis of the above
-                lhtml.append("<div class='row'><div class='col-md-12' align='right'>")
+                lhtml.append("<div class='row'><div class='col-md-12 container-small' align='right'><form method='post'>")
                 for item in lbuttons:
-                    idfield = ""
-                    if 'click' in item:
-                        ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
-                    elif 'submit' in item:
-                        ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
-                    elif 'open' in item:
-                        ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                    if 'html' in item:
+                        lhtml.append(item['html'])
                     else:
-                        ref = " href='{}'".format(item['href'])
-                    if 'id' in item:
-                        idfield = " id='{}'".format(item['id'])
-                    lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
-                    lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
-                lhtml.append("</div></div>")
+                        idfield = ""
+                        if 'click' in item:
+                            ref = " onclick='document.getElementById(\"{}\").click();'".format(item['click'])
+                        elif 'submit' in item:
+                            ref = " onclick='document.getElementById(\"{}\").submit();'".format(item['submit'])
+                        elif 'open' in item:
+                            ref = " data-toggle='collapse' data-target='#{}'".format(item['open'])
+                        else:
+                            ref = " href='{}'".format(item['href'])
+                        if 'id' in item:
+                            idfield = " id='{}'".format(item['id'])
+                        lhtml.append("  <a role='button' class='btn btn-xs jumbo-3' title='{}' {} {}>".format(item['title'], ref, idfield))
+                        lhtml.append("     <span class='glyphicon glyphicon-chevron-right'></span>{}</a>".format(item['label']))
+                lhtml.append("</form></div></div>")
 
                 if not istemplate:
                     # Add HTML to allow for the *creation* of a template from this manuscript
                     local_context = dict(manubase=instance.id)
                     lhtml.append(render_to_string('seeker/template_create.html', local_context, self.request))
-
-                    # Also add the manuscript download code
-                    local_context = dict(ajaxurl = reverse("manuscript_download", kwargs={'pk': instance.id}))
-                    lhtml.append(render_to_string('seeker/manuscript_download.html', local_context, self.request))
 
                     # Add HTML to allow the user to choose sermons from a template
                     local_context['frmImport'] = TemplateImportForm({'manu_id': instance.id})
@@ -8721,7 +9171,7 @@ class ManuscriptEdit(BasicDetails):
                 url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
                 # Add the information to the codico list
                 codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
-                context['codico_list'] = codico_list
+            context['codico_list'] = codico_list
 
             # Make sure to add the mtype to the context
             context['mtype'] = instance.mtype
@@ -8793,10 +9243,17 @@ class ManuscriptEdit(BasicDetails):
         lkv.append(dict(label="Extent", value=codico.extent))
         lkv.append(dict(label="Format", value=codico.format))
         lkv.append(dict(label="Keywords", value=codico.get_keywords_markdown()))
-        lkv.append(dict(label="Origin", value=codico.get_origin_markdown()))
+        lkv.append(dict(label="Origin", value=self.get_codiorigin_markdown(codico)))
         lkv.append(dict(label="Provenances", value=self.get_codiprovenance_markdown(codico)))
         lkv.append(dict(label="Notes", value=codico.get_notes_markdown()))
         return lkv
+
+    def get_codiorigin_markdown(self, codico):
+        """Calculate a collapsable table view of the origins for this codico, for Codico details view"""
+
+        context = dict(codi=codico)
+        sBack = render_to_string("seeker/codi_origins.html", context, self.request)
+        return sBack
 
     def get_codiprovenance_markdown(self, codico):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
@@ -8910,17 +9367,31 @@ class ManuscriptEdit(BasicDetails):
         return None
 
     def before_save(self, form, instance):
-        if instance != None:
-            # If there is no source, then create a source for this one
-            if instance.source == None:
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
                 username = self.request.user.username
                 profile = Profile.get_user_profile(username)
-                source = SourceInfo.objects.create(
-                    code="Manually created",
-                    collector=username, 
-                    profile=profile)
-                instance.source = source
-        return True, ""
+
+                # If there is no source, then create a source for this one
+                if instance.source == None:
+                    source = SourceInfo.objects.create(
+                        code="Manually created",
+                        collector=username, 
+                        profile=profile)
+                    instance.source = source
+
+                # Issue #473: automatic assignment of project for particular editor(s)
+                projlist = form.cleaned_data.get("projlist")
+                bBack, msg = evaluate_projlist(profile, instance, projlist, "Manuscript")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -8952,11 +9423,27 @@ class ManuscriptEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(ManuscriptProject, instance, "manuscript", projlist, "project")
+            manu_proj_deleted = []
+            adapt_m2m(ManuscriptProject, instance, "manuscript", projlist, "project", deleted=manu_proj_deleted)
+            project_dependant_delete(self.request, manu_proj_deleted)
 
             # When projects have been added to the manuscript, the sermons need to be updated too 
             # or vice versa
-            instance.adapt_projects() 
+            # Issue #412: do *NOT* call this any more
+            #             when the project of a manuscript changes, underlying sermons are *not* automatically affected
+            # instance.adapt_projects() 
+
+            # Issue #412 + #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -9079,9 +9566,13 @@ class ManuscriptDetails(ManuscriptEdit):
 
     def before_save(self, form, instance):
         if instance != None:
-            # If no project has been selected, then select the default project: Passim TH aanpassen
-            if instance.project == None:
-                instance.project = Project.get_default(self.request.user.username)
+            # If no project has been selected, then select the default project(s) - see issue #479
+            count = instance.projects.count()
+            if count == 0:
+                # Set the default projects
+                profile = Profile.get_user_profile(self.request.user.username)
+                projects = profile.get_defaults()
+                instance.set_projects(projects)
         return True, ""
 
     def process_formset(self, prefix, request, formset):
@@ -9105,6 +9596,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
             id = None if obj == None else obj.id
             return id
 
+        # Note: use [errHandle]
         try:
             # Make sure to set the correct redirect page
             if instance:
@@ -9115,10 +9607,9 @@ class ManuscriptHierarchy(ManuscriptDetails):
             if 'manu-hlist' in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd['manu-hlist'])
+                # Debugging:
+                str_hlist = json.dumps(hlist, indent=2)
 
-                #if method == "july2020":
-                # The new July20920 method that uses different parameters and uses MsItem
-                    
                 # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                 head_to_id = {}
                 deletables = []
@@ -9165,6 +9656,10 @@ class ManuscriptHierarchy(ManuscriptDetails):
                             if codi == None or codi.id != codi_id:
                                 codi = Codico.objects.filter(id=codi_id).first()
 
+                        # Safe guarding
+                        if codi is None:
+                            errHandle.Status("ManuscriptHierarchy: codi is none")
+                            x = msitem.itemsermons.first()
                         # Possibly set the msitem codi
                         if msitem.codico != codi:
                             msitem.codico = codi
@@ -9179,10 +9674,10 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         # Possibly adapt the [shead] title and locus
                         itemhead = msitem.itemheads.first()
                         if itemhead and 'title' in item and 'locus' in item:
-                            title= item['title']
+                            title= item['title'].strip()
                             locus = item['locus']
                             if itemhead.title != title or itemhead.locus != locus:
-                                itemhead.title = title
+                                itemhead.title = title.strip()
                                 itemhead.locus = locus
                                 # Save the itemhead
                                 itemhead.save()
@@ -9429,7 +9924,8 @@ class ManuscriptListView(BasicList):
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origin',                 
+            {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origins__location|manuscriptcodicounits__origins', 
+             # Issue #427. This was: 'manuscriptcodicounits__origin',                 
              'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'keyword',       'fkfield': 'keywords',               'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'name' },
             {'filter': 'project',       'fkfield': 'projects',               'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
@@ -9473,7 +9969,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
+            #{'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             {'filter': 'source',    'fkfield': 'source',   'keyS': 'source',  'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id' },
             {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
             ]}
@@ -9502,33 +9998,48 @@ class ManuscriptListView(BasicList):
         # Should galway be added?
         if not bHasGalway:
             # Add a reference to the Excel upload method
+            html = []
+            html.append("Import manuscripts from Galway using one or more CSV files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oGalway = dict(title="galway", label="Galway",
                           url=reverse('manuscript_upload_galway'),
-                          type="multiple",
-                          msg="Import manuscripts from Galway using one or more CSV files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple",msg=msg)
             self.uploads.append(oGalway)
 
         # Should excel be added?
         if not bHasExcel:
             # Add a reference to the Excel upload method
+            html = []
+            html.append("Import manuscripts from one or more Excel files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oExcel = dict(title="excel", label="Excel",
                           url=reverse('manuscript_upload_excel'),
-                          type="multiple",
-                          msg="Import manuscripts from one or more Excel files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple", msg=msg)
             self.uploads.append(oExcel)
 
         # Should json be added?
         if not bHasJson:
-            # Add a reference to the Excel upload method
+            # Add a reference to the Json upload method
+            html = []
+            html.append("Import manuscripts from one or more JSON files.")
+            html.append("<b>Note 1:</b> this OVERWRITES a manuscript/sermon if it exists!")
+            html.append("<b>Note 2:</b> default PROJECT assignment according to MyPassim!")
+            msg = "<br />".join(html)
             oJson = dict(title="json", label="Json",
                           url=reverse('manuscript_upload_json'),
-                          type="multiple",
-                          msg="Import manuscripts from one or more JSON files.<br /><b>Note:</b> this OVERWRITES a manuscript/sermon if it exists!")
+                          type="multiple", msg=msg)
             self.uploads.append(oJson)
 
         # Possibly *NOT* show the downloads
         if not user_is_ingroup(self.request, app_developer):
             self.downloads = []
+        if not user_is_authenticated(self.request) or not (user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)):
+            # Do *not* unnecessarily show the custombuttons
+            self.custombuttons = []
 
         # ======== One-time adaptations ==============
         listview_adaptations("manuscript_list")
@@ -9628,7 +10139,7 @@ class ManuscriptListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        prjlist = None # old
+        #prjlist = None # old
         projlist = None
 
         # Check if a list of keywords is given
@@ -9649,18 +10160,7 @@ class ManuscriptListView(BasicList):
             # Get the list
             projlist = fields['projlist']
 
-        # Check if the projlist is identified TH: dit was eerst uncommented
-        if fields['projlist'] == None or len(fields['projlist']) == 0:
-            # Get the default project
-            qs = Project2.objects.all()
-            if qs.count() > 0:
-                proj_default = qs.first()
-                qs = Project2.objects.filter(id=proj_default.id)
-                fields['projlist'] = qs
-                projlist = qs
-
-
-        # Check if the prjlist is identified
+        ## Check if the prjlist is identified
         #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
         #    # Get the default project
         #    qs = Project.objects.all()
@@ -9690,7 +10190,7 @@ class ManuscriptListView(BasicList):
                 
                         # (1) Possible manuscripts only filter on: mtype=man, prjlist
                         lstQ = []
-                        if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                        # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                         lstQ.append(Q(mtype="man"))
                         lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                         manu_list = Manuscript.objects.filter(*lstQ)
@@ -9721,7 +10221,7 @@ class ManuscriptListView(BasicList):
                 
                             # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
                             lstQ = []
-                            if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                            # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                             lstQ.append(Q(mtype="man"))
                             lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
@@ -9741,10 +10241,6 @@ class ManuscriptListView(BasicList):
                             fields['cmpmanuidlist'] = None
                             fields['cmpmanu'] = Q(id__in=manu_include)
 
-
-        # Adapt the manutype filter
-        #if 'manutype' in fields and fields['manutype'] != None:
-        #    fields['manutype'] = fields['manutype'].abbr
 
         # Adapt the bible reference list
         bibrefbk = fields.get("bibrefbk", "")
@@ -9840,6 +10336,9 @@ class ManuscriptDownload(BasicPart):
             profile = Profile.get_user_profile(self.request.user.username)
             username = profile.user.username
             team_group = app_editor
+
+            # Make sure we only look at lower-case Dtype
+            dtype = dtype.lower()
 
             # Is this Excel?
             if dtype == "excel" or dtype == "xlsx":
@@ -9984,6 +10483,21 @@ class ManuscriptDownload(BasicPart):
                 lst_manu.append(oManu)
                 # Make sure to return this list
                 sData = json.dumps( lst_manu, indent=2)
+            elif dtype == "tei" or dtype== "xml-tei":
+                # Prepare a context for the XML creation
+                context = dict(details_id=self.obj.id, download_person=username)
+                context['details_url'] = 'https://passim.rich.ru.nl{}'.format(reverse('manuscript_details', kwargs={'pk': self.obj.id}))
+                context['download_date_ymd'] = get_current_datetime().strftime("%Y-%m-%d")
+                context['download_date'] = get_current_datetime().strftime("%d/%b/%Y")
+                context['manu'] = self.obj
+
+                # Convert into string
+                sData = render_to_string("seeker/tei-template.xml", context, self.request)
+
+                # Perform pretty printing
+                tree = ET.fromstring(sData, parser=ET.XMLParser(encoding='utf-8', remove_blank_text=True))
+                pretty = ET.tostring(tree, encoding="utf-8", pretty_print=True, xml_declaration=True)
+                sData = pretty
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ManuscriptDownload/get_data")
@@ -10015,13 +10529,19 @@ class CodicoEdit(BasicDetails):
                                          form=CodicoProvForm, min_num=0,
                                          fk_name = "codico",
                                          extra=0, can_delete=True, can_order=False)
+    CoriFormSet = inlineformset_factory(Codico, OriginCod,
+                                         form=CodicoOriginForm, min_num=0, max_num=1,
+                                         fk_name = "codico",
+                                         extra=0, can_delete=True, can_order=False)
 
     formset_objects = [{'formsetClass': CdrFormSet,   'prefix': 'cdr',   'readonly': False, 'noinit': True, 'linkfield': 'codico'},
-                       {'formsetClass': CprovFormSet, 'prefix': 'cprov', 'readonly': False, 'noinit': True, 'linkfield': 'codico'}]
+                       {'formsetClass': CprovFormSet, 'prefix': 'cprov', 'readonly': False, 'noinit': True, 'linkfield': 'codico'},
+                       {'formsetClass': CoriFormSet,  'prefix': 'cori',  'readonly': False, 'noinit': True, 'linkfield': 'codico'}]
 
     stype_edi_fields = ['name', 'order', 'origin', 'support', 'extent', 'format', 
                         'Daterange', 'datelist',
-                        'ProvenanceCod', 'cprovlist']
+                        'ProvenanceCod', 'cprovlist',
+                        'OriginCod', 'corilist']
     
     def custom_init(self, instance):
         if instance != None:
@@ -10071,20 +10591,23 @@ class CodicoEdit(BasicDetails):
                 {'type': 'plain', 'label': "Title:",        'value': instance.name,                     'field_key': 'name'},
                 {'type': 'safe',  'label': "Order:",        'value': instance.order},
                 {'type': 'line',  'label': "Date:",         'value': instance.get_date_markdown(), 
-                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0], 'template_selection': 'ru.passim.litref_template' },
+                 'multiple': True, 'field_list': 'datelist', 'fso': self.formset_objects[0]},   #, 'template_selection': 'ru.passim.litref_template' },
                 {'type': 'plain', 'label': "Support:",      'value': instance.support,                  'field_key': 'support'},
                 {'type': 'plain', 'label': "Extent:",       'value': instance.extent,                   'field_key': 'extent'},
                 {'type': 'plain', 'label': "Format:",       'value': instance.format,                   'field_key': 'format'},
-                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown()}
+                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown2()}
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
             username = profile.user.username
             team_group = app_editor
             mainitems_m2m = [
                 {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),  'field_list': 'kwlist'},
-                {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                # Was: (see issue #427)
+                #      {'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
+                {'type': 'plain', 'label': "Origin:",       'value': self.get_origin_markdown(instance),    
+                 'multiple': True, 'field_list': 'corilist', 'fso': self.formset_objects[2]},
                 {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                    'multiple': True, 'field_list': 'cprovlist', 'fso': self.formset_objects[1] }
+                 'multiple': True, 'field_list': 'cprovlist', 'fso': self.formset_objects[1] }
                 ]
             for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -10144,6 +10667,13 @@ class CodicoEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_origin_markdown(self, instance):
+        """Calculate a collapsable table view of the origins for this codico, for Codico details view"""
+
+        context = dict(codi=instance)
+        sBack = render_to_string("seeker/codi_origins.html", context, self.request)
+        return sBack
+
     def get_provenance_markdown(self, instance):
         """Calculate a collapsable table view of the provenances for this codico, for Codico details view"""
 
@@ -10189,7 +10719,18 @@ class CodicoEdit(BasicDetails):
                     if prov_new != None:
                         form.instance.provenance = prov_new
                         form.instance.note = note
-
+                elif prefix == "cori":
+                    # Don't allow more than one origin
+                    count = instance.origins.count()
+                    if count < 1:
+                        # See issue #427
+                        note = cleaned.get("note")
+                        origin_new = cleaned.get("origin_new")
+                        if origin_new != None:
+                            form.instance.origin = origin_new
+                            form.instance.note = note
+                    else:
+                        errors.append("A codicological unit may not have more than one Origin")
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -10221,11 +10762,17 @@ class CodicoEdit(BasicDetails):
             cprovlist = form.cleaned_data['cprovlist']
             adapt_m2m(ProvenanceCod, instance, "codico", cprovlist, "provenance", extra=['note'], related_is_through = True)
 
+            # (3) 'origins'
+            corilist = form.cleaned_data['corilist']
+            adapt_m2m(OriginCod, instance, "codico", corilist, "origin", extra=['note'], related_is_through = True)
+
             # Process many-to-ONE changes
             # (1) links from Daterange to Codico
             datelist = form.cleaned_data['datelist']
             adapt_m2o(Daterange, instance, "codico", datelist)
 
+            # Make sure to process changes
+            instance.refresh_from_db()
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -10313,7 +10860,7 @@ class CodicoListView(BasicList):
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'project',   'fkfield': 'manuscript__project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' }
+            #{'filter': 'project',   'fkfield': 'manuscript__project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' }
             ]}
          ]
 
@@ -10356,7 +10903,7 @@ class CodicoListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        prjlist = None
+        # prjlist = None
         # Check if a list of keywords is given
         if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
             # Get the list
@@ -10370,15 +10917,15 @@ class CodicoListView(BasicList):
                 kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
                 fields['kwlist'] = kwlist
 
-        # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-                prjlist = qs
+        ## Check if the prjlist is identified
+        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+        #    # Get the default project
+        #    qs = Project.objects.all()
+        #    if qs.count() > 0:
+        #        prj_default = qs.first()
+        #        qs = Project.objects.filter(id=prj_default.id)
+        #        fields['prjlist'] = qs
+        #        prjlist = qs
 
         return fields, lstExclude, qAlternative
 
@@ -10981,7 +11528,7 @@ class EqualGoldEdit(BasicDetails):
             {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                 'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
             # Project2 HIER
-            {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+            {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
             
             {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
                 'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
@@ -10997,6 +11544,14 @@ class EqualGoldEdit(BasicDetails):
             ]
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+
+        # Special processing for moderator
+        if may_edit_project(self.request, profile, instance):
+            for oItem in context['mainitems']:
+                if oItem['label'] == "Project:":
+                    # Add the list
+                    oItem['field_list'] = "projlist"
 
         # THe SSG items that have a value in *moved* may not be editable
         editable = (instance.moved == None)
@@ -11030,6 +11585,19 @@ class EqualGoldEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_goldset_html(goldlist):
+        context = {}
+        template_name = 'seeker/super_goldset.html'
+        sBack = ""
+        if goldlist != None:
+            # Add to context
+            context['goldlist'] = SermonGold.objects.filter(id__in=goldlist).order_by('siglist')
+            context['is_app_editor'] = False
+            context['object_id'] = None
+            # Calculate with the template
+            sBack = render_to_string(template_name, context)
+        return sBack
+
     def get_goldset_markdown(self, instance):
         context = {}
         template_name = 'seeker/super_goldset.html'
@@ -11047,68 +11615,86 @@ class EqualGoldEdit(BasicDetails):
         errors = []
         bResult = True
         instance = formset.instance
+        # Need to know who is 'talking'...
+        username = self.request.user.username
+        profile = Profile.get_user_profile(username)
         for form in formset:
             if form.is_valid():
-                cleaned = form.cleaned_data
-                # Action depends on prefix
+                oErr = ErrHandle()
+                try:
+                    cleaned = form.cleaned_data
+                    # Action depends on prefix
                 
-                # Note: eqgcol can be either settype 'pd' or 'hc'
-                if prefix == "eqgcol":
-                    # Keyword processing
-                    if 'newcol' in cleaned and cleaned['newcol'] != "":
-                        newcol = cleaned['newcol']
-                        # Is the COL already existing?
-                        obj = Collection.objects.filter(name=newcol).first()
-                        if obj == None:
-                            # TODO: add profile here
-                            profile = Profile.get_user_profile(request.user.username)
-                            obj = Collection.objects.create(name=newcol, type='super', owner=profile)
-                        # Make sure we set the keyword
-                        form.instance.collection = obj
-                        # Note: it will get saved with formset.save()
-                elif prefix == "ssglink":
-                    # SermonDescr-To-EqualGold processing
-                    if 'newsuper' in cleaned and cleaned['newsuper'] != "":
-                        newsuper = cleaned['newsuper']
-                        # There also must be a linktype
-                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
-                            linktype = cleaned['newlinktype']
-                            # Get optional parameters
-                            note = cleaned.get('note', None)
-                            spectype = cleaned.get('newspectype', None)
-                            # Alternatives: this is true if it is in there, and false otherwise
-                            alternatives = cleaned.get("newalt", None)
-                            # Check existence
-                            obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
+                    # Note: eqgcol can be either settype 'pd' or 'hc'
+                    if prefix == "eqgcol":
+                        # Keyword processing
+                        if 'newcol' in cleaned and cleaned['newcol'] != "":
+                            newcol = cleaned['newcol']
+                            # Is the COL already existing?
+                            obj = Collection.objects.filter(name=newcol).first()
                             if obj == None:
-                                super = EqualGold.objects.filter(id=newsuper.id).first()
-                                if super != None:
-                                    # Set the right parameters for creation later on
-                                    form.instance.linktype = linktype
-                                    form.instance.dst = super
-                                    if note != None and note != "": 
-                                        form.instance.note = note
-                                    if spectype != None and len(spectype) > 1:
-                                        form.instance.spectype = spectype
-                                    form.instance.alternatives = alternatives
+                                # TODO: add profile here
+                                profile = Profile.get_user_profile(request.user.username)
+                                obj = Collection.objects.create(name=newcol, type='super', owner=profile)
+                            # Make sure we set the keyword
+                            form.instance.collection = obj
+                            # Note: it will get saved with formset.save()
+                    elif prefix == "ssglink":
+                        # SermonDescr-To-EqualGold processing
+                        if 'newsuper' in cleaned and cleaned['newsuper'] != "":
+                            newsuper = cleaned['newsuper']
+                            # There also must be a linktype
+                            if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                                linktype = cleaned['newlinktype']
+                                # Get optional parameters
+                                note = cleaned.get('note', None)
+                                spectype = cleaned.get('newspectype', None)
+                                # Alternatives: this is true if it is in there, and false otherwise
+                                alternatives = cleaned.get("newalt", None)
+                                # Check existence
+                                obj = EqualGoldLink.objects.filter(src=instance, dst=newsuper, linktype=linktype).first()
+                                if obj == None:
+                                    super = EqualGold.objects.filter(id=newsuper.id).first()
+                                    if super != None:
+                                        # See if this can be accepted right away or needs waiting
+                                        new_data = dict(linktype=linktype, note=note, spectype=spectype, alternatives=alternatives, dst=super.id)
+                                        iCount = approval_parse_formset(profile, prefix, new_data, instance)
 
-                                    # Double check reverse
-                                    if linktype in LINK_BIDIR:
-                                        rev_link = EqualGoldLink.objects.filter(src=super, dst=instance).first()
-                                        if rev_link == None:
-                                            # Add it
-                                            rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                        # Only proceed if changes don't need to be reviewed by others
+                                        if iCount == 0:
+
+                                            # Set the right parameters for creation later on
+                                            form.instance.linktype = linktype
+                                            form.instance.dst = super
+                                            if note != None and note != "": 
+                                                form.instance.note = note
+                                            if spectype != None and len(spectype) > 1:
+                                                form.instance.spectype = spectype
+                                            form.instance.alternatives = alternatives
+
+                                            # Double check reverse
+                                            if linktype in LINK_BIDIR:
+                                                rev_link = EqualGoldLink.objects.filter(src=super, dst=instance).first()
+                                                if rev_link == None:
+                                                    # Add it
+                                                    rev_link = EqualGoldLink.objects.create(src=super, dst=instance, linktype=linktype)
+                                                else:
+                                                    # Double check the linktype
+                                                    if rev_link.linktype != linktype:
+                                                        rev_link.linktype = linktype
+                                                if note != None and note != "": 
+                                                    rev_link.note = note
+                                                if spectype != None and len(spectype) > 1:
+                                                    rev_link.spectype = get_reverse_spec(spectype)
+                                                rev_link.alternatives = alternatives
+                                                rev_link.save()
                                         else:
-                                            # Double check the linktype
-                                            if rev_link.linktype != linktype:
-                                                rev_link.linktype = linktype
-                                        if note != None and note != "": 
-                                            rev_link.note = note
-                                        if spectype != None and len(spectype) > 1:
-                                            rev_link.spectype = get_reverse_spec(spectype)
-                                        rev_link.alternatives = alternatives
-                                        rev_link.save()
-                    # Note: it will get saved with form.save()
+                                            # Make sure this one does not get saved!
+                                            setattr(form, 'do_not_save', True)
+                        # Note: it will get saved with form.save()
+                except:
+                    msg = oErr.get_error_message()
+                    oErr.DoError("EqualGoldEdit/process_formset")
             else:
                 errors.append(form.errors)
                 bResult = False
@@ -11126,12 +11712,44 @@ class EqualGoldEdit(BasicDetails):
         return oBack
            
     def before_save(self, form, instance):
-        # Check for author
-        if instance.author == None:
-            # Set to "undecided" author if possible
-            author = Author.get_undecided()
-            instance.author = author
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if instance != None:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # Check for author
+                if instance.author == None:
+                    # Set to "undecided" author if possible
+                    author = Author.get_undecided()
+                    instance.author = author
+
+                # Get the cleaned data: this is the new stuff
+                cleaned_data = form.cleaned_data
+
+                # See if and how many changes are suggested
+                iCount = approval_parse_changes(profile, cleaned_data, instance)
+
+                # Only proceed if changes don't need to be reviewed by others
+                if iCount == 0:
+
+                    # Issue #473: automatic assignment of project for particular editor(s)
+                    projlist = form.cleaned_data.get("projlist")
+                    bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
+                else:
+                    # The changes may *NOT* be committed
+                    msg = None   # "The suggested changes will be reviewed by the other projects' editors"
+                    bBack = False
+                    # Make sure redirection takes place
+                    self.redirect_to = reverse('equalgold_details', kwargs={'pk': instance.id})
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldEdit/before_save")
+            bBack = False
+        return bBack, msg
 
     def after_save(self, form, instance):
         msg = ""
@@ -11197,7 +11815,21 @@ class EqualGoldEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project")
+            equal_proj_deleted = []
+            adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project", deleted=equal_proj_deleted)
+            project_dependant_delete(self.request, equal_proj_deleted)
+
+            # Issue #473: default project assignment
+            if instance.projects.count() == 0:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+
+                # The user has not selected a project (yet): try default assignment
+                user_projects = profile.projects.all()
+                if user_projects.count() == 1:
+                    project = profile.projects.first()
+                    EqualGoldProject.objects.create(equal=instance, project=project)
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -11392,20 +12024,6 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Use the 'graph' function or not?
                 use_network_graph = True
 
-                ## Add a custom button to the manuscript listview: to trigger showing a graph
-                #html = []
-                #if use_network_graph:
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Textual overlap network" ')
-                #    html.append('   onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>')
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Manuscript Transmission" ')
-                #    html.append('   onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>')
-                #    html.append('<a class="btn btn-xs jumbo-1" title="Network graph" ')
-                #    html.append('   onclick="ru.passim.seeker.network_graph(this);">Graph</a>')
-                ##html.append('<a class="btn btn-xs jumbo-1" title="Network of SSGs based on their incipit and explicit" ')
-                ##html.append('   onclick="ru.passim.seeker.network_pca(this);">Inc-Expl</a>')
-                #custombutton = "\n".join(html)
-                #manuscripts['custombutton'] = custombutton
-
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
 
@@ -11423,6 +12041,8 @@ class EqualGoldDetails(EqualGoldEdit):
                     lHtml.append(context['after_details'])
                 if context['object'] == None:
                     context['object'] = instance
+                context['approval_pending'] = approval_pending(instance)
+                context['approval_pending_list'] = approval_pending_list(instance)
                 lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
                 context['after_details'] = "\n".join(lHtml)
 
@@ -11454,7 +12074,6 @@ class EqualGoldListView(BasicList):
     prefix = "ssg"
     plural_name = "Authority files"
     sg_name = "Authority file"
-    # order_cols = ['code', 'author', 'number', 'firstsig', 'srchincipit', 'sgcount', 'stype' ]
     order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype' ]
     order_default= order_cols
     order_heads = [
@@ -12717,7 +13336,7 @@ class BasketUpdate(BasicPart):
     s_form = SermonForm
     s_field = "sermon"
     colltype = "sermo"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def add_to_context(self, context):
         # Reset the redirect page
@@ -12778,7 +13397,9 @@ class BasketUpdate(BasicPart):
                         with transaction.atomic():
                             for item in search_id:
                                 kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.create(**kwargs)
+                                obj = self.clsBasket.objects.filter(**kwargs).first()
+                                if obj == None:
+                                    self.clsBasket.objects.create(**kwargs)
                         # Process history
                         profile.history(operation, self.colltype, oFields)
                     elif search_count > 0  and operation == "remove":
@@ -12986,7 +13607,7 @@ class BasketUpdateManu(BasketUpdate):
     s_form = SearchManuForm
     s_field = "manu"
     colltype = "manu"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -13006,7 +13627,7 @@ class BasketUpdateGold(BasketUpdate):
     s_form = SermonGoldForm
     s_field = "gold"
     colltype = "gold"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size
@@ -13018,7 +13639,7 @@ class BasketUpdateGold(BasketUpdate):
     
 
 class BasketUpdateSuper(BasketUpdate):
-    """Update contents of the sermondescr basket"""
+    """Update contents of the EqualGold basket"""
 
     MainModel = EqualGold
     clsBasket = BasketSuper
@@ -13026,7 +13647,7 @@ class BasketUpdateSuper(BasketUpdate):
     s_form = SuperSermonGoldForm
     s_field = "super"
     colltype = "super"
-    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': False}]
+    form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def get_basketsize(self, profile):
         # Adapt the basket size

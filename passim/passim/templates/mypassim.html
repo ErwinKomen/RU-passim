@@ -43,7 +43,7 @@
       <section>
         <h3>Datasets</h3>
         <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}">my datasets</a>
-        (current siz: ).
+        (current size: {{count_datasets}}).
         </p>
       </section>
 
@@ -57,8 +57,61 @@
       {% if is_app_editor %}
         <section>
           <h3>Edit actions</h3>
-          <p>Since you are an editor within Passim, this place could contain part of your edit history.
-          </p>
+          <p>Importing projects can be done by an editor via JSON, Excel and some other ways.
+            The items an editor can import are: Manuscript, Sermon, Historical Collection and Authority File.</p>
+
+          <table>
+            <!-- Edit privileges-->
+            <tr>
+              <td valign="top"class="hangingindent">You are an editor within Passim for these projects:</td>
+              <td valign="top">{% spaceless %}{{edit_projects|safe}}{% endspaceless %}</td>
+              <td></td>
+            </tr>
+
+            <!-- Default project assignment -->
+            <tr>
+              <td valign="top" class="hangingindent">By default assign all items that I import to the following project(s):</td>
+              <td valign="top">{{default_projects|safe}}</td>
+              <td>
+                <a href="{% url 'default_details' profile.id  %}" role="button" title="Edit default project assignment" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-pencil" title="Edit default project assignment"></span>
+                </a>
+              </td>
+            </tr>
+
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+
+            <!-- Submitted changes -->
+            <tr>
+              <td valign="top"class="hangingindent">My Authority File change suggestions:</td>
+              <td valign="top">
+                <a href="{% url 'equalchangeuser_list' %}" role="button" title="View all my Authority File suggestions" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-check" title="View all my Authority File suggestions"></span>
+                </a>
+              </td>
+              <td valign="top">
+                <a href="{% url 'equalchangeuser_list' %}?user-atype=def" role="button" title="View my pending Authority File suggestions" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-edit" title="View my pending Authority File suggestions"></span>
+                </a>
+              </td>
+            </tr>
+
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+
+            <!-- For me to review -->
+            <tr>
+              <td valign="top"class="hangingindent">Suggestions of others that I need to review:</td>
+              <td valign="top">all</td>
+              <td valign="top">
+                <a href="{% url 'equalchangerev_list' %}?user-atype=def" role="button" title="View my pending Authority File reviews" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-edit" title="View my pending Authority File reviews"></span>
+                </a>
+              </td>
+            </tr>
+          </table>
+
         </section>
       {% endif %}
 

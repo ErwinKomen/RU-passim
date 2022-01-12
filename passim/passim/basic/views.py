@@ -506,9 +506,9 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
         else:
             orderings = []
             for idx, order_item in enumerate(order_default):
-                if idx == 0 and order_item[0] == "-":
-                    bAscending = False
-                    order_item = order_item[1:]
+                #if idx == 0 and order_item[0] == "-":
+                #    bAscending = False
+                #    order_item = order_item[1:]
                 # Get the type
                 sType = order_heads[idx]['type']
                 if ";" in order_item:
@@ -520,10 +520,27 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                 sType = item['type']
                 order_item = item['item']
                 if order_item != "":
-                    if sType == "int":
-                        order.append(order_item)
+                    if order_item[0] == "-":
+                        bAscending = False
+                        order_item = order_item[1:]
                     else:
-                        order.append(Lower(order_item))
+                        bAscending = True
+                    # USED TO BE:
+                    #if sType == "int":
+                    #    order.append(order_item)
+                    #else:
+                    #    order.append(Lower(order_item))
+                    if bAscending:
+                        if sType == "str":
+                            order.append(Lower(order_item).asc(nulls_last=True))
+                        else:
+                            order.append(F(order_item).asc(nulls_last=True))
+                    else:
+                        if sType == "str":
+                            order.append(Lower(order_item).desc(nulls_last=True))
+                        else:
+                            order.append(F(order_item).desc(nulls_last=True))
+
 
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
@@ -1323,6 +1340,7 @@ class BasicDetails(DetailView):
     afterdelurl = None
     listview = None
     listviewtitle = None
+    has_select2 = False
     backbutton = True
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
@@ -1400,6 +1418,8 @@ class BasicDetails(DetailView):
             # Check if 'afternewurl' needs adding
             if 'afternewurl' in context:
                 data['afternewurl'] = context['afternewurl']
+            if hasattr(self, "redirect_to"):
+                data['afternewurl'] = getattr(self,"redirect_to")
             # Check if 'afterdelurl' needs adding
             if 'afterdelurl' in context:
                 data['afterdelurl'] = context['afterdelurl']
@@ -1531,6 +1551,9 @@ class BasicDetails(DetailView):
                 self.permission = "write"
         context['permission'] = self.permission
 
+        if self.has_select2:
+            context['has_select2'] = True
+
         # Possibly define where a listview is
         classname = self.model._meta.model_name
         if self.basic_name == None or self.basic_name == "":
@@ -1637,14 +1660,15 @@ class BasicDetails(DetailView):
                         
                                 # Process all the correct forms in the formset
                                 for subform in formset:
-                                    if subform.is_valid():
+                                    if subform.is_valid() and not hasattr(subform, 'do_not_save'):
                                         # DO the actual saving - but that will only work if all is *actually* valid
                                         try:
                                             subform.save()
-
+                                            
                                             # Log the SAVE action
                                             details = {'id': instance.id}
-                                            details["savetype"] = "add" # if bNew else "change"
+                                            details["savetype"] = "add_sub" # if bNew else "change"
+                                            details["form"] = subform.__class__.__name__
                                             details['model'] = subform.instance.__class__.__name__
                                             if subform.changed_data != None and len(subform.changed_data) > 0:
                                                 details['changes'] = action_model_changes(subform, subform.instance)
@@ -1653,9 +1677,12 @@ class BasicDetails(DetailView):
                                             # Signal that the *FORM* needs refreshing, because the formset changed
                                             bFormsetChanged = True
                                         except:
-                                            msg = oErr.get_error_message()
-                                            oErr.DoError("BasicDetails/get_context_data")
-                                            context['errors'] = {'subform':  msg }
+                                            if hasattr(subform, "warning"):
+                                                context['errors'] = getattr(subform, "warning")
+                                            else:
+                                                msg = oErr.get_error_message()
+                                                oErr.DoError("BasicDetails/get_context_data")
+                                                context['errors'] = {'subform':  msg }
 
                                 if formset.is_valid():
                                     # Load an explicitly empty formset
@@ -1885,21 +1912,30 @@ class BasicDetails(DetailView):
                     if bResult:
                         # Now save it for real
                         obj.save()
+
+                        # Make sure the form is actually saved completely
+                        # Issue #426: put it up here
+                        frm.save()
+                        instance = obj
+                    
                         # Log the SAVE action
                         details = {'id': obj.id}
                         details["savetype"] = "new" if bNew else "change"
+                        details["form"] = frm.__class__.__name__
                         if frm.changed_data != None and len(frm.changed_data) > 0:
                             details['changes'] = action_model_changes(frm, obj)
                         self.action_add(obj, details, "save")
 
-                        # Make sure the form is actually saved completely
-                        frm.save()
-                        instance = obj
+                        # Issue #426: comment this
+                        ## Make sure the form is actually saved completely
+                        #frm.save()
+                        #instance = obj
                     
                         # Any action(s) after saving
                         bResult, msg = self.after_save(frm, obj)
                     else:
-                        context['errors'] = {'save': msg }
+                        if not msg is None:
+                            context['errors'] = {'save': msg }
                 elif frm.errors:
                     # We need to pass on to the user that there are errors
                     context['errors'] = frm.errors
@@ -2219,7 +2255,11 @@ class BasicPart(View):
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
                     modelname = self.MainModel.__name__
                     obj_id = "n" if self.obj == None else self.obj.id
-                    extension = "xlsx" if self.dtype == "excel" else self.dtype
+                    extension = self.dtype
+                    if self.dtype == "excel":
+                        extension = "xlsx"
+                    elif self.dtype == "tei" or self.dtype == "xml-tei":
+                        extension = "xml"
                     sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":

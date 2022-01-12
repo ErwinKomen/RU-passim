@@ -317,6 +317,7 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
     model = Daterange
     search_fields = [ 'yearstart__icontains', 'yearfinish__icontains' ]
     addonly = False
+    codico = None
 
     def label_from_instance(self, obj):
         if obj.yearstart == obj.yearfinish:
@@ -327,7 +328,10 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         if self.addonly:
-            qs = Daterange.objects.none()
+            if self.codico is None:
+                qs = Daterange.objects.none()
+            else:
+                qs = self.codico.codico_dateranges.all()
         else:
             qs = Daterange.objects.all().order_by('yearstart').distinct()
         return qs
@@ -685,7 +689,53 @@ class OriginOneWidget(ModelSelect2Widget):
         return Origin.objects.all().order_by('name').distinct()
 
 
-#class ProjectOneWidget(ModelSelect2Widget): PROJECT_MOD_HERE
+class OriginCodWidget(ModelSelect2MultipleWidget):
+    model = OriginCod
+    search_fields = [ 'origin__name__icontains', 'origin__location__name__icontains' ]
+    addonly = False
+    codico = None
+
+    def label_from_instance(self, obj):
+        oErr = ErrHandle()
+        sLabel = ""
+        try:
+            ori = obj.origin
+            if ori.name == "":
+                if ori.location == None:
+                    sLabel = "(undetermined)"
+                else:
+                    sLabel = ori.location.name
+            else:
+                if ori.location == None:
+                    sLabel = ori.name
+                else:
+                    sLabel = "{}: {}".format(ori.name, ori.location.name)
+            sNote = obj.note
+            if sNote != None and sNote != "":
+                sLabel = "{} ({}...)".format(sLabel, sNote[:30])
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("OriginCodWidget/label_from_instance")
+        return sLabel
+
+    def get_queryset(self):
+        qs = OriginCod.objects.none()
+        oErr = ErrHandle()
+        try:
+            if self.addonly:
+                if self.codico == None:
+                    qs = OriginCod.objects.none()
+                else:
+                    qs = self.codico.codico_origins.all().order_by('origin__name', 'origin__location__name')
+            else:
+                qs = OriginCod.objects.all().order_by('origin__name', 'origin__location__name') # .distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("OriginCodWidget/get_queryset")
+        return qs        
+
+
+#class ProjectOneWidget(ModelSelect2Widget):
 #    model = Project
 #    search_fields = [ 'name__icontains' ]
 
@@ -696,7 +746,7 @@ class OriginOneWidget(ModelSelect2Widget):
 #        return Project.objects.all().order_by('name').distinct()
     
 
-#class ProjectWidget(ModelSelect2MultipleWidget): PROJECT_MOD_HERE
+#class ProjectWidget(ModelSelect2MultipleWidget):
 #    model = Project
 #    search_fields = [ 'name__icontains' ]
 
@@ -715,7 +765,10 @@ class Project2Widget(ModelSelect2MultipleWidget):
         return obj.name
 
     def get_queryset(self):
-        qs = Project2.objects.all().order_by('name').distinct()
+        if self.queryset == None:
+            qs = Project2.objects.all().order_by('name').distinct()
+        else:
+            qs = self.queryset
         return qs
 
 
@@ -848,7 +901,7 @@ class ProvenanceCodWidget(ModelSelect2MultipleWidget):
     model = ProvenanceCod
     search_fields = [ 'provenance__name__icontains', 'provenance__location__name__icontains' ]
     addonly = False
-    manu = None
+    codico = None
 
     def label_from_instance(self, obj):
         oErr = ErrHandle()
@@ -878,10 +931,10 @@ class ProvenanceCodWidget(ModelSelect2MultipleWidget):
         oErr = ErrHandle()
         try:
             if self.addonly:
-                if self.manu == None:
+                if self.codico == None:
                     qs = ProvenanceCod.objects.none()
                 else:
-                    qs = self.manu.codico_provenances.all().order_by('provenance__name', 'provenance__location__name')
+                    qs = self.codico.codico_provenances.all().order_by('provenance__name', 'provenance__location__name')
             else:
                 qs = ProvenanceCod.objects.all().order_by('provenance__name', 'provenance__location__name') # .distinct()
         except:
@@ -1301,7 +1354,7 @@ class SearchManuForm(PassimModelForm):
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     #prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'})) PROJECT_MOD_HERE
+    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1375,7 +1428,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-           # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -1459,6 +1512,8 @@ class SermonForm(PassimModelForm):
                 widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    signature_a = forms.CharField(label=_("Signature"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     #siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
     #                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -1546,7 +1601,8 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                     widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
-    typeaheads = ["authors", "manuidnos", "signatures", "keywords", "countries", "cities", "libraries", "origins", "locations", "srmincipits", "srmexplicits", "gldsiggrysons", "gldsigclavises"]
+    typeaheads = ["authors", "manuidnos", "signatures", "keywords", "countries", "cities", "libraries", "origins", 
+                  "locations", "srmincipits", "srmexplicits", "gldsiggrysons", "gldsigclavises"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1602,7 +1658,9 @@ class SermonForm(PassimModelForm):
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             if user_is_in_team(username, team_group):
@@ -1873,6 +1931,10 @@ class ProvenanceManForm(forms.ModelForm):
 class ProfileForm(forms.ModelForm):
     """Profile list and details"""
 
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1889,18 +1951,37 @@ class ProfileForm(forms.ModelForm):
         # Start by executing the standard handling
         super(ProfileForm, self).__init__(*args, **kwargs)
 
-        # Some fields are not required
-        self.fields['user'].required = False
-        self.fields['ptype'].required = False
-        self.fields['affiliation'].required = False
-        # Initialize choices for linktype
-        init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            self.fields['ptype'].initial = instance.ptype
-            self.fields['user'].initial = instance.user
-            self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['user'].required = False
+            self.fields['ptype'].required = False
+            self.fields['affiliation'].required = False
+
+            # Initialize a queryset for projlist and deflist
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['deflist'].queryset = Project2.objects.all().order_by('name')
+
+            # Initialize choices for linktype
+            init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['ptype'].initial = instance.ptype
+                self.fields['user'].initial = instance.user
+                self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
+
+                self.fields['deflist'].queryset = instance.projects.all().order_by('name')
+                self.fields['deflist'].widget.queryset = self.fields['deflist'].queryset
+
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
+                # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
+                self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileForm-init")
+        # We are okay
+        return None
 
     def clean_user(self):
         data = self.cleaned_data.get("user")
@@ -1922,7 +2003,6 @@ class ProjectForm(forms.ModelForm):
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-        #model = Project
         model = Project2
         fields = ['name']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
@@ -2050,10 +2130,16 @@ class CollectionForm(PassimModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
+        ## Obligatory for this type of form!!!
+        #self.username = kwargs.pop('username', "")
+        #self.team_group = kwargs.pop('team_group', "")
+        #self.userplus = kwargs.pop('userplus', "")
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
         username = self.username
         team_group = self.team_group
+        profile = Profile.get_user_profile(username)
+
         # Get the prefix
         prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
         # Some fields are not required
@@ -2080,7 +2166,12 @@ class CollectionForm(PassimModelForm):
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
         # Project2:
-        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        if profile is None:
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+        else:
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+        self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
         # SSG section
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -2690,7 +2781,9 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
@@ -3289,6 +3382,42 @@ class CodicoProvForm(forms.ModelForm):
                     self.fields['location'].initial = instance.provenance.location.id
 
 
+class CodicoOriginForm(forms.ModelForm):
+    origin_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget = OriginOneWidget(attrs={'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}))
+    note = forms.CharField(label=_("Note"), required=False, help_text="editable",
+                widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
+    typeaheads = ["locations"]
+    warning = "One codicological unit may only contain one Origin"
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = OriginCod
+        fields = ['origin', 'codico']
+        widgets={'origin':  OriginOneWidget(attrs={'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CodicoOriginForm, self).__init__(*args, **kwargs)
+        # Set the keyword to optional for best processing
+        self.fields['note'].required = False
+        self.fields['origin'].required = False
+        self.fields['origin_new'].queryset = Origin.objects.all().order_by('name', 'location__name')
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+            # Check if the initial name should be added
+            if instance.origin != None:
+                self.fields['name'].initial = instance.origin.name
+                self.fields['note'].initial = instance.origin.note
+                if instance.origin.location != None:
+                    self.fields['location_ta'].initial = instance.origin.location.get_loc_name()
+                    # Make sure the location is set to the correct number
+                    self.fields['location'].initial = instance.origin.location.id
+
+
 class CollectionLitrefForm(forms.ModelForm):
     oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
                widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -3502,6 +3631,32 @@ class OriginForm(forms.ModelForm):
                     self.fields['location_ta'].initial = instance.location.get_loc_name()
 
 
+class OriginCodForm(forms.ModelForm):
+    """OriginCod item"""
+
+    warning = "One codicological unit may only contain one Origin"
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = OriginCod
+        fields = ['note']
+        widgets={'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                            'class': 'searching', 'placeholder': 'Notes on this origin...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(OriginCodForm, self).__init__(*args, **kwargs)
+
+        # Some fields are not required
+        self.fields['note'].required = False
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
 class LibrarySearchForm(forms.ModelForm):
     country = forms.CharField(label=_("Country"), required=False, 
                  widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -3632,12 +3787,14 @@ class CodicoForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     cprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProvenanceCodWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
+    corilist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=OriginCodWidget(attrs={'data-placeholder': 'Select origin-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
-    # prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'})) PROJECT_MOD_HERE
+    #prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["origins"]
-    action_log = ['name', 'origin', 'support', 'extent', 'format', 'stype', 'kwlist', 'cprovlist', 'datelist']
+    action_log = ['name', 'origin', 'support', 'extent', 'format', 'stype', 'kwlist', 'cprovlist', 'corilist', 'datelist']
     exclude = ['origin_ta']
 
     class Meta:
@@ -3669,7 +3826,7 @@ class CodicoForm(PassimModelForm):
 
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+            # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             if user_is_in_team(username, team_group):
@@ -3681,9 +3838,11 @@ class CodicoForm(PassimModelForm):
 
             # Some lists need to be initialized to NONE:
             self.fields['cprovlist'].queryset = ProvenanceCod.objects.none()
+            self.fields['corilist'].queryset = OriginCod.objects.none()
             self.fields['datelist'].queryset = Daterange.objects.none()
 
             self.fields['cprovlist'].widget.addonly = True
+            self.fields['corilist'].widget.addonly = True
             self.fields['datelist'].widget.addonly = True
         
             # Get the instance
@@ -3697,13 +3856,17 @@ class CodicoForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
 
                 self.fields['cprovlist'].initial = [x.pk for x in instance.codico_provenances.all()]
+                self.fields['corilist'].initial = [x.pk for x in instance.codico_origins.all()]
                 self.fields['datelist'].initial = [x.pk for x in instance.codico_dateranges.all()]
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
                 self.fields['cprovlist'].queryset = ProvenanceCod.objects.filter(id__in=self.fields['cprovlist'].initial)
+                self.fields['corilist'].queryset = OriginCod.objects.filter(id__in=self.fields['corilist'].initial)
                 self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
-                self.fields['cprovlist'].widget.manu = instance
+                self.fields['cprovlist'].widget.codico = instance
+                self.fields['corilist'].widget.codico = instance
+                self.fields['datelist'].widget.codico = instance
 
         except:
             msg = oErr.get_error_message()
@@ -3752,8 +3915,8 @@ class ManuscriptForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 
-                  'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'project' PROJECT_MOD_HERE
+        fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 'project' 
+                  'origin', 'url', 'support', 'extent', 'format', 'stype']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -3769,7 +3932,7 @@ class ManuscriptForm(PassimModelForm):
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
-                # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'}) PROJECT_MOD_HERE
+                 # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -3788,9 +3951,11 @@ class ManuscriptForm(PassimModelForm):
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # Set the dependent fields for [lcity]
             if self.prefix != "":

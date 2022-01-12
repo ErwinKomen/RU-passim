@@ -22,6 +22,8 @@ from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
+from passim.approve.views import EqualChangeListView, EqualChangeDetails, EqualChangeEdit, \
+    EqualChangeUserEdit, EqualChangeUserDetails
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -110,6 +112,8 @@ urlpatterns = [
     url(r'^origin/list', OriginListView.as_view(), name='origin_list'),
     url(r'^origin/details(?:/(?P<pk>\d+))?/$', OriginDetails.as_view(), name='origin_details'),
     url(r'^origin/edit(?:/(?P<pk>\d+))?/$', OriginEdit.as_view(), name='origin_edit'),
+    url(r'^origincod/details(?:/(?P<pk>\d+))?/$', OriginCodDetails.as_view(), name='origincod_details'),
+    url(r'^origincod/edit(?:/(?P<pk>\d+))?/$', OriginCodEdit.as_view(), name='origincod_edit'),
 
     url(r'^library/list', LibraryListView.as_view(), name='library_list'),
     url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetails.as_view(), name='library_details'),
@@ -128,6 +132,18 @@ urlpatterns = [
     url(r'^ssg/trans/download(?:/(?P<pk>\d+))?/$', EqualGoldTransDownload.as_view(), name='equalgold_trans_download'),
     url(r'^ssg/overlap/download(?:/(?P<pk>\d+))?/$', EqualGoldOverlapDownload.as_view(), name='equalgold_overlap_download'),
 
+    url(r'^ssg/field/list', EqualChangeListView.as_view(prefix="any"), name='equalchangeany_list'),
+    url(r'^ssg/ufield/list', EqualChangeListView.as_view(prefix="user"), name='equalchangeuser_list'),
+    url(r'^ssg/rfield/list', EqualChangeListView.as_view(prefix="rev"), name='equalchangerev_list'),
+
+    url(r'^ssg/field/details(?:/(?P<pk>\d+))?/$', EqualChangeDetails.as_view(), name='equalchangeany_details'),
+    url(r'^ssg/ufield/details(?:/(?P<pk>\d+))?/$', EqualChangeUserDetails.as_view(), name='equalchangeuser_details'),
+    url(r'^ssg/rfield/details(?:/(?P<pk>\d+))?/$', EqualChangeUserDetails.as_view(), name='equalchangerev_details'),
+
+    url(r'^ssg/field/edit(?:/(?P<pk>\d+))?/$', EqualChangeEdit.as_view(), name='equalchangeany_edit'),
+    url(r'^ssg/ufield/edit(?:/(?P<pk>\d+))?/$', EqualChangeUserEdit.as_view(), name='equalchangeuser_edit'),
+    url(r'^ssg/rfield/edit(?:/(?P<pk>\d+))?/$', EqualChangeUserEdit.as_view(), name='equalchangerev_edit'),
+    
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
@@ -218,6 +234,8 @@ urlpatterns = [
     url(r'^profile/list', ProfileListView.as_view(), name='profile_list'),
     url(r'^profile/details(?:/(?P<pk>\d+))?/$', ProfileDetails.as_view(), name='profile_details'),
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
+    url(r'^default/details(?:/(?P<pk>\d+))?/$', DefaultDetails.as_view(), name='default_details'), 
+    url(r'^default/edit(?:/(?P<pk>\d+))?/$', DefaultEdit.as_view(), name='default_edit'), 
 
     url(r'^project/list', ProjectListView.as_view(), name='project2_list'), 
     url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project2_details'), 

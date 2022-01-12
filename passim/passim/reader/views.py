@@ -52,7 +52,7 @@ from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Report, Keyword, ManuscriptKeyword, STYPE_IMPORTED, get_current_datetime
+    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -65,8 +65,10 @@ from passim.basic.views import BasicList, BasicDetails, BasicPart
 #    ]
 # NEW METHODS
 reader_uploads = [
-    {"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "type": "multiple","msg": "Upload e-codices XML files (n)"},
-    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "type": "multiple","msg": "Upload 'Archives et Manuscripts' XML files"}
+    {"title": "ecodex", "label": "e-codices", "url": "import_ecodex", "type": "multiple",
+     "msg": "Upload e-codices XML files (n), using default project assignment defined in MyPassim"},
+    {"title": "ead",    "label": "EAD",       "url": "import_ead",    "type": "multiple",
+     "msg": "Upload 'Archives et Manuscripts' XML files, using default project assignment defined in MyPassim"}
     ]
 # Global debugging 
 bDebug = False
@@ -686,6 +688,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
          
     This approach makes use of MINIDOM (which is part of the standard xml.dom)    
     """
+
     mapIdentifier = {'settlement': 'city', 'repository': 'library', 'idno': 'idno'}
     oInfo = {'city': '', 'library': '', 'manuscript': '', 'name': '', 'origPlace': '', 'origDateFrom': '', 'origDateTo': '', 'url':'', 'list': []}
     oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username, 'lst_obj': []}
@@ -703,7 +706,11 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
         # Make sure we have the data
         if xmldoc == None:
             # Read and parse the data into a DOM element
-            xmldoc = ElementTree.parse(data_file)                
+            xmldoc = ElementTree.parse(data_file)  
+            
+        # Find out who I am: Get profile      
+        profile = Profile.get_user_profile(username) 
+             
             
         # First the manuscript data will be extracted from the XML, then the general parts of the XML.
         # The last part is extracting the data on the sermons.
@@ -1011,11 +1018,8 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
             # Create a new Manuscript if this is the case
                 manu_obj = Manuscript.objects.filter(idno=manuidno).first()
                 if manu_obj == None:
-                    # Now we can create a completely fresh manuscript
-                    manu_obj = Manuscript.objects.create() 
-                    
-                    manu_obj.idno = manuidno
-                    manu_obj.source = source
+                    # Now we can create a completely fresh manuscript with the correct manuscript IDNO and source
+                    manu_obj = Manuscript.objects.create(idno=manuidno, source=source) 
                 else:
                     # Remove *ALL* existing Manuscript-Comment links and delete Comments (for this manuscript)                     
                     # Retrieve the id's of the Comments linked to the manuscript
@@ -1604,11 +1608,17 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
                         errHandle.Status(drange)
                     
                     
-                    # Add id's of project, source, library, city and country to the Manuscript table.                                            
-                    project = Project.get_default(username) 
-                    
-                    # Add project id to the manuscript                               
-                    manu_obj.project = project
+                    # Issue #479: a new manuscript gets assigned to a user's default project(s)
+                    projects = profile.get_defaults()
+                    manu_obj.set_projects(projects)
+
+                    # OLD CODE from before issue #479
+                    #  # Add id's of project, source, library, city and country to the Manuscript table.                                            
+                    #  project = Project.get_default(username) 
+                    #
+                    #  # Add project id to the manuscript                               
+                    #  manu_obj.project = project
+                    # -------------------------------
 
                     # This is probably not the best way to do this...
                     unitlibrary_id = 1160 # Bibliothèque nationale de France, Manuscrits

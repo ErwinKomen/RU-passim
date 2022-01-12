@@ -1,0 +1,227 @@
+"""Models for the APPROVE app: approval by editors of a SSG modification or creation
+
+"""
+from django.apps.config import AppConfig
+from django.apps import apps
+from django.db import models, transaction
+from django.contrib.auth.models import User, Group
+from django.db.models import Q
+from django.db.models.functions import Lower
+from django.db.models.query import QuerySet 
+from django.urls import reverse
+
+
+from markdown import markdown
+import json, copy
+
+# Take from my own app
+from passim.utils import ErrHandle
+from passim.settings import TIME_ZONE
+from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, \
+    APPROVAL_TYPE, \
+    EqualGold, Profile, ProjectEditor
+
+STANDARD_LENGTH=255
+LONG_STRING=255
+ABBR_LENGTH = 5
+
+class EqualChange(models.Model):
+    """A proposal to change the value of one field within one SSG"""
+
+    # [1] obligatory link to the SSG
+    super = models.ForeignKey(EqualGold, on_delete=models.CASCADE, related_name="superproposals")
+    # [1] a proposal belongs to a particular user's profilee
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileproposals")
+    # [1] The name of the field for which a change is being suggested
+    field = models.CharField("Field name", max_length=LONG_STRING)
+    # [0-1] The current field's value (which may be none, if a new SSG is suggested)
+    current = models.TextField("Current value", null=True, blank=True)
+    # [0-1] The proposed value for the field as a stringified JSON
+    change = models.TextField("Proposed value", default="{}")
+
+    # [1] The approval status of this proposed change
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    # Fields for which changes need to be monitored
+    approve_fields = [
+        {'field': 'author',             'tofld': 'author',   'type': 'fk', 'display': 'Author'},
+        {'field': 'incipit',            'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
+        {'field': 'explicit',           'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+        {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
+        #{'field': 'projects',           'tofld': 'projects', 'type': 'm2m-inline',  'listfield': 'projlist'},
+        {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
+         # 'lstQ': [Q(settype="hc") & (Q(scope='publ') | Q(scope='team'))], 'display': 'Historical collections' },
+         'lstQ': [Q(settype="hc")], 'display': 'Historical collections' },
+        {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist', 'display': 'Sermons Gold'},
+        {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist', 'display': 'Links',
+         'prefix': 'ssglink', 'formfields': [
+             {'field': 'linktype',      'type': 'string'},
+             {'field': 'spectype',      'type': 'string'},
+             {'field': 'note',          'type': 'string'},
+             {'field': 'alternatives',  'type': 'string'},
+             {'field': 'dst',           'type': 'fk'},
+             ]},
+        ]
+
+    def __str__(self):
+        """Show who proposes what kind of change"""
+        sBack = "{}: [{}] on ssg {}".format(
+            self.profile.user.username, self.field, self.super.id)
+        return sBack
+
+    def add_item(super, profile, field, oChange, oCurrent=None):
+        """Add one item"""
+
+        oErr = ErrHandle()
+        obj = None
+        try:
+            # Make sure to stringify, sorting the keys
+            change = json.dumps(oChange, sort_keys=True)
+            if oCurrent is None:
+                current = None
+            else:
+                current = json.dumps(oCurrent, sort_keys=True)
+
+            # Look for this particular change, supposing it has not changed yet
+            obj = EqualChange.objects.filter(super=super, profile=profile, field=field, current=current, change=change).first()
+            if obj == None or obj.changeapprovals.count() > 0:
+                # Less restricted: look for any suggestion for a change on this field that has not been reviewed by anyone yet.
+                bFound = False
+                for obj in EqualChange.objects.filter(super=super, profile=profile, field=field, atype="def"):
+                    if obj.changeapprovals.count() == 0:
+                        # We can use this one
+                        bFound = True
+                        obj.current = current
+                        obj.change = change
+                        obj.save()
+                        break
+                # What if nothing has been found?
+                if not bFound:
+                    # Only in that case do we make a new suggestion
+                    obj = EqualChange.objects.create(super=super, profile=profile, field=field, current=current, change=change)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/add_item")
+        return obj
+
+    def get_approver_list(self, excl=None):
+        """Get the list of editors that need to approve this change
+        
+        If [excl] is specified, then this object is excluded from the list of Profile objects returned
+        """
+
+        oErr = ErrHandle()
+        lstBack = None
+        try:
+            # Default: return the empty list
+            lstBack = Profile.objects.none()
+            # Get all the projects to which this SSG 'belongs'
+            lst_project = self.super.projects.all().values("id")
+            # Note: only SSGs that belong to more than one project need to be reviewed
+            if len(lst_project) > 1:
+                # Get all the editors associated with these projects
+                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(id__in=lst_project).values('profile_id')]
+                if len(lst_profile_id) > 0:
+                    if excl == None:
+                        lstBack = Profile.models.filter(id__in=lst_profile_id)
+                    else:
+                        lstBack = Profile.models.filter(id__in=lst_profile_id).exclude(id=excl.id)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_approver_list")
+        return lstBack
+
+    def get_code(self):
+        """Get the passim code for this object"""
+
+        sBack = self.super.get_code()
+        return sBack
+
+    def get_display_name(self):
+        """Get the display name of this field"""
+
+        sBack = self.field
+        for oItem in self.approve_fields:
+            if self.field == oItem['tofld']:
+                sBack = oItem['display']
+                break
+        return sBack
+
+    def get_review_list(profile, all=False):
+        """Get the list of objects this editor needs to review"""
+
+        oErr = ErrHandle()
+        lstBack = []
+        try:
+            # Default: return the empty list
+            # lstBack = EqualChange.objects.none()
+            # Get the list of projects for this user
+            lst_project_id = profile.projects.all().values("id")
+            if len(lst_project_id) > 0:
+                # Get the list of EqualChange objects linked to any of these projects
+                lstQ = []
+                lstQ.append(Q(super__equal_proj__project__id__in=lst_project_id))
+                if not all:
+                    lstQ.append(Q(atype='def'))
+                lstBack = [x['id'] for x in EqualChange.objects.exclude(profile=profile).filter(*lstQ).distinct().values('id')]
+                # lstBack = EqualChange.objects.exclude(profile=profile).filter(*lstQ).distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_review_list")
+        return lstBack
+
+    def get_saved(self):
+        """Get the date of saving"""
+
+        saved = self.created if self.saved is None else self.saved
+        sBack = saved.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualChange, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
+
+
+class EqualApproval(models.Model):
+    """THis is one person (profile) approving one particular change suggestion"""
+
+    # [1] obligatory link to the SSG
+    change = models.ForeignKey(EqualChange, on_delete=models.CASCADE, related_name="changeapprovals")
+    # [1] an approval belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileapprovals")
+
+    # [1] The approval status of this proposed change
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+    # [0-1] A comment on the reason for rejecting a proposal
+    comment = models.TextField("Comment", null=True, blank=True)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        """Show this approval"""
+        sBack = "{}: [{}] on ssg {}={}".format(
+            self.profile.user.name, self.change.field, self.change.super.id, self.atype)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualApproval, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
+

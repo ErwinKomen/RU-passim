@@ -1880,3 +1880,9 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
 .overlap-node {
     cursor: pointer;
 }
+
+.hangingindent {
+    padding-left: 1.5em;
+    text-indent:-1.5em;
+}
+

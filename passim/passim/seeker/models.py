@@ -38,6 +38,8 @@ from pyzotero import zotero
 # import xmltodict
 from xml.dom import minidom
 
+re_number = r'\d+'
+
 STANDARD_LENGTH=100
 LONG_STRING=255
 MAX_TEXT_LEN = 200
@@ -55,12 +57,15 @@ LINK_TYPE = "seeker.linktype"
 SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
+APPROVAL_TYPE = "seeker.atype"
 MANIFESTATION_TYPE = "seeker.mtype"
 MANUSCRIPT_TYPE = "seeker.mtype"
 CERTAINTY_TYPE = "seeker.autype"
 PROFILE_TYPE = "seeker.profile"     # THese are user statuses
 VIEW_STATUS = "view.status"
 YESNO_TYPE = "seeker.yesno"
+RIGHTS_TYPE = "seeker.rights"
+PROJ_DEFAULT = "seeker.prjdeftype"
 VISIBILITY_TYPE = "seeker.visibility"
 
 LINK_EQUAL = 'eqs'
@@ -107,6 +112,15 @@ class FieldChoice(models.Model):
 
     class Meta:
         ordering = ['field','machine_value']
+
+    def get_english(field, abbr):
+        """Get the english name of the abbr"""
+
+        sBack = "-"
+        obj = FieldChoice.objects.filter(field=field, abbr=abbr).first()
+        if obj != None:
+            sBack = obj.english_name
+        return sBack
         
 
 class HelpChoice(models.Model):
@@ -283,6 +297,23 @@ def get_crpp_date(dtThis, readable=False):
         # Model: yyyy-MM-dd'T'HH:mm:ss
         sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
     return sDate
+
+def get_locus_range(locus):
+    num_one = 0
+    num_two = 3000
+    oErr = ErrHandle()
+    try:
+        if locus != None and locus != "":
+            lst_locus = re.findall(r'\d+', locus)
+            if len(lst_locus) > 0:
+                num_one = lst_locus[0]
+                num_two = num_one
+                if len(lst_locus) > 1:
+                    num_two = lst_locus[-1]
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_locus_range")
+    return num_one, num_two
 
 def get_now_time():
     """Get the current time"""
@@ -1390,17 +1421,18 @@ class Profile(models.Model):
     # [1] Current size of the user's basket (super sermons gold)
     basketsize_super = models.IntegerField("Basket size super sermons gold", default=0)
     
+    # ------------------- MANY_TO_MANY fields ==========================================================
     # Many-to-many field for the contents of a search basket per user (sermons)
-    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")
-    
+    basketitems = models.ManyToManyField("SermonDescr", through="Basket", related_name="basketitems_user")    
     # Many-to-many field for the contents of a search basket per user (manuscripts)
     basketitems_manu = models.ManyToManyField("Manuscript", through="BasketMan", related_name="basketitems_user_manu")
-
     # Many-to-many field for the contents of a search basket per user (sermons gold)
     basketitems_gold = models.ManyToManyField("SermonGold", through="BasketGold", related_name="basketitems_user_gold")
-
     # Many-to-many field for the contents of a search basket per user (super sermons gold)
     basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
+
+    # Many-to-many field that links this person/profile with particular projects
+    projects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="projects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -1458,6 +1490,71 @@ class Profile(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("profile/add_visit")
 
+    def defaults_update(self, deflist):
+        """Update the 'status' field with the default incl/excl"""
+
+        bBack = True
+        oErr = ErrHandle()
+        try:
+            if not deflist is None:
+                with transaction.atomic():
+                    for obj in self.project_editor.all():
+                        project = obj.project
+                        if project in deflist:
+                            obj.status = "incl"
+                        else:
+                            obj.status = "excl"
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("defaults_update")
+        return bBack
+
+    def get_defaults(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        # Get a list of project id's that are my default
+        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
+        # Select all the relevant projects
+        if len(lst_id) == 0:
+            # Try to at least include the PASSIM project as a default
+            qs = Project2.objects.filter(name__icontains="passim").first()
+        else:
+            qs = Project2.objects.filter(id__in=lst_id)
+        # Return the list
+        return qs
+
+    def get_defaults_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
+            project = obj.project
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_editor_status(self, project, is_editor=False, is_developer=False, is_moderator=False, is_superuser=False):
+        """What are the rights for this person for the given [project]??"""
+
+        # Get the overal status of this person
+        rights = ""
+        if is_editor or is_developer or is_moderator or is_superuser:
+            # Check the rights level for the particular project
+            obj = ProjectEditor.objects.filter(project=project, profile=self).first()
+            if not obj is None:
+                # Some relationship exists...
+                rights = obj.rights
+
+        # Return the rights level that was found
+        return rights
+
     def get_stack(username):
         """Get the stack as a list from the current user"""
 
@@ -1501,6 +1598,27 @@ class Profile(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
+
+    def get_projects_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for project in self.projects.all().order_by('name'):
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_project_ids(self):
+        """List of id's this person had editing rights for"""
+
+        id_list = [x['id'] for x in self.projects.all().values('id')]
+        return id_list
 
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
@@ -2225,6 +2343,8 @@ class Origin(models.Model):
     def get_location(self):
         if self.location:
             sBack = self.location.name
+        elif self.name:
+            sBack = self.name
         else:
             sBack = "-"
 
@@ -2937,6 +3057,11 @@ class Project2(models.Model):
 
     # [1] Obligatory name for a project
     name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] Description of this project
+    description = models.TextField("Description", blank=True, null=True)
+
+    # [1] Date created (automatically done)
+    created = models.DateTimeField(default=get_current_datetime)
   
     def __str__(self):
         sName = self.name
@@ -2965,7 +3090,22 @@ class Project2(models.Model):
 
         return response
 
-# PROJECT_MOD_HERE
+    def get_editor_markdown(self):
+        """List of users (=profiles) that have editing rights"""
+
+        lHtml = []
+        # Visit all keywords
+        for profile in self.projects_profile.all().order_by('user__username'):
+            # Find the URL to access this user (profile)
+            url = reverse('profile_details', kwargs={'pk': profile.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, profile.user.username))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+
 #class Project(models.Model):
 #    """manuscripts may belong to the project 'Passim' or to something else"""
 
@@ -3181,14 +3321,14 @@ class Manuscript(models.Model):
 
     # [0-1] Each manuscript should belong to a particular project TH this needs to be changed to a MANYTOMANY
     # in order to be able to link on manuscript to multiple 
-    # project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts") PROJECT_MOD_HERE
+    # project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
 
     # ============== MANYTOMANY connections
     # [m] Many-to-many: one manuscript can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceMan")       
     # [m] Many-to-many: one manuscript can have a series of literature references
     litrefs = models.ManyToManyField("Litref", through="LitrefMan")
-     # [0-n] Many-to-many: keywords per SermonDescr
+    # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
@@ -3198,8 +3338,7 @@ class Manuscript(models.Model):
 
     # [m] Many-to-many: one manuscript can belong to one or more projects
     projects = models.ManyToManyField(Project2, through="ManuscriptProject", related_name="project2_manuscripts")
-
-   
+       
 
     # Scheme for downloading and uploading
     specification = [
@@ -3231,7 +3370,7 @@ class Manuscript(models.Model):
         self.saved = get_current_datetime()
         response = super(Manuscript, self).save(force_insert, force_update, using, update_fields)
 
-        # If this is a new manuscript there is no codi conncted yet
+        # If this is a new manuscript there is no codi connected yet
         # Check if the codico exists
         codi = Codico.objects.filter(manuscript=self).first()
         if codi == None:
@@ -3251,7 +3390,11 @@ class Manuscript(models.Model):
         return response
        
     def adapt_projects(self):
-        """Adapt sermon-project connections for all sermons under me""" 
+        """Adapt sermon-project connections for all sermons under me
+        
+        Issue #412: this must *not* be called from the ManuscriptEdit view
+        """ 
+
         oErr = ErrHandle()
         bBack = False
         try:
@@ -3278,7 +3421,6 @@ class Manuscript(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("adapt_projects")
         return bBack
-
 
     def adapt_hierarchy():
         bResult = True
@@ -3367,20 +3509,28 @@ class Manuscript(models.Model):
                 oErr.DoError("Manuscript/add_one: no [shelf mark] provided")
             else:
                 # Get the standard project TH: hier naar kijken voor punt 4
-                project = Project.get_default(username)
+                # OLD: project = Project.get_default(username)
+
                 # Retrieve or create a new manuscript with default values
                 if source == None:
-                    obj = Manuscript.objects.filter(idno=idno, mtype="man", project=project).first()
+                    obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
                 else:
-                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man", project=project).first()
+                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
                 if obj == None:
                     # Doesn't exist: create it
-                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man", project=project)
+                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                    if not source is None:
+                        obj.source = source
                 else:
                     # We are overwriting
                     oErr.Status("Overwriting manuscript [{}]".format(idno))
                     bOverwriting = True
-                        
+
+                # Issue #479: get the default project(s) - may be more than one
+                projects = profile.get_defaults()
+                # Link the manuscript to the projects, if not already done
+                obj.set_projects(projects)
+
                 country = ""
                 city = ""
                 library = ""
@@ -3729,6 +3879,28 @@ class Manuscript(models.Model):
             oErr.DoError("get_country")
         return country
 
+    def get_dates(self):
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " (see {})".format(obj.reference.get_full_markdown())
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "{} {}".format(years, ref)
+            lhtml.append(item)
+
+        return ", ".join(lhtml)
+
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
 
@@ -3850,6 +4022,14 @@ class Manuscript(models.Model):
             lib = "-"
         return lib
 
+    def get_library_city(self):
+        sBack = ""
+        if self.lcity != None:
+            sBack = self.lcity.name
+        elif self.library != None:
+            sBack = self.library.lcity.name
+        return sBack
+
     def get_library_markdown(self):
         sBack = "-"
         if self.library != None:
@@ -3912,15 +4092,24 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
-    def get_project(self):
-        sBack = "-" if self.project == None else self.project.name
+    #def get_project(self):
+    #    sBack = "-" if self.project == None else self.project.name
+    #    return sBack
+
+    def get_projects(self):
+        sBack = "-" 
+        if self.projects.count() > 0:
+            html = []
+            for obj in self.projects.all().order_by("name"):
+                html.append(obj.name)
+            sBack = ", ".join(html)
         return sBack
 
-    def get_project_markdown(self):
-        sBack = "-"
-        if self.project:
-            sBack = '<span class="project">{}</span>'.format(self.project.name)
-        return sBack
+    #def get_project_markdown(self):
+    #    sBack = "-"
+    #    if self.project:
+    #        sBack = '<span class="project">{}</span>'.format(self.project.name)
+    #    return sBack
 
     def get_project_markdown2(self): 
         lHtml = []
@@ -4228,6 +4417,9 @@ class Manuscript(models.Model):
         manu_dst = self
         repair = ['parent', 'firstchild', 'next']
 
+        # Figure out what the codico of me is
+        codico = Codico.objects.filter(manuscript=self).first()
+
         # copy all the sermons...
         msitems = []
         with transaction.atomic():
@@ -4238,6 +4430,8 @@ class Manuscript(models.Model):
                 dst.pk = None
                 dst.manu = manu_dst     # This sets the destination's FK for the manuscript
                                         # Does this leave the original unchanged? I hope so...:)
+                # Make sure the codico is set correctly
+                dst.codico = codico
                 dst.save()
                 src = MsItem.objects.filter(id=src_id).first()
                 msitems.append(dict(src=src, dst=dst))
@@ -4851,6 +5045,24 @@ class Manuscript(models.Model):
 
         # Return the object that has been created
         return oBack
+
+    def set_projects(self, projects):
+        """Make sure there are connections between myself and the projects"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            for project in projects:
+                # Create a connection between this project and the manuscript
+                obj_pm = ManuscriptProject.objects.filter(project=project, manuscript=self).first()
+                if obj_pm is None:
+                    # Create this link
+                    obj_pm = ManuscriptProject.objects.create(manuscript=self, project=project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/set_projects")
+            bBack = False
+        return bBack
         
 
 class Codico(models.Model):
@@ -4899,6 +5111,9 @@ class Codico(models.Model):
     # ============== MANYTOMANY connections
     # [m] Many-to-many: one codico can have a series of provenances
     provenances = models.ManyToManyField("Provenance", through="ProvenanceCod")
+    # [m] Many-to-many: one codico can have a series of origins (though this series is limited to one)
+    #                   and each of these can have its own note attached to it
+    origins = models.ManyToManyField("Origin", through="OriginCod")
      # [m] Many-to-many: keywords per Codico
     keywords = models.ManyToManyField(Keyword, through="CodicoKeyword", related_name="keywords_codi")
     # [m] Many-to-many: one codico can have a series of user-supplied comments
@@ -5038,7 +5253,9 @@ class Codico(models.Model):
                     dates.append(obj.__str__())
                 sBack = json.dumps(dates)
             elif path == "origin":
-                sBack = self.get_origin()
+                # sBack = self.get_origin()
+                # See issue #427
+                sBack = self.get_origin_markdown(plain=True)
             elif path == "provenances":
                 sBack = self.get_provenance_markdown(plain=True)
         except:
@@ -5162,6 +5379,28 @@ class Codico(models.Model):
             bResult = False
         return bResult
 
+    def get_dates(self):
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.codico_dateranges.all().order_by('yearstart')
+        # Walk the date range objects
+        for obj in qs:
+            # Determine the output for this one daterange
+            ref = ""
+            if obj.reference: 
+                if obj.pages: 
+                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                else:
+                    ref = " (see {})".format(obj.reference.get_full_markdown())
+            if obj.yearstart == obj.yearfinish:
+                years = "{}".format(obj.yearstart)
+            else:
+                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+            item = "{} {}".format(years, ref)
+            lhtml.append(item)
+
+        return ", ".join(lhtml)
+
     def get_date_markdown(self):
         """Get the date ranges as a HTML string"""
 
@@ -5266,29 +5505,76 @@ class Codico(models.Model):
                 sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
         return sBack
 
-    def get_origin_markdown(self):
+    def get_origin_markdown(self, plain=False, table=True):
         sBack = "-"
-        if self.origin:
-            # Just take the bare name of the origin
-            sBack = self.origin.name
-            if self.origin.location:
-                # Add the actual location if it is known
-                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
-            # Get the url to it
-            url = reverse('origin_details', kwargs={'pk': self.origin.id})
-            # Adapt what we return
-            sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
+
+        lHtml = []
+        # Visit all origins
+        order = 0
+        if not plain: 
+            if table: lHtml.append("<table><tbody>")
+        # for prov in self.origins.all().order_by('name'):
+        for codori in self.codico_origins.all().order_by('origin__name'):
+            order += 1
+            # Get the URL
+            origin = codori.origin
+            url = reverse("origin_details", kwargs = {'pk': origin.id})
+            sNote = codori.note
+            if sNote == None: sNote = ""
+
+            if not plain: 
+                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+            sLocName = "" 
+            if origin.location!=None:
+                if plain:
+                    sLocName = origin.location.name
+                else:
+                    sLocName = " ({})".format(origin.location.name)
+            sName = "-" if origin.name == "" else origin.name
+            sLoc = "{} {}".format(sName, sLocName)
+
+            if plain:
+                sCodOri = dict(origin=origin.name, location=sLocName)
+            else:
+                sOriLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                if table:
+                    sCodOri = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        sOriLink, sNote)
+                else:
+                    sCodOri = sOriLink
+
+            lHtml.append(sCodOri)
+
+        if not plain: 
+            if table: lHtml.append("</tbody></table>")
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            # sBack = ", ".join(lHtml)
+            sBack = "".join(lHtml)
         return sBack
 
-    def get_project_markdown(self):
-        sBack = "-"
-        if self.manuscript != None and self.manuscript.project != None:
-            sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
+    #def get_project_markdown(self):
+    #    sBack = "-"
+    #    if self.manuscript != None and self.manuscript.project != None:
+    #        sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
+    #    return sBack
+
+    def get_project_markdown2(self): 
+        lHtml = []
+        # Visit all project items
+        for project2 in self.manuscript.projects.all().order_by('name'):           
+            # Determine where clicking should lead to
+            url = "{}?manu-projlist={}".format(reverse('manuscript_list'), project2.id) 
+            # Create a display for this topic
+            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))    
+        sBack = ", ".join(lHtml)
         return sBack
 
     def get_provenance_markdown(self, plain=False, table=True):
         lHtml = []
-        # Visit all literature references
+        # Visit all provenances
         order = 0
         if not plain: 
             if table: lHtml.append("<table><tbody>")
@@ -5391,6 +5677,7 @@ class Daterange(models.Model):
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
     manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+    # [0-1] Well actually each daterange belongs (or should belong) to exactly one Codico
     codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
 
     def __str__(self):
@@ -5416,39 +5703,45 @@ class Daterange(models.Model):
         return response
 
     def adapt_manu_dates(self):
-        manu_start = self.manuscript.yearstart
-        manu_finish = self.manuscript.yearfinish
-        current_start = 3000
-        current_finish = 0
-        for dr in self.manuscript.manuscript_dateranges.all():
-            if dr.yearstart < current_start: current_start = dr.yearstart
-            if dr.yearfinish > current_finish: current_finish = dr.yearfinish
+        oErr = ErrHandle()
+        bBack = False
+        try:
+            manu_start = self.manuscript.yearstart
+            manu_finish = self.manuscript.yearfinish
+            current_start = 3000
+            current_finish = 0
+            for dr in self.manuscript.manuscript_dateranges.all():
+                if dr.yearstart < current_start: current_start = dr.yearstart
+                if dr.yearfinish > current_finish: current_finish = dr.yearfinish
 
-        # Need any changes in *MANUSCRIPT*?
-        bNeedSaving = False
-        if manu_start != current_start:
-            self.manuscript.yearstart = current_start
-            bNeedSaving = True
-        if manu_finish != current_finish:
-            self.manuscript.yearfinish = current_finish
-            bNeedSaving = True
-        if bNeedSaving: self.manuscript.save()
-
-        # Need any changes in *CODICO*?
-        bNeedSaving = False
-        if self.codico != None:
-            codi_start = self.codico.yearstart
-            codi_finish = self.codico.yearfinish
-            if codi_start != current_start:
-                self.codico.yearstart = current_start
+            # Need any changes in *MANUSCRIPT*?
+            bNeedSaving = False
+            if manu_start != current_start:
+                self.manuscript.yearstart = current_start
                 bNeedSaving = True
-            if codi_finish != current_finish:
-                self.codico.yearfinish = current_finish
+            if manu_finish != current_finish:
+                self.manuscript.yearfinish = current_finish
                 bNeedSaving = True
-            if bNeedSaving: self.codico.save()
+            if bNeedSaving: self.manuscript.save()
 
-
-        return True
+            # Need any changes in *CODICO*?
+            bNeedSaving = False
+            if self.codico != None:
+                codi_start = self.codico.yearstart
+                codi_finish = self.codico.yearfinish
+                if codi_start != current_start:
+                    self.codico.yearstart = current_start
+                    bNeedSaving = True
+                if codi_finish != current_finish:
+                    self.codico.yearfinish = current_finish
+                    bNeedSaving = True
+                if bNeedSaving: self.codico.save()
+            bBack = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Daterange/adapt_manu_dates")
+            
+        return bBack
 
 
 class Author(models.Model):
@@ -5782,6 +6075,8 @@ class EqualGold(models.Model):
 
     # [1] Every SSG has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="-")
+    # [1] Every SSG has an approval type
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
@@ -5830,7 +6125,7 @@ class EqualGold(models.Model):
                 self.srchexplicit = srchexplicit
 
             # Double check the number and the code
-            if self.author:
+            if self != None and self.author_id != None and self.author != None:
                 # Get the author number
                 auth_num = self.author.get_number()
                 
@@ -7216,6 +7511,15 @@ class EqualGoldProject(models.Model):
     project = models.ForeignKey(Project2, related_name="equal_proj", on_delete=models.CASCADE)     
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.equal.projects.count()
+        if count > 1:
+            response = super(EqualGoldProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
     
 
 class SermonGoldSame(models.Model):
@@ -7328,6 +7632,7 @@ class Collection(models.Model):
         return self.name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        oErr = ErrHandle()
         # Double check the number of authors, if this is settype HC
         if self.settype == "hc":
             ssg_id = self.super_col.all().values('super__id')
@@ -7335,8 +7640,14 @@ class Collection(models.Model):
             self.ssgauthornum = authornum
         # Adapt the save date
         self.saved = get_current_datetime()
-        respons = super(Collection, self).save(force_insert, force_update, using, update_fields)
-        return respons
+
+        # Double checking for issue #484 ========================================================
+        if self.name == "" or self.owner_id == "" or self.owner == None:
+            oErr.Status("Collection/save issue484: name=[{}] type=[{}]".format(self.name, self.type))
+        # =======================================================================================
+
+        response = super(Collection, self).save(force_insert, force_update, using, update_fields)
+        return response
 
     def freqsermo(self):
         """Frequency in manifestation sermons"""
@@ -7470,7 +7781,6 @@ class Collection(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-
     def get_readonly_display(self):
         response = "yes" if self.readonly else "no"
         return response
@@ -7568,7 +7878,6 @@ class Collection(models.Model):
             return None
 
         # Now we know that we're okay...
-        project = Project.get_default(username)
         profile = Profile.get_user_profile(username)
         source = SourceInfo.objects.create(
             code="Copy of Historical Collection [{}] (id={})".format(self.name, self.id), 
@@ -7576,7 +7885,12 @@ class Collection(models.Model):
             profile=profile)
 
         # Create an empty Manuscript
-        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source, project=project)
+        manu = Manuscript.objects.create(mtype=mtype, stype="imp", source=source)
+
+        # Issue #479: a new manuscript gets assigned to a user's default project(s)
+        projects = profile.get_defaults()
+        manu.set_projects(projects)
+
         # Figure out  what the automatically created codico is
         codico = Codico.objects.filter(manuscript=manu).first()
         
@@ -7704,6 +8018,11 @@ class MsItem(models.Model):
                     oBack = self.codico
         return oBack
 
+    def get_children(self):
+        """Get all my children in the correct order"""
+
+        return self.sermon_parent.all().order_by("order")
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""
@@ -7718,6 +8037,17 @@ class SermonHead(models.Model):
     #     Note: one [MsItem] will have only one [SermonHead], but using an FK is easier for processing (than a OneToOneField)
     #           when the MsItem is removed, its SermonHead is too
     msitem = models.ForeignKey(MsItem, null=True, on_delete = models.CASCADE, related_name="itemheads")
+
+    def get_locus_range(self):
+        return get_locus_range(self.locus)
+
+    def locus_first(self):
+        first, last = self.get_locus_range()
+        return first
+
+    def locus_last(self):
+        first, last = self.get_locus_range()
+        return last
 
 
 class SermonDescr(models.Model):
@@ -7969,7 +8299,7 @@ class SermonDescr(models.Model):
         return bStatus, msg
 
     def custom_add(oSermo, manuscript, order=None, **kwargs):
-        """Add a manuscript according to the specifications provided"""
+        """Add a sermon to a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
         obj = None
@@ -7978,6 +8308,7 @@ class SermonDescr(models.Model):
         try:
             # Understand where we are coming from
             keyfield = kwargs.get("keyfield", "name")
+            profile = kwargs.get("profile")
 
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
@@ -8040,8 +8371,14 @@ class SermonDescr(models.Model):
                             # Set the KV in a special way
                             obj.custom_set(path, value)
 
-            # Make sure the updae the object
+            # Make sure the update the object
             obj.save()
+
+            # Figure out if project assignment should be done
+            if type.lower() != "structural" and not profile is None and obj.projects.count() == 0:
+                # Assign the default projects
+                projects = profile.get_defaults()
+                obj.set_projects(projects)
 
         except:
             msg = oErr.get_error_message()
@@ -8794,6 +9131,9 @@ class SermonDescr(models.Model):
         sBack = "<span class='clickable'><a class='nostyle' href='{}'>{}</a></span>".format(url, locus)
         return sBack
 
+    def get_locus_range(self):
+        return get_locus_range(self.locus)
+
     def get_manuscript(self):
         """Get the manuscript that links to this sermondescr"""
 
@@ -8971,6 +9311,14 @@ class SermonDescr(models.Model):
                     sResult = self.msitem.codico.id
         return sResult
 
+    def locus_first(self):
+        first, last = self.get_locus_range()
+        return first
+
+    def locus_last(self):
+        first, last = self.get_locus_range()
+        return last
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
@@ -9003,6 +9351,24 @@ class SermonDescr(models.Model):
                 # Only now do the actual saving...
                 response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
         return response
+
+    def set_projects(self, projects):
+        """Make sure there are connections between myself and the projects"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            for project in projects:
+                # Create a connection between this project and the manuscript
+                obj_ps = SermonDescrProject.objects.filter(project=project, sermon=self).first()
+                if obj_ps is None:
+                    # Create this link
+                    obj_ps = SermonDescrProject.objects.create(sermon=self, project=project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/set_projects")
+            bBack = False
+        return bBack
 
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
@@ -9496,6 +9862,15 @@ class SermonDescrProject(models.Model):
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.sermon.projects.count()
+        if count > 1:
+            response = super(SermonDescrProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
+
 
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
@@ -9517,6 +9892,15 @@ class ManuscriptProject(models.Model):
     project = models.ForeignKey(Project2, related_name="manuscript_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.manuscript.projects.count()
+        if count > 1:
+            response = super(ManuscriptProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
 
 
 class CodicoKeyword(models.Model):
@@ -10034,9 +10418,31 @@ class ProvenanceCod(models.Model):
         prov = self.provenance
         sName = ""
         sLoc = ""
-        url = reverse("provenance_details", kwargs={'pk': self.id})
+        url = reverse("provenance_details", kwargs={'pk': prov.id})
         if prov.name != None and prov.name != "": sName = "{}: ".format(prov.name)
         if prov.location != None: sLoc = prov.location.name
+        sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
+        return sBack
+
+
+class OriginCod(models.Model):
+    """Link between Origin and Codico"""
+
+    # [1] The origin
+    origin = models.ForeignKey(Origin, related_name = "codico_origins", on_delete=models.CASCADE)
+    # [1] The codico this origin is written on 
+    codico = models.ForeignKey(Codico, related_name = "codico_origins", on_delete=models.CASCADE)
+    # [0-1] Further details are required too
+    note = models.TextField("Codico-specific origin note", blank=True, null=True)
+
+    def get_origin(self):
+        sBack = ""
+        ori = self.origin
+        sName = ""
+        sLoc = ""
+        url = reverse("origin_details", kwargs={'pk': origin.id})
+        if ori.name != None and ori.name != "": sName = "{}: ".format(ori.name)
+        if ori.location != None: sLoc = ori.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
         return sBack
 
@@ -10211,9 +10617,16 @@ class NewsItem(models.Model):
         now = timezone.now()
         oErr = ErrHandle()
         try:
-            with transaction.atomic():
-                for obj in NewsItem.objects.all():
-                    if obj.until and obj.until < now:
+            lst_id = []
+            for obj in NewsItem.objects.all():
+                if not obj.until is None:
+                    until_time = obj.until
+                    if until_time < now:
+                        lst_id.append(obj.id)
+            # Need any changes??
+            if len(lst_id) > 0:
+                with transaction.atomic():
+                    for obj in NewsItem.objects.filter(id__in=lst_id):
                         # This should be set invalid
                         obj.status = "ext"
                         obj.save()
@@ -10278,6 +10691,38 @@ class CollectionProject(models.Model):
     project = models.ForeignKey(Project2, related_name="collection_proj", on_delete=models.CASCADE)
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
+
+    def delete(self, using = None, keep_parents = False):
+        # Deletion is only allowed, if the project doesn't become 'orphaned'
+        count = self.collection.projects.count()
+        if count > 1:
+            response = super(CollectionProject, self).delete(using, keep_parents)
+        else:
+            response = None
+        return response
+
+
+class ProjectEditor(models.Model):
+    """Relation between a Profile (=person) and a Project"""
+
+    # [1] The link is between a Profile instance ...
+    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+
+    # [1] The rights for this person. Right now that is by default "edi" = editing
+    rights = models.CharField("Rights", choices=build_abbr_list(RIGHTS_TYPE), max_length=5, default="edi")
+
+    # [1] Whether this project is to be included ('incl') or not ('excl') by default project assignment
+    status = models.CharField("Default assignment", choices=build_abbr_list(PROJ_DEFAULT), max_length=5, default="incl")
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.profile.user.username, self.project.name)
+        return sBack
 
 
 class Template(models.Model):
