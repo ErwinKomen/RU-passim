@@ -22,8 +22,9 @@ from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
-from passim.approve.views import EqualChangeListView, EqualChangeDetails, EqualChangeEdit, \
-    EqualChangeUserEdit, EqualChangeUserDetails
+from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
+    EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
+    EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -132,17 +133,21 @@ urlpatterns = [
     url(r'^ssg/trans/download(?:/(?P<pk>\d+))?/$', EqualGoldTransDownload.as_view(), name='equalgold_trans_download'),
     url(r'^ssg/overlap/download(?:/(?P<pk>\d+))?/$', EqualGoldOverlapDownload.as_view(), name='equalgold_overlap_download'),
 
-    url(r'^ssg/field/list', EqualChangeListView.as_view(prefix="any"), name='equalchangeany_list'),
-    url(r'^ssg/ufield/list', EqualChangeListView.as_view(prefix="user"), name='equalchangeuser_list'),
-    url(r'^ssg/rfield/list', EqualChangeListView.as_view(prefix="rev"), name='equalchangerev_list'),
+    url(r'^ssg/field/change/list', EqualChangeList.as_view(), name='equalchangeall_list'),
+    url(r'^ssg/field/change/details(?:/(?P<pk>\d+))?/$', EqualChangeDetails.as_view(), name='equalchangeall_details'),
+    url(r'^ssg/field/change/edit(?:/(?P<pk>\d+))?/$', EqualChangeEdit.as_view(), name='equalchangeall_edit'),
 
-    url(r'^ssg/field/details(?:/(?P<pk>\d+))?/$', EqualChangeDetails.as_view(), name='equalchangeany_details'),
-    url(r'^ssg/ufield/details(?:/(?P<pk>\d+))?/$', EqualChangeUserDetails.as_view(), name='equalchangeuser_details'),
-    url(r'^ssg/rfield/details(?:/(?P<pk>\d+))?/$', EqualChangeUserDetails.as_view(), name='equalchangerev_details'),
+    url(r'^ssg/ufield/change/list', EqualChangeUlist.as_view(), name='equalchangeuser_list'),
+    url(r'^ssg/ufield/change/details(?:/(?P<pk>\d+))?/$', EqualChangeUserDetails.as_view(), name='equalchangeuser_details'),
+    url(r'^ssg/ufield/change/edit(?:/(?P<pk>\d+))?/$', EqualChangeUserEdit.as_view(), name='equalchangeuser_edit'),
 
-    url(r'^ssg/field/edit(?:/(?P<pk>\d+))?/$', EqualChangeEdit.as_view(), name='equalchangeany_edit'),
-    url(r'^ssg/ufield/edit(?:/(?P<pk>\d+))?/$', EqualChangeUserEdit.as_view(), name='equalchangeuser_edit'),
-    url(r'^ssg/rfield/edit(?:/(?P<pk>\d+))?/$', EqualChangeUserEdit.as_view(), name='equalchangerev_edit'),
+    url(r'^ssg/field/approval/list', EqualApprovalList.as_view(), name='equalapprovalall_list'),
+    url(r'^ssg/field/approval/details(?:/(?P<pk>\d+))?/$', EqualApprovalDetails.as_view(), name='equalapprovalall_details'),
+    url(r'^ssg/field/approval/edit(?:/(?P<pk>\d+))?/$', EqualApprovalEdit.as_view(), name='equalapprovalall_edit'),
+    
+    url(r'^ssg/ufield/approval/list', EqualApprovalUlist.as_view(), name='equalapprovaluser_list'),
+    url(r'^ssg/ufield/approval/details(?:/(?P<pk>\d+))?/$', EqualApprovalUserDetails.as_view(), name='equalapprovaluser_details'),
+    url(r'^ssg/ufield/approval/edit(?:/(?P<pk>\d+))?/$', EqualApprovalUserEdit.as_view(), name='equalapprovaluser_edit'),
     
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),

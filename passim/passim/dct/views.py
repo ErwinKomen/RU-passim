@@ -30,6 +30,7 @@ from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, 
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
 from passim.dct.forms import ResearchSetForm, SetDefForm
+from passim.approve.models import EqualChange, EqualApproval
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -230,6 +231,17 @@ def mypassim(request):
                 html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
             sDefault = ", ".join(html)
         context['default_projects'] = sDefault
+
+    # Make sure to check (and possibly create) EqualApprove items for this user
+    iCount = EqualChange.check_projects(profile)
+
+    # What about the field changes that I have suggested?
+    context['count_fchange_all'] = profile.profileproposals.count()
+    context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
+
+    # How many do I need to approve?
+    context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+    context['count_approve_all'] = profile.profileapprovals.count()
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)

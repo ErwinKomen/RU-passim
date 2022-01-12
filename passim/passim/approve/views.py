@@ -10,8 +10,8 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, get_crpp_date, \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
     Keyword, SermonGold, EqualGoldLink, FieldChoice
-from passim.approve.models import EqualChange
-from passim.approve.forms import EqualChangeForm
+from passim.approve.models import EqualChange, EqualApproval
+from passim.approve.forms import EqualChangeForm, EqualApprovalForm
 from passim.basic.views import BasicList, BasicDetails
 
 import json, copy
@@ -303,7 +303,7 @@ def approval_pending_list(super):
 
 # ========================================================= MODEL views =========================================================
 
-class EqualChangeListView(BasicList):
+class EqualChangeList(BasicList):
     """Listview of EqualChange"""
 
     model = EqualChange
@@ -312,7 +312,7 @@ class EqualChangeListView(BasicList):
     bUseFilter = True
     new_button = False
     use_team_group = True
-    prefix = "any"
+    prefix = "all"
     basic_name_prefix = "equalchange"
     order_cols = ['profile__user__username', 'saved', 'super__code', 'field', 'atype']
     order_default = ['profile__user__username', '-saved', 'super__code', 'field', 'atype']
@@ -326,12 +326,15 @@ class EqualChangeListView(BasicList):
     filters = [ 
         {"name": "Authority File",  "id": "filter_code",      "enabled": False},
         {"name": "User",            "id": "filter_user",      "enabled": False},
+        {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
         ]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
+            {'filter': 'code',          'fkfield': 'super',     'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
-            {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
+            {'filter': 'user',          'fkfield': 'profile',   'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'},
+            {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+             'keyType': 'fieldchoice',  'infield': 'abbr' }
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
@@ -339,7 +342,7 @@ class EqualChangeListView(BasicList):
          ]
 
     def initializations(self):
-        if self.prefix == "any":
+        if self.prefix == "all":
             # Provide all changes
             self.plural_name = "All field changes"
             self.sg_name = "Field change"
@@ -355,38 +358,20 @@ class EqualChangeListView(BasicList):
                 {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
                 {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
-            self.filters = [{"name": "Authority File",       "id": "filter_code",      "enabled": False}]
+            self.filters = [
+                {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+                {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
                      'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+                     'keyType': 'fieldchoice',  'infield': 'abbr' }
                     ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
-                    ]}
-                 ]
-        elif self.prefix == "rev":
-            # Restricted to the changes a user needs to review...
-            self.plural_name = "User field reviews"
-            self.sg_name = "User field review"
-            self.order_cols = ['saved', 'super__code', 'field', 'atype']
-            self.order_default = ['saved', 'super__code', 'field', 'atype']
-            self.order_heads = [
-                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
-                {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
-                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
-                ]
-            self.filters = [{"name": "Authority File",       "id": "filter_code",      "enabled": False}]
-            self.searches = [
-                {'section': '', 'filterlist': [
-                    {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
-                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
-                    ]},
-                {'section': 'other', 'filterlist': [
-                    {'filter': 'atype',     'dbfield': 'atype',     'keyS': 'atype'},
-                    {'filter': 'review',    'dbfield': '$dummy',    'keyS': 'review'},
-                    # {'filter': 'review',    'dbfield': 'id',        'keyList': 'reviewlist', 'infield': 'id'},
+                    {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
                     ]}
                  ]
         return None
@@ -414,15 +399,15 @@ class EqualChangeListView(BasicList):
         oErr = ErrHandle()
 
         try:
-            if self.prefix == "rev":
+            if self.prefix == "all":
+                # No adaptation needed
+                pass
+            elif self.prefix == "user":
                 # Figure out who is asking
                 profile = Profile.get_user_profile(self.request.user.username)
-                # Get the queryset of objects that this user needs to review
+                # Restrict the profile
+                fields['profilelist'] = Profile.objects.filter(id=profile.id)
 
-                id_list = EqualChange.get_review_list(profile, all=False)
-                fields['review'] = Q(id__in=id_list)
-                
-                # fields['reviewlist'] = EqualChange.get_review_list(profile, all=False)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChangeListView/adapt_search")
@@ -430,8 +415,7 @@ class EqualChangeListView(BasicList):
         return fields, lstExclude, qAlternative
 
 
-class EqualChangeUserListview(EqualChangeListView):
-    """User-specific view of proposed changes"""
+class EqualChangeUlist(EqualChangeList):
 
     prefix = "user"
 
@@ -439,7 +423,7 @@ class EqualChangeUserListview(EqualChangeListView):
 class EqualChangeEdit(BasicDetails):
     model = EqualChange
     mForm = EqualChangeForm
-    prefix = "any"
+    prefix = "all"
     basic_name_prefix = "equalchange"
     title = "Field change"
     no_delete = True            # Don't allow users to remove a field change that they have entered
@@ -502,9 +486,190 @@ class EqualChangeUserDetails(EqualChangeUserEdit):
     rtype = "html"
 
 
-class EqualChangeReviewListview(EqualChangeListView):
-    """Reviews for a particular user"""
+class EqualApprovalList(BasicList):
+    """Listview of EqualChange"""
 
-    # basic_name = "equalreview"
-    prefix = "rev"
+    model = EqualApproval
+    listform = EqualApprovalForm
+    has_select2 = True
+    bUseFilter = True
+    new_button = False
+    use_team_group = True
+    prefix = "all"
+    basic_name_prefix = "equalapproval"
+    order_cols = ['profile__user__username', 'saved', 'change__super__code', 'change__field', 'atype']
+    order_default = ['profile__user__username', '-saved', 'change__super__code', 'change__field', 'atype']
+    order_heads = [
+        {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
+        {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
+        {'name': 'Field',           'order': 'o=4', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        ]
+    filters = [ 
+        {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+        {"name": "User",            "id": "filter_user",      "enabled": False},
+        {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'code',          'fkfield': 'change__super',    'help': 'passimcode',
+             'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'},
+            {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+             'keyType': 'fieldchoice',  'infield': 'abbr' }
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+            ]}
+         ]
+
+    def initializations(self):
+        if self.prefix == "all":
+            # Provide all changes
+            self.plural_name = "All field approvals"
+            self.sg_name = "Field approval"
+        elif self.prefix == "user":
+            # Restricted to a particular user...
+            self.plural_name = "Field approvals"
+            self.sg_name = "Field approval"
+            self.order_cols = ['saved', 'change__super__code', 'change__field', 'atype']
+            self.order_default = ['-saved', 'change__super__code', 'change__field', 'atype']
+            self.order_heads = [
+                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
+                {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                ]
+            self.filters = [
+                {"name": "Authority File",       "id": "filter_code",      "enabled": False},
+                {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+                ]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'code',          'fkfield': 'change__super',    'help': 'passimcode',
+                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+                     'keyType': 'fieldchoice',  'infield': 'abbr' }
+                    ]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
+                    ]}
+                 ]
+        return None
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            saved = instance.created if instance.saved is None else instance.saved
+            sBack = saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "user":
+            sBack = instance.profile.user.username
+        elif custom == "atype":
+            sBack = instance.get_atype_display()
+        elif custom == "code":
+            sBack = instance.change.get_code()
+        elif custom == "field":
+            sBack = instance.change.get_display_name()
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=[]
+        qAlternative = None
+        oErr = ErrHandle()
+
+        try:
+            if self.prefix == "all":
+                # No adaptation needed
+                pass
+            elif self.prefix == "user":
+                # Figure out who is asking
+                profile = Profile.get_user_profile(self.request.user.username)
+                # Restrict the profile
+                fields['profilelist'] = Profile.objects.filter(id=profile.id)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeListView/adapt_search")
+
+        return fields, lstExclude, qAlternative
+
+
+class EqualApprovalUlist(EqualApprovalList):
+
+    prefix = "user"
+
+
+class EqualApprovalEdit(BasicDetails):
+    model = EqualApproval
+    mForm = EqualApprovalForm
+    prefix = "all"
+    basic_name_prefix = "equalapproval"
+    title = "Change approval"
+    no_delete = True            # Don't allow users to remove a field change that they have entered
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+
+            # Define the main items to show and edit
+            context['mainitems'] = []
+
+            # Add user or not?
+            if self.prefix == "user":
+                context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
+
+            # Add the normal information
+            mainitems_main = [
+                # -------- HIDDEN field values (these are defined in [EqualApprovalForm] ---------------
+                {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
+                {'type': 'plain', 'label': "Change id",     'value': instance.change.id,'field_key': "change",  'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'plain', 'label': "Authority File:",'value': instance.change.get_code()}, #,          'field_key': 'super'},
+                {'type': 'plain', 'label': "Field:",        'value': instance.change.get_display_name()}, #,   'field_key': 'field'},
+                {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display(),  'field_key': 'atype'},
+                {'type': 'safe',  'label': "Comment:",      'value': instance.comment,              'field_key': 'comment'},
+                {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance.change, "current")},
+                {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance.change, "change")},
+                ]
+            for item in mainitems_main: 
+                context['mainitems'].append(item)
+
+            # Signal that we do have select2
+            context['has_select2'] = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualApprovalEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+
+class EqualApprovalDetails(EqualApprovalEdit):
+    """HTML output for an EqualApproval object"""
+
+    rtype = "html"
+
+
+class EqualApprovalUserEdit(EqualApprovalEdit):
+    """User-specific equal change editing"""
+    
+    prefix = "user"
+    title = "Change approval"
+
+
+class EqualApprovalUserDetails(EqualApprovalUserEdit):
+    """HTML output for an EqualApprovalUser object"""
+
+    rtype = "html"
+
 

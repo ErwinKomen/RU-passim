@@ -9565,7 +9565,13 @@ class ManuscriptDetails(ManuscriptEdit):
         return context
 
     def before_save(self, form, instance):
-        if instance != None:
+        return True, ""
+
+    def process_formset(self, prefix, request, formset):
+        return None
+
+    def after_save(self, form, instance):
+        if instance != None and instance.id != None:
             # If no project has been selected, then select the default project(s) - see issue #479
             count = instance.projects.count()
             if count == 0:
@@ -9573,12 +9579,6 @@ class ManuscriptDetails(ManuscriptEdit):
                 profile = Profile.get_user_profile(self.request.user.username)
                 projects = profile.get_defaults()
                 instance.set_projects(projects)
-        return True, ""
-
-    def process_formset(self, prefix, request, formset):
-        return None
-
-    def after_save(self, form, instance):
         return True, ""
 
 

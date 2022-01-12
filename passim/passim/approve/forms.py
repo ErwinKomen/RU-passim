@@ -13,10 +13,21 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 # From my own application
 from passim.utils import ErrHandle
 from passim.approve.models import *
-from passim.seeker.models import Profile
+from passim.seeker.models import Profile, FieldChoice
 
 
 # =============== WIDGETS ===============================================
+class AtypeWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=APPROVAL_TYPE).order_by("english_name")
+
+
 class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
     model = EqualGold
     search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
@@ -69,6 +80,8 @@ class EqualChangeForm(forms.ModelForm):
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
+    atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = EqualChange
@@ -95,6 +108,7 @@ class EqualChangeForm(forms.ModelForm):
             # Set queryset(s) - for details view
             self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['atypelist'].queryset = FieldChoice.objects.filter(field=APPROVAL_TYPE).order_by("english_name")
 
             # Get the instance
             if 'instance' in kwargs:
@@ -103,4 +117,54 @@ class EqualChangeForm(forms.ModelForm):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChangeForm")
+        return None
+
+
+class EqualApprovalForm(forms.ModelForm):
+    """Form to list and to edit EqualApproval items"""
+
+    profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+    passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))
+    atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
+
+    class Meta:
+        model = EqualApproval
+        fields = ['change', 'profile', 'comment', 'atype']
+        widgets={'profile':  ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+                 'comment':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
+                                                   'class': 'searching', 'placeholder': 'Any comment on your choice...'}),
+                 'atype':    forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(EqualApprovalForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['change'].required = False
+            self.fields['comment'].required = False
+            self.fields['profile'].required = False
+            self.fields['atype'].required = False
+
+            # Set queryset(s) - for details view
+            self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['atypelist'].queryset = FieldChoice.objects.filter(field=APPROVAL_TYPE).order_by("english_name")
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']   
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualApprovalForm")
         return None

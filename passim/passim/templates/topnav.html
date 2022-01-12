@@ -79,6 +79,8 @@
                           {% if is_app_moderator %}
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'profile_list' %}" title="Projects">User profiles</a></li> 
+                            <li><a href="{% url 'equalchangeall_list' %}" title="SSG Field changes">Field changes</a></li> 
+                            <li><a href="{% url 'equalapprovalall_list' %}" title="SSG Field change approvals">Field approvals</a></li> 
                           {% endif %}
                           {% if 0 and user.is_superuser %}
                             <li><a href="{% url 'testunit_list' %}">Enrich: test units</a></li>

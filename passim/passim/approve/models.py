@@ -92,7 +92,7 @@ class EqualChange(models.Model):
                 # Less restricted: look for any suggestion for a change on this field that has not been reviewed by anyone yet.
                 bFound = False
                 for obj in EqualChange.objects.filter(super=super, profile=profile, field=field, atype="def"):
-                    if obj.changeapprovals.count() == 0:
+                    if obj.changeapprovals.exclude(atype="def").count() == 0:
                         # We can use this one
                         bFound = True
                         obj.current = current
@@ -108,6 +108,48 @@ class EqualChange(models.Model):
             oErr.DoError("EqualChange/add_item")
         return obj
 
+    def check_projects(profile):
+        """Check of [profile] needs to have any EqualApprove objects
+
+        And if he does: create them for him
+        """
+
+        oErr = ErrHandle()
+        iCount = 0
+        try:
+            # Walk through all the changes that I have suggested
+            qs = EqualChange.objects.filter(profile=profile)
+            for change in qs:
+                # Check the approval of this particular one
+                iCount += change.check_approval()
+            # All should be up to date now
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/check_projects")
+        return iCount
+
+    def check_approval(self):
+        """Check if all who need it have an EqualApprove object for this one"""
+
+        oErr = ErrHandle()
+        iCount = 0
+        try:
+            # Check which editors should have an approval object (excluding myself)
+            change = self
+            profile = self.profile
+            lst_approver = change.get_approver_list(profile)
+            for approver in lst_approver:
+                # Check if an EqualApprove exists
+                approval = EqualApproval.objects.filter(change=change, profile=approver).first()
+                if approval is None:
+                    # Create one
+                    approval = EqualApproval.objects.create(change=change, profile=approver)
+                    iCount = 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/check_approval")
+        return iCount
+
     def get_approver_list(self, excl=None):
         """Get the list of editors that need to approve this change
         
@@ -120,16 +162,16 @@ class EqualChange(models.Model):
             # Default: return the empty list
             lstBack = Profile.objects.none()
             # Get all the projects to which this SSG 'belongs'
-            lst_project = self.super.projects.all().values("id")
+            lst_project = [x['id'] for x in self.super.projects.all().values("id")]
             # Note: only SSGs that belong to more than one project need to be reviewed
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
-                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(id__in=lst_project).values('profile_id')]
+                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
                 if len(lst_profile_id) > 0:
                     if excl == None:
-                        lstBack = Profile.models.filter(id__in=lst_profile_id)
+                        lstBack = Profile.objects.filter(id__in=lst_profile_id)
                     else:
-                        lstBack = Profile.models.filter(id__in=lst_profile_id).exclude(id=excl.id)
+                        lstBack = Profile.objects.filter(id__in=lst_profile_id).exclude(id=excl.id)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChange/get_approver_list")
@@ -188,6 +230,9 @@ class EqualChange(models.Model):
         # Actual saving
         response = super(EqualChange, self).save(force_insert, force_update, using, update_fields)
 
+        # Check whether all needed approvars have an EqualApproval object
+        self.check_approval()
+
         # Return the response when saving
         return response
 
@@ -213,6 +258,25 @@ class EqualApproval(models.Model):
         """Show this approval"""
         sBack = "{}: [{}] on ssg {}={}".format(
             self.profile.user.name, self.change.field, self.change.super.id, self.atype)
+        return sBack
+
+    def get_mytask(profile):
+        """Find out which items [profile] needs to approve"""
+
+        qs = EqualApproval.objects.filter(profile=profile, atype="def")
+        return qs
+
+    def get_mytask_count(profile):
+        """Find out how many items [profile] needs to approve"""
+
+        qs = EqualApproval.get_mytask(profile)
+        return qs.count()
+
+    def get_saved(self):
+        """Get the date of saving"""
+
+        saved = self.created if self.saved is None else self.saved
+        sBack = saved.strftime("%d/%b/%Y %H:%M")
         return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
