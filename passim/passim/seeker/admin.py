@@ -214,9 +214,9 @@ class EqualGoldAdmin(admin.ModelAdmin):
 
 class ManuscriptAdmin(admin.ModelAdmin):
     """Manuscript"""
-    list_display = ['id', 'name', 'idno', 'project']
+    list_display = ['id', 'name', 'idno'] # PROJECT_MOD_HERE , 'project'
     search_fields = ['name', 'idno']
-    list_filter = ['project'] 
+    # list_filter = ['project'] # PROJECT_MOD_HERE
     formfield_overrides = {
         models.TextField: {'widget': Textarea(attrs={'rows': 1, 'class': 'mytextarea'})},
         }

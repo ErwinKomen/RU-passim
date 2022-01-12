@@ -2965,41 +2965,41 @@ class Project2(models.Model):
 
         return response
 
+# PROJECT_MOD_HERE
+#class Project(models.Model):
+#    """manuscripts may belong to the project 'Passim' or to something else"""
 
-class Project(models.Model):
-    """manuscripts may belong to the project 'Passim' or to something else"""
+#    # [1] Obligatory name for a project
+#    name = models.CharField("Name", max_length=LONG_STRING)
 
-    # [1] Obligatory name for a project
-    name = models.CharField("Name", max_length=LONG_STRING)
+#    def __str__(self):
+#        sName = self.name
+#        if sName == None or sName == "":
+#            sName = "(unnamed)"
+#        return sName
 
-    def __str__(self):
-        sName = self.name
-        if sName == None or sName == "":
-            sName = "(unnamed)"
-        return sName
+#    def get_default(username):
+#        """Determine the default project for this user""" # TH: dit niet voor de toekomstige oplossing               
 
-    def get_default(username):
-        """Determine the default project for this user""" # TH: dit niet voor de toekomstige oplossing               
+#        obj = Project.objects.filter(name__iexact = "passim").first()
+#        if obj == None:
+#            obj = Project.objects.all().first()
+#        return obj
 
-        obj = Project.objects.filter(name__iexact = "passim").first()
-        if obj == None:
-            obj = Project.objects.all().first()
-        return obj
+#    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+#        # First do the normal saving
+#        response = super(Project, self).save(force_insert, force_update, using, update_fields)
+#        # Check if this is the first project object
+#        qs = Project.objects.all()
+#        if qs.count() == 1:
+#            # Set this as default project for all manuscripts
+#            prj = qs.first()
+#            with transaction.atomic():
+#                for obj in Manuscript.objects.all():
+#                    obj.project = prj
+#                    obj.save()
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # First do the normal saving
-        response = super(Project, self).save(force_insert, force_update, using, update_fields)
-        # Check if this is the first project object
-        qs = Project.objects.all()
-        if qs.count() == 1:
-            # Set this as default project for all manuscripts
-            prj = qs.first()
-            with transaction.atomic():
-                for obj in Manuscript.objects.all():
-                    obj.project = prj
-                    obj.save()
-
-        return response
+#        return response
 
 
 class Keyword(models.Model):
@@ -3181,7 +3181,7 @@ class Manuscript(models.Model):
 
     # [0-1] Each manuscript should belong to a particular project TH this needs to be changed to a MANYTOMANY
     # in order to be able to link on manuscript to multiple 
-    project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts")
+    # project = models.ForeignKey(Project, null=True, blank=True, on_delete = models.SET_NULL, related_name="project_manuscripts") PROJECT_MOD_HERE
 
     # ============== MANYTOMANY connections
     # [m] Many-to-many: one manuscript can have a series of provenances

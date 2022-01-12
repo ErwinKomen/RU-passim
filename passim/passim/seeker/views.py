@@ -76,7 +76,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
-    Project, Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
+    Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
@@ -4775,7 +4775,7 @@ class SermonListView(BasicList):
                 {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
                 # Issue #416: Delete the option to search for a GoldSermon personal dataset
                 # {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
-                {"name": "Super sermon gold","id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Authority file",   "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
                 {"name": "Manuscript",       "id": "filter_collmanu",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
@@ -8542,7 +8542,7 @@ class ManuscriptEdit(BasicDetails):
                         # 'CollectionMan', 'collist',
                         # 'ProvenanceMan', 'mprovlist'
                         # 'Daterange', 'datelist',
-                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', 'project',
+                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
                         'hierarchy',
                         'LitrefMan', 'litlist',
                         'ManuscriptExt', 'extlist']
@@ -8600,7 +8600,7 @@ class ManuscriptEdit(BasicDetails):
                 #{'type': 'plain', 'label': "Support:",      'value': instance.support,              'field_key': 'support'},
                 #{'type': 'plain', 'label': "Extent:",       'value': instance.extent,               'field_key': 'extent'},
                 #{'type': 'plain', 'label': "Format:",       'value': instance.format,               'field_key': 'format'},
-                {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
+                #{'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'}, PROJECT_MOD_HERE
                 #{'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
                 ]
             for item in mainitems_main: context['mainitems'].append(item)
@@ -8616,10 +8616,7 @@ class ManuscriptEdit(BasicDetails):
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
                         'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
                     #{'type': 'safe',  'label': "Origin:",       'value': instance.get_origin_markdown(),    'field_key': 'origin'},
-
-                    # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
-
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
                         'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
                     ]
@@ -9420,7 +9417,7 @@ class ManuscriptListView(BasicList):
         {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold",     "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Super sermon gold",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Authority file",   "id": "filter_collection_super",    "enabled": False, "head_id": "filter_collection"},
       ]
 
     searches = [
@@ -9652,26 +9649,26 @@ class ManuscriptListView(BasicList):
             # Get the list
             projlist = fields['projlist']
 
-        ## Check if the projlist is identified
-        #if fields['projlist'] == None or len(fields['projlist']) == 0:
-        #    # Get the default project
-        #    qs = Project2.objects.all()
-        #    if qs.count() > 0:
-        #        proj_default = qs.first()
-        #        qs = Project2.objects.filter(id=proj_default.id)
-        #        fields['projlist'] = qs
-        #        projlist = qs
+        # Check if the projlist is identified TH: dit was eerst uncommented
+        if fields['projlist'] == None or len(fields['projlist']) == 0:
+            # Get the default project
+            qs = Project2.objects.all()
+            if qs.count() > 0:
+                proj_default = qs.first()
+                qs = Project2.objects.filter(id=proj_default.id)
+                fields['projlist'] = qs
+                projlist = qs
 
 
         # Check if the prjlist is identified
-        if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-            # Get the default project
-            qs = Project.objects.all()
-            if qs.count() > 0:
-                prj_default = qs.first()
-                qs = Project.objects.filter(id=prj_default.id)
-                fields['prjlist'] = qs
-                prjlist = qs
+        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
+        #    # Get the default project
+        #    qs = Project.objects.all()
+        #    if qs.count() > 0:
+        #        prj_default = qs.first()
+        #        qs = Project.objects.filter(id=prj_default.id)
+        #        fields['prjlist'] = qs
+        #        prjlist = qs
 
         # Check if an overlap percentage is specified
         if 'overlap' in fields and fields['overlap'] != None:
@@ -12594,7 +12591,8 @@ class LitRefListView(ListView):
     model = Litref
     paginate_by = 2000
     template_name = 'seeker/literature_list.html'
-    entrycount = 0
+    entrycount = 0    
+    plural_name = "Projects"
 
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context

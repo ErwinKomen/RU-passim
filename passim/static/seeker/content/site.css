@@ -1655,6 +1655,10 @@ svg .links {
     stroke: #999;
     stroke-opacity: 0.6;
 }
+.link-path {
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
 svg .links .linktype_eqs:hover {
     stroke-width: 4;
     stroke: red;

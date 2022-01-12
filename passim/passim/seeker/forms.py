@@ -685,26 +685,26 @@ class OriginOneWidget(ModelSelect2Widget):
         return Origin.objects.all().order_by('name').distinct()
 
 
-class ProjectOneWidget(ModelSelect2Widget):
-    model = Project
-    search_fields = [ 'name__icontains' ]
+#class ProjectOneWidget(ModelSelect2Widget): PROJECT_MOD_HERE
+#    model = Project
+#    search_fields = [ 'name__icontains' ]
 
-    def label_from_instance(self, obj):
-        return obj.name
+#    def label_from_instance(self, obj):
+#        return obj.name
 
-    def get_queryset(self):
-        return Project.objects.all().order_by('name').distinct()
+#    def get_queryset(self):
+#        return Project.objects.all().order_by('name').distinct()
     
 
-class ProjectWidget(ModelSelect2MultipleWidget):
-    model = Project
-    search_fields = [ 'name__icontains' ]
+#class ProjectWidget(ModelSelect2MultipleWidget): PROJECT_MOD_HERE
+#    model = Project
+#    search_fields = [ 'name__icontains' ]
 
-    def label_from_instance(self, obj):
-        return obj.name
+#    def label_from_instance(self, obj):
+#        return obj.name
 
-    def get_queryset(self):
-        return Project.objects.all().order_by('name').distinct()
+#    def get_queryset(self):
+#        return Project.objects.all().order_by('name').distinct()
 
 
 class Project2Widget(ModelSelect2MultipleWidget):
@@ -1300,8 +1300,8 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'})) PROJECT_MOD_HERE
     projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1375,7 +1375,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
+           # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -3634,8 +3634,8 @@ class CodicoForm(PassimModelForm):
                 widget=ProvenanceCodWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
-    prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    # prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'})) PROJECT_MOD_HERE
     typeaheads = ["origins"]
     action_log = ['name', 'origin', 'support', 'extent', 'format', 'stype', 'kwlist', 'cprovlist', 'datelist']
     exclude = ['origin_ta']
@@ -3753,7 +3753,7 @@ class ManuscriptForm(PassimModelForm):
 
         model = Manuscript
         fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 
-                  'origin', 'url', 'support', 'extent', 'format', 'stype', 'project']
+                  'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'project' PROJECT_MOD_HERE
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -3769,7 +3769,7 @@ class ManuscriptForm(PassimModelForm):
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
-                 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
+                # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'}) PROJECT_MOD_HERE
                  }
 
     def __init__(self, *args, **kwargs):
