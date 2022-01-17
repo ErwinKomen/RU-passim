@@ -7,12 +7,13 @@ from django.urls import reverse
 from django.shortcuts import render
 from django.template.loader import render_to_string
 
-from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, get_crpp_date, \
+from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
+    get_crpp_date, get_current_datetime,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword
 from passim.approve.models import EqualChange, EqualApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm
-from passim.basic.views import BasicList, BasicDetails
+from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o
 
 import json, copy
 
@@ -33,7 +34,7 @@ def get_goldset_html(goldlist):
         sBack = render_to_string(template_name, context)
     return sBack
 
-def equalchange_json_to_html(instance, type):
+def equalchange_json_to_html(instance, type, profile=None):
     """Convert the proposed change from JSON into an HTML representation"""
 
     html = []
@@ -80,12 +81,22 @@ def equalchange_json_to_html(instance, type):
                     # Process list of FK-to-collection
                     hclist = oItem.get('collist_hist')
                     if hclist != None:
+                        if profile is None:
+                            other_priv_hcs = []
+                        else:
+                            # Adapt the list: remove all private HCs from which I am not the owner
+                            other_priv_hcs = [x['id'] for x in Collection.objects.filter(id__in=hclist, settype='hc', scope='priv', owner=profile).values('id')]
+
                         # Process the list
-                        qs = Collection.objects.filter(id__in=hclist).values('name')
+                        qs = Collection.objects.filter(id__in=hclist).values('id', 'name', 'owner__user__username')
                         lst_hc = []
                         for hc in qs:
                             # Create a display for this topic
-                            lst_hc.append("<span class='collection'>{}</span>".format(hc['name']))
+                            if hc['id'] in other_priv_hcs:
+                                lst_hc.append("<span class='collection private' title='This is a private HC of {}'><b>P</b> {}</span>".format(
+                                    hc['owner__user__username'], hc['name']))
+                            else:
+                                lst_hc.append("<span class='collection'>{}</span>".format(hc['name']))
                         html.append(", ".join(lst_hc))
                 elif field == "golds":
                     # Process list of FK-to-SermonGold
@@ -148,6 +159,124 @@ def equalchange_json_to_html(instance, type):
     sBack = "\n".join(html)
     return sBack
 
+def equalchange_json_to_accept(instance):
+    """Accept the change: implement it and set my status"""
+
+    oErr = ErrHandle()
+    bBack = True
+    try:
+        # Execute the change
+        oItem = json.loads(instance.change)
+        # Make sure we have the SSG object ready
+        super = instance.super
+        bSuperNeedSaving = False
+        # Find out what type this is
+        field = oItem.get('field')
+        if field != None:
+            if field == "author":
+                # Process author FK
+                author_id = oItem.get("id")
+                if author_id != None and author_id != "":
+                    author = Author.objects.filter(id=author_id).first()
+                    if author != None:
+                        # First: possibly create a moved
+                        moved = EqualGold.create_moved(super)
+                        # Assign it to the SSG
+                        super.author = author
+                        bSuperNeedSaving = True
+            elif field == "incipit":
+                # Process incipit string
+                super.incipit = oItem.get("text")
+                bSuperNeedSaving = True
+            elif field == "explicit":
+                # Process explicit string
+                super.explicit = oItem.get("text")
+                bSuperNeedSaving = True
+            elif field == "keywords":
+                # Process list of FK-to-keyword
+                kwlist_ids = oItem.get('kwlist')
+                if kwlist_ids != None:
+                    kwlist = Keyword.objects.filter(id__in=kwlist_ids)
+                    adapt_m2m(EqualGoldKeyword, super, "equal", kwlist, "keyword")
+
+            elif field == "hcs":
+                # Process list of FK-to-collection
+                hclist = oItem.get('collist_hist')
+                if hclist != None:
+                    collist_ssg = Collection.objects.filter(id__in=hclist)
+                    adapt_m2m(CollectionSuper, super, "super", collist_ssg, "collection")
+            elif field == "golds":
+                # Process list of FK-to-SermonGold
+                goldlist_ids = oItem.get('goldlist')
+                if goldlist_ids != None:
+                    # Process the list
+                    goldlist = SermonGold.objects.filter(id__in=goldlist_ids)
+                    ssglist = [x.equal for x in goldlist]
+                    adapt_m2o(SermonGold, super, "equal", goldlist)
+                    # Adapt the SSGs needed
+                    for ssg in ssglist:
+                        # Adapt the SG count value
+                        ssg.set_sgcount()
+                        # Adapt the 'firstsig' value
+                        ssg.set_firstsig()
+
+            elif field == "supers":
+                # Process list of EqualGoldLink specifications
+                superlist = oItem.get('superlist')
+                if superlist != None:
+                    # Process the list
+                    super_added = []
+                    super_deleted = []
+                    adapt_m2m(EqualGoldLink, super, "src", superlist, "dst", 
+                              extra = ['linktype', 'alternatives', 'spectype', 'note'], related_is_through=True,
+                              added=super_added, deleted=super_deleted)
+                    # Check for partial links in 'deleted'
+                    for obj in super_deleted:
+                        # This if-clause is not needed: anything that needs deletion should be deleted
+                        # if obj.linktype in LINK_BIDIR:
+                        # First find and remove the other link
+                        reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                        if reverse != None:
+                            reverse.delete()
+                        # Then remove myself
+                        obj.delete()
+                    # Make sure to add the reverse link in the bidirectionals
+                    for obj in super_added:
+                        if obj.linktype in LINK_BIDIR:
+                            # Find the reversal
+                            reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                            if reverse == None:
+                                # Create the reversal 
+                                reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                                # Other adaptations
+                                bNeedSaving = False
+                                # Set the correct 'reverse' spec type
+                                if obj.spectype != None and obj.spectype != "":
+                                    reverse.spectype = get_reverse_spec(obj.spectype)
+                                    bNeedSaving = True
+                                # Possibly copy note
+                                if obj.note != None and obj.note != "":
+                                    reverse.note = obj.note
+                                    bNeedSaving = True
+                                # Need saving? Then save
+                                if bNeedSaving:
+                                    reverse.save()
+
+            # Need any saving?
+            if bSuperNeedSaving:
+                # Save the SSG
+                super.save()
+
+        # Make sure that our state changes to accepted
+        instance.atype = "acc"
+        instance.comment = "This change has been succesfully processed on: {}".format(get_crpp_date(get_current_datetime(), True))
+        instance.save()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("equalchange_json_to_accept")
+        bBack = False
+    return bBack
+
 def approval_parse_changes(profile, cleaned_data, super):
     """Check if there are any changes, add them into EqualChange objects, and return how many there are"""
 
@@ -174,7 +303,7 @@ def approval_parse_changes(profile, cleaned_data, super):
                 bAddChange = False
                 if type == "string":
                     # Get the current text
-                    sTextCurrent = getattr(current, field)
+                    sTextCurrent = getattr(current, to_field)
                     # Get the suggestion text
                     sTextChange = cleaned_data[field]
 
@@ -185,7 +314,7 @@ def approval_parse_changes(profile, cleaned_data, super):
                         bAddChange = True
                 elif type == "fk":
                     # Get the current id (FK)
-                    id_current = None if getattr(current, field) is None else getattr(current, field).id
+                    id_current = None if getattr(current, to_field) is None else getattr(current, to_field).id
                     # Get the suggestion id (FK)
                     id_change = None if cleaned_data[field] is None else cleaned_data[field].id
 
@@ -203,6 +332,13 @@ def approval_parse_changes(profile, cleaned_data, super):
                         lst_id_current = [x['id'] for x in getattr(current, field).filter(*lstQ).values("id")]
                     # Get the suggestion
                     lst_id_change = [x.id for x in cleaned_data[listfield]]
+
+                    # Special processing?
+                    if to_field == "hcs":
+                        # This is special - the lst_id_change must include all private HCs from other people
+                        hc_others = Collection.objects.filter(settype="hc", scope="priv").exclude(owner=profile).values('id')
+                        for item in hc_others:
+                            lst_id_change.append(item['id'])
                     
                     # Signal that the change needs processing
                     if set(lst_id_change) != set(lst_id_current):
@@ -244,7 +380,8 @@ def approval_parse_formset(profile, frm_prefix, new_data, super):
                 if not prefix is None and prefix == frm_prefix:
                     # Get the fields to be processed of this form
                     to_field = oForm.get("tofld")
-                    listfield = oForm.get("listfield")
+                    # listfield = oForm.get("listfield")
+                    # formfields = oForm.get("formfields")
 
                     # Create a dictionary with these values
                     oChange = dict(field=to_field)
@@ -257,7 +394,8 @@ def approval_parse_formset(profile, frm_prefix, new_data, super):
                         type = oField.get("type")
 
                         oItem[field] = new_data.get(field)
-                    oChange[listfield] = [ oItem ]
+                    # oChange[listfield] = [ oItem ]
+                    oChange["formfields"] = [ oItem ]
 
                     # Note: sThe dictionary with current values is empty, since it is an addition
 
@@ -288,9 +426,11 @@ def approval_pending_list(super):
         for obj in qs:
             saved = obj.created.strftime("%d/%b/%Y %H:%M") if not obj.saved else obj.saved.strftime("%d/%b/%Y %H:%M")
             oApproval = dict(
+                id=obj.id,
                 field=obj.get_display_name(),
                 editor=obj.profile.user.username,
                 atype=obj.get_atype_display(),
+                statushistory = obj.get_status_history(),
                 created=obj.created.strftime("%d/%b/%Y %H:%M"),
                 saved=saved,
                 change=equalchange_json_to_html(obj, "change"))
@@ -450,13 +590,16 @@ class EqualChangeEdit(BasicDetails):
             {'type': 'plain', 'label': "Field val",     'value': instance.field,    'field_key': "field",   'empty': 'hide'},
             {'type': 'plain', 'label': "Atype val",     'value': instance.atype,    'field_key': "atype",   'empty': 'hide'},
             # --------------------------------------------
-            {'type': 'plain', 'label': "Authority File:",'value': instance.get_code()}, #,          'field_key': 'super'},
-            {'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()}, #,   'field_key': 'field'},
+            {'type': 'plain', 'label': "Authority File:",'value': instance.get_code_html()},        #,          'field_key': 'super'},
+            {'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()},      #,   'field_key': 'field'},
             {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
-            {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()}, #,  'field_key': 'atype'},
-            {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current")},
-            {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance, "change")},
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},     #,  'field_key': 'atype'},
+            {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current", profile)},
+            {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance, "change", profile)},
             ]
+        # Only add the 'comment', if it is there (and read-only)
+        if not instance.comment is None and instance.comment != "":
+            mainitems_main.append({'type': 'plain', 'label': "Comment:", 'value': instance.comment})
         for item in mainitems_main: 
             context['mainitems'].append(item)
 
@@ -627,20 +770,35 @@ class EqualApprovalEdit(BasicDetails):
             if self.prefix == "user":
                 context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
 
+            # Check if the approval has been 'locked'
+            locked = (instance.change.atype == "acc")
+
             # Add the normal information
             mainitems_main = [
                 # -------- HIDDEN field values (these are defined in [EqualApprovalForm] ---------------
                 {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
                 {'type': 'plain', 'label': "Change id",     'value': instance.change.id,'field_key': "change",  'empty': 'hide'},
                 # --------------------------------------------
-                {'type': 'plain', 'label': "Authority File:",'value': instance.change.get_code()}, #,          'field_key': 'super'},
-                {'type': 'plain', 'label': "Field:",        'value': instance.change.get_display_name()}, #,   'field_key': 'field'},
+                {'type': 'plain', 'label': "Authority File:",'value': instance.change.get_code_html()},         #,   'field_key': 'super'},
+                {'type': 'plain', 'label': "Field:",        'value': instance.change.get_display_name()},       #,   'field_key': 'field'},
                 {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display(),  'field_key': 'atype'},
-                {'type': 'safe',  'label': "Comment:",      'value': instance.comment,              'field_key': 'comment'},
-                {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance.change, "current")},
-                {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance.change, "change")},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},             #,   'field_key': 'atype'},
+                {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment_html()},              #,   'field_key': 'comment'},
+                {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance.change, "current", profile)},
+                {'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance.change, "change", profile)},
                 ]
+            # Only add the 'comment', if it is there (and read-only)
+            if locked:
+                # Possibly show the comment
+                if not instance.change.comment is None and instance.change.comment != "":
+                    mainitems_main.append({'type': 'plain', 'label': "Processed:", 'value': instance.change.comment})
+            else:
+                # Make sure fields status and comment are editable
+                editables = {'Status:': 'atype', 'Comment:': 'comment'}
+                for item in mainitems_main:
+                    if item['label'] in editables:
+                        item['field_key'] = editables[item['label']]
+
             for item in mainitems_main: 
                 context['mainitems'].append(item)
 
@@ -652,6 +810,47 @@ class EqualApprovalEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Is this something tangible?
+            if not instance is None and instance.id != None:
+                # Get to the change itself from EqualChange
+                change = instance.change
+
+                # Is this EqualChange object already finished?
+                if not change is None and change.atype == "def":
+                    # Check how many approvals there should be and how many are left
+                    iLeft, iNeeded = change.get_approval_count()
+                    if iNeeded > 0 and iLeft == 0:
+                        # The last approval has been saved: we may implement the change
+                        equalchange_json_to_accept(change)
+                    elif change.changeapprovals.exclude(atype="def").count() == 0:
+                        # Do some more careful checking: all approvals are now known
+                        iRejected = change.changeapprovals.filter(atype='rej').count()
+                        if iRejected == iNeeded:
+                            # This suggestion has been rejected completely
+                            change.atype = "rej"
+                            change.save()
+                        else:
+                            # Not everything is rejected means: modifications are needed
+                            change.atype = "mod"
+                            change.save()
+                    elif change.changeapprovals.filter(atype='rej').count() == iNeeded:
+                        # This suggestion has been rejected completely
+                        change.atype = "rej"
+                        change.save()
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualApprovalEdit/after_save")
+            bResult = False
+        return bResult, msg
 
 
 class EqualApprovalDetails(EqualApprovalEdit):

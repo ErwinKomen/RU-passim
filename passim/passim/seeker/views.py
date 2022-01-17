@@ -11503,10 +11503,13 @@ class EqualGoldEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
-            {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'author'},
+            {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
 
             # Issue #295: the [number] (number within author) must be there, though hidden, not editable
-            {'type': 'plain', 'label': "Number:",        'value': instance.number, 'field_key': 'number', 'empty': 'hide'},
+            {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
+            {'type': 'plain', 'label': "Author id:",     'value': instance.author.id, 'field_key': 'author',   'empty': 'hide'},
+            {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
+            {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
 
             # Issue #212: remove this sermon number
             # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -11514,9 +11517,9 @@ class EqualGoldEdit(BasicDetails):
 
             {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
             {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-             'field_key': 'incipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+             'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
             {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-             'field_key': 'explicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+             'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
             # Hier project    
     
 
@@ -11545,6 +11548,12 @@ class EqualGoldEdit(BasicDetails):
         # Notes:
         # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
+        pending = approval_pending(instance)
+        if user_is_ingroup(self.request, app_editor) and pending.count() > 0:
+            context['approval_pending'] = pending
+            context['approval_pending_list'] = approval_pending_list(instance)
+            context['mainitems'].append(dict(
+                type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
 
         # Special processing for moderator
         if may_edit_project(self.request, profile, instance):
@@ -11715,17 +11724,22 @@ class EqualGoldEdit(BasicDetails):
         oErr = ErrHandle()
         bBack = True
         msg = ""
+        transfer_changes = [
+            {'src': 'newincipit',  'dst': 'incipit',  'type': 'text'},
+            {'src': 'newexplicit', 'dst': 'explicit', 'type': 'text'},
+            {'src': 'newauthor',   'dst': 'author',   'type': 'fk'},
+            ]
         try:
             if instance != None:
                 # Need to know who is 'talking'...
                 username = self.request.user.username
                 profile = Profile.get_user_profile(username)
 
-                # Check for author
-                if instance.author == None:
-                    # Set to "undecided" author if possible
-                    author = Author.get_undecided()
-                    instance.author = author
+                ## Check for author
+                #if instance.author == None:
+                #    # Set to "undecided" author if possible
+                #    author = Author.get_undecided()
+                #    instance.author = author
 
                 # Get the cleaned data: this is the new stuff
                 cleaned_data = form.cleaned_data
@@ -11736,6 +11750,35 @@ class EqualGoldEdit(BasicDetails):
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:
 
+                    # This means that any changes may be implemented right away
+                    for oTransfer in transfer_changes:
+                        type = oTransfer.get("type")
+                        src_field = oTransfer.get("src")
+                        dst_field = oTransfer.get("dst")
+                        src_value = cleaned_data.get(src_field)
+                        
+                        # Transfer the value
+                        if type == "fk" or type == "text":
+                            # Is there any change?
+                            prev_value = getattr(instance, dst_field)
+                            if src_value != prev_value:
+                                # Special cases
+                                if dst_field == "author":
+                                    authornameLC = instance.author.name.lower()
+                                    # Determine what to do in terms of 'moved'.
+                                    if authornameLC != "undecided":
+                                        # Create a copy of the object I used to be
+                                        moved = EqualGold.create_moved(instance)
+
+                                # Perform the actual change
+                                setattr(form.instance, dst_field, src_value)
+
+                    # Check for author
+                    if instance.author == None:
+                        # Set to "undecided" author if possible
+                        author = Author.get_undecided()
+                        instance.author = author
+
                     # Issue #473: automatic assignment of project for particular editor(s)
                     projlist = form.cleaned_data.get("projlist")
                     bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
@@ -11743,8 +11786,28 @@ class EqualGoldEdit(BasicDetails):
                     # The changes may *NOT* be committed
                     msg = None   # "The suggested changes will be reviewed by the other projects' editors"
                     bBack = False
-                    # Make sure redirection takes place
-                    self.redirect_to = reverse('equalgold_details', kwargs={'pk': instance.id})
+
+                    # Changes may not be commited: reset the changes in the transfer_changes formfields
+                    for oTransfer in transfer_changes:
+                        type = oTransfer.get("type")
+                        src_field = oTransfer.get("src")
+                        dst_field = oTransfer.get("dst")
+                        key_reset = "{}-{}".format(form.prefix, src_field)
+                        value_reset = None
+                        if type == "text":
+                            value_reset = getattr(instance, dst_field)
+                        elif dst_field == "author":
+                            value_reset = str(instance.author.id)
+                        if value_reset != None:
+                            form.data[key_reset] = value_reset
+
+                    ## The author gets a special treatment: [newauthor] should equal [author]
+                    #key_newauthor = '{}-newauthor'.format(form.prefix)
+                    #form.data[key_newauthor] = str(instance.author.id)
+
+                    # NOTE (EK): the following (redirection) is no longer needed, since all the changes are shown in the EDIT view
+                    ## Make sure redirection takes place
+                    #self.redirect_to = reverse('equalgold_details', kwargs={'pk': instance.id})
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldEdit/before_save")
@@ -11842,6 +11905,21 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
+
+
+            # ADDED Take over any data from [instance] to [frm.data]
+            #       Provided these fields are in the form's [initial_fields]
+            if instance != None:
+
+                # Walk the fields that need to be taken from the instance
+                for key in form.initial_fields:
+                    value = getattr(instance, key)
+
+                    key_prf = '{}-{}'.format(form.prefix, key)
+                    if isinstance(value, str) or isinstance(value, int):
+                        form.data[key_prf] = value
+                    elif isinstance(value, object):
+                        form.data[key_prf] = str(value.id)
 
         except:
             msg = oErr.get_error_message()
@@ -12041,9 +12119,12 @@ class EqualGoldDetails(EqualGoldEdit):
                     lHtml.append(context['after_details'])
                 if context['object'] == None:
                     context['object'] = instance
-                context['approval_pending'] = approval_pending(instance)
-                context['approval_pending_list'] = approval_pending_list(instance)
-                lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
+
+                # NOTE (EK): moved to EqualGoldEdit, so that re-loading is not needed
+                #context['approval_pending'] = approval_pending(instance)
+                #context['approval_pending_list'] = approval_pending_list(instance)
+                #lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
+
                 context['after_details'] = "\n".join(lHtml)
 
         except:

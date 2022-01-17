@@ -6133,9 +6133,12 @@ class EqualGold(models.Model):
                 if auth_num < 0: # or Author.is_undecided(self.author):
                     self.code = None
                 else:
-                    # There is an author--is this different than the author we used to have?
-                    prev_auth = EqualGold.objects.filter(id=self.id).first().author
-                    was_undecided = False if prev_auth == None else (prev_auth.name.lower() == "undecided")
+                    if self.id is None:
+                        was_undecided = False
+                    else:
+                        # There is an author--is this different than the author we used to have?
+                        prev_auth = EqualGold.objects.filter(id=self.id).first().author
+                        was_undecided = False if prev_auth == None else (prev_auth.name.lower() == "undecided")
                     if self.number == None or was_undecided:
                         # This may be a mistake: see if there is a code already
                         if self.code != None and "PASSIM" in self.code:
@@ -6206,10 +6209,23 @@ class EqualGold(models.Model):
 
         # Get a copy of self
         org = self.create_new()
+
+        # Do we have a previous one that moved?
+        prev = None
+        if self.moved_ssg.count() > 0:
+            # Find the previous one
+            prev = self.moved_ssg.first()
+
         # Now indicate where the original moved to
         org.moved = self
         # Save the result
         org.save()
+
+        # Also adapt the prev to point to [org]
+        if not prev is None:
+            prev.moved = org
+            prev.save()
+
         return org
 
     def create_new(self):

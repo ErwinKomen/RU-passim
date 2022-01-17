@@ -679,6 +679,138 @@ def treat_bom(sHtml):
     # Return what we have
     return sHtml
 
+def adapt_m2m(cls, instance, field1, qs, field2, extra = [], extrargs = {}, qfilter = {}, 
+              related_is_through = False, userplus = None, added=None, deleted=None):
+    """Adapt the 'field' of 'instance' to contain only the items in 'qs'
+    
+    The lists [added] and [deleted] (if specified) will contain links to the elements that have been added and deleted
+    If [deleted] is specified, then the items will not be deleted by adapt_m2m(). Caller needs to do this.
+    """
+
+    errHandle = ErrHandle()
+    try:
+        # Get current associations
+        lstQ = [Q(**{field1: instance})]
+        for k,v in qfilter.items(): lstQ.append(Q(**{k: v}))
+        through_qs = cls.objects.filter(*lstQ)
+        if related_is_through:
+            related_qs = through_qs
+        else:
+            related_qs = [getattr(x, field2) for x in through_qs]
+        # make sure all items in [qs] are associated
+        if userplus == None or userplus:
+            for obj in qs:
+                if obj not in related_qs:
+                    # Add the association
+                    args = {field1: instance}
+                    if related_is_through:
+                        args[field2] = getattr(obj, field2)
+                    else:
+                        args[field2] = obj
+                    for item in extra:
+                        # Copy the field with this name from [obj] to 
+                        args[item] = getattr(obj, item)
+                    for k,v in extrargs.items():
+                        args[k] = v
+                    # cls.objects.create(**{field1: instance, field2: obj})
+                    new = cls.objects.create(**args)
+                    if added != None:
+                        added.append(new)
+
+        # Remove from [cls] all associations that are not in [qs]
+        # NOTE: do not allow userplus to delete
+        for item in through_qs:
+            if related_is_through:
+                obj = item
+            else:
+                obj = getattr(item, field2)
+            if obj not in qs:
+                if deleted == None:
+                    # Remove this item
+                    item.delete()
+                else:
+                    deleted.append(item)
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+def adapt_m2o(cls, instance, field, qs, link_to_obj = None, **kwargs):
+    """Adapt the instances of [cls] pointing to [instance] with [field] to only include [qs] """
+
+    errHandle = ErrHandle()
+    try:
+        # Get all the [cls] items currently linking to [instance]
+        lstQ = [Q(**{field: instance})]
+        linked_qs = cls.objects.filter(*lstQ)
+        if link_to_obj != None:
+            linked_through = [getattr(x, link_to_obj) for x in linked_qs]
+        # make sure all items in [qs] are linked to [instance]
+        for obj in qs:
+            if (obj not in linked_qs) and (link_to_obj == None or obj not in linked_through):
+                # Create new object
+                oNew = cls()
+                setattr(oNew, field, instance)
+                # Copy the local fields
+                for lfield in obj._meta.local_fields:
+                    fname = lfield.name
+                    if fname != "id" and fname != field:
+                        # Copy the field value
+                        setattr(oNew, fname, getattr(obj, fname))
+                for k, v in kwargs.items():
+                    setattr(oNew, k, v)
+                # Need to add an object link?
+                if link_to_obj != None:
+                    setattr(oNew, link_to_obj, obj)
+                oNew.save()
+        # Remove links that are not in [qs]
+        for obj in linked_qs:
+            if obj not in qs:
+                # Remove this item
+                obj.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
+def adapt_m2o_sig(instance, qs):
+    """Adapt the instances of [SermonSignature] pointing to [instance] to only include [qs] 
+    
+    Note: convert SermonSignature into (Gold) Signature
+    """
+
+    errHandle = ErrHandle()
+    try:
+        # Get all the [SermonSignature] items currently linking to [instance]
+        linked_qs = SermonSignature.objects.filter(sermon=instance)
+        # make sure all items in [qs] are linked to [instance]
+        bRedo = False
+        for obj in qs:
+            # Get the SermonSignature equivalent for Gold signature [obj]
+            sermsig = instance.get_sermonsig(obj)
+            if sermsig not in linked_qs:
+                # Indicate that we need to re-query
+                bRedo = True
+        # Do we need to re-query?
+        if bRedo: 
+            # Yes we do...
+            linked_qs = SermonSignature.objects.filter(sermon=instance)
+        # Remove links that are not in [qs]
+        for obj in linked_qs:
+            # Get the gold-signature equivalent of this sermon signature
+            gsig = obj.get_goldsig()
+            # Check if the gold-sermon equivalent is in [qs]
+            if gsig not in qs:
+                # Remove this item
+                obj.delete()
+        # Return okay
+        return True
+    except:
+        msg = errHandle.get_error_message()
+        return False
+
 def csv_to_excel(sCsvData, response):
     """Convert CSV data to an Excel worksheet"""
 
@@ -1917,7 +2049,7 @@ class BasicDetails(DetailView):
                         # Issue #426: put it up here
                         frm.save()
                         instance = obj
-                    
+
                         # Log the SAVE action
                         details = {'id': obj.id}
                         details["savetype"] = "new" if bNew else "change"
@@ -1934,6 +2066,24 @@ class BasicDetails(DetailView):
                         # Any action(s) after saving
                         bResult, msg = self.after_save(frm, obj)
                     else:
+
+                        # EK: working on this.
+                        #     I've now put this exclusively in EqualGoldEdit's method after_save()
+                        #
+                        ## ADDED Take over any data from [instance] to [frm.data]
+                        ##       Provided these fields are in the form's [initial_fields]
+                        #if instance != None and hasattr(frm, "initial_fields"):
+
+                        #    # Walk the fields that need to be taken from the instance
+                        #    for key in frm.initial_fields:
+                        #        value = getattr(instance, key)
+
+                        #        key_prf = '{}-{}'.format(frm.prefix, key)
+                        #        if isinstance(value, str) or isinstance(value, int):
+                        #            frm.data[key_prf] = value
+                        #        elif isinstance(value, object):
+                        #            frm.data[key_prf] = str(value.id)
+                    
                         if not msg is None:
                             context['errors'] = {'save': msg }
                 elif frm.errors:

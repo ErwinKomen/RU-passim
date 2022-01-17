@@ -2699,6 +2699,12 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newauthor = ModelChoiceField(queryset=None, required=False,
+                widget=AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}))
+    newincipit = forms.CharField(label=_("Incipit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
+    newexplicit = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
     signature = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
@@ -2742,13 +2748,14 @@ class SuperSermonGoldForm(PassimModelForm):
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSuperWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
+    initial_fields = ['author', 'incipit', 'explicit']
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGold
         fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
-        widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={# 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
                                                        'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
                  'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
@@ -2776,6 +2783,7 @@ class SuperSermonGoldForm(PassimModelForm):
             # Initialize querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['newauthor'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['goldlist'].queryset = SermonGold.objects.all().order_by('siglist')
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
@@ -2827,6 +2835,10 @@ class SuperSermonGoldForm(PassimModelForm):
                 # If there is an instance, then check the author specification
                 sAuthor = "" if not instance.author else instance.author.name
                 self.fields['authorname'].initial = sAuthor
+                self.fields['newauthor'].initial = instance.author.id
+                self.fields['newauthor'].widget.initial = instance.author.id
+                self.fields['newincipit'].initial = instance.incipit
+                self.fields['newexplicit'].initial = instance.explicit
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(settype="pd").order_by('name')]
                 self.fields['collist_hist'].initial = [x.pk for x in instance.collections.filter(settype="hc").order_by('name')]
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
@@ -2842,34 +2854,51 @@ class SuperSermonGoldForm(PassimModelForm):
         # We are okay
         return None
 
-    def clean_author(self):
-        """Possibly determine the author if not known"""
+    # =====================================================================================
+    # EK: Leave this outcommented code, until the project issues are working fully and well
+    # =====================================================================================
+    #def clean_author(self):
+    #    """Possibly determine the author if not known"""
 
-        do_remove = False
+    #    oErr = ErrHandle()
+    #    author = None
+    #    try:
+    #        do_remove = False
         
-        author = self.cleaned_data.get("author", None)
-        if not author:
-            authorname = self.cleaned_data.get("authorname", None)
-            if authorname:
-                # Figure out what the author is
-                author = Author.objects.filter(name=authorname).first()
-        if self.instance and self.instance.author and author:
-            authornameLC = self.instance.author.name.lower()
-            if self.instance.author.id != author.id:
-                if do_remove:
-                    # Need to remove all SSG that have me as 'moved
-                    qs = EqualGold.objects.filter(moved=self.instance)
-                    qs.delete()
-                # Determine what to do in terms of 'moved'.
-                if authornameLC != "undecided":
-                    # Create a copy of the object I used to be
-                    moved = EqualGold.create_moved(self.instance)
-                    # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
-                else:
-                    # We are moving from "undecided" to another name
-                    # NOTE: not yet implemented. Is this needed??
-                    pass
-        return author
+    #        #author = self.cleaned_data.get("author", None)
+    #        #if not author:
+    #        #    authorname = self.cleaned_data.get("authorname", None)
+    #        #    if authorname:
+    #        #        # Figure out what the author is
+    #        #        author = Author.objects.filter(name=authorname).first()
+
+
+    #        #if self.instance and self.instance.author and author:
+    #        #    # How many projects does this SSG belong to?
+    #        #    count_project = self.instance.projects.count()
+
+    #        #    # If this SSG belongs to more than one project, it may not process the author change yet
+    #        #    if count_project <= 1:
+    #        #        authornameLC = self.instance.author.name.lower()
+    #        #        if self.instance.author.id != author.id:
+    #        #            if do_remove:
+    #        #                # Need to remove all SSG that have me as 'moved
+    #        #                qs = EqualGold.objects.filter(moved=self.instance)
+    #        #                qs.delete()
+    #        #            # Determine what to do in terms of 'moved'.
+    #        #            if authornameLC != "undecided":
+    #        #                # Create a copy of the object I used to be
+    #        #                moved = EqualGold.create_moved(self.instance)
+    #        #                # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
+    #        #            else:
+    #        #                # We are moving from "undecided" to another name
+    #        #                # NOTE: not yet implemented. Is this needed??
+    #        #                pass
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        oErr.DoError("SuperSermonGoldForm/clean_author")
+
+    #    return author
 
 
 class EqualGoldLinkForm(forms.ModelForm):
