@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, \
-    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
+    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
@@ -3487,6 +3487,7 @@ def get_ssg2ssg(request):
         try:
             sId = request.GET.get('id', '')
             co_json = {'id': sId}
+            oErr.Status("get_ssg2ssg id={}".format(sId))
             lstQ = []
             lstQ.append(Q(id=sId))
             ssg = EqualGoldLink.objects.filter(Q(id=sId)).first()
@@ -11492,104 +11493,108 @@ class EqualGoldEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
-        info = render_to_string('seeker/author_info.html')
+        oErr = ErrHandle()
+        try:
+            # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
+            info = render_to_string('seeker/author_info.html')
 
-        # Need to know who this user (profile) is
-        profile = Profile.get_user_profile(self.request.user.username)
-        username = profile.user.username
-        team_group = app_editor
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
-            {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
+            # Define the main items to show and edit
+            author_id = None if instance.author is None else instance.author.id
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
+                {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
 
-            # Issue #295: the [number] (number within author) must be there, though hidden, not editable
-            {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
-            {'type': 'plain', 'label': "Author id:",     'value': instance.author.id, 'field_key': 'author',   'empty': 'hide'},
-            {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
-            {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
+                # Issue #295: the [number] (number within author) must be there, though hidden, not editable
+                {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
+                {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
 
-            # Issue #212: remove this sermon number
-            # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
-            # 'title': 'This is the automatically assigned sermon number for this particular author' },
+                # Issue #212: remove this sermon number
+                # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
+                # 'title': 'This is the automatically assigned sermon number for this particular author' },
 
-            {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-            {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-             'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
-            {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-             'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
-            # Hier project    
+                {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
+                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
+                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
+                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                # Hier project    
     
 
-            {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-            {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-             'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-            {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
-            {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-            {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
-            # Project2 HIER
-            {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
+                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
+                {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+                # Project2 HIER
+                {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
             
-            {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
-                'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
-            {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
-                'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
-            {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
-                'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
-            {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-             'title': 'All the editions associated with the Gold Sermons in this equality set'},
-            {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-             'title': 'All the literature references associated with the Gold Sermons in this equality set'}
-            ]
-        # Notes:
-        # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+                {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
+                {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
+                    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
+                {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
+                    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
+                    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
+                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                 'title': 'All the literature references associated with the Gold Sermons in this equality set'}
+                ]
+            # Notes:
+            # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-        pending = approval_pending(instance)
-        if user_is_ingroup(self.request, app_editor) and pending.count() > 0:
-            context['approval_pending'] = pending
-            context['approval_pending_list'] = approval_pending_list(instance)
-            context['mainitems'].append(dict(
-                type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
+            # Some tests can only be performed if this is *not* a new instance
+            if not instance is None and not instance.id is None:
+                pending = approval_pending(instance)
+                if user_is_ingroup(self.request, app_editor) and pending.count() > 0:
+                    context['approval_pending'] = pending
+                    context['approval_pending_list'] = approval_pending_list(instance)
+                    context['mainitems'].append(dict(
+                        type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
 
-        # Special processing for moderator
-        if may_edit_project(self.request, profile, instance):
-            for oItem in context['mainitems']:
-                if oItem['label'] == "Project:":
-                    # Add the list
-                    oItem['field_list'] = "projlist"
+                # Special processing for moderator
+                if may_edit_project(self.request, profile, instance):
+                    for oItem in context['mainitems']:
+                        if oItem['label'] == "Project:":
+                            # Add the list
+                            oItem['field_list'] = "projlist"
 
-        # THe SSG items that have a value in *moved* may not be editable
-        editable = (instance.moved == None)
-        if not editable:
-            self.permission = "readonly"
-            context['permission'] = self.permission
-            #remove_fields = ['field_key', 'field_list', 'multiple', 'fso']
-            #for mainitem in context['mainitems']:
-            #    for field in remove_fields:
-            #        mainitem.pop(field, None)
+                # THe SSG items that have a value in *moved* may not be editable
+                editable = (instance.moved == None)
+                if not editable:
+                    self.permission = "readonly"
+                    context['permission'] = self.permission
 
-        # Add comment modal stuff
-        initial = dict(otype="super", objid=instance.id, profile=profile)
-        context['commentForm'] = CommentForm(initial=initial, prefix="com")
-        context['comment_list'] = get_usercomments('super', instance, profile)
-        lhtml = []
-        lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
-        context['after_details'] = "\n".join(lhtml)
+                # Add comment modal stuff
+                initial = dict(otype="super", objid=instance.id, profile=profile)
+                context['commentForm'] = CommentForm(initial=initial, prefix="com")
+                context['comment_list'] = get_usercomments('super', instance, profile)
+                lhtml = []
+                lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+                context['after_details'] = "\n".join(lhtml)
 
-        # Signal that we have select2
-        context['has_select2'] = True
+            # Signal that we have select2
+            context['has_select2'] = True
 
-        # SPecification of the new button
-        context['new_button_title'] = "Sermon Gold"
-        context['new_button_name'] = "gold"
-        context['new_button_url'] = reverse("gold_details")
-        context['new_button_params'] = [
-            {'name': 'gold-n-equal', 'value': instance.id}
-            ]
+            # SPecification of the new button
+            context['new_button_title'] = "Sermon Gold"
+            context['new_button_name'] = "gold"
+            context['new_button_url'] = reverse("gold_details")
+            context['new_button_params'] = [
+                {'name': 'gold-n-equal', 'value': instance.id}
+                ]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldEdit/add_to_context")
 
         # Return the context we have made
         return context
@@ -12135,13 +12140,43 @@ class EqualGoldDetails(EqualGoldEdit):
         return context
 
     def before_save(self, form, instance):
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            self.isnew = False
+            if not instance is None:
+                if instance.id is None:
+                    # This is a new SSG being created.
+                    # Provide standard stuff:
+                    instance.author = Author.get_undecided()
+                    instance.stype = STYPE_MANUAL
+                    self.isnew = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldDetails/before_save")
+            bBack = False
+        return bBack, msg
 
     def process_formset(self, prefix, request, formset):
         return None
 
     def after_save(self, form, instance):
-        return True, ""
+        oErr = ErrHandle()
+        bBack = True
+        msg = ""
+        try:
+            if self.isnew:
+                # Try default project assignment
+                profile = Profile.get_user_profile(self.request.user.username)
+                qs = profile.project_editor.filter(status="incl")
+                for obj in qs:
+                    EqualGoldProject.objects.create(project=obj.project, equal=instance)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldDetails/before_save")
+            bBack = False
+        return bBack, msg
 
 
 class EqualGoldListView(BasicList):

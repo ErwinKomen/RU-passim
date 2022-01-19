@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
-    get_crpp_date, get_current_datetime,  \
+    get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
     Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword
 from passim.approve.models import EqualChange, EqualApproval
@@ -36,6 +36,55 @@ def get_goldset_html(goldlist):
 
 def equalchange_json_to_html(instance, type, profile=None):
     """Convert the proposed change from JSON into an HTML representation"""
+
+    def link_to_row(superlink, number):
+        """Translate one link into HTML table row"""
+
+        sBack = ""
+        html = []
+        try:
+            html.append("<tr class='view-row'>")
+            sSpectype = ""
+            sAlternatives = ""
+            number += 1
+
+            # Get the values from [superlink]
+            linktype = superlink.get("linktype")
+            spectype = superlink.get("spectype")
+            alternatives = superlink.get("alternatives")
+            note = superlink.get("note")
+            dst_id = superlink.get("dst")
+            dst = SermonGold.objects.filter(id=dst_id).first()
+
+            if spectype != None and len(spectype) > 1:
+                # Show the specification type
+                sSpectype = "<span class='badge signature gr'>{}</span>".format(
+                    FieldChoice.get_english(SPEC_TYPE, spectype))
+            if alternatives != None and alternatives == "true":
+                sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+            html.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}</td>".format(
+                FieldChoice.get_english(LINK_TYPE, linktype), sSpectype))
+
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            if note != None and len(note) > 1:
+                sTitle = "title='{}'".format(note)
+                sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
+                    number)
+                sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
+                    number, note)
+            url = reverse('equalgold_details', kwargs={'pk': dst_id})
+            html.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
+                url, sTitle, dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+            html.append("</tr>")
+
+            # Combine
+            sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("link_to_row")
+        return number, sBack
 
     html = []
     oErr = ErrHandle()
@@ -85,7 +134,7 @@ def equalchange_json_to_html(instance, type, profile=None):
                             other_priv_hcs = []
                         else:
                             # Adapt the list: remove all private HCs from which I am not the owner
-                            other_priv_hcs = [x['id'] for x in Collection.objects.filter(id__in=hclist, settype='hc', scope='priv', owner=profile).values('id')]
+                            other_priv_hcs = [x['id'] for x in Collection.objects.filter(id__in=hclist, settype='hc', scope='priv').exclude(owner=profile).values('id')]
 
                         # Process the list
                         qs = Collection.objects.filter(id__in=hclist).values('id', 'name', 'owner__user__username')
@@ -105,50 +154,32 @@ def equalchange_json_to_html(instance, type, profile=None):
                         # Process the list
                         html.append(get_goldset_html(goldlist))
                 elif field == "supers":
+                    # Needed for super processing
+                    number = 0
                     # Process list of EqualGoldLink specifications
-                    linklist = oItem.get('superlist')
-                    if linklist != None:
+                    linklist = oItem.get('superlist', [])
+                    if len(linklist) > 0:
                         # TODO: Process the list
                         lst_super = []
-                        number = 0
-                        for superlink in linklist:
-                            lst_super.append("<tr class='view-row'>")
-                            sSpectype = ""
-                            sAlternatives = ""
-                            number += 1
-
-                            # Get the values from [superlink]
-                            linktype = superlink.get("linktype")
-                            spectype = superlink.get("spectype")
-                            alternatives = superlink.get("alternatives")
-                            note = superlink.get("note")
-                            dst_id = superlink.get("dst")
-                            dst = SermonGold.objects.filter(id=dst_id).first()
-
-                            if spectype != None and len(spectype) > 1:
-                                # Show the specification type
-                                sSpectype = "<span class='badge signature gr'>{}</span>".format(
-                                    FieldChoice.get_english(SPEC_TYPE, spectype))
-                            if alternatives != None and alternatives == "true":
-                                sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
-                            lst_super.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}</td>".format(
-                                FieldChoice.get_english(LINK_TYPE, linktype), sSpectype))
-
-                            sTitle = ""
-                            sNoteShow = ""
-                            sNoteDiv = ""
-                            if note != None and len(note) > 1:
-                                sTitle = "title='{}'".format(note)
-                                sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
-                                    number)
-                                sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
-                                    number, note)
-                            url = reverse('equalgold_details', kwargs={'pk': dst_id})
-                            lst_super.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
-                                url, sTitle, dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
-                            lst_super.append("</tr>")
+                        for superlink in EqualGoldLink.objects.filter(id__in=linklist).values('dst', 'linktype', 'spectype', 'alternatives', 'note'):
+                            number, oLink = link_to_row(superlink, number)
+                            lst_super.append(oLink)
                         if len(lst_super) > 0:
-                            html.append("<table><tbody>{}</tbody></table>".format( "".join(lst_super)))
+                            html.append("<h4>Set of links:</h4><table><tbody>{}</tbody></table>".format( "".join(lst_super)))
+
+                    # Check if links have been added via 'formfields'
+                    lst_adding = oItem.get('formfields', [])
+                    if len(lst_adding) > 0:
+                        # TODO: Process the list
+                        lst_super = []
+                        for superlink in lst_adding:
+                            number, oLink = link_to_row(superlink, number)
+                            lst_super.append(oLink)
+                        if len(lst_super) > 0:
+                            html.append("<h4>Adding:</h4><table><tbody>{}</tbody></table>".format( "".join(lst_super)))
+
+        elif instance.field == "supers":
+            html.append("<i>(no changes)</i>")
         else:
             html.append("empty")
     except:
@@ -161,6 +192,26 @@ def equalchange_json_to_html(instance, type, profile=None):
 
 def equalchange_json_to_accept(instance):
     """Accept the change: implement it and set my status"""
+
+    def link_add(super, oItem):
+        """Add the superlink, connecting it to [super]"""
+
+        obj = None
+        try:
+            # Get the correct information from [oItem]
+            linktype = oItem.get("linktype")
+            alternatives = oItem.get("alternatives")
+            spectype = oItem.get("spectype")
+            note = oItem.get("note")
+            dst_id = oItem.get("dst")
+            if dst_id != None and linktype != None and spectype != None:
+                # This should create and save a link
+                obj = EqualGoldLink.objects.create(src=super, dst_id=dst_id, linktype=linktype,
+                        spectype=spectype, alternatives=alternatives, note=note)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("equalchange_json_to_accept/link_add")
+        return obj
 
     oErr = ErrHandle()
     bBack = True
@@ -221,11 +272,14 @@ def equalchange_json_to_accept(instance):
                         ssg.set_firstsig()
 
             elif field == "supers":
+                # Both changes as well as additions need the [super_added] lists
+                super_added = []
                 # Process list of EqualGoldLink specifications
                 superlist = oItem.get('superlist')
                 if superlist != None:
+                    # Emend the [superlist], which should be a qs
+                    superlist = EqualGoldLink.objects.filter(id__in=superlist)
                     # Process the list
-                    super_added = []
                     super_deleted = []
                     adapt_m2m(EqualGoldLink, super, "src", superlist, "dst", 
                               extra = ['linktype', 'alternatives', 'spectype', 'note'], related_is_through=True,
@@ -240,27 +294,37 @@ def equalchange_json_to_accept(instance):
                             reverse.delete()
                         # Then remove myself
                         obj.delete()
-                    # Make sure to add the reverse link in the bidirectionals
-                    for obj in super_added:
-                        if obj.linktype in LINK_BIDIR:
-                            # Find the reversal
-                            reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
-                            if reverse == None:
-                                # Create the reversal 
-                                reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
-                                # Other adaptations
-                                bNeedSaving = False
-                                # Set the correct 'reverse' spec type
-                                if obj.spectype != None and obj.spectype != "":
-                                    reverse.spectype = get_reverse_spec(obj.spectype)
-                                    bNeedSaving = True
-                                # Possibly copy note
-                                if obj.note != None and obj.note != "":
-                                    reverse.note = obj.note
-                                    bNeedSaving = True
-                                # Need saving? Then save
-                                if bNeedSaving:
-                                    reverse.save()
+                # Check if links have been added via 'formfields'
+                lst_adding = oItem.get('formfields')
+                if lst_adding != None:
+                    # Process the list of items to be added
+                    for oItem in lst_adding:
+                        # Create a new EqualGoldLink based on [oItem]
+                        obj = link_add(super, oItem)
+                        # Add this item in the super_added list
+                        super_added.append(obj)
+
+                # Make sure to add the reverse link in the bidirectionals
+                for obj in super_added:
+                    if obj.linktype in LINK_BIDIR:
+                        # Find the reversal
+                        reverse = EqualGoldLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                        if reverse == None:
+                            # Create the reversal 
+                            reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                            # Other adaptations
+                            bNeedSaving = False
+                            # Set the correct 'reverse' spec type
+                            if obj.spectype != None and obj.spectype != "":
+                                reverse.spectype = get_reverse_spec(obj.spectype)
+                                bNeedSaving = True
+                            # Possibly copy note
+                            if obj.note != None and obj.note != "":
+                                reverse.note = obj.note
+                                bNeedSaving = True
+                            # Need saving? Then save
+                            if bNeedSaving:
+                                reverse.save()
 
             # Need any saving?
             if bSuperNeedSaving:
@@ -412,8 +476,10 @@ def approval_parse_formset(profile, frm_prefix, new_data, super):
 def approval_pending(super):
     """Get all pending approvals"""
 
-    atype_list = ['def', 'mod']
-    qs = EqualChange.objects.filter(super=super, atype__in=atype_list)
+    qs = EqualChange.objects.none()
+    if not super is None:
+        atype_list = ['def', 'mod']
+        qs = EqualChange.objects.filter(super=super, atype__in=atype_list)
     return qs
 
 def approval_pending_list(super):

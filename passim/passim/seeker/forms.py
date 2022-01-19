@@ -2833,10 +2833,12 @@ class SuperSermonGoldForm(PassimModelForm):
             if 'instance' in kwargs:
                 instance = kwargs['instance']
                 # If there is an instance, then check the author specification
-                sAuthor = "" if not instance.author else instance.author.name
-                self.fields['authorname'].initial = sAuthor
-                self.fields['newauthor'].initial = instance.author.id
-                self.fields['newauthor'].widget.initial = instance.author.id
+                if instance.author is None:
+                    self.fields['authorname'].initial = ""
+                else:
+                    self.fields['authorname'].initial = instance.author.name
+                    self.fields['newauthor'].initial = instance.author.id
+                    self.fields['newauthor'].widget.initial = instance.author.id
                 self.fields['newincipit'].initial = instance.incipit
                 self.fields['newexplicit'].initial = instance.explicit
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(settype="pd").order_by('name')]
@@ -2847,6 +2849,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
+                self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
                 qs = instance.equalgold_dst.all()
         except:
             msg = oErr.get_error_message()
