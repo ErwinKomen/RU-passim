@@ -1621,6 +1621,9 @@ var ru = (function ($, ru) {
             var elTd = null,
                 lst_parts = [],
                 i = 0,
+                count_view = 0,
+                count_edit = 0,
+                count_reload = 0,
                 options = {},
                 template_fn = null,
                 template_sel = null;
@@ -1647,7 +1650,21 @@ var ru = (function ($, ru) {
               $(el).parent().find(".select2").remove();
               // Now make it happen
               $(el).parent().find(".django-select2").djangoSelect2(options);
+
+              // Now we do a double check:
+              if ($(el).attr("id").indexOf("prefix") < 0) {
+                count_view = $(el).find("option").length;
+                count_edit = $(el).parent().find("li.select2-selection__choice").length;
+                count_reload = $(".basic-need-reload").length;
+                // count_edit = count_view;
+                if (count_view !== count_edit || count_reload > 0) {
+                  // Need to make a hard re-load
+                  location.reload(true);
+                }
+              }
+
             }
+
           });
 
           // Resizable table columns
@@ -1681,6 +1698,26 @@ var ru = (function ($, ru) {
           private_methods.errMsg("init_events", ex);
         }
       },
+
+      ///**
+      // * check_select2counts
+      // *    Check all DjangoSelect2 counts and if needed, issue a hard re-load
+      // */
+      //check_select2counts: function () {
+      //  try {
+      //    $(".django-select2").each(function (idx, el) {
+      //      // Now we do a double check:
+      //      if ($(el).attr("id").indexOf("prefix") < 0) {
+      //        if ($(el).find("option").length !== $(el).parent().find("li.select2-selection__choice").length) {
+      //          // Need to make a hard re-load
+      //          location.reload(true);
+      //        }
+      //      }
+      //    });
+      //  } catch (ex) {
+      //    private_methods.errMsg("init_events", ex);
+      //  }
+      //},
 
       /**
        * init_typeahead

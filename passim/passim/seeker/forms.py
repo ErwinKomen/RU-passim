@@ -2713,9 +2713,10 @@ class SuperSermonGoldForm(PassimModelForm):
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 
                                                 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
-    superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
-                                                         'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
+    #superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
+    #                                                     'data-ajax--cache': 'false',
+    #                                                     'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -2737,6 +2738,7 @@ class SuperSermonGoldForm(PassimModelForm):
     collist_sg  = ModelMultipleChoiceField(queryset=None, required=False)
     collist_ssg = ModelMultipleChoiceField(queryset=None, required=False)
     collist_hist = ModelMultipleChoiceField(queryset=None, required=False)
+    superlist    = ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_s = forms.CharField(label=_("Collection s"), required=False,
@@ -2805,10 +2807,12 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'settype': 'hc',
+                        'settype': 'hc', 'data-debug': 'true', 'data-ajax--cache': "false",
                         'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['superlist'].widget = EqualGoldLinkAddOnlyWidget(attrs={
+                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
@@ -2823,6 +2827,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
+            self.fields['superlist'].queryset = EqualGoldLink.objects.none()
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
@@ -2843,13 +2848,15 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['newexplicit'].initial = instance.explicit
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(settype="pd").order_by('name')]
                 self.fields['collist_hist'].initial = [x.pk for x in instance.collections.filter(settype="hc").order_by('name')]
+                self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
+                self.fields['superlist'].queryset = EqualGoldLink.objects.filter(id__in=self.fields['superlist'].initial)
                 self.fields['goldlist'].initial = [x.pk for x in instance.equal_goldsermons.all().order_by('siglist')]
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
-                self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
-                self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
-                self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
+                #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
+                #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
+                #self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
                 qs = instance.equalgold_dst.all()
         except:
             msg = oErr.get_error_message()

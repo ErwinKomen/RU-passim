@@ -3487,7 +3487,7 @@ def get_ssg2ssg(request):
         try:
             sId = request.GET.get('id', '')
             co_json = {'id': sId}
-            oErr.Status("get_ssg2ssg id={}".format(sId))
+            # oErr.Status("get_ssg2ssg id={}".format(sId))
             lstQ = []
             lstQ.append(Q(id=sId))
             ssg = EqualGoldLink.objects.filter(Q(id=sId)).first()
@@ -6501,7 +6501,7 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
             {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
             {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,                  'field_key': 'affiliation'},
-            {'type': 'line',  'label': "Editing rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
+            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
         # Return the context we have made
         return context
@@ -6544,7 +6544,7 @@ class ProfileListView(BasicList):
         {'name': 'Email',       'order': '',    'type': 'str', 'custom': 'email', 'linkdetails': True},
         {'name': 'Status',      'order': 'o=3', 'type': 'str', 'custom': 'status', 'linkdetails': True},
         {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
-        {'name': 'Editor',      'order': '',    'type': 'str', 'custom': 'projects'},
+        {'name': 'Project Approver',    'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
 
     def get_field_value(self, instance, custom):
@@ -11655,8 +11655,8 @@ class EqualGoldEdit(BasicDetails):
                             # Note: it will get saved with formset.save()
                     elif prefix == "ssglink":
                         # SermonDescr-To-EqualGold processing
-                        if 'newsuper' in cleaned and cleaned['newsuper'] != "":
-                            newsuper = cleaned['newsuper']
+                        newsuper = cleaned.get("newsuper")
+                        if not newsuper is None:
                             # There also must be a linktype
                             if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
                                 linktype = cleaned['newlinktype']
@@ -11750,7 +11750,10 @@ class EqualGoldEdit(BasicDetails):
                 cleaned_data = form.cleaned_data
 
                 # See if and how many changes are suggested
-                iCount = approval_parse_changes(profile, cleaned_data, instance)
+                iCount, bNeedReload = approval_parse_changes(profile, cleaned_data, instance)
+                if bNeedReload:
+                    # Signal that we need to have a re-load
+                    self.bNeedReload = True
 
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:

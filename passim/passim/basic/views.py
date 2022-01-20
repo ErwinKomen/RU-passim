@@ -1474,6 +1474,7 @@ class BasicDetails(DetailView):
     listviewtitle = None
     has_select2 = False
     backbutton = True
+    bNeedReload = False     # Needed to signal a Ctrl+F5 reload for JS
     custombuttons = []
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
@@ -1940,6 +1941,11 @@ class BasicDetails(DetailView):
             # Define where to go to after deletion
             if 'afterdelurl' not in context or context['afterdelurl'] == "":
                 context['afterdelurl'] = get_previous_page(self.request)
+
+            # CHeck if reloading is needed
+            if self.bNeedReload:
+                self.bNeedReload = False
+                context['needreload'] = True
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BasicDetails, get_context_data")

@@ -13,13 +13,33 @@ from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BI
     Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword
 from passim.approve.models import EqualChange, EqualApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm
-from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o
+from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
 
 import json, copy
 
 # Take from my own app
 from passim.utils import ErrHandle
 
+#def get_application_name():
+#    """Try to get the name of this application"""
+
+#    # Walk through all the installed apps
+#    for app in apps.get_app_configs():
+#        # Check if this is a site-package
+#        if "site-package" not in app.path:
+#            # Get the name of this app
+#            name = app.name
+#            # Take the first part before the dot
+#            project_name = name.split(".")[0]
+#            return project_name
+#    return "unknown"
+## Provide application-specific information
+#PROJECT_NAME = get_application_name()
+#app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+#app_editor = "{}_editor".format(PROJECT_NAME.lower())
+#app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+#app_developer = "{}_developer".format(PROJECT_NAME.lower())
+#app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 
 def get_goldset_html(goldlist):
     context = {}
@@ -333,7 +353,7 @@ def equalchange_json_to_accept(instance):
 
         # Make sure that our state changes to accepted
         instance.atype = "acc"
-        instance.comment = "This change has been succesfully processed on: {}".format(get_crpp_date(get_current_datetime(), True))
+        instance.comment = "This change has been successfully processed on: {}".format(get_crpp_date(get_current_datetime(), True))
         instance.save()
     except:
         msg = oErr.get_error_message()
@@ -346,6 +366,7 @@ def approval_parse_changes(profile, cleaned_data, super):
 
     oErr = ErrHandle()
     iCount = 0
+    bNeedReload = False
     try:
         # Get the current data: this is the old stuff
         current = EqualGold.objects.filter(id=super.id).first()
@@ -418,12 +439,18 @@ def approval_parse_changes(profile, cleaned_data, super):
                     obj = EqualChange.add_item(super, profile, to_field, oChange, oCurrent)
                     # Signal the amount of changes that are to be approved
                     iCount += 1
+                    # Signal that the user needs to do a clean-reloading of the page
+                    if listfield == "superlist":
+                        # Signal reloading
+                        bNeedReload = True
+                        ## Repair the cleaned_data - doesn't work like that, unfortunately...
+                        #cleaned_data['superlist'] = EqualGoldLink.objects.filter(id__in=lst_id_current)
 
     except:
         msg = oErr.get_error_message()
         oErr.DoError("approval_parse_changes")
         iCount = 0
-    return iCount
+    return iCount, bNeedReload
 
 def approval_parse_formset(profile, frm_prefix, new_data, super):
     """Check if the addition of this form in a formset needs approval, and if so add an EqualChange object"""
@@ -681,6 +708,85 @@ class EqualChangeDetails(EqualChangeEdit):
 
     rtype = "html"
 
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualChangeDetails, self).add_to_context(context, instance)
+
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Lists of related objects
+            context['related_objects'] = []
+
+            # Need to know who this user (profile) is
+            username = self.request.user.username
+            team_group = app_editor
+
+            # List of approvers related to the this Change 
+            approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
+
+            rel_list =[]
+            qs = instance.changeapprovals.all().order_by('atype', '-saved')
+            for item in qs:
+                change = item.change
+                url = reverse('equalapprovaluser_details', kwargs={'pk': item.id})
+                url_chg = reverse('equalchangeuser_details', kwargs={'pk': change.id})
+                rel_item = []
+
+                # S: Order number for this approval
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
+
+                # Who is this?
+                approver = item.profile.user.username
+                add_rel_item(rel_item, approver, False, main=False, link=url)
+
+                # Which project(s) does this person have?
+                projects_md = item.profile.get_projects_markdown()
+                add_rel_item(rel_item, projects_md, False, main=False, link=url)
+
+                # Approval status
+                astatus = item.get_atype_display()
+                add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
+
+                # Comments on this approval
+                comment_txt = item.get_comment_html()
+                add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
+
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
+
+            approvers['rel_list'] = rel_list
+
+            approvers['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Note</span>{}'.format(sort_start, sort_end), 
+                ]
+            related_objects.append(approvers)
+            
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
 
 class EqualChangeUserEdit(EqualChangeEdit):
     """User-specific equal change editing"""
@@ -689,10 +795,11 @@ class EqualChangeUserEdit(EqualChangeEdit):
     title = "Field change"
 
 
-class EqualChangeUserDetails(EqualChangeUserEdit):
+class EqualChangeUserDetails(EqualChangeDetails):
     """HTML output for an EqualChangeUser object"""
 
-    rtype = "html"
+    prefix = "user"
+    title = "Field change"
 
 
 class EqualApprovalList(BasicList):
@@ -821,6 +928,20 @@ class EqualApprovalEdit(BasicDetails):
     no_delete = True            # Don't allow users to remove a field change that they have entered
     mainitems = []
 
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            # An item is readonly, if I am not the one who is supposed to comment on it
+            if profile.id != instance.profile.id:
+                self.permission = "readonly"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualApprovalEdit/custom_init")
+
+        return None
+
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
@@ -838,6 +959,9 @@ class EqualApprovalEdit(BasicDetails):
 
             # Check if the approval has been 'locked'
             locked = (instance.change.atype == "acc")
+            # An item is also 'locked', if I am not the one who is supposed to comment on it
+            if profile.id != instance.profile.id:
+                locked = True
 
             # Add the normal information
             mainitems_main = [
@@ -884,12 +1008,12 @@ class EqualApprovalEdit(BasicDetails):
         
         try:
             # Is this something tangible?
-            if not instance is None and instance.id != None:
+            if not instance is None and instance.id != None and not self.permission == "readonly":
                 # Get to the change itself from EqualChange
                 change = instance.change
 
                 # Is this EqualChange object already finished?
-                if not change is None and change.atype == "def":
+                if not change is None and change.atype != "acc":
                     # Check how many approvals there should be and how many are left
                     iLeft, iNeeded = change.get_approval_count()
                     if iNeeded > 0 and iLeft == 0:
@@ -924,6 +1048,85 @@ class EqualApprovalDetails(EqualApprovalEdit):
 
     rtype = "html"
 
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualApprovalDetails, self).add_to_context(context, instance)
+
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Lists of related objects
+            context['related_objects'] = []
+
+            # Need to know who this user (profile) is
+            username = self.request.user.username
+            team_group = app_editor
+
+            # List of approvers related to the this Change 
+            approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
+
+            rel_list =[]
+            qs = instance.change.changeapprovals.all().order_by('atype', '-saved')
+            for item in qs:
+                change = item.change
+                url = reverse('equalapprovaluser_details', kwargs={'pk': item.id})
+                url_chg = reverse('equalchangeuser_details', kwargs={'pk': change.id})
+                rel_item = []
+
+                # S: Order number for this approval
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
+
+                # Who is this?
+                approver = item.profile.user.username
+                add_rel_item(rel_item, approver, False, main=False, link=url)
+
+                # Which project(s) does this person have?
+                projects_md = item.profile.get_projects_markdown()
+                add_rel_item(rel_item, projects_md, False, main=False, link=url)
+
+                # Approval status
+                astatus = item.get_atype_display()
+                add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
+
+                # Comments on this approval
+                comment_txt = item.get_comment_html()
+                add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
+
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
+
+            approvers['rel_list'] = rel_list
+
+            approvers['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Note</span>{}'.format(sort_start, sort_end), 
+                ]
+            related_objects.append(approvers)
+            
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualApprovalDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
 
 class EqualApprovalUserEdit(EqualApprovalEdit):
     """User-specific equal change editing"""
@@ -932,9 +1135,10 @@ class EqualApprovalUserEdit(EqualApprovalEdit):
     title = "Change approval"
 
 
-class EqualApprovalUserDetails(EqualApprovalUserEdit):
+class EqualApprovalUserDetails(EqualApprovalDetails):
     """HTML output for an EqualApprovalUser object"""
 
-    rtype = "html"
+    prefix = "user"
+    title = "Change approval"
 
 

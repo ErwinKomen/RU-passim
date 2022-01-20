@@ -98,7 +98,9 @@ class EqualChange(models.Model):
                         bFound = True
                         obj.current = current
                         obj.change = change
+                        obj.atype = "def"
                         obj.save()
+
                         break
                 # What if nothing has been found?
                 if not bFound:
@@ -296,7 +298,7 @@ class EqualApproval(models.Model):
     def __str__(self):
         """Show this approval"""
         sBack = "{}: [{}] on ssg {}={}".format(
-            self.profile.user.name, self.change.field, self.change.super.id, self.atype)
+            self.profile.user.username, self.change.field, self.change.super.id, self.atype)
         return sBack
 
     def get_comment_html(self):
