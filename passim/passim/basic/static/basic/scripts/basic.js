@@ -42,6 +42,14 @@ var ru = (function ($, ru) {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
           END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46
         },
+        loc_dtype = {
+          'xlsx':   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'excel':  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'csv':    'text/tab-separated-values',
+          'json':   'application/json',
+          'hist-svg': 'application/svg',
+          'hist-png': 'image/png',
+        },
         dummy = 1;
 
     // Private methods specification
@@ -2334,7 +2342,9 @@ var ru = (function ($, ru) {
             sMsg = "",
             svgText = "",
             waitclass = null,
+            dstatus = "#downloadstatus",
             method = "normal",
+            attempt = "xhr",
             data = [];
 
         try {
@@ -2380,14 +2390,14 @@ var ru = (function ($, ru) {
               });
               break;
             default:
-              // Set the 'action; attribute in the form
-              action = frm.attr("action");
-              frm.attr("action", ajaxurl);
               // Make sure we do a POST
               frm.attr("method", "POST");
 
               // Do we have a contentid?
               if (contentid !== undefined && contentid !== null && contentid !== "") {
+                // Set the 'action; attribute in the form
+                action = frm.attr("action");
+                frm.attr("action", ajaxurl);
                 // Generic
                 elData = $(frm).find("#downloaddata");
                 // Process download data
@@ -2498,8 +2508,78 @@ var ru = (function ($, ru) {
                     return;
                 }
               } else {
-                // Do a plain submit of the form
-                oBack = frm.submit();
+
+                if (attempt === "xhr") {
+                  var xhr = null,
+                      formData = null;
+
+                  xhr = new XMLHttpRequest();
+                  // Possibly show what we're doing
+                  if ($(dstatus).length > 0) {
+                    $(dstatus).removeClass("hidden");
+                  }
+                  // Set the request type to POSt and the destination URL
+                  xhr.open("POST", ajaxurl);
+                  // Set the response type to BLOB, since that's what we are expecting back
+                  xhr.responseType = "blob";
+                  formData = new FormData(frm[0]);
+                  xhr.send(formData);
+
+                  // Make sure we know how to handle this
+                  xhr.onload = function (e) {
+                    var contenttype = "text",
+                        blob = null,
+                        a = null,
+                        url = null,
+                        filename = "unknown_file.txt",
+                        disposition = null;
+
+  
+                    // Determine the filename from what is being sent to us
+                    disposition = xhr.getResponseHeader('Content-Disposition');
+                    if (disposition && disposition.indexOf('attachment') !== -1) {
+                      var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                      var matches = filenameRegex.exec(disposition);
+                      if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+                    }
+
+                    // Ge tthe contenttype correctly
+                    if (dtype in loc_dtype) {
+                      contenttype = loc_dtype[dtype];
+                    }
+                    // Check status
+                    if (this.status == 200) {
+                      // Create a new Blob object using the 
+                      //response data of the onload object
+                      blob = new Blob([this.response], { type: contenttype });
+                      //Create a link element, hide it, direct 
+                      //it towards the blob, and then 'click' it programatically
+                      a = document.createElement("a");
+                      a.style = "display: none";
+                      document.body.appendChild(a);
+                      //Create a DOMString representing the blob 
+                      //and point the link element towards it
+                      url = window.URL.createObjectURL(blob);
+                      a.href = url;
+                      a.download = filename;
+                      //programatically click the link to trigger the download
+                      a.click();
+                      //release the reference to the file by revoking the Object URL
+                      window.URL.revokeObjectURL(url);
+
+                      // Possibly show what we're doing
+                      if ($(dstatus).length > 0) {
+                        $(dstatus).addClass("hidden");
+                      }
+
+                    } else {
+                      //deal with your error state here
+                    }
+                  }
+                } else {
+                  // Do a plain submit of the form
+                  oBack = frm.submit();
+                }
               }
               break;
           }

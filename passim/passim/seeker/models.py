@@ -3354,12 +3354,15 @@ class Manuscript(models.Model):
         {'name': 'City id',             'type': 'fk_id', 'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        # TODO: change FK project into m2m
         {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
+
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
         {'name': 'External links',      'type': 'func',  'path': 'external_links'},
+        # TODO process issue #509 here
         ]
 
     def __str__(self):

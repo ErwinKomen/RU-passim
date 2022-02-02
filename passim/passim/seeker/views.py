@@ -12131,7 +12131,9 @@ class EqualGoldDetails(EqualGoldEdit):
                 # NOTE (EK): moved to EqualGoldEdit, so that re-loading is not needed
                 #context['approval_pending'] = approval_pending(instance)
                 #context['approval_pending_list'] = approval_pending_list(instance)
-                #lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
+
+                # Note (EK): this must be here, see issue #508
+                lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
 
                 context['after_details'] = "\n".join(lHtml)
 
@@ -12826,13 +12828,23 @@ class LibraryListDownload(BasicPart):
 
         if dtype == "json":
             # Loop
-            for lib in self.get_queryset(prefix):
-                country = ""
-                city = ""
-                if lib.country: country = lib.country.name
-                if lib.city: city = lib.city.name
-                row = {"id": lib.id, "country": lib.get_country_name(), "city": lib.get_city_name(), "library": lib.name, "libtype": lib.libtype}
-                lData.append(row)
+            with transaction.atomic():
+                for lib in self.get_queryset(prefix):
+                    country = ""
+                    city = ""
+                    if lib.country: country = lib.country.name
+                    if lib.city: city = lib.city.name
+                    row = {"id": lib.id, "country": lib.get_country_name(), "city": lib.get_city_name(), "library": lib.name, "libtype": lib.libtype}
+                    lData.append(row)
+
+            ## Loop
+            #for oLib in self.get_queryset(prefix).values('id', 'lcountry__name', 'lcity__name', 'name', 'libtype'):
+            #    country = ""
+            #    city = ""
+            #    if lib.country: country = lib.country.name
+            #    if lib.city: city = lib.city.name
+            #    row = {"id": lib.id, "country": lib.get_country_name(), "city": lib.get_city_name(), "library": lib.name, "libtype": lib.libtype}
+            #    lData.append(row)
             # convert to string
             sData = json.dumps(lData)
         else:
@@ -12846,9 +12858,10 @@ class LibraryListDownload(BasicPart):
             qs = self.get_queryset(prefix)
             if qs.count() > 0:
                 # Loop
-                for lib in qs:
-                    row = [lib.id, lib.get_country_name(), lib.get_city_name(), lib.name, lib.libtype]
-                    csvwriter.writerow(row)
+                with transaction.atomic():
+                    for lib in qs:
+                        row = [lib.id, lib.get_country_name(), lib.get_city_name(), lib.name, lib.libtype]
+                        csvwriter.writerow(row)
 
             # Convert to string
             sData = output.getvalue()
