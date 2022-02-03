@@ -30,7 +30,7 @@ adaptation_list = {
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal'],
+                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 'atype_def_equal'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless'] 
     }
@@ -806,6 +806,32 @@ def adapt_passim_project_name_equal():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+# NEW ISSUE #492 change def in atype EqualGold model
+
+def adapt_atype_def_equal():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    code = "acc"
+    try:
+        with transaction.atomic():
+            # Iterate over all SSGs/AFs in the database:  
+            for equal in EqualGold.objects.all():
+                bNeedSaving = False
+                # if atype is def
+                if equal.atype == "def":            
+                    equal.atype = code             
+                    bNeedSaving = True
+                if bNeedSaving:
+                    equal.save()
+                    #print(equal.atype)    
+                        
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 # =========== Part of provenance_list ==================
 def adapt_manuprov_m2m():

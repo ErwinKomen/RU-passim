@@ -162,7 +162,7 @@ class CodeWidget(ModelSelect2MultipleWidget):
         return obj.get_code()
 
     def get_queryset(self):
-        return EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
+        return EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by('code').distinct()
 
 
 class CodicoOneWidget(ModelSelect2Widget):
@@ -363,7 +363,7 @@ class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
         if self.addonly:
             qs = EqualGold.objects.none()
         else:
-            qs = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code').distinct()
+            qs = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code').distinct()
         return qs
 
 
@@ -403,9 +403,9 @@ class EqualGoldWidget(ModelSelect2Widget):
         else:
             # qs = EqualGold.objects.all().order_by('code', 'firstsig').distinct()
             if self.exclude == None:
-                qs = EqualGold.objects.filter(moved__isnull=True).order_by(*self.order).distinct()
+                qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by(*self.order).distinct()
             else:
-                qs = EqualGold.objects.filter(moved__isnull=True).exclude(id=self.exclude).order_by(*self.order).distinct()
+                qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(id=self.exclude).order_by(*self.order).distinct()
         return qs
 
 
@@ -1132,7 +1132,7 @@ class SuperOneWidget(ModelSelect2Widget):
         return sLabel
 
     def get_queryset(self):
-        return EqualGold.objects.filter(moved__isnull=True).order_by('code', 'id').distinct()
+        return EqualGold.objects.filter(moved__isnull=True, atype = 'acc').order_by('code', 'id').distinct()
 
     def filter_queryset(self, term, queryset = None, **dependent_fields):
         qs = super(SuperOneWidget, self).filter_queryset(term, queryset, **dependent_fields)
@@ -1432,7 +1432,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
             self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
@@ -1649,6 +1649,9 @@ class SermonForm(PassimModelForm):
             self.fields['stype'].required = False
             self.fields['mtype'].required = False
             self.fields['authortype'].required = False
+            
+            # NEW 493
+            #self.fields['atype'].required = False
 
             # Choice field initialization
             self.fields['authortype'].choices = AUTHOR_TYPE
@@ -1676,7 +1679,7 @@ class SermonForm(PassimModelForm):
             # The available Sermondescr-Equal list
             # self.fields['goldlist'].queryset = SermonDescrGold.objects.none()
             self.fields['superlist'].queryset = SermonDescrEqual.objects.none()
-            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
             self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
@@ -1709,7 +1712,7 @@ class SermonForm(PassimModelForm):
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
-            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='pd')
+            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='pd') 
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='hc')
 
             # The CollOne information is needed for the basket (add basket to collection)
@@ -2066,6 +2069,8 @@ class CollectionForm(PassimModelForm):
     ssgexplicit = forms.CharField(label=_("Explicit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
     ssgstype    = forms.ChoiceField(label=_("Stype"), required=False, widget=forms.Select(attrs={'style': 'width: 100%;'}))
+    
+    
     # SERMON-specific
     sermoincipit  = forms.CharField(label=_("Incipit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
@@ -2175,9 +2180,9 @@ class CollectionForm(PassimModelForm):
 
         # SSG section
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-        self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name')
+        self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
         self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
+        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
         self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
         # S section
@@ -2414,7 +2419,7 @@ class SermonDescrSuperForm(forms.ModelForm):
         else:
             self.fields['newsuper'].required = False
             # Initialize queryset
-            self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code', 'author__name', 'id')
+            self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by('code', 'author__name', 'id')
 
 
         # Get the instance
@@ -2475,8 +2480,10 @@ class SermonGoldForm(PassimModelForm):
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
-    codelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CodeWidget(attrs={'data-placeholder': 'Select multiple Passim Codes...', 'style': 'width: 100%;', 'class': 'searching'}))
+    # passimlist ipc codelist
+    passimlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                                                       'class': 'searching'}))    
     codetype  = forms.ChoiceField(label=_("Passim code type"), required=False, 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Passim code...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     codename  = forms.CharField(label=_("Passim code"), required=False, 
@@ -2549,7 +2556,7 @@ class SermonGoldForm(PassimModelForm):
             # Determine the querysets
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-            self.fields['codelist'].queryset = EqualGold.objects.filter(moved__isnull=True).order_by('code').distinct()
+            self.fields['passimlist'].queryset = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -2585,7 +2592,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
-            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group) # 
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='hc')
 
             # The CollOne information is needed for the basket (add basket to collection)

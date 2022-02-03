@@ -133,6 +133,15 @@ urlpatterns = [
     url(r'^ssg/trans/download(?:/(?P<pk>\d+))?/$', EqualGoldTransDownload.as_view(), name='equalgold_trans_download'),
     url(r'^ssg/overlap/download(?:/(?P<pk>\d+))?/$', EqualGoldOverlapDownload.as_view(), name='equalgold_overlap_download'),
 
+    # New urls to direct the editors from MyPassim to My_AF_add / New_AF_review (issue 494)
+    # See how things are done with Collection? Using prefix?
+
+    # url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
+    # url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
+
+    url(r'^ssg/afadds/list', EqualGoldListView.as_view(prefix="afadds"), name='equalgold_myafadds_list'), #using Collection
+    url(r'^ssg/myrevw/list', EqualGoldListView.as_view(prefix="myrevw"), name='equalgold_newafreview_list'),
+
     url(r'^ssg/field/change/list', EqualChangeList.as_view(), name='equalchangeall_list'),
     url(r'^ssg/field/change/details(?:/(?P<pk>\d+))?/$', EqualChangeDetails.as_view(), name='equalchangeall_details'),
     url(r'^ssg/field/change/edit(?:/(?P<pk>\d+))?/$', EqualChangeEdit.as_view(), name='equalchangeall_edit'),

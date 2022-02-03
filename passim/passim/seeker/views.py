@@ -5045,7 +5045,9 @@ class SermonListView(BasicList):
         {'section': 'other', 'filterlist': [
             {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'},
             {'filter': 'sigauto',   'fkfield': 'equalgolds__equal_goldsermons__goldsignatures', 'keyList':  'siglist_a', 'infield': 'id'},
-            {'filter': 'sigmanu',   'fkfield': 'sermonsignatures',                              'keyList':  'siglist_m', 'infield': 'id'}
+            {'filter': 'sigmanu',   'fkfield': 'sermonsignatures',                              'keyList':  'siglist_m', 'infield': 'id'},
+            {'filter': 'atype',     'dbfield': 'sermondescr_super__super__atype',    'keyS': 'atype'}
+            #{'filter': 'appr_type', 'fkfield': 'equalgolds__', 'keyList':' ', 'infield': }
             ]}
          ]
 
@@ -5136,6 +5138,8 @@ class SermonListView(BasicList):
             # Provide that status badge
             # html.append("<span class='badge' title='{}'>{}</span>".format(instance.get_stype_light(), instance.stype[:1]))
             html.append(instance.get_stype_light())
+
+
             
         # Combine the HTML code
         sBack = "\n".join(html)
@@ -5256,6 +5260,12 @@ class SermonListView(BasicList):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListView/adapt_search")
+        
+        # Make sure we only use the Authority Files with accepted modifications
+        # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
+        # With this condition we make sure ALL sermons are in de unfiltered listview
+        if fields['passimcode'] != '':
+            fields['atype'] = 'acc'
 
         return fields, lstExclude, qAlternative
 
@@ -8539,6 +8549,7 @@ class CollectionListView(BasicList):
                     {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
                     {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    {'filter': 'atype',    'dbfield': 'super_col__super__atype',    'keyS': 'atype'}, 
                     {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
                 ]
                 # ======== One-time adaptations ==============
@@ -8603,7 +8614,12 @@ class CollectionListView(BasicList):
                 collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
 
                 fields['bibrefbk'] = Q(id__in=collectionlist)
-
+            
+            # Make sure we only use the Authority Files with accepted modifications
+            # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
+            # With this condition we make sure ALL historical collections are in de unfiltered listview
+            if fields['ssgcode'] != '':
+                fields['atype'] = 'acc'
         elif self.prefix == "priv":
             # Show private datasets as well as those with scope "team", provided the person is in the team
             fields['settype'] = "pd"
@@ -9934,7 +9950,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super',    'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
-            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'}
             ]},
         {'section': 'collection', 'filterlist': [
             # === Overlap with a specific manuscript ===
@@ -9971,7 +9987,8 @@ class ManuscriptListView(BasicList):
         {'section': 'other', 'filterlist': [
             #{'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
             {'filter': 'source',    'fkfield': 'source',   'keyS': 'source',  'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id' },
-            {'filter': 'mtype',     'dbfield': 'mtype',    'keyS': 'mtype'}
+            {'filter': 'atype',     'dbfield': 'manuitems__itemsermons__sermondescr_super__super__atype',    'keyS': 'atype'},
+            {'filter': 'mtype', 'dbfield': 'mtype', 'keyS': 'mtype'}
             ]}
          ]
     uploads = reader_uploads
@@ -10124,7 +10141,7 @@ class ManuscriptListView(BasicList):
         return sBack, sTitle
 
     def adapt_search(self, fields):
-
+        
         def get_overlap_ptc(base_ssgs, comp_ssgs):
             """Calculate the overlap percentage between base and comp"""
 
@@ -10259,10 +10276,18 @@ class ManuscriptListView(BasicList):
             fields['bibrefbk'] = Q(id__in=manulist)
 
         # Make sure we only show manifestations
-        #fields['mtype'] = 'man'
+        # fields['mtype'] = 'man'
         # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
-        lstExclude = [ Q(mtype='tem') ] 
 
+        # Make sure we only use the Authority Files with accepted modifications
+        # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def')        
+        # With this condition we make sure ALL manuscripts are in de unfiltered listview
+        print (fields['passimcode'])
+        if fields['passimcode'] != '':
+            fields['atype'] = 'acc'
+       
+        lstExclude = [ Q(mtype='tem') ]
+        
         return fields, lstExclude, qAlternative
 
     def view_queryset(self, qs):
@@ -10948,6 +10973,7 @@ class SermonGoldListView(BasicList):
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
     has_select2 = True
     use_team_group = True
+    bUseFilter = True 
     paginate_by = 20
     order_default = ['author__name', 'siglist', 'equal__code', 'srchincipit;srchexplicit', '', '', 'stype']
     order_cols = order_default
@@ -10983,7 +11009,7 @@ class SermonGoldListView(BasicList):
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature',    'help': 'signature',
              'keyFk': 'code',       'keyList': 'siglist',   'keyId': 'signatureid', 'infield': 'code' },
             {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',     'help': 'passimcode',      
-             'keyFk': 'code',       'keyList': 'codelist',  'infield': 'code'},
+             'keyFk': 'code',       'keyList': 'passimlist',  'infield': 'code'}, # passimlist
             {'filter': 'keyword',   'fkfield': 'keywords',    'keyFk': 'name',  'keyList': 'kwlist',   'infield': 'name' },
             {'filter': 'project',   'fkfield': 'equal__projects',    'keyFk': 'name',  'keyList': 'projlist', 'infield': 'name'}, # view keyword
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' } 
@@ -10994,8 +11020,13 @@ class SermonGoldListView(BasicList):
             {'filter': 'collgold',  'fkfield': 'collections',                   'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
             {'filter': 'collsuper', 'fkfield': 'equal__collections',            'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
             {'filter': 'collhist',  'fkfield': 'equal__collections',                            
-             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
-            ]}
+             'keyS': 'collection',  'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
+            {'filter': 'atype',     'fkfield': 'equal', 'keyS': 'atype', 'keyFk': 'atype', 'keyList': 'atypelist',  'infield': 'atype'},
+            ]},
+        ##{'section': 'other', 'filterlist': [
+        ###    {'filter': 'source',    'fkfield': 'source',   'keyS': 'source',  'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id' },
+        ##     {'filter': 'atype',     'fkfield': 'equal',    'keyS': 'equal', 'keyFk': 'id', 'keyList': 'equallist', 'infield': 'id' } #?
+        ##]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
@@ -11101,6 +11132,14 @@ class SermonGoldListView(BasicList):
                 lstExclude.append(Q(equal__isnull=True))
             # Reset the codetype
             fields['codetype'] = ""
+                
+        # Make sure we only show the SSG/AF's that have accepted modifications
+        # (fields['atype'] = 'acc'), so exclude the others:
+
+        # Iterate over list for each GS? No 1-1 relationship
+       # lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) ] 
+
+
 
         # Return the adapted stuff
         return fields, lstExclude, qAlternative
@@ -12072,9 +12111,10 @@ class EqualGoldListView(BasicList):
     use_team_group = True
     template_help = "seeker/filter_help.html"
     prefix = "ssg"
+    bUseFilter = True  
     plural_name = "Authority files"
     sg_name = "Authority file"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype' ]
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype']
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -12097,7 +12137,7 @@ class EqualGoldListView(BasicList):
          'title': "Number of other Authority files this Authority file links to"},
         {'name': 'HCs',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
-        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}
+        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}        
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -12110,7 +12150,7 @@ class EqualGoldListView(BasicList):
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
         {"name": "Sermon count",    "id": "filter_scount",            "enabled": False},
         {"name": "Relation count",  "id": "filter_ssgcount",          "enabled": False},
-        {"name": "Project",         "id": "filter_project",           "enabled": False},
+        {"name": "Project",         "id": "filter_project",           "enabled": False},        
         {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -12137,8 +12177,8 @@ class EqualGoldListView(BasicList):
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures',    'help': 'signature',
-             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-             {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
+             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code'},
+            {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'}            
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
@@ -12153,12 +12193,18 @@ class EqualGoldListView(BasicList):
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
             {'filter': 'collhist', 'fkfield': 'collections',                                        
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' }
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'atype', 'dbfield': 'atype', 'keyS': 'atype'} 
             ]}
         ]
     custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def initializations(self):
+        #if self.prefix == "sermo":
+
+        #elif
 
         # ======== One-time adaptations ==============
         listview_adaptations("equalgold_list")
@@ -12225,7 +12271,7 @@ class EqualGoldListView(BasicList):
         sBack = ""
         sTitle = ""
         html = []
-        if custom == "author":
+        if custom == "author": 
             # Get a good name for the author
             if instance.author:
                 html.append(instance.author.name)
@@ -12265,13 +12311,22 @@ class EqualGoldListView(BasicList):
         elif custom == "status":
             # Provide the status traffic light
             html.append(instance.get_stype_light())
-        # Combine the HTML code
-        sBack = "\n".join(html)
+        #elif custom == "approval_status": # For testing
+        #    appr_status = instance.atype
+        #    if appr_status == "acc":
+        #        html.append("<i>accepted</i>")
+        #    elif appr_status == "def": 
+        #        html.append("<i>default</i>")
+        #    elif appr_status == "rej": 
+        #        html.append("<i>rejected</i>")
+        #    elif appr_status == "mod": 
+        #        html.append("<i>modify</i>")
+        sBack = "\n".join(html) 
         return sBack, sTitle
 
     def adapt_search(self, fields):
         # Adapt the search to the keywords that *may* be shown
-        lstExclude=None
+        lstExclude= None
         qAlternative = None
 
         # Check if a list of keywords is given
@@ -12298,8 +12353,12 @@ class EqualGoldListView(BasicList):
         if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
             # Action depends on the operator
             fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
-
-        return fields, lstExclude, qAlternative
+        
+        # Make sure we only show the SSG/AF's that have accepted modifications
+        # (fields['atype'] = 'acc'), so exclude the others:
+        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) ]      
+       
+        return fields, lstExclude, qAlternative        
 
     def view_queryset(self, qs):
         search_id = [x['id'] for x in qs.values('id')]
@@ -12311,7 +12370,8 @@ class EqualGoldListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
-
+    
+    
 
 class EqualGoldScountDownload(BasicPart):
     MainModel = EqualGold

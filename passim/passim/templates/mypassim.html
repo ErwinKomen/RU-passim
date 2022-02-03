@@ -84,13 +84,15 @@
                 </a>
               </td>
             </tr>
-
+           </table>
+           <table>
+            <h4>Field changes Authority File</h4>
             <!-- Empty table row -->
             <tr><td colspan="3">&nbsp;</td></tr>
-
+            
             <!-- Submitted changes -->
-            <tr>
-              <td valign="top" class="hangingindent">My Authority File change suggestions:</td>
+            <tr>            
+              <td valign="top" class="hangingindent">My Authority File field change suggestions:</td>
               <td valign="top">
                 <a href="{% url 'equalchangeuser_list' %}" role="button" title="View all my Authority File suggestions" class="btn btn-xs jumbo-1">
                   {{count_fchange_all}}
@@ -126,8 +128,51 @@
                 </a>
               </td>
             </tr>
-          </table>
+           </table>
+           <table>
+            <h4>New additions Authority File</h4>
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+            
+            <!-- Submitted new AF additions --> 
+            <tr>            
+              <td valign="top" class="hangingindent">My Authority File additions:</td>
+              <td valign="top">
+                <a href="{% url 'equalgold_myafadds_list' %}" role="button" title="View all my Authority File additions" class="btn btn-xs jumbo-1">
+                  {{count_fchange_all}}
+                  <span class="glyphicon glyphicon-check" title="View all my Authority File additions"></span>
+                </a>
+              </td>
+              <td valign="top">
+                <a href="{% url 'equalgold_newafreview_list' %}?user-atype=def" role="button" title="View my pending Authority File additions" 
+                   class="btn btn-xs {% if count_fchange_open == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
+                  {{count_fchange_open}}
+                  <span class="glyphicon glyphicon-edit" title="View my pending Authority File additions"></span>
+                </a>
+              </td>
+            </tr>
 
+            <!-- Empty table row -->
+            <tr><td colspan="3">&nbsp;</td></tr>
+
+            <!-- New AF additions for me to review -->
+            <tr>
+              <td valign="top" class="hangingindent">New AF additions that I need to review:</td>
+              <td valign="top">
+                <a href="{% url 'equalapprovaluser_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
+                  {{count_approve_all}}
+                  <span class="glyphicon glyphicon-check" title="View all my reviews of AF additions"></span>
+                </a>
+              </td>
+              <td valign="top">
+                <a href="{% url 'equalapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF additions" 
+                   class="btn btn-xs {% if count_approve_task == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
+                  {{count_approve_task}}
+                  <span class="glyphicon glyphicon-edit" title="View my pending reviews of AF additions"></span>
+                </a>
+              </td>
+            </tr>
+           </table>
         </section>
       {% endif %}
 
