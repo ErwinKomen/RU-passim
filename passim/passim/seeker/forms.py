@@ -2592,7 +2592,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
             self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
-            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group) # 
+            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype='hc')
 
             # The CollOne information is needed for the basket (add basket to collection)

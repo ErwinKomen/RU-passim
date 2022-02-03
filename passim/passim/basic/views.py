@@ -1347,7 +1347,7 @@ class BasicList(ListView):
                     if lstExclude:
                         qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
                     else:
-                        qs = self.model.objects.filter(filter).distinct() # TH hierna gaat het mis
+                        qs = self.model.objects.filter(filter).distinct()
 
                 # Only set the [bFilter] value if there is an overt specified filter
                 for filter in self.filters:
