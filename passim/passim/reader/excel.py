@@ -270,6 +270,12 @@ class ManuscriptUploadJson(ReaderImport):
                             sData = data_file.read()
                             lst_manu = json.loads( sData.decode(encoding="utf8"))
 
+                            # Check if this is a dictionary or a list
+                            if isinstance(lst_manu, dict):
+                                # It is a dictionary: turn it into a list
+                                oManuList = lst_manu
+                                lst_manu = [v for k,v in oManuList.items()]
+
                             # Walk through the manuscripts
                             for oManu in lst_manu:
                                 # Each manuscript has some stuff of its own

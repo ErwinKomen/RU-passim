@@ -104,6 +104,7 @@ if USE_REDIS:
             }
     # Set the cache backend to select2
     SELECT2_CACHE_BACKEND = 'select2'
+# TESTING PURPOSES: SELECT2_JS = "basic/scripts/select2.js"
 
 # Application definition
 

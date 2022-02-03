@@ -332,3 +332,5 @@ ModelManifest.xml
 /passimproject/img/Ger.jpg
 /passim/passim/approve/migrations
 /passim_backup
+/passim/passim/basic/static/basic/scripts/select2.js
+/passim/passim/basic/static/basic/scripts/select2.full.js

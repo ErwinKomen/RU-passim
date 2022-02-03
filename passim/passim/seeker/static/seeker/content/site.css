@@ -1211,11 +1211,17 @@ table.compact-table td:hover {
     font-size: 90%;
     padding: 0px 4px;
 }
+.collection.private {
+    color: white;
+}
 
 .collection:hover {
     color: whitesmoke;
     background-color: darkgreen;
     cursor: pointer;
+}
+.collection.private:hover {
+    background-color: gray;
 }
 
 .project {
@@ -1884,5 +1890,9 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
 .hangingindent {
     padding-left: 1.5em;
     text-indent:-1.5em;
+}
+
+.status-details {
+    color: darkblue;
 }
 

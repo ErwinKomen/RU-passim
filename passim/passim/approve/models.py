@@ -41,6 +41,8 @@ class EqualChange(models.Model):
 
     # [1] The approval status of this proposed change
     atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+    # [0-1] A system-created comment on the approval and processing
+    comment = models.TextField("Comment", null=True, blank=True)
 
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
@@ -48,14 +50,13 @@ class EqualChange(models.Model):
 
     # Fields for which changes need to be monitored
     approve_fields = [
-        {'field': 'author',             'tofld': 'author',   'type': 'fk', 'display': 'Author'},
-        {'field': 'incipit',            'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
-        {'field': 'explicit',           'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+        {'field': 'newauthor',          'tofld': 'author',   'type': 'fk', 'display': 'Author'},
+        {'field': 'newincipit',         'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
+        {'field': 'newexplicit',        'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
         {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
-        #{'field': 'projects',           'tofld': 'projects', 'type': 'm2m-inline',  'listfield': 'projlist'},
         {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
-         # 'lstQ': [Q(settype="hc") & (Q(scope='publ') | Q(scope='team'))], 'display': 'Historical collections' },
-         'lstQ': [Q(settype="hc")], 'display': 'Historical collections' },
+         'lstQ': [Q(settype="hc")],  
+         'display': 'Historical collections' },
         {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist', 'display': 'Sermons Gold'},
         {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist', 'display': 'Links',
          'prefix': 'ssglink', 'formfields': [
@@ -97,7 +98,9 @@ class EqualChange(models.Model):
                         bFound = True
                         obj.current = current
                         obj.change = change
+                        obj.atype = "def"
                         obj.save()
+
                         break
                 # What if nothing has been found?
                 if not bFound:
@@ -150,6 +153,22 @@ class EqualChange(models.Model):
             oErr.DoError("EqualChange/check_approval")
         return iCount
 
+    def get_approval_count(self):
+        """Check how many approvals are left to be made for this change"""
+
+        oErr = ErrHandle()
+        iCount = 0
+        iTotal = 0
+        try:
+            # Count the number of approvals I need to have
+            iTotal = self.changeapprovals.count()
+            # Count the number of non-accepting approvals
+            iCount = self.changeapprovals.exclude(atype="acc").count()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_approval_count")
+        return iCount, iTotal
+
     def get_approver_list(self, excl=None):
         """Get the list of editors that need to approve this change
         
@@ -182,6 +201,10 @@ class EqualChange(models.Model):
 
         sBack = self.super.get_code()
         return sBack
+
+    def get_code_html(self):
+        """Get the PASSIM code, including a link to follow it"""
+        return self.super.get_passimcode_markdown()
 
     def get_display_name(self):
         """Get the display name of this field"""
@@ -223,6 +246,24 @@ class EqualChange(models.Model):
         sBack = saved.strftime("%d/%b/%Y %H:%M")
         return sBack
 
+    def get_status_history(self):
+        """Show all editor's approvals for this item"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            html = []
+            for obj in self.changeapprovals.all().order_by('-saved'):
+                name = obj.profile.user.username
+                status = obj.get_atype_display()
+                dated = get_crpp_date(obj.saved, True)
+                html.append("<b>{}</b>: {} - {}".format(name, status, dated))
+            sBack = "<br />".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_status_history")
+        return sBack
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the save date
         self.saved = get_current_datetime()
@@ -257,7 +298,15 @@ class EqualApproval(models.Model):
     def __str__(self):
         """Show this approval"""
         sBack = "{}: [{}] on ssg {}={}".format(
-            self.profile.user.name, self.change.field, self.change.super.id, self.atype)
+            self.profile.user.username, self.change.field, self.change.super.id, self.atype)
+        return sBack
+
+    def get_comment_html(self):
+        """Get the comment, translating markdown"""
+
+        sBack = "-"
+        if not self.comment is None:
+            sBack = markdown(self.comment)
         return sBack
 
     def get_mytask(profile):
