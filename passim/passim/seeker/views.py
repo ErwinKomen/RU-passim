@@ -11024,10 +11024,6 @@ class SermonGoldListView(BasicList):
              'keyS': 'collection',  'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },
             {'filter': 'atype',     'fkfield': 'equal', 'keyS': 'atype', 'keyFk': 'atype', 'keyList': 'atypelist',  'infield': 'atype'},
             ]},
-        ##{'section': 'other', 'filterlist': [
-        ###    {'filter': 'source',    'fkfield': 'source',   'keyS': 'source',  'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id' },
-        ##     {'filter': 'atype',     'fkfield': 'equal',    'keyS': 'equal', 'keyFk': 'id', 'keyList': 'equallist', 'infield': 'id' } #?
-        ##]}
         ]
     uploads = [{"title": "gold", "label": "Gold", "url": "import_gold", "msg": "Upload Excel files"}]
 
@@ -11134,14 +11130,6 @@ class SermonGoldListView(BasicList):
             # Reset the codetype
             fields['codetype'] = ""
                 
-        # Make sure we only show the SSG/AF's that have accepted modifications
-        # (fields['atype'] = 'acc'), so exclude the others:
-
-        # Iterate over list for each GS? No 1-1 relationship
-       # lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) ] 
-
-
-
         # Return the adapted stuff
         return fields, lstExclude, qAlternative
 
@@ -12323,10 +12311,6 @@ class EqualGoldListView(BasicList):
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def initializations(self):
-        #if self.prefix == "sermo":
-
-        #elif
-
         # ======== One-time adaptations ==============
         listview_adaptations("equalgold_list")
 
@@ -12432,16 +12416,7 @@ class EqualGoldListView(BasicList):
         elif custom == "status":
             # Provide the status traffic light
             html.append(instance.get_stype_light())
-        #elif custom == "approval_status": # For testing
-        #    appr_status = instance.atype
-        #    if appr_status == "acc":
-        #        html.append("<i>accepted</i>")
-        #    elif appr_status == "def": 
-        #        html.append("<i>default</i>")
-        #    elif appr_status == "rej": 
-        #        html.append("<i>rejected</i>")
-        #    elif appr_status == "mod": 
-        #        html.append("<i>modify</i>")
+
         sBack = "\n".join(html) 
         return sBack, sTitle
 
@@ -12491,8 +12466,7 @@ class EqualGoldListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
-    
-    
+        
 
 class EqualGoldScountDownload(BasicPart):
     MainModel = EqualGold
