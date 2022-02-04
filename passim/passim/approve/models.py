@@ -338,3 +338,309 @@ class EqualApproval(models.Model):
         # Return the response when saving
         return response
 
+
+class EqualAdd(models.Model):
+    """This is one person (profile) adding one particular EqualGold"""
+
+    # [1] obligatory link to the SSG
+    equal = models.ForeignKey(EqualGold, on_delete=models.CASCADE, related_name="equaladdings")
+    # [1] an addition belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileaddings")
+
+    # [1] The approval status of this proposed change
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+    # [0-1] A comment on the reason for rejecting an addition
+    comment = models.TextField("Comment", null=True, blank=True)
+
+    # [1] And a date: the date of saving this addition
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    ## Fields for which changes need to be monitored
+    #approve_fields = [
+    #    {'field': 'newauthor',          'tofld': 'author',   'type': 'fk', 'display': 'Author'},
+    #    {'field': 'newincipit',         'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
+    #    {'field': 'newexplicit',        'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+    #    {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
+    #    {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
+    #     'lstQ': [Q(settype="hc")],  
+    #     'display': 'Historical collections' },
+    #    {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist', 'display': 'Sermons Gold'},
+    #    {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist', 'display': 'Links',
+    #     'prefix': 'ssglink', 'formfields': [
+    #         {'field': 'linktype',      'type': 'string'},
+    #         {'field': 'spectype',      'type': 'string'},
+    #         {'field': 'note',          'type': 'string'},
+    #         {'field': 'alternatives',  'type': 'string'},
+    #         {'field': 'dst',           'type': 'fk'},
+    #         ]},
+    #    ]
+
+    def __str__(self):
+        """Show who proposes which addition"""
+        sBack = "{}: [{}] on ssg {}".format(
+            self.profile.user.username, self.super.id) 
+        return sBack
+
+    def add_item(super, profile, oChange, oCurrent=None): 
+        """Add one item"""
+
+        oErr = ErrHandle()
+        obj = None
+        try:
+            # Make sure to stringify, sorting the keys
+            change = json.dumps(oChange, sort_keys=True)
+            if oCurrent is None:
+                current = None
+            else:
+                current = json.dumps(oCurrent, sort_keys=True)
+
+            # Look for this particular change, supposing it has not changed yet
+            obj = EqualAdd.objects.filter(super=super, profile=profile, current=current, change=change).first()
+            if obj == None or obj.changeapprovals.count() > 0:
+                # Less restricted: look for any suggestion for a change on this field that has not been reviewed by anyone yet.
+                bFound = False
+                for obj in EqualAdd.objects.filter(super=super, profile=profile, atype="def"):
+                    if obj.changeapprovals.exclude(atype="def").count() == 0:
+                        # We can use this one
+                        bFound = True
+                        obj.current = current
+                        obj.change = change
+                        obj.atype = "def"
+                        obj.save()
+
+                        break
+                # What if nothing has been found?
+                if not bFound:
+                    # Only in that case do we make a new suggestion
+                    obj = EqualAdd.objects.create(super=super, profile=profile, field=field, current=current, change=change)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/add_item")
+        return obj
+
+    def check_projects(profile):
+        """Check of [profile] needs to have any EqualAdd objects
+
+        And if he does: create them for him
+        """
+
+        oErr = ErrHandle()
+        iCount = 0
+        try:
+            # Walk through all the changes that I have suggested
+            qs = EqualAdd.objects.filter(profile=profile)
+            for change in qs:
+                # Check the approval of this particular one
+                iCount += change.check_approval()
+            # All should be up to date now
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/check_projects")
+        return iCount
+
+    def check_approval(self):
+        """Check if all who need it have an EqualAddApproval object for this one"""
+
+        oErr = ErrHandle()
+        iCount = 0
+        try:
+            # Check which editors should have an approval object (excluding myself)
+            change = self
+            profile = self.profile
+            lst_approver = change.get_approver_list(profile)
+            for approver in lst_approver:
+                # Check if an EqualApprove exists
+                approval = EqualAddApproval.objects.filter(change=change, profile=approver).first()
+                if approval is None:
+                    # Create one
+                    approval = EqualAddApproval.objects.create(change=change, profile=approver)
+                    iCount = 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/check_approval") 
+        return iCount
+
+    def get_approval_count(self):
+        """Check how many approvals are left to be made for this change"""
+
+        oErr = ErrHandle()
+        iCount = 0
+        iTotal = 0
+        try:
+            # Count the number of approvals I need to have
+            iTotal = self.changeapprovals.count()
+            # Count the number of non-accepting approvals
+            iCount = self.changeapprovals.exclude(atype="acc").count()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/get_approval_count") 
+        return iCount, iTotal
+
+    def get_approver_list(self, excl=None):
+        """Get the list of editors that need to approve this addition
+        
+        If [excl] is specified, then this object is excluded from the list of Profile objects returned
+        """
+
+        oErr = ErrHandle()
+        lstBack = None
+        try:
+            # Default: return the empty list
+            lstBack = Profile.objects.none()
+            # Get all the projects to which this SSG 'belongs'
+            lst_project = [x['id'] for x in self.super.projects.all().values("id")]
+            # Note: only SSGs that belong to more than one project need to be reviewed
+            if len(lst_project) > 1:
+                # Get all the editors associated with these projects
+                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
+                if len(lst_profile_id) > 0:
+                    if excl == None:
+                        lstBack = Profile.objects.filter(id__in=lst_profile_id)
+                    else:
+                        lstBack = Profile.objects.filter(id__in=lst_profile_id).exclude(id=excl.id)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/get_approver_list") 
+        return lstBack
+
+    def get_code(self):
+        """Get the passim code for this object"""
+        sBack = self.super.get_code()
+        return sBack
+
+    def get_code_html(self):
+        """Get the PASSIM code, including a link to follow it"""
+        return self.super.get_passimcode_markdown()
+
+    def get_display_name(self):
+        """Get the display name of this field"""
+
+        sBack = self.field
+        for oItem in self.approve_fields:
+            if self.field == oItem['tofld']:
+                sBack = oItem['display']
+                break
+        return sBack
+
+    def get_review_list(profile, all=False):
+        """Get the list of objects this editor needs to review"""
+
+        oErr = ErrHandle()
+        lstBack = []
+        try:
+            # Default: return the empty list
+            # lstBack = EqualChange.objects.none()
+            # Get the list of projects for this user
+            lst_project_id = profile.projects.all().values("id")
+            if len(lst_project_id) > 0:
+                # Get the list of EqualChange objects linked to any of these projects
+                lstQ = []
+                lstQ.append(Q(super__equal_proj__project__id__in=lst_project_id))
+                if not all:
+                    lstQ.append(Q(atype='def'))
+                lstBack = [x['id'] for x in EqualAdd.objects.exclude(profile=profile).filter(*lstQ).distinct().values('id')]
+                # lstBack = EqualChange.objects.exclude(profile=profile).filter(*lstQ).distinct()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/get_review_list") 
+        return lstBack
+
+    def get_saved(self):
+        """Get the date of saving"""
+
+        saved = self.created if self.saved is None else self.saved
+        sBack = saved.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
+    def get_status_history(self):
+        """Show all editor's approvals for this item"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            html = []
+            for obj in self.changeapprovals.all().order_by('-saved'):
+                name = obj.profile.user.username
+                status = obj.get_atype_display()
+                dated = get_crpp_date(obj.saved, True)
+                html.append("<b>{}</b>: {} - {}".format(name, status, dated))
+            sBack = "<br />".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAdd/get_status_history")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualAdd, self).save(force_insert, force_update, using, update_fields)
+
+        # Check whether all needed approvars have an EqualApproval object
+        self.check_approval()
+
+        # Return the response when saving
+        return response
+
+
+class EqualAddApproval (models.Model):
+    """This is one person (profile) approving one particular EqualGold addition"""
+
+    # [1] obligatory link to the SSG
+    add = models.ForeignKey(EqualAdd, on_delete=models.CASCADE, related_name="addapprovals")
+    # [1] an approval belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileaddapprovals")
+
+    # [1] The approval status of this proposed addition
+    atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
+    # [0-1] A comment on the reason for rejecting an addition
+    comment = models.TextField("Comment", null=True, blank=True)
+
+    # [1] And a date: the date of saving this approval
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        """Show this approval"""
+        sBack = "{}: [{}] on ssg {}={}".format(
+            self.profile.user.username, self.change.super.id, self.atype)
+        return sBack
+
+    def get_comment_html(self):
+        """Get the comment, translating markdown"""
+
+        sBack = "-"
+        if not self.comment is None:
+            sBack = markdown(self.comment)
+        return sBack
+
+    def get_mytask(profile):
+        """Find out which additions [profile] needs to approve"""
+
+        qs = EqualAddApproval.objects.filter(profile=profile, atype="def")
+        return qs
+
+    def get_mytask_count(profile):
+        """Find out how many additions [profile] needs to approve"""
+
+        qs = EqualAddApproval.get_mytask(profile)
+        return qs.count()
+
+    def get_saved(self):
+        """Get the date of saving"""
+
+        saved = self.created if self.saved is None else self.saved
+        sBack = saved.strftime("%d/%b/%Y %H:%M")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+
+        # Actual saving
+        response = super(EqualAddApproval, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
