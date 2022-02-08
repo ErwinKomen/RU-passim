@@ -24,7 +24,9 @@ from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
 from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
     EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
-    EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist
+    EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
+    EqualAddDetails, EqualAddEdit, EqualAddUserDetails, EqualAddUserEdit, EqualAddApprovalList, EqualAddApprovalUList,\
+    EqualAddApprovalDetails, EqualAddApprovalEdit, EqualAddApprovalUserDetails, EqualAddApprovalUserEdit
 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
@@ -132,16 +134,23 @@ urlpatterns = [
     url(r'^ssg/graph/download(?:/(?P<pk>\d+))?/$', EqualGoldGraphDownload.as_view(), name='equalgold_graph_download'),
     url(r'^ssg/trans/download(?:/(?P<pk>\d+))?/$', EqualGoldTransDownload.as_view(), name='equalgold_trans_download'),
     url(r'^ssg/overlap/download(?:/(?P<pk>\d+))?/$', EqualGoldOverlapDownload.as_view(), name='equalgold_overlap_download'),
-
-    # New urls to direct the editors from MyPassim to My_AF_add / New_AF_review (issue 494)
-    # See how things are done with Collection? Using prefix?
-
-    # url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
-    # url(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
-
-    url(r'^ssg/afadds/list', EqualGoldListView.as_view(prefix="afadds"), name='equalgold_myafadds_list'), #using Collection
-    url(r'^ssg/myrevw/list', EqualGoldListView.as_view(prefix="myrevw"), name='equalgold_newafreview_list'),
-
+    
+    url(r'^ssg/af/add/list', EqualAddList.as_view(), name='equaladdall_list'),
+    url(r'^ssg/af/add/details(?:/(?P<pk>\d+))?/$', EqualAddDetails.as_view(), name='equaladdeall_details'),
+    url(r'^ssg/af/add/edit(?:/(?P<pk>\d+))?/$', EqualAddEdit.as_view(), name='equaladdall_edit'),
+        
+    url(r'^ssg/uaf/add/list', EqualAddUList.as_view(), name='equaladduser_list'),
+    url(r'^ssg/uaf/add/details(?:/(?P<pk>\d+))?/$', EqualAddUserDetails.as_view(), name='equaladduser_details'),
+    url(r'^ssg/uaf/add/edit(?:/(?P<pk>\d+))?/$', EqualAddUserEdit.as_view(), name='equaladduser_edit'),
+    
+    url(r'^ssg/af/approval/list', EqualAddApprovalList.as_view(), name='equaladdapprovalall_list'),
+    url(r'^ssg/af/approval/details(?:/(?P<pk>\d+))?/$', EqualAddApprovalDetails.as_view(), name='equaladdapprovalall_details'),
+    url(r'^ssg/af/approval/edit(?:/(?P<pk>\d+))?/$', EqualAddApprovalEdit.as_view(), name='equaladdapprovalall_edit'),
+        
+    url(r'^ssg/uaf/approval/list', EqualAddApprovalUList.as_view(), name='equaladdapprovaluser_list'),
+    url(r'^ssg/uaf/approval/details(?:/(?P<pk>\d+))?/$', EqualAddApprovalUserDetails.as_view(), name='equaladdapprovaluser_details'),
+    url(r'^ssg/uaf/approval/edit(?:/(?P<pk>\d+))?/$', EqualAddApprovalUserEdit.as_view(), name='equaladdapprovaluser_edit'),    
+    
     url(r'^ssg/field/change/list', EqualChangeList.as_view(), name='equalchangeall_list'),
     url(r'^ssg/field/change/details(?:/(?P<pk>\d+))?/$', EqualChangeDetails.as_view(), name='equalchangeall_details'),
     url(r'^ssg/field/change/edit(?:/(?P<pk>\d+))?/$', EqualChangeEdit.as_view(), name='equalchangeall_edit'),

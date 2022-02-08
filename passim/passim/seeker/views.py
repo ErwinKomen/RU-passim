@@ -12304,16 +12304,16 @@ class EqualGoldListView(BasicList):
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' }
             ]},
         {'section': 'other', 'filterlist': [
-            {'filter': 'atype', 'dbfield': 'atype', 'keyS': 'atype'} 
+            {'filter': 'atype', 'dbfield': 'atype', 'keyS': 'atype'}
             ]}
         ]
     custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
     def initializations(self):
+
         # ======== One-time adaptations ==============
         listview_adaptations("equalgold_list")
-
         return None
     
     def add_to_context(self, context, initial):

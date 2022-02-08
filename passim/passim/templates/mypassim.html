@@ -134,19 +134,19 @@
             <!-- Empty table row -->
             <tr><td colspan="3">&nbsp;</td></tr>
             
-            <!-- Submitted new AF additions --> 
+            <!-- Submitted new AF additions AANPASSEN + COUNT!--> 
             <tr>            
               <td valign="top" class="hangingindent">My Authority File additions:</td>
               <td valign="top">
-                <a href="{% url 'equalgold_myafadds_list' %}" role="button" title="View all my Authority File additions" class="btn btn-xs jumbo-1">
-                  {{count_fchange_all}}
+                <a href="{% url 'equaladduser_list' %}" role="button" title="View all my Authority File additions" class="btn btn-xs jumbo-1">
+                  {{count_afadd_all}}
                   <span class="glyphicon glyphicon-check" title="View all my Authority File additions"></span>
                 </a>
               </td>
               <td valign="top">
-                <a href="{% url 'equalgold_newafreview_list' %}?user-atype=def" role="button" title="View my pending Authority File additions" 
+                <a href="{% url 'equaladduser_list' %}?user-atype=def" role="button" title="View my pending Authority File additions" 
                    class="btn btn-xs {% if count_fchange_open == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
-                  {{count_fchange_open}}
+                  {{count_afadd_open}}
                   <span class="glyphicon glyphicon-edit" title="View my pending Authority File additions"></span>
                 </a>
               </td>
@@ -159,15 +159,15 @@
             <tr>
               <td valign="top" class="hangingindent">New AF additions that I need to review:</td>
               <td valign="top">
-                <a href="{% url 'equalapprovaluser_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
-                  {{count_approve_all}}
+                <a href="{% url 'equaladdapprovaluser_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
+                  {{count_afaddapprove_all}}
                   <span class="glyphicon glyphicon-check" title="View all my reviews of AF additions"></span>
                 </a>
               </td>
               <td valign="top">
-                <a href="{% url 'equalapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF additions" 
+                <a href="{% url 'equaladdapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF additions" 
                    class="btn btn-xs {% if count_approve_task == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
-                  {{count_approve_task}}
+                  {{count_afaddapprove_all}}
                   <span class="glyphicon glyphicon-edit" title="View my pending reviews of AF additions"></span>
                 </a>
               </td>

@@ -239,9 +239,19 @@ def mypassim(request):
     context['count_fchange_all'] = profile.profileproposals.count()
     context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
 
-    # How many do I need to approve?
-    context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+    # How many do I need to approve?    
     context['count_approve_all'] = profile.profileapprovals.count()
+    context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+
+    # What about the SSG/AFs that I have suggested?
+    context['count_afadd_all'] = profile.profileaddings.count()
+    context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
+
+    # How many SSG/AFs do I need to approve?    
+    context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
+    context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
+
+    # How many do I need to approve?
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)

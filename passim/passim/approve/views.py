@@ -11,8 +11,8 @@ from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BI
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
     Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword
-from passim.approve.models import EqualChange, EqualApproval
-from passim.approve.forms import EqualChangeForm, EqualApprovalForm
+from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
+from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
 
 import json, copy
@@ -501,7 +501,7 @@ def approval_parse_formset(profile, frm_prefix, new_data, super):
     return iCount
 
 def approval_pending(super):
-    """Get all pending approvals"""
+    """Get all pending approvals for SSG changes"""
 
     qs = EqualChange.objects.none()
     if not super is None:
@@ -509,8 +509,17 @@ def approval_pending(super):
         qs = EqualChange.objects.filter(super=super, atype__in=atype_list)
     return qs
 
+def addapproval_pending(super):
+    """Get all pending approvals for SSG additions"""
+
+    qs = EqualAdd.objects.none()
+    if not super is None:
+        atype_list = ['def', 'mod']
+        qs = EqualAdd.objects.filter(super=super, atype__in=atype_list)
+    return qs
+
 def approval_pending_list(super):
-    """GEt a list of pending approvals"""
+    """Get a list of pending approvals for SSG changes"""
 
     oErr = ErrHandle()
     html = []
@@ -533,8 +542,144 @@ def approval_pending_list(super):
         oErr.DoError("approval_pending_list")
     return html
 
+def addapproval_pending_list(super):
+    """Get a list of pending approvals for SSG additions"""
+
+    oErr = ErrHandle()
+    html = []
+    try:
+        qs = addapproval_pending(super)
+        for obj in qs:
+            saved = obj.created.strftime("%d/%b/%Y %H:%M") if not obj.saved else obj.saved.strftime("%d/%b/%Y %H:%M")
+            oApproval = dict(
+                id=obj.id,
+                #field=obj.get_display_name(),
+                editor=obj.profile.user.username,
+                atype=obj.get_atype_display(),
+                statushistory = obj.get_status_history(),
+                created=obj.created.strftime("%d/%b/%Y %H:%M"),
+                saved=saved,
+                add=equaladd_json_to_html(obj, "addition"))
+            html.append(oApproval)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("addapproval_pending_list")
+    return html
+
 
 # ========================================================= MODEL views =========================================================
+
+class EqualAddList(BasicList):
+    """Listview of EqualAdd"""
+    model = EqualAdd
+    listform = EqualAddForm 
+    has_select2 = True
+    bUseFilter = True
+    new_button = False
+    use_team_group = True
+    prefix = "all"
+    basic_name_prefix = "equaladd"
+    order_cols = ['profile__user__username', 'saved', 'super__code', 'atype']
+    order_default = ['profile__user__username', '-saved', 'super__code', 'atype']
+    order_heads = [
+        {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
+        {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},        
+        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        ]
+    filters = [ 
+        {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+        {"name": "User",            "id": "filter_user",      "enabled": False},
+        {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'code',          'fkfield': 'super',     'help': 'passimcode',
+             'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'user',          'fkfield': 'profile',   'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'},
+            {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+             'keyType': 'fieldchoice',  'infield': 'abbr' }
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+            ]}
+         ]
+
+    def initializations(self):
+        if self.prefix == "all":
+            # Provide all changes
+            self.plural_name = "All Authority File additions"
+            self.sg_name = "Authoriy File addition"
+        elif self.prefix == "user":
+            # Restricted to a particular user...
+            self.plural_name = "User Authority Files additions"
+            self.sg_name = "User Authority File addition"
+            self.order_cols = ['saved', 'super__code', 'atype']
+            self.order_default = ['saved', 'super__code', 'atype']
+            self.order_heads = [
+                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},                
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                ]
+            self.filters = [
+                {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+                {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+                ]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'code',          'fkfield': 'super',    'help': 'passimcode',
+                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+                     'keyType': 'fieldchoice',  'infield': 'abbr' }
+                    ]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
+                    ]}
+                 ]
+        return None
+        
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            saved = instance.created if instance.saved is None else instance.saved
+            sBack = saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "user":
+            sBack = instance.profile.user.username
+        elif custom == "atype":
+            sBack = instance.get_atype_display()
+        elif custom == "code":
+            sBack = instance.get_code()        
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=[]
+        qAlternative = None
+        oErr = ErrHandle()
+
+        try:
+            if self.prefix == "all":
+                # No adaptation needed
+                pass
+            elif self.prefix == "user":
+                # Figure out who is asking
+                profile = Profile.get_user_profile(self.request.user.username)
+                # Restrict the profile
+                fields['profilelist'] = Profile.objects.filter(id=profile.id)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeListView/adapt_search")
+
+        return fields, lstExclude, qAlternative
+
+
+class EqualAddUList(EqualAddList):
+
+    prefix = "user"
+
 
 class EqualChangeList(BasicList):
     """Listview of EqualChange"""
@@ -653,6 +798,56 @@ class EqualChangeUlist(EqualChangeList):
     prefix = "user"
 
 
+class EqualAddEdit(BasicDetails): # Waarom is dit niet op basis van BasicEdit?
+    model = EqualAdd
+    mForm = EqualAddForm
+    prefix = "all"
+    basic_name_prefix = "equaladd"
+    title = "Authority File addition"
+    no_delete = True            # Don't allow users to remove an addition (?)
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
+        # Define the main items to show and edit
+        context['mainitems'] = []
+
+        # Add user or not?
+        if self.prefix == "user":
+            context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
+
+        # Add the normal information
+        mainitems_main = [
+            # -------- HIDDEN field values (these are defined in [EqualChangeForm] ---------------
+            {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Super id",      'value': instance.super.id, 'field_key': "super",   'empty': 'hide'},
+            #{'type': 'plain', 'label': "Field val",     'value': instance.field,    'field_key': "field",   'empty': 'hide'},
+            {'type': 'plain', 'label': "Atype val",     'value': instance.atype,    'field_key': "atype",   'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'plain', 'label': "Authority File:",'value': instance.get_code_html()},        #,   'field_key': 'super'},
+            #{'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()},      #,   'field_key': 'field'},
+            {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+            {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},     #,  'field_key': 'atype'},
+            {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current", profile)},
+            #{'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance, "change", profile)},
+            ]
+        # Only add the 'comment', if it is there (and read-only)
+        if not instance.comment is None and instance.comment != "":
+            mainitems_main.append({'type': 'plain', 'label': "Comment:", 'value': instance.comment})
+        for item in mainitems_main: 
+            context['mainitems'].append(item)
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
 class EqualChangeEdit(BasicDetails):
     model = EqualChange
     mForm = EqualChangeForm
@@ -698,6 +893,91 @@ class EqualChangeEdit(BasicDetails):
 
         # Signal that we do have select2
         context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class EqualAddDetails(EqualAddEdit):
+    """HTML output for an EqualAdd object"""
+
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualAddDetails, self).add_to_context(context, instance)
+
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Lists of related objects
+            context['related_objects'] = []
+
+            # Need to know who this user (profile) is
+            username = self.request.user.username
+            team_group = app_editor
+
+            # List of approvers related to the this Addition 
+            approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
+
+            rel_list =[]
+            qs = instance.addapprovals.all().order_by('atype', '-saved')
+            for item in qs:
+                add = item.add
+                url = reverse('equaladdapprovaluser_details', kwargs={'pk': item.id}) # is er niet equaladdapprovaluser_details moet in URLS.py
+                url_chg = reverse('equaladduser_details', kwargs={'pk': add.id})
+                rel_item = []
+
+                # S: Order number for this approval
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
+
+                # Who is this?
+                approver = item.profile.user.username
+                add_rel_item(rel_item, approver, False, main=False, link=url)
+
+                # Which project(s) does this person have?
+                projects_md = item.profile.get_projects_markdown()
+                add_rel_item(rel_item, projects_md, False, main=False, link=url)
+
+                # Approval status
+                astatus = item.get_atype_display()
+                add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
+
+                # Comments on this approval
+                comment_txt = item.get_comment_html()
+                add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
+
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
+
+            approvers['rel_list'] = rel_list
+
+            approvers['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Note</span>{}'.format(sort_start, sort_end), 
+                ]
+            related_objects.append(approvers)
+            
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddDetails/add_to_context")
 
         # Return the context we have made
         return context
@@ -800,6 +1080,20 @@ class EqualChangeUserDetails(EqualChangeDetails):
 
     prefix = "user"
     title = "Field change"
+
+
+class EqualAddUserEdit(EqualAddEdit):
+    """User-specific equal addition editing"""
+    
+    prefix = "user"
+    title = "Authority file addition"
+
+
+class EqualAddUserDetails(EqualAddDetails):
+    """HTML output for an EqualAddUser object"""
+
+    prefix = "user"
+    title = "Authority file addition"
 
 
 class EqualApprovalList(BasicList):
@@ -915,6 +1209,119 @@ class EqualApprovalList(BasicList):
 
 
 class EqualApprovalUlist(EqualApprovalList):
+
+    prefix = "user"
+
+
+class EqualAddApprovalList(BasicList):
+    """Listview of EqualAddApproval"""
+
+    model = EqualAddApproval
+    listform = EqualAddApprovalForm
+    has_select2 = True
+    bUseFilter = True
+    new_button = False
+    use_team_group = True
+    prefix = "all"
+    basic_name_prefix = "equaladdapproval"
+    order_cols = ['profile__user__username', 'saved', 'add__super__code', 'atype']
+    order_default = ['profile__user__username', '-saved', 'add__super__code', 'atype']
+    order_heads = [
+        {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
+        {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},       
+        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        ]
+    filters = [ 
+        {"name": "Authority File",  "id": "filter_code",      "enabled": False},
+        {"name": "User",            "id": "filter_user",      "enabled": False},
+        {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'code',          'fkfield': 'add__super',    'help': 'passimcode',
+             'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'},
+            {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+             'keyType': 'fieldchoice',  'infield': 'abbr' }
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+            ]}
+         ]
+
+    def initializations(self):
+        if self.prefix == "all":
+            # Provide all additions
+            self.plural_name = "All Authority File approvals"
+            self.sg_name = "Authority File approval"
+        elif self.prefix == "user":
+            # Restricted to a particular user...
+            self.plural_name = "Authority File approvals"
+            self.sg_name = "Authority File approval"
+            self.order_cols = ['saved', 'add__super__code', 'atype']
+            self.order_default = ['-saved', 'add__super__code', 'atype']
+            self.order_heads = [
+                {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},                
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                ]
+            self.filters = [
+                {"name": "Authority File",       "id": "filter_code",      "enabled": False},
+                {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
+                ]
+            self.searches = [
+                {'section': '', 'filterlist': [
+                    {'filter': 'code',          'fkfield': 'add__super',    'help': 'passimcode',
+                     'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+                    {'filter': 'approval',      'dbfield': 'atype',     'keyList': 'atypelist',
+                     'keyType': 'fieldchoice',  'infield': 'abbr' }
+                    ]},
+                {'section': 'other', 'filterlist': [
+                    {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
+                    ]}
+                 ]
+        return None
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "date":
+            saved = instance.created if instance.saved is None else instance.saved
+            sBack = saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "user":
+            sBack = instance.profile.user.username
+        elif custom == "atype":
+            sBack = instance.get_atype_display()
+        elif custom == "code":
+            sBack = instance.add.get_code()
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=[]
+        qAlternative = None
+        oErr = ErrHandle()
+
+        try:
+            if self.prefix == "all":
+                # No adaptation needed
+                pass
+            elif self.prefix == "user":
+                # Figure out who is asking
+                profile = Profile.get_user_profile(self.request.user.username)
+                # Restrict the profile
+                fields['profilelist'] = Profile.objects.filter(id=profile.id)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddListView/adapt_search")
+
+        return fields, lstExclude, qAlternative
+
+
+class EqualAddApprovalUList(EqualAddApprovalList):
 
     prefix = "user"
 
@@ -1142,3 +1549,223 @@ class EqualApprovalUserDetails(EqualApprovalDetails):
     title = "Change approval"
 
 
+class EqualAddApprovalEdit(BasicDetails):
+    model = EqualAddApproval
+    mForm = EqualAddApprovalForm
+    prefix = "all"
+    basic_name_prefix = "equaladdapproval"
+    title = "Addition approval"
+    no_delete = True            # Don't allow users to remove a field change that they have entered
+    mainitems = []
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            # An item is readonly, if I am not the one who is supposed to comment on it
+            if profile.id != instance.profile.id:
+                self.permission = "readonly"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddApprovalEdit/custom_init")
+
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+
+            # Define the main items to show and edit
+            context['mainitems'] = []
+
+            # Add user or not?
+            if self.prefix == "user":
+                context['mainitems'].append({'type': 'line',  'label': "User:",'value': instance.profile.user.username})
+
+            # Check if the approval has been 'locked'
+            locked = (instance.add.atype == "acc")
+            # An item is also 'locked', if I am not the one who is supposed to comment on it
+            if profile.id != instance.profile.id:
+                locked = True
+
+            # Add the normal information
+            mainitems_main = [
+                # -------- HIDDEN field values (these are defined in [EqualApprovalForm] ---------------
+                {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
+                {'type': 'plain', 'label': "Add id",     'value': instance.add.id,'field_key': "add",  'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'plain', 'label': "Authority File:",'value': instance.add.get_code_html()},         #,   'field_key': 'super'},                
+                {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},             #,   'field_key': 'atype'},
+                {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment_html()},              #,   'field_key': 'comment'},
+                {'type': 'safe',  'label': "Current:",      'value': equaladd_json_to_html(instance.add, "current", profile)},
+                {'type': 'safe',  'label': "Proposed:",     'value': equaladd_json_to_html(instance.add, "add", profile)},
+                ]
+            # Only add the 'comment', if it is there (and read-only)
+            if locked:
+                # Possibly show the comment
+                if not instance.add.comment is None and instance.add.comment != "":
+                    mainitems_main.append({'type': 'plain', 'label': "Processed:", 'value': instance.add.comment})
+            else:
+                # Make sure fields status and comment are editable
+                editables = {'Status:': 'atype', 'Comment:': 'comment'}
+                for item in mainitems_main:
+                    if item['label'] in editables:
+                        item['field_key'] = editables[item['label']]
+
+            for item in mainitems_main: 
+                context['mainitems'].append(item)
+
+            # Signal that we do have select2
+            context['has_select2'] = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddApprovalEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            # Is this something tangible?
+            if not instance is None and instance.id != None and not self.permission == "readonly":
+                # Get to the addition itself from EqualAdd
+                add = instance.add
+
+                # Is this EqualAdd object already finished?
+                if not add is None and add.atype != "acc":
+                    # Check how many approvals there should be and how many are left
+                    iLeft, iNeeded = add.get_approval_count()
+                    if iNeeded > 0 and iLeft == 0:
+                        # The last approval has been saved: we may implement the addition
+                        equaladd_json_to_accept(add)
+                    elif add.addapprovals.exclude(atype="def").count() == 0:
+                        # Do some more careful checking: all approvals are now known
+                        iRejected = add.addapprovals.filter(atype='rej').count()
+                        if iRejected == iNeeded:
+                            # This suggestion has been rejected completely
+                            add.atype = "rej"
+                            add.save()
+                        else:
+                            # Not everything is rejected means: modifications are needed
+                            add.atype = "mod"
+                            add.save()
+                    elif add.addapprovals.filter(atype='rej').count() == iNeeded:
+                        # This suggestion has been rejected completely
+                        add.atype = "rej"
+                        add.save()
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddApprovalEdit/after_save")
+            bResult = False
+        return bResult, msg
+
+
+class EqualAddApprovalDetails(EqualAddApprovalEdit):
+    """HTML output for an EqualApproval object"""
+
+    rtype = "html"
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(EqualAddApprovalDetails, self).add_to_context(context, instance)
+
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+        sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Lists of related objects
+            context['related_objects'] = []
+
+            # Need to know who this user (profile) is
+            username = self.request.user.username
+            team_group = app_editor
+
+            # List of approvers related to the this addition 
+            approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
+
+            rel_list =[]
+            qs = instance.add.addapprovals.all().order_by('atype', '-saved')
+            for item in qs:
+                add = item.add
+                url = reverse('equaladdapprovaluser_details', kwargs={'pk': item.id})
+                url_chg = reverse('equaladduser_details', kwargs={'pk': add.id})
+                rel_item = []
+
+                # S: Order number for this approval
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
+
+                # Who is this?
+                approver = item.profile.user.username
+                add_rel_item(rel_item, approver, False, main=False, link=url)
+
+                # Which project(s) does this person have?
+                projects_md = item.profile.get_projects_markdown()
+                add_rel_item(rel_item, projects_md, False, main=False, link=url)
+
+                # Approval status
+                astatus = item.get_atype_display()
+                add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
+
+                # Comments on this approval
+                comment_txt = item.get_comment_html()
+                add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
+
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
+
+            approvers['rel_list'] = rel_list
+
+            approvers['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Note</span>{}'.format(sort_start, sort_end), 
+                ]
+            related_objects.append(approvers)
+            
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddApprovalDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
+
+class EqualAddApprovalUserEdit(EqualAddApprovalEdit):
+    """User-specific equal addition editing"""
+    
+    prefix = "user"
+    title = "Addition approval"
+
+
+class EqualAddApprovalUserDetails(EqualAddApprovalDetails):
+    """HTML output for an EqualApprovalUser object"""
+
+    prefix = "user"
+    title = "Addition approval"

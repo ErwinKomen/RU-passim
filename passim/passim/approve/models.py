@@ -279,7 +279,7 @@ class EqualChange(models.Model):
 
 
 class EqualApproval(models.Model):
-    """THis is one person (profile) approving one particular change suggestion"""
+    """This is one person (profile) approving one particular change suggestion"""
 
     # [1] obligatory link to the SSG
     change = models.ForeignKey(EqualChange, on_delete=models.CASCADE, related_name="changeapprovals")
@@ -343,7 +343,7 @@ class EqualAdd(models.Model):
     """This is one person (profile) adding one particular EqualGold"""
 
     # [1] obligatory link to the SSG
-    equal = models.ForeignKey(EqualGold, on_delete=models.CASCADE, related_name="equaladdings")
+    super = models.ForeignKey(EqualGold, on_delete=models.CASCADE, related_name="equaladdings")
     # [1] an addition belongs to a particular user's profile
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileaddings")
 
@@ -355,65 +355,35 @@ class EqualAdd(models.Model):
     # [1] And a date: the date of saving this addition
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
-
-    ## Fields for which changes need to be monitored
-    #approve_fields = [
-    #    {'field': 'newauthor',          'tofld': 'author',   'type': 'fk', 'display': 'Author'},
-    #    {'field': 'newincipit',         'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
-    #    {'field': 'newexplicit',        'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
-    #    {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
-    #    {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
-    #     'lstQ': [Q(settype="hc")],  
-    #     'display': 'Historical collections' },
-    #    {'field': 'equal_goldsermons',  'tofld': 'golds',    'type': 'm2o',         'listfield': 'goldlist', 'display': 'Sermons Gold'},
-    #    {'field': 'equalgold_src',      'tofld': 'supers',   'type': 'm2m-addable', 'listfield': 'superlist', 'display': 'Links',
-    #     'prefix': 'ssglink', 'formfields': [
-    #         {'field': 'linktype',      'type': 'string'},
-    #         {'field': 'spectype',      'type': 'string'},
-    #         {'field': 'note',          'type': 'string'},
-    #         {'field': 'alternatives',  'type': 'string'},
-    #         {'field': 'dst',           'type': 'fk'},
-    #         ]},
-    #    ]
-
+    
     def __str__(self):
         """Show who proposes which addition"""
         sBack = "{}: [{}] on ssg {}".format(
             self.profile.user.username, self.super.id) 
         return sBack
 
-    def add_item(super, profile, oChange, oCurrent=None): 
+    def add_item(super, profile):
         """Add one item"""
 
         oErr = ErrHandle()
         obj = None
         try:
-            # Make sure to stringify, sorting the keys
-            change = json.dumps(oChange, sort_keys=True)
-            if oCurrent is None:
-                current = None
-            else:
-                current = json.dumps(oCurrent, sort_keys=True)
-
-            # Look for this particular change, supposing it has not changed yet
-            obj = EqualAdd.objects.filter(super=super, profile=profile, current=current, change=change).first()
-            if obj == None or obj.changeapprovals.count() > 0:
-                # Less restricted: look for any suggestion for a change on this field that has not been reviewed by anyone yet.
+            # Look for this particular addition, supposing it has not been added yet TH:werkt dit zo? Niet dus, hier gaat er iets mis. 
+            obj = EqualAdd.objects.filter(super=super, profile=profile).first() 
+            if obj == None or obj.addapprovals.count() > 0:
+                # Less restricted: look for any addition of a SSG/AF that has not been reviewed by anyone yet. TH: nodig??
                 bFound = False
                 for obj in EqualAdd.objects.filter(super=super, profile=profile, atype="def"):
-                    if obj.changeapprovals.exclude(atype="def").count() == 0:
+                    if obj.addapprovals.exclude(atype="def").count() == 0:
                         # We can use this one
                         bFound = True
-                        obj.current = current
-                        obj.change = change
-                        obj.atype = "def"
+                        obj.atype = "def" 
                         obj.save()
-
                         break
                 # What if nothing has been found?
                 if not bFound:
-                    # Only in that case do we make a new suggestion
-                    obj = EqualAdd.objects.create(super=super, profile=profile, field=field, current=current, change=change)
+                    # Only in that case do we make a new addition
+                    obj = EqualAdd.objects.create(super=super, profile=profile)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualAdd/add_item")
@@ -428,11 +398,11 @@ class EqualAdd(models.Model):
         oErr = ErrHandle()
         iCount = 0
         try:
-            # Walk through all the changes that I have suggested
+            # Walk through all the additions that I have suggested
             qs = EqualAdd.objects.filter(profile=profile)
-            for change in qs:
+            for add in qs:
                 # Check the approval of this particular one
-                iCount += change.check_approval()
+                iCount += add.check_approval()
             # All should be up to date now
         except:
             msg = oErr.get_error_message()
@@ -446,15 +416,15 @@ class EqualAdd(models.Model):
         iCount = 0
         try:
             # Check which editors should have an approval object (excluding myself)
-            change = self
+            add = self
             profile = self.profile
-            lst_approver = change.get_approver_list(profile)
+            lst_approver = add.get_approver_list(profile)
             for approver in lst_approver:
-                # Check if an EqualApprove exists
-                approval = EqualAddApproval.objects.filter(change=change, profile=approver).first()
+                # Check if an EqualAddApproval exists
+                approval = EqualAddApproval.objects.filter(add=add, profile=approver).first()
                 if approval is None:
                     # Create one
-                    approval = EqualAddApproval.objects.create(change=change, profile=approver)
+                    approval = EqualAddApproval.objects.create(add=add, profile=approver)
                     iCount = 1
         except:
             msg = oErr.get_error_message()
@@ -462,16 +432,16 @@ class EqualAdd(models.Model):
         return iCount
 
     def get_approval_count(self):
-        """Check how many approvals are left to be made for this change"""
+        """Check how many approvals are left to be made for this addition"""
 
         oErr = ErrHandle()
         iCount = 0
         iTotal = 0
         try:
             # Count the number of approvals I need to have
-            iTotal = self.changeapprovals.count()
+            iTotal = self.addapprovals.count()
             # Count the number of non-accepting approvals
-            iCount = self.changeapprovals.exclude(atype="acc").count()
+            iCount = self.addeapprovals.exclude(atype="acc").count()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualAdd/get_approval_count") 
@@ -505,7 +475,7 @@ class EqualAdd(models.Model):
         return lstBack
 
     def get_code(self):
-        """Get the passim code for this object"""
+        """Get the PASSIM code for this object"""
         sBack = self.super.get_code()
         return sBack
 
@@ -514,7 +484,7 @@ class EqualAdd(models.Model):
         return self.super.get_passimcode_markdown()
 
     def get_display_name(self):
-        """Get the display name of this field"""
+        """Get the display name of this field""" #TH: KAN WEG?
 
         sBack = self.field
         for oItem in self.approve_fields:
@@ -534,7 +504,7 @@ class EqualAdd(models.Model):
             # Get the list of projects for this user
             lst_project_id = profile.projects.all().values("id")
             if len(lst_project_id) > 0:
-                # Get the list of EqualChange objects linked to any of these projects
+                # Get the list of EqualAdd objects linked to any of these projects # TH werkt dit nu?
                 lstQ = []
                 lstQ.append(Q(super__equal_proj__project__id__in=lst_project_id))
                 if not all:
@@ -560,7 +530,7 @@ class EqualAdd(models.Model):
         oErr = ErrHandle()
         try:
             html = []
-            for obj in self.changeapprovals.all().order_by('-saved'):
+            for obj in self.addapprovals.all().order_by('-saved'):
                 name = obj.profile.user.username
                 status = obj.get_atype_display()
                 dated = get_crpp_date(obj.saved, True)
@@ -571,24 +541,24 @@ class EqualAdd(models.Model):
             oErr.DoError("EqualAdd/get_status_history")
         return sBack
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None): # Wat moet hier weg?
         # Adapt the save date
         self.saved = get_current_datetime()
 
         # Actual saving
         response = super(EqualAdd, self).save(force_insert, force_update, using, update_fields)
 
-        # Check whether all needed approvars have an EqualApproval object
+        # Check whether all needed approvers have an EqualApproval object
         self.check_approval()
 
         # Return the response when saving
         return response
 
 
-class EqualAddApproval (models.Model):
+class EqualAddApproval(models.Model):
     """This is one person (profile) approving one particular EqualGold addition"""
 
-    # [1] obligatory link to the SSG
+    # [1] obligatory link to EqualAdd
     add = models.ForeignKey(EqualAdd, on_delete=models.CASCADE, related_name="addapprovals")
     # [1] an approval belongs to a particular user's profile
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileaddapprovals")
@@ -635,7 +605,7 @@ class EqualAddApproval (models.Model):
         sBack = saved.strftime("%d/%b/%Y %H:%M")
         return sBack
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None): # Aanpassen?
         # Adapt the save date
         self.saved = get_current_datetime()
 
