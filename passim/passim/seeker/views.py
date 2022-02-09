@@ -11812,15 +11812,18 @@ class EqualGoldEdit(BasicDetails):
                 # Get the cleaned data: this is the new stuff
                 cleaned_data = form.cleaned_data
 
+                # Issue #517: submit request to add this SSG to indicated project(s)
+                addprojlist = form.cleaned_data.get("addprojlist")
+                iCountAddA = approval_parse_adding(profile, addprojlist, instance) 
+
+                projlist = form.cleaned_data.get("projlist")
+                iCountAddB = approval_parse_adding(profile, projlist, instance) 
+
                 # See if and how many changes are suggested
                 iCount, bNeedReload = approval_parse_changes(profile, cleaned_data, instance)
                 if bNeedReload:
                     # Signal that we need to have a re-load
                     self.bNeedReload = True
-
-                # Issue #517: submit request to add this SSG to indicated project(s)
-                addprojlist = form.cleaned_data.get("addprojlist")
-                iCount = approval_parse_adding(profile, addprojlist, instance) 
 
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:

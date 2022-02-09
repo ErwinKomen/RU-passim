@@ -1949,7 +1949,7 @@ var ru = (function ($, ru) {
                   .selectAll("line")
                   .data(options['links'])
                   .join("line")
-                  // .join("polyline")
+                  // .join("polyline")  // See issue #511
                   .attr("class", function (d) {
                     var m = "linktype_" + d.linktype;
                     return m;

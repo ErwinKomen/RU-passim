@@ -25,7 +25,7 @@ import csv
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
-from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup
+from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
@@ -193,68 +193,81 @@ def dct_manulist(lst_manu, bDebug=False):
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
     """Renders the MyPassim page (=PRE)."""
-    assert isinstance(request, HttpRequest)
-    # Specify the template
-    template_name = 'mypassim.html'
-    context =  {'title':'My Passim',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
-    context = get_application_context(request, context)
+    
+    oErr = ErrHandle()
+    try:
+        # Get the request right
+        assert isinstance(request, HttpRequest)
 
-    profile = Profile.get_user_profile(request.user.username)
-    context['profile'] = profile
-    context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
-    context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
-    context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+        # Double check: the person must have been logged-in
+        if not user_is_authenticated(request):
+            # Indicate that use must log in
+            return nlogin(request)
 
-    # Figure out any editing rights
-    qs = profile.projects.all()
-    context['edit_projects'] = "(none)"
-    if context['is_app_editor'] and qs.count() > 0:
-        html = []
-        for obj in qs:
-            url = reverse('project2_details', kwargs={'pk': obj.id})
-            html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
-        context['edit_projects'] = ",".join(html)
+        # Specify the template
+        template_name = 'mypassim.html'
+        context =  {'title':'My Passim',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
+        context = get_application_context(request, context)
 
-    # Figure out which projects this editor may handle
-    if context['is_app_editor']:
-        qs = profile.project_editor.filter(status="incl")
-        if qs.count() == 0:
-            sDefault = "(none)"
-        else:
+        profile = Profile.get_user_profile(request.user.username)
+        context['profile'] = profile
+        context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
+        context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
+        context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+
+        # Figure out any editing rights
+        qs = profile.projects.all()
+        context['edit_projects'] = "(none)"
+        if context['is_app_editor'] and qs.count() > 0:
             html = []
             for obj in qs:
-                project = obj.project
-                url = reverse('project2_details', kwargs={'pk': project.id})
-                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
-            sDefault = ", ".join(html)
-        context['default_projects'] = sDefault
+                url = reverse('project2_details', kwargs={'pk': obj.id})
+                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
+            context['edit_projects'] = ",".join(html)
 
-    # Make sure to check (and possibly create) EqualApprove items for this user
-    iCount = EqualChange.check_projects(profile)
+        # Figure out which projects this editor may handle
+        if context['is_app_editor']:
+            qs = profile.project_editor.filter(status="incl")
+            if qs.count() == 0:
+                sDefault = "(none)"
+            else:
+                html = []
+                for obj in qs:
+                    project = obj.project
+                    url = reverse('project2_details', kwargs={'pk': project.id})
+                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                sDefault = ", ".join(html)
+            context['default_projects'] = sDefault
 
-    # What about the field changes that I have suggested?
-    context['count_fchange_all'] = profile.profileproposals.count()
-    context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
+        # Make sure to check (and possibly create) EqualApprove items for this user
+        iCount = EqualChange.check_projects(profile)
 
-    # How many do I need to approve?    
-    context['count_approve_all'] = profile.profileapprovals.count()
-    context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+        # What about the field changes that I have suggested?
+        context['count_fchange_all'] = profile.profileproposals.count()
+        context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
 
-    # What about the SSG/AFs that I have suggested?
-    context['count_afadd_all'] = profile.profileaddings.count()
-    context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
+        # How many do I need to approve?    
+        context['count_approve_all'] = profile.profileapprovals.count()
+        context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
 
-    # How many SSG/AFs do I need to approve?    
-    context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
-    context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
+        # What about the SSG/AFs that I have suggested?
+        context['count_afadd_all'] = profile.profileaddings.count()
+        context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
 
-    # How many do I need to approve?
+        # How many SSG/AFs do I need to approve?    
+        context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
+        context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
 
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
+        # How many do I need to approve?
+
+        # Process this visit
+        context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("mypassim")
 
     return render(request,template_name, context)
 
