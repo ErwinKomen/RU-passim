@@ -6517,7 +6517,9 @@ var ru = (function ($, ru) {
                 break;
             }
           } else {
-            m = or(d.value).toString();
+            // Issue #510: make all lines equal in blackness
+            // WAS: sm = or(d.value).toString();
+            m = "0.8";
           }
           return m;
         } catch (ex) {
