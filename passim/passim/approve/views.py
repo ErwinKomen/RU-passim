@@ -375,10 +375,10 @@ def approval_parse_adding(profile, qs_projlist, super):
             for prj in qs_projlist:
                 # Check if we have an EqualAdd object for this
                 #  (don't include [profile] in this test; a different user may have suggested the same thing)
-                obj = EqualAdd.objects.filter(project=prj, equal=super).first()
+                obj = EqualAdd.objects.filter(project=prj, super=super).first()                
                 if obj is None:
                     # Create an object
-                    obj = EqualAdd.objects.create(project=prj, equal=super, profile=profile)
+                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile) 
                     # Increment the counter
                     iCount += 1
 
@@ -611,7 +611,7 @@ class EqualAddList(BasicList):
     order_heads = [
         {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
         {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},        
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True},        
         {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
@@ -636,7 +636,7 @@ class EqualAddList(BasicList):
         if self.prefix == "all":
             # Provide all changes
             self.plural_name = "All Authority File additions"
-            self.sg_name = "Authoriy File addition"
+            self.sg_name = "Authority File addition"
         elif self.prefix == "user":
             # Restricted to a particular user...
             self.plural_name = "User Authority Files additions"
@@ -645,8 +645,8 @@ class EqualAddList(BasicList):
             self.order_default = ['saved', 'super__code', 'atype']
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},                
-                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True},              
+                {'name': 'Status',          'order': 'o=3', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
                 {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -859,7 +859,7 @@ class EqualAddEdit(BasicDetails): # Waarom is dit niet op basis van BasicEdit?
             #{'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()},      #,   'field_key': 'field'},
             {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
             {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},     #,  'field_key': 'atype'},
-            {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current", profile)},
+            #{'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current", profile)},
             #{'type': 'safe',  'label': "Proposed:",     'value': equalchange_json_to_html(instance, "change", profile)},
             ]
         # Only add the 'comment', if it is there (and read-only)
@@ -1256,8 +1256,8 @@ class EqualAddApprovalList(BasicList):
     order_heads = [
         {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
         {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},       
-        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True},       
+        {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
         {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -1290,7 +1290,7 @@ class EqualAddApprovalList(BasicList):
             self.order_default = ['-saved', 'add__super__code', 'atype']
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},                
+                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True},                
                 {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
@@ -1624,14 +1624,14 @@ class EqualAddApprovalEdit(BasicDetails):
             mainitems_main = [
                 # -------- HIDDEN field values (these are defined in [EqualApprovalForm] ---------------
                 {'type': 'plain', 'label': "Profile id",    'value': profile.id,        'field_key': "profile", 'empty': 'hide'},
-                {'type': 'plain', 'label': "Add id",     'value': instance.add.id,'field_key': "add",  'empty': 'hide'},
+                {'type': 'plain', 'label': "Add id",     'value': instance.add.id,      'field_key': "add",  'empty': 'hide'},
                 # --------------------------------------------
                 {'type': 'plain', 'label': "Authority File:",'value': instance.add.get_code_html()},         #,   'field_key': 'super'},                
                 {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},             #,   'field_key': 'atype'},
                 {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment_html()},              #,   'field_key': 'comment'},
-                {'type': 'safe',  'label': "Current:",      'value': equaladd_json_to_html(instance.add, "current", profile)},
-                {'type': 'safe',  'label': "Proposed:",     'value': equaladd_json_to_html(instance.add, "add", profile)},
+                #{'type': 'safe',  'label': "Current:",      'value': equaladd_json_to_html(instance.add, "current", profile)},
+                #{'type': 'safe',  'label': "Proposed:",     'value': equaladd_json_to_html(instance.add, "add", profile)},
                 ]
             # Only add the 'comment', if it is there (and read-only)
             if locked:
@@ -1642,7 +1642,7 @@ class EqualAddApprovalEdit(BasicDetails):
                 # Make sure fields status and comment are editable
                 editables = {'Status:': 'atype', 'Comment:': 'comment'}
                 for item in mainitems_main:
-                    if item['label'] in editables:
+                    if item['label'] in editables:  
                         item['field_key'] = editables[item['label']]
 
             for item in mainitems_main: 
@@ -1763,7 +1763,8 @@ class EqualAddApprovalDetails(EqualAddApprovalEdit):
                 rel_list.append(dict(id=item.id, cols=rel_item))
 
             approvers['rel_list'] = rel_list
-
+            
+            # Dit is het onderste gedeelte, de table
             approvers['columns'] = [
                 '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
                 '{}<span>Approver</span>{}'.format(sort_start, sort_end), 

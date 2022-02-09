@@ -145,7 +145,7 @@
               </td>
               <td valign="top">
                 <a href="{% url 'equaladduser_list' %}?user-atype=def" role="button" title="View my pending Authority File additions" 
-                   class="btn btn-xs {% if count_fchange_open == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
+                   class="btn btn-xs {% if count_afadd_open == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
                   {{count_afadd_open}}
                   <span class="glyphicon glyphicon-edit" title="View my pending Authority File additions"></span>
                 </a>
@@ -159,15 +159,15 @@
             <tr>
               <td valign="top" class="hangingindent">New AF additions that I need to review:</td>
               <td valign="top">
-                <a href="{% url 'equaladdapprovaluser_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
+                <a href="{% url 'equaladdapprovalall_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
                   {{count_afaddapprove_all}}
                   <span class="glyphicon glyphicon-check" title="View all my reviews of AF additions"></span>
                 </a>
               </td>
               <td valign="top">
                 <a href="{% url 'equaladdapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF additions" 
-                   class="btn btn-xs {% if count_approve_task == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
-                  {{count_afaddapprove_all}}
+                   class="btn btn-xs {% if count_afaddapprove_task == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
+                  {{count_afaddapprove_task}}
                   <span class="glyphicon glyphicon-edit" title="View my pending reviews of AF additions"></span>
                 </a>
               </td>

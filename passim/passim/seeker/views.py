@@ -11820,7 +11820,7 @@ class EqualGoldEdit(BasicDetails):
 
                 # Issue #517: submit request to add this SSG to indicated project(s)
                 addprojlist = form.cleaned_data.get("addprojlist")
-                iCount = approval_parse_adding(profile, addprojlist, instance)
+                iCount = approval_parse_adding(profile, addprojlist, instance) 
 
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:

@@ -413,16 +413,16 @@ class EqualAdd(models.Model):
 
     def check_approval(self):
         """Check if all who need it have an EqualAddApproval object for this one"""
-
+        # Not yet working
         oErr = ErrHandle()
         iCount = 0
         try:
             # Check which editors should have an approval object (excluding myself)
             add = self
             profile = self.profile
-            lst_approver = add.get_approver_list(profile)
+            lst_approver = add.get_approver_list(profile) # Hierna vliegt hij eruit is leeg
             for approver in lst_approver:
-                # Check if an EqualAddApproval exists
+                # Check if an EqualAddApproval exists TH gaat het mis?
                 approval = EqualAddApproval.objects.filter(add=add, profile=approver).first()
                 if approval is None:
                     # Create one
@@ -461,8 +461,12 @@ class EqualAdd(models.Model):
             # Default: return the empty list
             lstBack = Profile.objects.none()
             # Get all the projects to which this SSG 'belongs'
-            lst_project = [x['id'] for x in self.super.projects.all().values("id")]
-            # Note: only SSGs that belong to more than one project need to be reviewed
+            lst_project = [x['id'] for x in self.super.projects.all().values("id")] # Hier gaat het mis, hij pikt hier niet het nieuwe project op.
+            # Get the id of the new project
+            id_new_project = self.project_id
+            # Add this to the list
+            lst_project.append(id_new_project)
+            # Note: only SSGs that belong to more than one project need to be reviewed 
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
                 lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
@@ -551,7 +555,7 @@ class EqualAdd(models.Model):
         response = super(EqualAdd, self).save(force_insert, force_update, using, update_fields)
 
         # Check whether all needed approvers have an EqualApproval object
-        self.check_approval()
+        self.check_approval() # Hierna mis?
 
         # Return the response when saving
         return response
