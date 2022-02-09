@@ -2113,19 +2113,23 @@ var ru = (function ($, ru) {
             // (but note: CSS prevents lines from scaling)
             g.attr("transform", event.transform);
 
-            /*
-            link.style("stroke-width", function (d) {
-              var width;
-              // Issue #510: used to be:
-              //width = widthrange(d.value);
-              width = fixed_width;
-              return width;
-            });
-
-            link.style("stroke", function (d) {
-              var m = ru.passim.seeker.overlap_stroke(d);
-              return m;
-            });*/
+            // EK While looking at issue #510, #511, I saw that the code below
+            //             causes the 'hover' effect to disappear, which is a pity
+            //
+            // EK Possibly remove completely in time??
+            //
+            //link.style("stroke-width", function (d) {
+            //  var width;
+            //  // Issue #510: used to be:
+            //  //width = widthrange(d.value);
+            //  width = fixed_width;
+            //  return width;
+            //});
+            //
+            //link.style("stroke", function (d) {
+            //  var m = ru.passim.seeker.overlap_stroke(d);
+            //  return m;
+            //});*/
 
             // Make sure that the circle retain their size by dividing by the scale factor
             node.selectAll("circle")
