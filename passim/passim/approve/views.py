@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2
 from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
@@ -360,6 +360,33 @@ def equalchange_json_to_accept(instance):
         oErr.DoError("equalchange_json_to_accept")
         bBack = False
     return bBack
+
+def approval_parse_adding(profile, qs_projlist, super):
+    """Process this user [profile] suggesting to add SSG [super] to projects [addprojlist]
+    
+    Note: this function is called from seeker/view EqualGoldEdit, before_save()
+    """
+
+    oErr = ErrHandle
+    iCount = 0
+    try:
+        # Walk all the projects to which this project is supposed to be added
+        if len(qs_projlist) > 0:
+            for prj in qs_projlist:
+                # Check if we have an EqualAdd object for this
+                #  (don't include [profile] in this test; a different user may have suggested the same thing)
+                obj = EqualAdd.objects.filter(project=prj, equal=super).first()
+                if obj is None:
+                    # Create an object
+                    obj = EqualAdd.objects.create(project=prj, equal=super, profile=profile)
+                    # Increment the counter
+                    iCount += 1
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("approval_parse_adding")
+        iCount = 0
+    return iCount
 
 def approval_parse_changes(profile, cleaned_data, super):
     """Check if there are any changes, add them into EqualChange objects, and return how many there are"""

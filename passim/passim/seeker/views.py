@@ -88,7 +88,8 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
-from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list
+from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
+    approval_parse_adding, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -11588,12 +11589,23 @@ class EqualGoldEdit(BasicDetails):
                     context['mainitems'].append(dict(
                         type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
 
-                # Special processing for moderator
+                # Special processing for those with editing rights
                 if may_edit_project(self.request, profile, instance):
+
+                    # Adapt the PROJECT line in the mainitems list
                     for oItem in context['mainitems']:
                         if oItem['label'] == "Project:":
                             # Add the list
                             oItem['field_list'] = "projlist"
+                            # We can now leave from here
+                            break
+                    # Any editor may suggest that an SSG be added to other project(s)
+                    oItem = dict(type="plain", 
+                                 label="Add to project",
+                                 title="Submit a request to add this SSG to the following project(s)",
+                                 value=self.get_prj_submitted(instance))
+                    oItem['field_list'] = "addprojlist"
+                    context['mainitems'].append(oItem)
 
                 # THe SSG items that have a value in *moved* may not be editable
                 editable = (instance.moved == None)
@@ -11751,6 +11763,30 @@ class EqualGoldEdit(BasicDetails):
                 oBack = dict(super_id=self.object.id)
 
         return oBack
+
+    def get_prj_submitted(self, instance):
+        """Get an HTML list of projects to which this SSG has already been submitted"""
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            # Get the list of EqualAdd objects (with atype ['def', 'mod'], i.e. not yet accepted)
+            qs = addapproval_pending(instance)
+
+            lHtml = []
+            # Visit all project items
+            for obj in qs:
+                project = obj.project
+                # Determine where clicking should lead to
+                url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project.id) 
+                # Create a display for this topic
+                lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+            sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldEdit/get_prj_submitted")
+            bBack = ""
+
+        return sBack
            
     def before_save(self, form, instance):
         oErr = ErrHandle()
@@ -11781,6 +11817,10 @@ class EqualGoldEdit(BasicDetails):
                 if bNeedReload:
                     # Signal that we need to have a re-load
                     self.bNeedReload = True
+
+                # Issue #517: submit request to add this SSG to indicated project(s)
+                addprojlist = form.cleaned_data.get("addprojlist")
+                iCount = approval_parse_adding(profile, addprojlist, instance)
 
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:
@@ -11817,6 +11857,7 @@ class EqualGoldEdit(BasicDetails):
                     # Issue #473: automatic assignment of project for particular editor(s)
                     projlist = form.cleaned_data.get("projlist")
                     bBack, msg = evaluate_projlist(profile, instance, projlist, "Authority File")
+
                 else:
                     # The changes may *NOT* be committed
                     msg = None   # "The suggested changes will be reviewed by the other projects' editors"
