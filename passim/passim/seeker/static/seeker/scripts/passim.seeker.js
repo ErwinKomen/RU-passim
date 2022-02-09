@@ -1785,7 +1785,7 @@ var ru = (function ($, ru) {
 
       /**
        * draw_network_overlap
-       *    draw a force-directed network similar to the on by Boodts & Denis "A sermon by any other name?"
+       *    draw a force-directed network similar to the one by Boodts & Denis "A sermon by any other name?"
        *
        * See: https://observablehq.com/@d3/force-directed-graph
        *
@@ -1812,6 +1812,7 @@ var ru = (function ($, ru) {
             i,
             count,
             max_width = 2,
+            fixed_width = 1,
             max_value = 1,
             max_group = 1,
             bDoTransform = true,
@@ -1947,7 +1948,8 @@ var ru = (function ($, ru) {
                   .attr("class", "links")
                   .selectAll("line")
                   .data(options['links'])
-                  .join("line")
+                  //.join("line")
+                  .join("polyline")
                   .attr("class", function (d) {
                     var m = "linktype_" + d.linktype;
                     return m;
@@ -1975,23 +1977,27 @@ var ru = (function ($, ru) {
                     return m;
                   })
                   .attr("stroke-width", function (d) {
-                    // return (max_width * d.value / max_value);
-                    return widthrange(d.value);
+                    var width;
+                    // Issue #510: used to be:
+                    //width = widthrange(d.value);
+                    width = fixed_width;
+                    return width;
                   })
-                  .attr("marker-end", function (d) {
+                  .attr("marker-mid", function (d) {
                     var m = ru.passim.seeker.overlap_marker_end(d);
                     return m;
                   })
-                  .attr("marker-end-copy", function (d) {
+                  .attr("marker-mid-copy", function (d) {
                     var m = ru.passim.seeker.overlap_marker_end(d);
                     return m;
                   })
-                  //.on("mousover", function (d) {
-                  //  return 5;
+                  //.attr("marker-end", function (d) {
+                  //  var m = ru.passim.seeker.overlap_marker_end(d);
+                  //  return m;
                   //})
-                  //.on("mouseout", function (d) {
-                  //  // return (max_width * d.value / max_value);
-                  //  return widthrange(d.value);
+                  //.attr("marker-end-copy", function (d) {
+                  //  var m = ru.passim.seeker.overlap_marker_end(d);
+                  //  return m;
                   //})
           ;
           node = g.append("g")
@@ -2107,15 +2113,19 @@ var ru = (function ($, ru) {
             // (but note: CSS prevents lines from scaling)
             g.attr("transform", event.transform);
 
+            /*
             link.style("stroke-width", function (d) {
-              // return (max_width * d.value / max_value);
-              return widthrange(d.value);
+              var width;
+              // Issue #510: used to be:
+              //width = widthrange(d.value);
+              width = fixed_width;
+              return width;
             });
 
             link.style("stroke", function (d) {
               var m = ru.passim.seeker.overlap_stroke(d);
               return m;
-            });
+            });*/
 
             // Make sure that the circle retain their size by dividing by the scale factor
             node.selectAll("circle")
@@ -2166,10 +2176,25 @@ var ru = (function ($, ru) {
               return `translate(${ix},${iy})`
             });
 
-            link.attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
+            link.attr("points", function (d) {
+              var sBack;
+              sBack = d.source.x + "," + d.source.y + " " +
+                      (d.source.x + d.target.x) / 2 + "," + (d.source.y + d.target.y) / 2 + " " +
+                      d.target.x + "," + d.target.y;
+              return sBack;
+            })
+
+            // Before issue #511
+            link.attr("x1", d => d.target.x)
+                .attr("y1", d => d.target.y)
+                .attr("x2", d => d.source.x)
+                .attr("y2", d => d.source.y);
+
+            // Original
+            //link.attr("x1", d => d.source.x)
+            //    .attr("y1", d => d.source.y)
+            //    .attr("x2", d => d.target.x)
+            //    .attr("y2", d => d.target.y);
           }
 
           function rectCollide(node) {
@@ -6391,15 +6416,15 @@ var ru = (function ($, ru) {
           if (bShow) {
             $("svg line." + linktype).each(function (idx, el) {
               var opacity = $(el).attr("stroke-opacity-copy"),
-                  marker_end = $(el).attr("marker-end-copy");
+                  marker_end = $(el).attr("marker-mid-copy");
               $(el).attr("stroke-opacity", opacity);
-              $(el).attr("marker-end", marker_end);
+              $(el).attr("marker-mid", marker_end);
             });
             loc_network_linktypes.push(linktype.replace("linktype_", ""));
           } else {
             $("svg line." + linktype)
               .attr("stroke-opacity", "0.02")
-              .attr("marker-end", "");
+              .attr("marker-mid", "");
             // Remove it from the list
             idx = loc_network_linktypes.indexOf(linktype.replace("linktype_", ""));
             if (idx >= 0) {
@@ -6427,11 +6452,17 @@ var ru = (function ($, ru) {
             switch (d.spectype) {
               case "usd":
               case "usi":
-                sResponse = "";
+                // Was:
+                // sResponse = "";
+                // Issue #511:
+                sResponse = sArrow;
                 break;
               case "udd":
               case "udi":
-                sResponse = sArrow;
+                // was:
+                // sResponse = sArrow;
+                // Issue #511:
+                sResponse = "";
                 break;
               default:
                 sResponse = "";
