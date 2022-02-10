@@ -117,7 +117,6 @@ class EqualAddForm(forms.ModelForm):
         return None
 
 
-
 class EqualAddApprovalForm(forms.ModelForm):
     """Form to list and to edit EqualAddApproval items"""
 
