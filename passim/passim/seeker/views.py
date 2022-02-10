@@ -89,7 +89,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
-    approval_parse_adding, addapproval_pending
+    approval_parse_adding, approval_parse_removing, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -11606,6 +11606,13 @@ class EqualGoldEdit(BasicDetails):
                                  value=self.get_prj_submitted(instance))
                     oItem['field_list'] = "addprojlist"
                     context['mainitems'].append(oItem)
+                    # Any editor may suggest that an SSG be deleted from particular project(s)
+                    oItem = dict(type="plain", 
+                                 label="Remove from project",
+                                 title="Submit a request to remove this SSG from the following project(s)",
+                                 value=self.get_prj_submitted(instance))
+                    oItem['field_list'] = "delprojlist"
+                    context['mainitems'].append(oItem)
 
                 # THe SSG items that have a value in *moved* may not be editable
                 editable = (instance.moved == None)
@@ -11812,15 +11819,24 @@ class EqualGoldEdit(BasicDetails):
                 # Get the cleaned data: this is the new stuff
                 cleaned_data = form.cleaned_data
 
+                # Issue #517: submit request to add this SSG to indicated project(s)
+                # Process the line "Add to a project"
+                addprojlist = form.cleaned_data.get("addprojlist")
+                iCountAddA = approval_parse_adding(profile, addprojlist, instance) 
+
+                # Process the line "Add to a project"
+                delprojlist = form.cleaned_data.get("delprojlist")
+                iCountAddB = approval_parse_removing(profile, delprojlist, instance) 
+
+                # Process the line "Project"
+                projlist = form.cleaned_data.get("projlist")
+                iCountAddC = approval_parse_adding(profile, projlist, instance) 
+
                 # See if and how many changes are suggested
                 iCount, bNeedReload = approval_parse_changes(profile, cleaned_data, instance)
                 if bNeedReload:
                     # Signal that we need to have a re-load
                     self.bNeedReload = True
-
-                # Issue #517: submit request to add this SSG to indicated project(s)
-                addprojlist = form.cleaned_data.get("addprojlist")
-                iCount = approval_parse_adding(profile, addprojlist, instance) 
 
                 # Only proceed if changes don't need to be reviewed by others
                 if iCount == 0:

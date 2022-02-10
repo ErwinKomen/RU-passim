@@ -2733,6 +2733,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     addprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    delprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     scount      = forms.IntegerField(min_value=-1, required=False,
@@ -2809,6 +2811,8 @@ class SuperSermonGoldForm(PassimModelForm):
             current_proj_ids = [x.id for x in self.fields['projlist'].queryset]
             self.fields['addprojlist'].queryset = Project2.objects.exclude(id__in=current_proj_ids).order_by('name').distinct()
             self.fields['addprojlist'].widget.queryset = self.fields['addprojlist'].queryset
+            self.fields['delprojlist'].queryset = Project2.objects.filter(id__in=current_proj_ids).order_by('name').distinct()
+            self.fields['delprojlist'].widget.queryset = self.fields['delprojlist'].queryset
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',

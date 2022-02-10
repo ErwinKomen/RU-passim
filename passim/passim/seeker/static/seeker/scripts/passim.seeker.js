@@ -1948,8 +1948,8 @@ var ru = (function ($, ru) {
                   .attr("class", "links")
                   .selectAll("line")
                   .data(options['links'])
-                  //.join("line")
-                  .join("polyline")
+                  .join("line")
+                  // .join("polyline")  // See issue #511
                   .attr("class", function (d) {
                     var m = "linktype_" + d.linktype;
                     return m;
@@ -1983,22 +1983,22 @@ var ru = (function ($, ru) {
                     width = fixed_width;
                     return width;
                   })
-                  .attr("marker-mid", function (d) {
-                    var m = ru.passim.seeker.overlap_marker_end(d);
-                    return m;
-                  })
-                  .attr("marker-mid-copy", function (d) {
-                    var m = ru.passim.seeker.overlap_marker_end(d);
-                    return m;
-                  })
-                  //.attr("marker-end", function (d) {
+                  //.attr("marker-mid", function (d) {
                   //  var m = ru.passim.seeker.overlap_marker_end(d);
                   //  return m;
                   //})
-                  //.attr("marker-end-copy", function (d) {
+                  //.attr("marker-mid-copy", function (d) {
                   //  var m = ru.passim.seeker.overlap_marker_end(d);
                   //  return m;
                   //})
+                  .attr("marker-end", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  })
+                  .attr("marker-end-copy", function (d) {
+                    var m = ru.passim.seeker.overlap_marker_end(d);
+                    return m;
+                  })
           ;
           node = g.append("g")
                   .attr("class", "nodes")
@@ -2180,15 +2180,16 @@ var ru = (function ($, ru) {
               return `translate(${ix},${iy})`
             });
 
-            link.attr("points", function (d) {
-              var sBack;
-              sBack = d.source.x + "," + d.source.y + " " +
-                      (d.source.x + d.target.x) / 2 + "," + (d.source.y + d.target.y) / 2 + " " +
-                      d.target.x + "," + d.target.y;
-              return sBack;
-            })
+            // Halfway points, issue #511, was shot down :)
+            //link.attr("points", function (d) {
+            //  var sBack;
+            //  sBack = d.source.x + "," + d.source.y + " " +
+            //          (d.source.x + d.target.x) / 2 + "," + (d.source.y + d.target.y) / 2 + " " +
+            //          d.target.x + "," + d.target.y;
+            //  return sBack;
+            //})
 
-            // Before issue #511
+            // After issue #511
             link.attr("x1", d => d.target.x)
                 .attr("y1", d => d.target.y)
                 .attr("x2", d => d.source.x)
@@ -6420,15 +6421,15 @@ var ru = (function ($, ru) {
           if (bShow) {
             $("svg line." + linktype).each(function (idx, el) {
               var opacity = $(el).attr("stroke-opacity-copy"),
-                  marker_end = $(el).attr("marker-mid-copy");
+                  marker_end = $(el).attr("marker-end-copy");
               $(el).attr("stroke-opacity", opacity);
-              $(el).attr("marker-mid", marker_end);
+              $(el).attr("marker-end", marker_end);
             });
             loc_network_linktypes.push(linktype.replace("linktype_", ""));
           } else {
             $("svg line." + linktype)
               .attr("stroke-opacity", "0.02")
-              .attr("marker-mid", "");
+              .attr("marker-end", "");
             // Remove it from the list
             idx = loc_network_linktypes.indexOf(linktype.replace("linktype_", ""));
             if (idx >= 0) {
@@ -6517,7 +6518,9 @@ var ru = (function ($, ru) {
                 break;
             }
           } else {
-            m = or(d.value).toString();
+            // Issue #510: make all lines equal in blackness
+            // WAS: sm = or(d.value).toString();
+            m = "0.8";
           }
           return m;
         } catch (ex) {

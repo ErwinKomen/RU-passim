@@ -362,7 +362,7 @@ def equalchange_json_to_accept(instance):
     return bBack
 
 def approval_parse_adding(profile, qs_projlist, super):
-    """Process this user [profile] suggesting to add SSG [super] to projects [addprojlist]
+    """Process this user [profile] suggesting to ADD SSG [super] to projects [qs_projlist]
     
     Note: this function is called from seeker/view EqualGoldEdit, before_save()
     """
@@ -385,6 +385,33 @@ def approval_parse_adding(profile, qs_projlist, super):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("approval_parse_adding")
+        iCount = 0
+    return iCount
+
+def approval_parse_removing(profile, qs_projlist, super):
+    """Process this user [profile] suggesting to REMOVE SSG [super] from projects [qs_projlist]
+    
+    Note: this function is called from seeker/view EqualGoldEdit, before_save()
+    """
+
+    oErr = ErrHandle
+    iCount = 0
+    try:
+        # Walk all the projects to which this project is supposed to be added
+        if len(qs_projlist) > 0:
+            for prj in qs_projlist:
+                # Check if we have an EqualAdd object for this
+                #  (don't include [profile] in this test; a different user may have suggested the same thing)
+                obj = EqualAdd.objects.filter(project=prj, super=super).first()                
+                if obj is None:
+                    # Create an object
+                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile) 
+                    # Increment the counter
+                    iCount += 1
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("approval_parse_removing")
         iCount = 0
     return iCount
 
