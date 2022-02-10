@@ -11819,43 +11819,6 @@ class EqualGoldEdit(BasicDetails):
                 # Get the cleaned data: this is the new stuff
                 cleaned_data = form.cleaned_data
 
-                # Issue #517: submit request to add this SSG to indicated project(s)
-                # Process the line "Add to a project"
-                addprojlist = form.cleaned_data.get("addprojlist")
-                allow_adding = []
-                iCountAddA = approval_parse_adding(profile, addprojlist, instance, allow_adding) 
-                if len(allow_adding) > 0:
-                    # Some combinations of Project-SSG may be added right away
-                    with transaction.atomic():
-                        for oItem in allow_adding:
-                            equal = oItem.get("super")
-                            project = oItem.get("project")
-                            if not equal is None and not project is None:
-                                obj = EqualGoldProject.objects.create(equal=equal, project=project)
-
-                # Process the line "Remove from a project"
-                # Sanity: the number of current projects to the SSG must be > 1
-                if instance.projects.count() > 1:
-                    delprojlist = form.cleaned_data.get("delprojlist")
-                    allow_removing = []
-                    iCountAddB = approval_parse_removing(profile, delprojlist, instance, allow_removing) 
-                    if len(allow_removing) > 0:
-                        # There are some project-SSG associations that may be removed right away
-                        delete_id = []
-                        for oItem in allow_removing:
-                            equal = oItem.get("super")
-                            project = oItem.get("project")
-                            if not equal is None and not project is None:
-                                obj = EqualGoldProject.objects.filter(equal=equal, project=project).first()
-                                delete_id.append(obj.id)
-                        # Now delete them
-                        if len(delete_id) > 0:
-                            EqualGoldProject.objects.delete(delete_id)
-
-                # Process the line "Project"
-                projlist = form.cleaned_data.get("projlist")
-                iCountAddC = approval_parse_adding(profile, projlist, instance) 
-
                 # See if and how many changes are suggested
                 iCount, bNeedReload = approval_parse_changes(profile, cleaned_data, instance)
                 if bNeedReload:
@@ -11931,10 +11894,73 @@ class EqualGoldEdit(BasicDetails):
         return bBack, msg
 
     def after_save(self, form, instance):
+
+        def process_proj_adding(profile, projlist):
+            oErr = ErrHandle()
+
+            try:
+                allow_adding = []
+                iCountAdd = approval_parse_adding(profile, projlist, instance, allow_adding) 
+                if len(allow_adding) > 0:
+                    # Some combinations of Project-SSG may be added right away
+                    with transaction.atomic():
+                        for oItem in allow_adding:
+                            equal = oItem.get("super")
+                            project = oItem.get("project")
+                            if not equal is None and not project is None:
+                                obj = EqualGoldProject.objects.create(equal=equal, project=project)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("process_proj_adding")
+            return True
+
+        def process_proj_removing(profile, projlist):
+            oErr = ErrHandle()
+
+            try:
+                if instance.projects.count() > 1:
+                    allow_removing = []
+                    iCountAddB = approval_parse_removing(profile, projlist, instance, allow_removing) 
+                    if len(allow_removing) > 0:
+                        # There are some project-SSG associations that may be removed right away
+                        delete_id = []
+                        for oItem in allow_removing:
+                            equal = oItem.get("super")
+                            project = oItem.get("project")
+                            if not equal is None and not project is None:
+                                obj = EqualGoldProject.objects.filter(equal=equal, project=project).first()
+                                delete_id.append(obj.id)
+                        # Now delete them
+                        if len(delete_id) > 0:
+                            EqualGoldProject.objects.delete(delete_id)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("process_proj_removing")
+            return True
+
+        def get_proj_add_remove(projlist):
+            """Split the list of projects into those being added and those being removed"""
+            oErr = ErrHandle()
+            addprojlist = []
+            delprojlist = []
+            try:
+                projcurrent = instance.projects.all()
+                for obj in projlist:
+                    # Check for addition
+                    if obj in projlist and not obj in projcurrent:
+                        addprojlist.append(obj)
+                    elif obj in projcurrent and not obj in projlist:
+                        delprojlist.append(obj)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_proj_add_remove")
+            return addprojlist, delprojlist
+
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
-        
+                
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
@@ -11994,9 +12020,24 @@ class EqualGoldEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            equal_proj_deleted = []
-            adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project", deleted=equal_proj_deleted)
-            project_dependant_delete(self.request, equal_proj_deleted)
+            # === EK: CODE PRIOR TO #517 =====
+            #equal_proj_deleted = []
+            #adapt_m2m(EqualGoldProject, instance, "equal", projlist, "project", deleted=equal_proj_deleted)
+            #project_dependant_delete(self.request, equal_proj_deleted)
+            # ================================
+            # Figure out what are the proposed additions, and what are the proposed deletions
+            addprojlist, delprojlist = get_proj_add_remove(projlist)
+            process_proj_adding(profile, addprojlist)
+            process_proj_removing(profile, delprojlist)
+
+            # Issue #517: submit request to add this SSG to indicated project(s)
+            # Process the line "Add to a project"
+            addprojlist = form.cleaned_data.get("addprojlist")
+            process_proj_adding(profile, addprojlist)
+
+            # Process the line "Remove from a project"
+            delprojlist = form.cleaned_data.get("delprojlist")
+            process_proj_removing(profile, delprojlist)
 
             # Issue #473: default project assignment
             if instance.projects.count() == 0:
