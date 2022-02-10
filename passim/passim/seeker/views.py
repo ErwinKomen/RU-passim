@@ -8499,7 +8499,7 @@ class CollectionListView(BasicList):
                      'keyS': 'ssgauthorname', 'keyFk': 'name', 'keyList': 'ssgauthorlist', 'infield': 'id', 'external': 'gold-authorname' },
                     {'filter': 'ssgincipit',   'dbfield': 'super_col__super__srchincipit',   'keyS': 'ssgincipit'},
                     {'filter': 'ssgexplicit',  'dbfield': 'super_col__super__srchexplicit',  'keyS': 'ssgexplicit'},
-                    {'filter': 'ssgcode',      'fkfield': 'super_col__super',              
+                    {'filter': 'ssgcode',      'fkfield': 'super_col__super', 'keyFk': 'code',           
                      'keyS': 'ssgcode', 'keyList': 'ssgpassimlist', 'infield': 'id'},
                     {'filter': 'ssgnumber',    'dbfield': 'super_col__super__number',       'keyS': 'ssgnumber'},
                     {'filter': 'ssgsignature', 'fkfield': 'super_col__super__equal_goldsermons__goldsignatures', 
