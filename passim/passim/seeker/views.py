@@ -11822,7 +11822,16 @@ class EqualGoldEdit(BasicDetails):
                 # Issue #517: submit request to add this SSG to indicated project(s)
                 # Process the line "Add to a project"
                 addprojlist = form.cleaned_data.get("addprojlist")
-                iCountAddA = approval_parse_adding(profile, addprojlist, instance) 
+                allow_adding = []
+                iCountAddA = approval_parse_adding(profile, addprojlist, instance, allow_adding) 
+                if len(allow_adding) > 0:
+                    # Some combinations of Project-SSG may be added right away
+                    with transaction.atomic():
+                        for oItem in allow_adding:
+                            equal = oItem.get("super")
+                            project = oItem.get("project")
+                            if not equal is None and not project is None:
+                                obj = EqualGoldProject.objects.create(equal=equal, project=project)
 
                 # Process the line "Remove from a project"
                 # Sanity: the number of current projects to the SSG must be > 1

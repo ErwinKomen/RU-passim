@@ -361,7 +361,7 @@ def equalchange_json_to_accept(instance):
         bBack = False
     return bBack
 
-def approval_parse_adding(profile, qs_projlist, super):
+def approval_parse_adding(profile, qs_projlist, super, allow_adding = None):
     """Process this user [profile] suggesting to ADD SSG [super] to projects [qs_projlist]
     
     Note: this function is called from seeker/view EqualGoldEdit, before_save()
@@ -377,10 +377,22 @@ def approval_parse_adding(profile, qs_projlist, super):
                 #  (don't include [profile] in this test; a different user may have suggested the same thing)
                 obj = EqualAdd.objects.filter(project=prj, super=super, action="add").first()                
                 if obj is None:
-                    # Create an object
-                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile, action="add") 
-                    # Increment the counter
-                    iCount += 1
+                    # Double check conditions: 
+                    # (1) status of the current user
+                    is_approver = profile.projects.filter(id=prj.id).exists()
+                    # (2) number of approvers for this project
+                    num_approvers = prj.project_editor.count()
+
+                    if is_approver and num_approvers == 1:
+                        # There is no need to ask for approval: the project may be added right away
+                        if not allow_adding is None:
+                            # Add info to allow_adding
+                            allow_adding.append(dict(project=prj, super=super))
+                    else:
+                        # Create an object
+                        obj = EqualAdd.objects.create(project=prj, super=super, profile=profile, action="add") 
+                        # Increment the counter
+                        iCount += 1
 
     except:
         msg = oErr.get_error_message()
