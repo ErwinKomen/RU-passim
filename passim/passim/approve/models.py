@@ -297,8 +297,8 @@ class EqualApproval(models.Model):
 
     def __str__(self):
         """Show this approval"""
-        sBack = "{}: [{}] on ssg {}={}".format(
-            self.profile.user.username, self.change.field, self.change.super.id, self.atype)
+        sBack = "{}: [{}] on ssg {}={}".format( # iets eruit halen?)
+            self.profile.user.username, self.change.field, self.change.super.id, self.atype) # iets eruit halen?
         return sBack
 
     def get_comment_html(self):
@@ -360,7 +360,7 @@ class EqualAdd(models.Model):
     
     def __str__(self):
         """Show who proposes which addition"""
-        sBack = "{}: [{}] on ssg {}".format(
+        sBack = "{}: [] on ssg {}".format(
             self.profile.user.username, self.super.id) 
         return sBack
 
@@ -443,7 +443,7 @@ class EqualAdd(models.Model):
             # Count the number of approvals I need to have
             iTotal = self.addapprovals.count()
             # Count the number of non-accepting approvals
-            iCount = self.addeapprovals.exclude(atype="acc").count()
+            iCount = self.addapprovals.exclude(atype="acc").count()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualAdd/get_approval_count") 
