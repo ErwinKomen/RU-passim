@@ -375,10 +375,10 @@ def approval_parse_adding(profile, qs_projlist, super):
             for prj in qs_projlist:
                 # Check if we have an EqualAdd object for this
                 #  (don't include [profile] in this test; a different user may have suggested the same thing)
-                obj = EqualAdd.objects.filter(project=prj, super=super).first()                
+                obj = EqualAdd.objects.filter(project=prj, super=super, action="add").first()                
                 if obj is None:
                     # Create an object
-                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile) 
+                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile, action="add") 
                     # Increment the counter
                     iCount += 1
 
@@ -388,7 +388,7 @@ def approval_parse_adding(profile, qs_projlist, super):
         iCount = 0
     return iCount
 
-def approval_parse_removing(profile, qs_projlist, super):
+def approval_parse_removing(profile, qs_projlist, super, allow_removing = None):
     """Process this user [profile] suggesting to REMOVE SSG [super] from projects [qs_projlist]
     
     Note: this function is called from seeker/view EqualGoldEdit, before_save()
@@ -402,12 +402,26 @@ def approval_parse_removing(profile, qs_projlist, super):
             for prj in qs_projlist:
                 # Check if we have an EqualAdd object for this
                 #  (don't include [profile] in this test; a different user may have suggested the same thing)
-                obj = EqualAdd.objects.filter(project=prj, super=super).first()                
+                obj = EqualAdd.objects.filter(project=prj, super=super, action="rem").first()                
                 if obj is None:
-                    # Create an object
-                    obj = EqualAdd.objects.create(project=prj, super=super, profile=profile) 
-                    # Increment the counter
-                    iCount += 1
+                    # Double check conditions: 
+                    # (1) number of projects attached to this SSG
+                    count_projects = super.projects.count()
+                    # (2) status of the current user
+                    is_approver = profile.projects.filter(id=prj.id).exists()
+                    # (3) number of approvers for this project
+                    num_approvers = prj.project_editor.count()
+
+                    if count_projects > 1 and is_approver and num_approvers == 1:
+                        # There is no need to ask for approval: the project may be removed right away
+                        if not allow_removing is None:
+                            # Add info to allow_removing
+                            allow_removing.append(dict(project=prj, super=super))
+                    else:
+                        # Create an object
+                        obj = EqualAdd.objects.create(project=prj, super=super, profile=profile, action="rem") 
+                        # Increment the counter
+                        iCount += 1
 
     except:
         msg = oErr.get_error_message()

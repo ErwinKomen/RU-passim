@@ -11824,9 +11824,24 @@ class EqualGoldEdit(BasicDetails):
                 addprojlist = form.cleaned_data.get("addprojlist")
                 iCountAddA = approval_parse_adding(profile, addprojlist, instance) 
 
-                # Process the line "Add to a project"
-                delprojlist = form.cleaned_data.get("delprojlist")
-                iCountAddB = approval_parse_removing(profile, delprojlist, instance) 
+                # Process the line "Remove from a project"
+                # Sanity: the number of current projects to the SSG must be > 1
+                if instance.projects.count() > 1:
+                    delprojlist = form.cleaned_data.get("delprojlist")
+                    allow_removing = []
+                    iCountAddB = approval_parse_removing(profile, delprojlist, instance, allow_removing) 
+                    if len(allow_removing) > 0:
+                        # There are some project-SSG associations that may be removed right away
+                        delete_id = []
+                        for oItem in allow_removing:
+                            equal = oItem.get("super")
+                            project = oItem.get("project")
+                            if not equal is None and not project is None:
+                                obj = EqualGoldProject.objects.filter(equal=equal, project=project).first()
+                                delete_id.append(obj.id)
+                        # Now delete them
+                        if len(delete_id) > 0:
+                            EqualGoldProject.objects.delete(delete_id)
 
                 # Process the line "Project"
                 projlist = form.cleaned_data.get("projlist")
