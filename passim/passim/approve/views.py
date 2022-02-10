@@ -632,8 +632,7 @@ def addapproval_pending_list(super):
         for obj in qs:
             saved = obj.created.strftime("%d/%b/%Y %H:%M") if not obj.saved else obj.saved.strftime("%d/%b/%Y %H:%M")
             oApproval = dict(
-                id=obj.id,
-                #field=obj.get_display_name(),
+                id=obj.id,                
                 editor=obj.profile.user.username,
                 atype=obj.get_atype_display(),
                 statushistory = obj.get_status_history(),
@@ -751,7 +750,7 @@ class EqualAddList(BasicList):
 
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("EqualChangeListView/adapt_search")
+            oErr.DoError("EqualAddListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
@@ -1344,10 +1343,10 @@ class EqualAddApprovalList(BasicList):
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
                 {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True},                
-                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                {'name': 'Status',          'order': 'o=3', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
-                {"name": "Authority File",       "id": "filter_code",      "enabled": False},
+                {"name": "Authority File",  "id": "filter_code",      "enabled": False},
                 {"name": "Approval type",   "id": "filter_approval",  "enabled": False},
                 ]
             self.searches = [

@@ -360,8 +360,9 @@ class EqualAdd(models.Model):
     
     def __str__(self):
         """Show who proposes which addition"""
-        sBack = "{}: [] on ssg {}".format(
+        sBack = "{}: on ssg {}".format(
             self.profile.user.username, self.super.id) 
+        print(sBack)
         return sBack
 
     def add_item(super, profile):
@@ -422,7 +423,7 @@ class EqualAdd(models.Model):
             profile = self.profile
             lst_approver = add.get_approver_list(profile) # Hierna vliegt hij eruit is leeg
             for approver in lst_approver:
-                # Check if an EqualAddApproval exists TH gaat het mis?
+                # Check if an EqualAddApproval exists 
                 approval = EqualAddApproval.objects.filter(add=add, profile=approver).first()
                 if approval is None:
                     # Create one
@@ -461,7 +462,7 @@ class EqualAdd(models.Model):
             # Default: return the empty list
             lstBack = Profile.objects.none()
             # Get all the projects to which this SSG 'belongs'
-            lst_project = [x['id'] for x in self.super.projects.all().values("id")] # Hier gaat het mis, hij pikt hier niet het nieuwe project op.
+            lst_project = [x['id'] for x in self.super.projects.all().values("id")] 
             # Get the id of the new project
             id_new_project = self.project_id
             # Add this to the list
@@ -510,7 +511,7 @@ class EqualAdd(models.Model):
             # Get the list of projects for this user
             lst_project_id = profile.projects.all().values("id")
             if len(lst_project_id) > 0:
-                # Get the list of EqualAdd objects linked to any of these projects # TH werkt dit nu?
+                # Get the list of EqualAdd objects linked to any of these projects 
                 lstQ = []
                 lstQ.append(Q(super__equal_proj__project__id__in=lst_project_id))
                 if not all:
@@ -547,7 +548,7 @@ class EqualAdd(models.Model):
             oErr.DoError("EqualAdd/get_status_history")
         return sBack
 
-    def save(self, force_insert = False, force_update = False, using = None, update_fields = None): # Wat moet hier weg?
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None): 
         # Adapt the save date
         self.saved = get_current_datetime()
 
@@ -555,7 +556,7 @@ class EqualAdd(models.Model):
         response = super(EqualAdd, self).save(force_insert, force_update, using, update_fields)
 
         # Check whether all needed approvers have an EqualApproval object
-        self.check_approval() # Hierna mis?
+        self.check_approval() 
 
         # Return the response when saving
         return response
@@ -581,7 +582,7 @@ class EqualAddApproval(models.Model):
     def __str__(self):
         """Show this approval"""
         sBack = "{}: [{}] on ssg {}={}".format(
-            self.profile.user.username, self.change.super.id, self.atype)
+            self.profile.user.username, self.add.super.id, self.atype)
         return sBack
 
     def get_comment_html(self):

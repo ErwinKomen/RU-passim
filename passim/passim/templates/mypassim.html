@@ -134,7 +134,7 @@
             <!-- Empty table row -->
             <tr><td colspan="3">&nbsp;</td></tr>
             
-            <!-- Submitted new AF additions AANPASSEN + COUNT!--> 
+            <!-- Submitted new AF additions--> 
             <tr>            
               <td valign="top" class="hangingindent">My Authority File additions:</td>
               <td valign="top">
@@ -159,7 +159,7 @@
             <tr>
               <td valign="top" class="hangingindent">New AF additions that I need to review:</td>
               <td valign="top">
-                <a href="{% url 'equaladdapprovalall_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
+                <a href="{% url 'equaladdapprovaluser_list' %}" role="button" title="View all my reviews of AF additions" class="btn btn-xs jumbo-1">
                   {{count_afaddapprove_all}}
                   <span class="glyphicon glyphicon-check" title="View all my reviews of AF additions"></span>
                 </a>
