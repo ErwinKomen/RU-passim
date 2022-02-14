@@ -2190,10 +2190,62 @@ var ru = (function ($, ru) {
             //})
 
             // After issue #511
-            link.attr("x1", d => d.target.x)
-                .attr("y1", d => d.target.y)
-                .attr("x2", d => d.source.x)
-                .attr("y2", d => d.source.y);
+            //link.attr("x1", d => d.target.x)
+            //    .attr("y1", d => d.target.y)
+            //    .attr("x2", d => d.source.x)
+            //    .attr("y2", d => d.source.y);
+            link.attr("x1", function (d) {
+              var result;
+              switch (d.spectype) {
+                case "usd":
+                case "usi":
+                  result = d.target.x;
+                  break;
+                default:
+                  result = d.source.x;
+                  break;
+              }
+              return result;
+            });
+            link.attr("y1", function (d) {
+              var result;
+              switch (d.spectype) {
+                case "usd":
+                case "usi":
+                  result = d.target.y;
+                  break;
+                default:
+                  result = d.source.y;
+                  break;
+              }
+              return result;
+            });
+            link.attr("x2", function (d) {
+              var result;
+              switch (d.spectype) {
+                case "usd":
+                case "usi":
+                  result = d.source.x;
+                  break;
+                default:
+                  result = d.target.x;
+                  break;
+              }
+              return result;
+            });
+            link.attr("y2", function (d) {
+              var result;
+              switch (d.spectype) {
+                case "usd":
+                case "usi":
+                  result = d.source.y;
+                  break;
+                default:
+                  result = d.target.y;
+                  break;
+              }              
+              return result;
+            });
 
             // Original
             //link.attr("x1", d => d.source.x)
@@ -6467,7 +6519,10 @@ var ru = (function ($, ru) {
                 // was:
                 // sResponse = sArrow;
                 // Issue #511:
-                sResponse = "";
+                // sResponse = "";
+
+                // Issue #521:
+                sResponse = sArrow;
                 break;
               default:
                 sResponse = "";
@@ -6507,14 +6562,21 @@ var ru = (function ($, ru) {
        *
        */
       overlap_stroke_opacity: function (d, or) {
-        var m = "0.2";  // Default black
+        var m = "0.2";  // Default light
         try {
           if ('overlap_direction' in loc_network_options && loc_network_options['overlap_direction'] === true) {
             // Check what kind of value is returned
             switch (d.spectype) {
-              case "usi":
-              case "udi":
-                m = "0.8";
+              case "usi": // Indirect link
+              case "udi": // Indirect link
+                m = "0.2";  // See issue # 520
+                break;
+              case "usd": // Direct link
+              case "udd": // Direct link
+                m = "0.8";  // See issue # 520
+                break;
+              default:
+                m = "0.3";  // Other link
                 break;
             }
           } else {
