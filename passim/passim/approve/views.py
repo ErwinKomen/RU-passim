@@ -367,7 +367,7 @@ def approval_parse_adding(profile, qs_projlist, super, allow_adding = None):
     Note: this function is called from seeker/view EqualGoldEdit, before_save()
     """
 
-    oErr = ErrHandle
+    oErr = ErrHandle()
     iCount = 0
     try:
         # Walk all the projects to which this project is supposed to be added
@@ -935,6 +935,24 @@ class EqualChangeEdit(BasicDetails):
     title = "Field change"
     no_delete = True            # Don't allow users to remove a field change that they have entered
     mainitems = []
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            if not instance is None:
+                # Need to know who this user (profile) is
+                profile = Profile.get_user_profile(self.request.user.username)
+
+                # Am I the owner of this record?
+                if profile is instance.profile:
+                    # Is this the 'user' one?
+                    if self.prefix == "user" and instance.atype != "acc":
+                        # Allow myself to delete this suggestion, since it has not been accepted yet
+                        self.no_delete = False
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeEdit/custom_init")
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
