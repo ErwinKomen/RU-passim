@@ -1356,6 +1356,9 @@ class BasicList(ListView):
                         break
                     # OLD self.bFilter = True
             elif not self.none_on_empty:
+                # Provide an error message for the LOG...
+                print('Form error WARNING: {}'.format(thisForm.errors))
+
                 # Just show everything
                 qs = self.model.objects.all().distinct()
 
