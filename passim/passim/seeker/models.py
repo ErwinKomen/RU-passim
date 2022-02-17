@@ -3269,6 +3269,8 @@ class Manuscript(models.Model):
     url = models.URLField("Web info", null=True, blank=True)
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
+    # [0-1] Editor-only notes (in Dutch)
+    editornotes = models.TextField("Editor notes (Dutch)", null=True, blank=True)
 
     # =============== THese are the Minimum start and the Maximum finish =========================
     # [1] Date estimate: starting from this year
@@ -3345,6 +3347,7 @@ class Manuscript(models.Model):
     specification = [
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
         {'name': 'Notes',               'type': 'field', 'path': 'notes'},
+        {'name': 'Editor Notes',        'type': 'field', 'path': 'notes_editor_in_dutch', 'target': 'editornotes'},
         {'name': 'Url',                 'type': 'field', 'path': 'url'},
         {'name': 'External id',         'type': 'field', 'path': 'external'},
         {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},                            # WAS: ,      'readonly': True},
@@ -3547,6 +3550,8 @@ class Manuscript(models.Model):
                     readonly = oField.get('readonly', False)
                     if value != None and value != "" and not readonly:
                         path = oField.get("path")
+                        if "target" in oField:
+                            path = oField.get("target")
                         type = oField.get("type")
                         if type == "field":
                             # Note overwriting
@@ -5327,9 +5332,19 @@ class Codico(models.Model):
                 # Possibly add each item from the list, if it doesn't yet exist
                 for date_item in dates:
                     years = date_item.split("-")
-                    yearstart = years[0]
+                    yearstart = years[0].strip()
                     yearfinish = yearstart
-                    if len(years) > 0: yearfinish = years[1]
+                    if len(years) > 0: yearfinish = years[1].strip()
+                    # Double check the lengths
+                    if len(yearstart) > 4 or len(yearfinish) > 4:
+                        # We need to do better
+                        years = re.findall(r'\d{4}', value)
+                        yearstart = years[0]
+                        if len(years) == 0:
+                            yearfinish = yearstart
+                        else:
+                            yearfinish = years[1]
+
                     obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
                     if obj == None:
                         # Doesn't exist, so create it
@@ -8564,6 +8579,35 @@ class SermonDescr(models.Model):
                     # Create a manual signature
                     sig_m = SermonSignature.objects.create(code=code, gsig=signature, sermon=self, editype=editype)
                 # Ready
+            elif path == "signaturesA":
+                signatureA_names = value_lst
+                # Walk all signatures
+                for code in signatureA_names:
+                    # Find the appropriate SG with this signature
+                    signature = Signature.objects.filter(code__iexact=code).first()
+                    if signature is None:
+                        # Show what is happening
+                        oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
+                    else:
+                        # Find the SG
+                        sg = signature.gold
+                        if sg is None:
+                            # Show what is happening
+                            oErr.Status("Reading signaturesA: no SG defined for signature [{}]".format(code))
+                        else:
+                            # Find the accompanying SSG
+                            ssg = sg.equal
+                            if ssg is None:
+                                # Show what is happening
+                                oErr.Status("Reading signaturesA: empty SSG for signature [{}]".format(code))
+                            else:
+                                # Make the connection from the Sermon to the SSG
+                                obj = SermonDescrEqual.objects.create(
+                                    sermon = self,
+                                    manu = self.msitem.manu,
+                                    super = ssg)
+                                # Log what has happened
+                                oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
             else:
                 # Figure out what to do in this case
                 pass
