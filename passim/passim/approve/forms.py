@@ -146,7 +146,8 @@ class EqualAddApprovalForm(forms.ModelForm):
 
         oErr = ErrHandle()
         try:
-            # Some fields are not required            
+            # Some fields are not required  TH: hier add?
+            self.fields['add'].required = False 
             self.fields['comment'].required = False
             self.fields['profile'].required = False
             self.fields['atype'].required = False
