@@ -18,7 +18,7 @@ import json, copy
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, \
-    APPROVAL_TYPE, \
+    APPROVAL_TYPE, ACTION_TYPE, \
     EqualGold, Profile, Project2, ProjectEditor
 
 STANDARD_LENGTH=255
@@ -348,6 +348,9 @@ class EqualAdd(models.Model):
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profileaddings")    
     # [1] each addition belongs to a particular project     
     project = models.ForeignKey(Project2, on_delete=models.CASCADE, related_name="projectaddings")
+
+    # [1] The kind of action: adding or removing ('add', 'rem')
+    action = models.CharField("Approval", choices=build_abbr_list(ACTION_TYPE), max_length=5, default="add")
 
     # [1] The approval status of this proposed change
     atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
