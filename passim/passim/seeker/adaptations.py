@@ -30,7 +30,8 @@ adaptation_list = {
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 'atype_def_equal'],
+                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
+                       'atype_def_equal', 'atype_acc_equal'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless'] 
     }
@@ -807,9 +808,8 @@ def adapt_passim_project_name_equal():
         msg = oErr.get_error_message()
     return bResult, msg
 
-# NEW ISSUE #492 change def in atype EqualGold model
-
 def adapt_atype_def_equal():
+    # NEW ISSUE #492 change def in atype EqualGold model
     oErr = ErrHandle()
     bResult = True
     msg = ""
@@ -826,6 +826,32 @@ def adapt_atype_def_equal():
                 if bNeedSaving:
                     equal.save()
                     #print(equal.atype)    
+                        
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_atype_acc_equal():
+    # Issue #522: mono-projectal SSGs must have atype 'acc'
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    code = "acc"
+    try:
+        with transaction.atomic():
+            # Iterate over all SSGs/AFs in the database:  
+            for equal in EqualGold.objects.all():
+                bNeedSaving = False
+                # if atype is def
+                if equal.atype == "def":  
+                    # How many projects are connected to this SSG?
+                    count = equal.projects.count()
+                    if count <= 1:
+                        equal.atype = code             
+                        bNeedSaving = True
+                if bNeedSaving:
+                    equal.save()
                         
     except:
         bResult = False

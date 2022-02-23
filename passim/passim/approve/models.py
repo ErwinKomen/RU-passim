@@ -350,7 +350,7 @@ class EqualAdd(models.Model):
     project = models.ForeignKey(Project2, on_delete=models.CASCADE, related_name="projectaddings")
 
     # [1] The kind of action: adding or removing ('add', 'rem')
-    action = models.CharField("Approval", choices=build_abbr_list(ACTION_TYPE), max_length=5, default="add")
+    action = models.CharField("Action", choices=build_abbr_list(ACTION_TYPE), max_length=5, default="add")
 
     # [1] The approval status of this proposed change
     atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
