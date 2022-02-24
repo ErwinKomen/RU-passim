@@ -11773,6 +11773,7 @@ class EqualGoldEdit(BasicDetails):
 
     def get_prj_submitted(self, instance):
         """Get an HTML list of projects to which this SSG has already been submitted"""
+
         oErr = ErrHandle()
         sBack = ""
         try:
