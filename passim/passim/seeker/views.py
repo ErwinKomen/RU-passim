@@ -11894,7 +11894,9 @@ class EqualGoldEdit(BasicDetails):
         return bBack, msg
 
     def after_save(self, form, instance):
+        """Actions to be undertaken after the EqualGold (=SSG/AF) proper has been saved"""
 
+        # Definition of functions that are used inside [after_save()]
         def process_proj_adding(profile, projlist):
             oErr = ErrHandle()
 
@@ -11956,7 +11958,7 @@ class EqualGoldEdit(BasicDetails):
                 oErr.DoError("get_proj_add_remove")
             return addprojlist, delprojlist
 
-
+        # Initialisations
         msg = ""
         bResult = True
         oErr = ErrHandle()
@@ -12046,10 +12048,13 @@ class EqualGoldEdit(BasicDetails):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                user_projects = profile.project_editor.filter(status="incl")
                 if user_projects.count() == 1:
-                    project = profile.projects.first()
+                    project = user_projects.first()
                     EqualGoldProject.objects.create(equal=instance, project=project)
+                    # Make sure the atype is set correctly
+                    instance.atype = "acc"
+                    instance.save()
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -12326,6 +12331,11 @@ class EqualGoldDetails(EqualGoldEdit):
                 qs = profile.project_editor.filter(status="incl")
                 for obj in qs:
                     EqualGoldProject.objects.create(project=obj.project, equal=instance)
+                # is it just one project?
+                if qs.count() == 1:
+                    # Make sure the atype is set correctly
+                    instance.atype = "acc"
+                    instance.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldDetails/before_save")
