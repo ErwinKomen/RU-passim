@@ -11603,14 +11603,14 @@ class EqualGoldEdit(BasicDetails):
                     oItem = dict(type="plain", 
                                  label="Add to project",
                                  title="Submit a request to add this SSG to the following project(s)",
-                                 value=self.get_prj_submitted(instance))
+                                 value=self.get_prj_submitted(instance, "other", profile))
                     oItem['field_list'] = "addprojlist"
                     context['mainitems'].append(oItem)
                     # Any editor may suggest that an SSG be deleted from particular project(s)
                     oItem = dict(type="plain", 
                                  label="Remove from project",
                                  title="Submit a request to remove this SSG from the following project(s)",
-                                 value=self.get_prj_submitted(instance))
+                                 value=self.get_prj_submitted(instance, 'current'))
                     oItem['field_list'] = "delprojlist"
                     context['mainitems'].append(oItem)
 
@@ -11771,19 +11771,33 @@ class EqualGoldEdit(BasicDetails):
 
         return oBack
 
-    def get_prj_submitted(self, instance):
+    def get_prj_submitted(self, instance, type=None, profile=None):
         """Get an HTML list of projects to which this SSG has already been submitted"""
 
         oErr = ErrHandle()
         sBack = ""
         try:
-            # Get the list of EqualAdd objects (with atype ['def', 'mod'], i.e. not yet accepted)
-            qs = addapproval_pending(instance)
+            # Determine which projects should be shown
+            if type is None:
+                # Get the list of EqualAdd objects (with atype ['def', 'mod'], i.e. not yet accepted)
+                qs = addapproval_pending(instance)
+            elif type == "current":
+                # Show the projects currently connected to this AF
+                qs = instance.projects.all()
+            elif type == "other":
+                # Show the list of projects to which I am not an approver
+                #      and to which this AF has not been attached yet
+                approval_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+                current_project_ids = [x['id'] for x in instance.projects.all().values('id')]
+                qs = Project2.objects.exclude(id__in=approval_project_ids).exclude(id__in=current_project_ids)
 
             lHtml = []
             # Visit all project items
             for obj in qs:
-                project = obj.project
+                if type is None:
+                    project = obj.project
+                else:
+                    project = obj
                 # Determine where clicking should lead to
                 url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project.id) 
                 # Create a display for this topic

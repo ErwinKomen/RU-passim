@@ -7474,6 +7474,32 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * toggle_approval_history
+       *   Toggle showing the approval history buttons or not
+       *
+       */
+      toggle_approval_history: function (elStart) {
+        var sHistory = ".approval-history",
+            elTable = null;
+
+        try {
+          // get to the table
+          elTable = $(elStart).closest("table").first();
+          // Find out what the action is to be
+          if ($(elTable).find(sHistory).first().hasClass("hidden")) {
+            // show it
+            $(elTable).find(sHistory).removeClass("hidden");
+          } else {
+            // Hide it
+            $(elTable).find(sHistory).addClass("hidden");
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("toggle_approval_history", ex);
+        }
+      },
+
+      /**
        * toggle_click
        *   Action when user clicks an element that requires toggling a target
        *

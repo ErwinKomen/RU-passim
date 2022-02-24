@@ -2848,7 +2848,6 @@ class SuperSermonGoldForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
-            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
             self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
         
            # Get the instance
@@ -2871,9 +2870,15 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
+
+                # TO BE DELETED in time...
                 #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 #self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
+                # ==================================
+
+                self.fields['delprojlist'].queryset = Project2.objects.filter(id__in=self.fields['projlist'].initial).order_by('name').distinct()
+                self.fields['delprojlist'].widget.queryset = self.fields['delprojlist'].queryset
                 qs = instance.equalgold_dst.all()
         except:
             msg = oErr.get_error_message()
