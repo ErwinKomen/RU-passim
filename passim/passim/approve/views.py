@@ -925,7 +925,7 @@ class EqualChangeEdit(BasicDetails):
                 profile = Profile.get_user_profile(self.request.user.username)
 
                 # Am I the owner of this record?
-                if profile is instance.profile:
+                if profile.id == instance.profile.id:
                     # Is this the 'user' one?
                     if self.prefix == "user" and instance.atype != "acc":
                         # Allow myself to delete this suggestion, since it has not been accepted yet
