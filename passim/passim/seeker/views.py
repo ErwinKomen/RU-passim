@@ -11894,7 +11894,9 @@ class EqualGoldEdit(BasicDetails):
         return bBack, msg
 
     def after_save(self, form, instance):
+        """Actions to be undertaken after the EqualGold (=SSG/AF) proper has been saved"""
 
+        # Definition of functions that are used inside [after_save()]
         def process_proj_adding(profile, projlist):
             oErr = ErrHandle()
 
@@ -11956,7 +11958,7 @@ class EqualGoldEdit(BasicDetails):
                 oErr.DoError("get_proj_add_remove")
             return addprojlist, delprojlist
 
-
+        # Initialisations
         msg = ""
         bResult = True
         oErr = ErrHandle()

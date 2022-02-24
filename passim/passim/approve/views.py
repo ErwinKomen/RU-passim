@@ -20,26 +20,7 @@ import json, copy
 # Take from my own app
 from passim.utils import ErrHandle
 
-#def get_application_name():
-#    """Try to get the name of this application"""
-
-#    # Walk through all the installed apps
-#    for app in apps.get_app_configs():
-#        # Check if this is a site-package
-#        if "site-package" not in app.path:
-#            # Get the name of this app
-#            name = app.name
-#            # Take the first part before the dot
-#            project_name = name.split(".")[0]
-#            return project_name
-#    return "unknown"
-## Provide application-specific information
-#PROJECT_NAME = get_application_name()
-#app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
-#app_editor = "{}_editor".format(PROJECT_NAME.lower())
-#app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
-#app_developer = "{}_developer".format(PROJECT_NAME.lower())
-#app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
+# =================================== SUPPORT functions API ====================================================================
 
 def get_goldset_html(goldlist):
     context = {}
