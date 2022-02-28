@@ -2,6 +2,7 @@
 Definition of views for the APPROVE app.
 """
 
+from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.shortcuts import render
@@ -34,6 +35,50 @@ def get_goldset_html(goldlist):
         # Calculate with the template
         sBack = render_to_string(template_name, context)
     return sBack
+
+def equaladd_to_accept(instance):
+    """Accept the addition or deletion of the SSG : implement it and set my status
+    
+    Note: the [instance] is an object EqualAdd
+    """
+
+    oErr = ErrHandle()
+    bBack = True
+    try:
+        # Figure out whether this is an addition or a delection
+        action = instance.action
+        action_message = "addition" if action == "add" else "deletion"
+
+        # Get to the actual SSG
+        super = instance.super
+
+        if action == "add":
+            # We must add the SSG: change the SSG's atype to 'acc'
+            super.atype = "acc"
+            super.save()
+            # Make sure that our addtion or deletion to accepted
+            instance.atype = "acc"
+
+        elif action == "rem":
+            # The action is to remove/delete the SSG
+            super.atype = "rej"
+            super.save()
+            # Make sure that our addtion or deletion to accepted
+            instance.atype = "rej"
+        else:
+            oErr.Status("equaladd_to_accept: unknown action [{}]".format(action))
+            return bBack
+
+        # Finish off the comment
+        instance.comment = "This {} has been successfully processed on: {}".format(
+            action_message, get_crpp_date(get_current_datetime(), True))
+        instance.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("equaladd_to_accept")
+        bBack = False
+    return bBack
 
 def equalchange_json_to_html(instance, type, profile=None):
     """Convert the proposed change from JSON into an HTML representation"""
@@ -1522,10 +1567,21 @@ class EqualApprovalEdit(BasicDetails):
                 # Is this EqualChange object already finished?
                 if not change is None and change.atype != "acc":
                     # Check how many approvals there should be and how many are left
+                    #   (issue #527 changed this to be the number of projects needed and left)
                     iLeft, iNeeded = change.get_approval_count()
                     if iNeeded > 0 and iLeft == 0:
                         # The last approval has been saved: we may implement the change
                         equalchange_json_to_accept(change)
+                        # Look for any left-over EqualApproval objects
+                        with transaction.atomic():
+                            for obj in change.changeapprovals.all():
+                                # Check if this has been processed
+                                if obj.atype == "def":
+                                    # THis has not been processed, it is still at the default value
+                                    # Issue #527: set it to [aut] (automatically accepted)
+                                    obj.atype = "aut"
+                                    obj.save()
+                                    # Result: this EqualApproval object will no longer appear on the list of SSG changes to be approved
                     elif change.changeapprovals.exclude(atype="def").count() == 0:
                         # Do some more careful checking: all approvals are now known
                         iRejected = change.changeapprovals.filter(atype='rej').count()
@@ -1744,10 +1800,21 @@ class EqualAddApprovalEdit(BasicDetails):
                 # Is this EqualAdd object already finished?
                 if not add is None and add.atype != "acc":
                     # Check how many approvals there should be and how many are left
+                    #  EK, issue #528: get_approval_count() has been changed to provide the number of projects left and needed
                     iLeft, iNeeded = add.get_approval_count()
                     if iNeeded > 0 and iLeft == 0:
+                        # Look for any left-over EqualApproval objects
+                        with transaction.atomic():
+                            for obj in change.addapprovals.all():
+                                # Check if this has been processed
+                                if obj.atype == "def":
+                                    # THis has not been processed, it is still at the default value
+                                    # Issue #527: set it to [aut] (automatically accepted)
+                                    obj.atype = "aut"
+                                    obj.save()
+                                    # Result: this EqualApproval object will no longer appear on the list of SSG changes to be approved
                         # The last approval has been saved: we may implement the addition
-                        equaladd_json_to_accept(add)
+                        equaladd_to_accept(add)
                     elif add.addapprovals.exclude(atype="def").count() == 0:
                         # Do some more careful checking: all approvals are now known
                         iRejected = add.addapprovals.filter(atype='rej').count()
