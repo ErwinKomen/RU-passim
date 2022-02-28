@@ -809,6 +809,7 @@ class EqualChangeList(BasicList):
                     ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    # {'filter': 'superacc',  'dbfield': '$dummy',   'keyS': 'superacc'},
                     {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
                     ]}
                  ]
@@ -845,6 +846,9 @@ class EqualChangeList(BasicList):
                 profile = Profile.get_user_profile(self.request.user.username)
                 # Restrict the profile
                 fields['profilelist'] = Profile.objects.filter(id=profile.id)
+
+                # Make sure to exclude all field changes, that have already perculated
+                # lstExclude.append(Q(super__atype='acc'))
 
         except:
             msg = oErr.get_error_message()
