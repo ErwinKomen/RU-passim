@@ -360,8 +360,8 @@ class ManuscriptUploadJson(ReaderImport):
 
                                     # (1) date
                                     daterange = oManu.get("date")
+                                    codico = manu.manuscriptcodicounits.first()
                                     if not daterange is None or daterange == "":
-                                        codico = manu.manuscriptcodicounits.first()
                                         if codico.codico_dateranges.count() == 0:
                                             # Get the date
                                             codico.add_one_daterange(daterange)
@@ -459,9 +459,26 @@ class ManuscriptUploadJson(ReaderImport):
                                     # Append this result
                                     lResults.append(oResult)
 
+                                # Prepare a 'read' item
+                                # Fields: ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
+                                yearstart = -1
+                                yearfinish = -1
+                                daterange = codico.codico_dateranges.first()
+                                if not daterange is None:
+                                    yearstart = daterange.yearstart
+                                    yearfinish = daterange.yearfinish
+                                library = manu.get_library()
+                                idno = manu.idno
+                                msg = "read" if not params['overwriting'] else "overwriting"
+                                oRead = dict(status="ok", msg=msg, name="-", 
+                                                yearstart=yearstart, yearfinish=yearfinish,
+                                                library=library, idno=idno, filename="-", url="-")
+                                lst_read.append(oRead)
+
                         # Create a report and add it to what we return
+                        
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
-                        oReport = Report.make(username, "ixlsx", json.dumps(oContents))
+                        oReport = Report.make(username, "ijson", json.dumps(oContents))
                                 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
