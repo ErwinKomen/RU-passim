@@ -9090,6 +9090,11 @@ class ManuscriptEdit(BasicDetails):
                 if user_is_ingroup(self.request, app_editor):
                     context['mainitems'].append(
                         {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
+                    # Also add a view on the editornotes, if available
+                    editornotes = instance.editornotes
+                    if not editornotes is None:
+                        context['mainitems'].append(
+                            {'type': 'safe', 'label': "Editor notes (Dutch):", 'value': markdown(editornotes),  'field_key': 'editornotes'}  )
 
                 # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
