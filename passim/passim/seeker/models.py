@@ -5122,6 +5122,7 @@ class Codico(models.Model):
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
         {'name': 'Support',             'type': 'field', 'path': 'support'},
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
@@ -5272,7 +5273,7 @@ class Codico(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
-            if path == "dateranges":
+            if path == "dateranges" or path == "date":
                 qs = self.codico_dateranges.all().order_by('yearstart')
                 dates = []
                 for obj in qs:
@@ -5343,7 +5344,7 @@ class Codico(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
-            if path == "dateranges":
+            if path == "dateranges" or path == "date":
                 # TRanslate the string into a list
                 dates = value_lst # json.loads(value)
                 # Possibly add each item from the list, if it doesn't yet exist

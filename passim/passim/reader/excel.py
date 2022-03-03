@@ -345,6 +345,8 @@ class ManuscriptUploadJson(ReaderImport):
 
                                 # Issue #509: literature fix
                                 sermones_fixes(oManu)
+                                # Make sure the stype is set to "imported"
+                                oManu['stype'] = "imp"
 
                                 # Each manuscript has some stuff of its own
                                 # We have an object with key/value pairs: process it
@@ -416,6 +418,10 @@ class ManuscriptUploadJson(ReaderImport):
                                         # Get the sermon object
                                         oSermon = oMsItem['sermon']
                                         order = oMsItem['order']
+
+                                        # Make sure the stype is set to "imported"
+                                        oSermon['stype'] = "imp"
+
                                         sermon = SermonDescr.custom_add(oSermon, manu, codico, order, **kwargs)
 
                                         # Keep track of the number of sermons read
