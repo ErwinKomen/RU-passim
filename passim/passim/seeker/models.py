@@ -5174,7 +5174,7 @@ class Codico(models.Model):
             years = sDateItem.split("-")
             yearstart = years[0].strip()
             yearfinish = yearstart
-            if len(years) > 0: yearfinish = years[1].strip()
+            if len(years) > 1: yearfinish = years[1].strip()
             # Double check the lengths
             if len(yearstart) > 4 or len(yearfinish) > 4:
                 # We need to do better
@@ -5184,6 +5184,13 @@ class Codico(models.Model):
                     yearfinish = yearstart
                 else:
                     yearfinish = years[1]
+            else:
+                # Check for question mark dates
+                if "?" in yearfinish:
+                    yearfinish = yearstart
+                if "?" in yearstart:
+                    # No problem, but we cannot process this
+                    return bResult
 
             obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
             if obj == None:
