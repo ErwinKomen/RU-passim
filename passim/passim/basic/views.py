@@ -1987,6 +1987,7 @@ class BasicDetails(DetailView):
                 action = ""
                 if 'action' in initial: action = initial['action']
                 if action == "delete":
+                    bContinue = False
                     # The user wants to delete this item
                     try:
                         bResult, msg = self.before_delete(instance)
@@ -1997,6 +1998,9 @@ class BasicDetails(DetailView):
                         
                             # Remove this sermongold instance
                             instance.delete()
+                        elif msg in ["ok", "okay"]:
+                            # Do not delete, and this is okay, by purpose
+                            bContinue = True
                         else:
                             # Removing is not possible
                             context['errors'] = {'delete': msg }
@@ -2005,8 +2009,11 @@ class BasicDetails(DetailView):
                         # Create an errors object
                         context['errors'] = {'delete':  msg }
 
-                    if 'afterdelurl' not in context or context['afterdelurl'] == "":
-                        context['afterdelurl'] = get_previous_page(self.request, True)
+                    if bContinue:
+                        context['afterdelurl'] = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
+                    else:
+                        if 'afterdelurl' not in context or context['afterdelurl'] == "":
+                            context['afterdelurl'] = get_previous_page(self.request, True)
 
                     # Make sure we are returning JSON
                     self.rtype = "json"
@@ -2016,7 +2023,8 @@ class BasicDetails(DetailView):
                         context = self.add_to_context(context, instance)
 
                     # No need to retern a form anymore - we have been deleting
-                    return None
+                    if not bContinue:
+                        return None
             
                 # All other actions just mean: edit or new and send back
                 # Make instance available

@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectEditor
 from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
@@ -66,7 +66,11 @@ def equaladd_to_accept(instance):
             super.projects.remove(instance.project)
             # Make sure that our deletion is set to accepted
             instance.atype = "acc"
-
+        elif action == "del":
+            # The action is to delete the SSG altogether
+            instance.atype = "acc"
+            # Perform the actual deletion
+            super.remove()
         else:
             oErr.Status("equaladd_to_accept: unknown action [{}]".format(action))
             return bBack
@@ -466,6 +470,47 @@ def approval_parse_removing(profile, qs_projlist, super, allow_removing = None):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("approval_parse_removing")
+        iCount = 0
+    return iCount
+
+def approval_parse_deleting(profile, qs_projlist, super):
+    """Process this user [profile] suggesting to REMOVE SSG [super] altogether
+    
+    Note: this function is called from seeker/view EqualGoldEdit, before_save()
+    """
+
+    oErr = ErrHandle()
+    iCount = 0
+    action = "del"
+    try:
+        # Walk all the projects to which this SSG belongs
+        if qs_projlist.count() > 1:
+            # (1) Get all projects attached to this SSG
+            proj_all_ids = [x.id for x in super.projects.all()]
+            # (2) Figur out all projects to which [profile] has editor access
+            proj_profile_ids = [x.id for x in profile.projects.all()]
+            # proj_profile_ids = [x.project.id for x in ProjectEditor.objects.filter(profile=profile, status="incl")]
+            # (3) get the list of projects for which consent is needed
+            proj_need_ids = []
+            for prj_id in proj_all_ids:
+                if not prj_id in proj_profile_ids:
+                    proj_need_ids.append(prj_id)
+            # Check if any action is required
+            if len(proj_need_ids) > 0:
+                # We need to check agreement for all projects in this list
+                for prj_id in proj_need_ids:
+                    # Check if we have an EqualAdd object for this
+                    #  (don't include [profile] in this test; a different user may have suggested the same thing)
+                    obj = EqualAdd.objects.filter(project_id=prj_id, super=super, action=action).first()                
+                    if obj is None:
+                        # Create an object
+                        obj = EqualAdd.objects.create(project_id=prj_id, super=super, profile=profile, action=action) 
+                    # Increment the counter
+                    iCount += 1
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("approval_parse_deleting")
         iCount = 0
     return iCount
 

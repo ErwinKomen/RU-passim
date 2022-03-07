@@ -89,7 +89,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
-    approval_parse_adding, approval_parse_removing, addapproval_pending
+    approval_parse_adding, approval_parse_removing, approval_parse_deleting, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -11814,6 +11814,34 @@ class EqualGoldEdit(BasicDetails):
             bBack = ""
 
         return sBack
+
+    def before_delete(self, instance):
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Who is this?
+            profile = Profile.get_user_profile(self.request.user.username)
+            # Check if deleting may take place
+            qs = instance.projects.all()
+            if qs.count() > 1:
+                # Get the list of projects
+                projlist = qs
+                iCountNeeded = approval_parse_deleting(profile, projlist, instance) 
+                if iCountNeeded == 0:
+                    # The SSG may be deleted right away
+                    pass
+                else:
+                    # It may not be delete
+                    bResult = False
+                    msg = "ok"
+            else:
+                # There is no problem deleting this SSG, since it is only attached to one project
+                pass
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
            
     def before_save(self, form, instance):
         oErr = ErrHandle()
