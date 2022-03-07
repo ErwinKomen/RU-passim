@@ -13325,44 +13325,53 @@ class ReportDownload(BasicPart):
 
         # Initialize
         lData = []
+        sData = ""
+        oErr = ErrHandle()
 
-        # Unpack the report contents
-        sData = self.obj.contents
+        try:
+            # Unpack the report contents
+            sData = self.obj.contents
 
-        if dtype == "json":
-            # no need to do anything: the information is already in sData
-            pass
-        else:
-            # Convert the JSON to a Python object
-            oContents = json.loads(sData)
-            # Get the headers and the list
-            headers = oContents['headers']
+            if dtype == "json":
+                # no need to do anything: the information is already in sData
+                pass
+            else:
+                # Convert the JSON to a Python object
+                oContents = json.loads(sData)
+                # Get the headers and the list
+                headers = oContents['headers']
 
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
 
-            # Write Headers
-            csvwriter.writerow(headers)
+                # Write Headers
+                csvwriter.writerow(headers)
 
-            # Two lists
-            todo = [oContents['list'], oContents['read'] ]
-            for lst_report in todo:
+                # Two lists
+                todo = [oContents['list'], oContents['read'] ]
+                for lst_report in todo:
 
-                # Loop
-                for item in lst_report:
-                    row = []
-                    for key in headers:
-                        if key in item:
-                            row.append(item[key].replace("\r", " ").replace("\n", " "))
-                        else:
-                            row.append("")
-                    csvwriter.writerow(row)
+                    # Loop
+                    for item in lst_report:
+                        row = []
+                        for key in headers:
+                            if key in item:
+                                element = item[key]
+                                if isinstance(element, str):
+                                    element = element.replace("\r", " ").replace("\n", " ")
+                                row.append(element)
+                            else:
+                                row.append("")
+                        csvwriter.writerow(row)
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ReportDownload/get_data")
 
         return sData
 
