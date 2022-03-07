@@ -1842,7 +1842,7 @@ class Location(models.Model):
                 lstQ = []
                 lstQ.append(Q(loctype__name="city"))
                 lstQ.append(Q(name__iexact=city))
-                lstQ.append(relations_location__in=qs_country)
+                lstQ.append(Q(relations_location__in=qs_country))
                 obj = Location.objects.filter(*lstQ).first()
         elif city != "" and city != None:
             lstQ.append(Q(loctype__name="city"))
@@ -3323,7 +3323,7 @@ class Manuscript(models.Model):
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         # TODO: change FK project into m2m
-        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project'},
+        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project2'},
 
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
@@ -3460,12 +3460,13 @@ class Manuscript(models.Model):
         details = dict(id=self.id, savetype="change", changes={path: change_text})
         Action.add(username, "Manuscript", self.id, actiontype, json.dumps(details))
 
-    def custom_add(oManu, **kwargs):
+    def custom_add(oManu, oParams, **kwargs):
         """Add a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
         manu = None
         bOverwriting = False
+        bSkip = False
         lst_msg = []
 
         try:
@@ -3484,7 +3485,16 @@ class Manuscript(models.Model):
 
                 # Retrieve or create a new manuscript with default values
                 if source == None:
-                    obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
+                    sCity = oManu.get("lcity")
+                    lCity = None
+                    if not sCity is None:
+                        sCountry = oManu.get("lcountry", "")
+                        # DOuble check city co-occurrence
+                        lCity = Location.get_location(sCity, sCountry)
+                    if lCity is None:
+                        obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
+                    else:
+                        obj = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man").first()
                 else:
                     obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
                 if obj == None:
@@ -3496,78 +3506,82 @@ class Manuscript(models.Model):
                     # We are overwriting
                     oErr.Status("Overwriting manuscript [{}]".format(idno))
                     bOverwriting = True
+                    if 'overwriting' in oParams:
+                        oParams['overwriting'] = True
+                        bSkip = True
 
-                # Issue #479: get the default project(s) - may be more than one
-                projects = profile.get_defaults()
-                # Link the manuscript to the projects, if not already done
-                obj.set_projects(projects)
+                if not bSkip:
+                    # Issue #479: get the default project(s) - may be more than one
+                    projects = profile.get_defaults()
+                    # Link the manuscript to the projects, if not already done
+                    obj.set_projects(projects)
 
-                country = ""
-                city = ""
-                library = ""
-                # Process all fields in the Specification
-                for oField in Manuscript.specification:
-                    field = oField.get(keyfield).lower()
-                    if keyfield == "path" and oField.get("type") == "fk_id":
-                        field = "{}_id".format(field)
-                    value = oManu.get(field)
-                    readonly = oField.get('readonly', False)
-                    if value != None and value != "" and not readonly:
-                        path = oField.get("path")
-                        if "target" in oField:
-                            path = oField.get("target")
-                        type = oField.get("type")
-                        if type == "field":
-                            # Note overwriting
-                            old_value = getattr(obj, path)
-                            if value != old_value:
-                                if bOverwriting:
-                                    # Show that this overwriting took place
-                                    obj.action_add_change(username, "import", path, old_value, value)
-                                # Set the correct field's value
-                                setattr(obj, path, value)
-                        elif type == "fk" or type == "fk_id":
-                            fkfield = oField.get("fkfield")
-                            model = oField.get("model")
-                            if fkfield != None and model != None:
-                                # Find an item with the name for the particular model
-                                cls = apps.app_configs['seeker'].get_model(model)
+                    country = ""
+                    city = ""
+                    library = ""
+                    # Process all fields in the Specification
+                    for oField in Manuscript.specification:
+                        field = oField.get(keyfield).lower()
+                        if keyfield == "path" and oField.get("type") == "fk_id":
+                            field = "{}_id".format(field)
+                        value = oManu.get(field)
+                        readonly = oField.get('readonly', False)
+                        if value != None and value != "" and not readonly:
+                            path = oField.get("path")
+                            if "target" in oField:
+                                path = oField.get("target")
+                            type = oField.get("type")
+                            if type == "field":
+                                # Note overwriting
+                                old_value = getattr(obj, path)
+                                if value != old_value:
+                                    if bOverwriting:
+                                        # Show that this overwriting took place
+                                        obj.action_add_change(username, "import", path, old_value, value)
+                                    # Set the correct field's value
+                                    setattr(obj, path, value)
+                            elif type == "fk" or type == "fk_id":
+                                fkfield = oField.get("fkfield")
+                                model = oField.get("model")
+                                if fkfield != None and model != None:
+                                    # Find an item with the name for the particular model
+                                    cls = apps.app_configs['seeker'].get_model(model)
+                                    if type == "fk":
+                                        instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                    else:
+                                        instance = cls.objects.filter(**{"id".format(fkfield): value}).first()
+                                    if instance != None:
+                                        old_value = getattr(obj,path)
+                                        if instance != old_value:
+                                            if bOverwriting:
+                                                # Show that this overwriting took place
+                                                old_id = "" if old_value == None else old_value.id
+                                                obj.action_add_change(username, "import", path, old_id, instance.id)
+                                            setattr(obj, path, instance)
+                                # Keep track of country/city/library for further fine-tuning
                                 if type == "fk":
-                                    instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
-                                else:
-                                    instance = cls.objects.filter(**{"id".format(fkfield): value}).first()
-                                if instance != None:
-                                    old_value = getattr(obj,path)
-                                    if instance != old_value:
-                                        if bOverwriting:
-                                            # Show that this overwriting took place
-                                            old_id = "" if old_value == None else old_value.id
-                                            obj.action_add_change(username, "import", path, old_id, instance.id)
-                                        setattr(obj, path, instance)
-                            # Keep track of country/city/library for further fine-tuning
-                            if type == "fk":
-                                if path == "lcountry":
-                                    country = value
-                                elif path == "lcity":
-                                    city = value
-                                elif path == "library":
-                                    library = value
-                        elif type == "func":
-                            # Set the KV in a special way
-                            obj.custom_set(path, value, **kwargs)
+                                    if path == "lcountry":
+                                        country = value
+                                    elif path == "lcity":
+                                        city = value
+                                    elif path == "library":
+                                        library = value
+                            elif type == "func":
+                                # Set the KV in a special way
+                                obj.custom_set(path, value, **kwargs)
 
-                # Check what we now have for Country/City/Library
-                lcountry, lcity, library = Library.get_best_match(country, city, library)
-                if lcountry != None and lcountry != obj.lcountry:
-                    obj.lcountry = lcountry
-                if lcity != None and lcity != obj.lcity:
-                    obj.lcity = lcity
-                if library != None and library != obj.library:
-                    obj.library = library
+                    # Check what we now have for Country/City/Library
+                    lcountry, lcity, library = Library.get_best_match(country, city, library)
+                    if lcountry != None and lcountry != obj.lcountry:
+                        obj.lcountry = lcountry
+                    if lcity != None and lcity != obj.lcity:
+                        obj.lcity = lcity
+                    if library != None and library != obj.library:
+                        obj.library = library
 
 
-                # Make sure the update the object
-                obj.save()
+                    # Make sure the update the object
+                    obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/add_one")
@@ -3692,22 +3706,33 @@ class Manuscript(models.Model):
                 # Go through the items to be added
                 litrefs_full = value_lst #  json.loads(value)
                 for litref_full in litrefs_full:
-                    # Divide into pages
-                    arLitref = litref_full.split(", pp")
-                    litref_short = arLitref[0]
-                    pages = ""
-                    if len(arLitref)>1: pages = arLitref[1].strip()
-                    # Find the short reference
-                    litref = Litref.objects.filter(short__iexact = litref_short).first()
-                    if litref != None:
-                        # Create an appropriate LitrefMan object
-                        obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
+                    litref_full = litref_full.strip()
+                    if litref_full != "":
+                        # Divide into pages
+                        arLitref = litref_full.split(", pp")
+                        litref_short = arLitref[0]
+                        pages = ""
+                        if len(arLitref)>1: pages = arLitref[1].strip()
+                        # Find the short reference
+                        litref = Litref.objects.filter(short__iexact = litref_short).first()
+                        if litref != None:
+                            # Create an appropriate LitrefMan object
+                            obj = LitrefMan.objects.create(reference=litref, manuscript=self, pages=pages)
+                        else:
+                            # Extend the [editornotes] to include this literature reference
+                            html = []
+                            if not self.editornotes is None: html.append(self.editornotes)
+                            html.append("Add Literature reference: {}".format(litref_full))
+                            self.editornotes = "\n\n".join(html)
                 # Ready
             elif path == "external_links":
                 link_names = value_lst #  json.loads(value)
                 for link_name in link_names:
-                    # Create this stuff
-                    ManuscriptExt.objects.create(manuscript=self, url=link_name)
+                    # Sanity check
+                    link_name = link_name.strip()
+                    if link_name != "":
+                        # Create this stuff
+                        ManuscriptExt.objects.create(manuscript=self, url=link_name)
                 # Ready
             else:
                 # Figure out what to do in this case
@@ -5097,6 +5122,7 @@ class Codico(models.Model):
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
+        {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
         {'name': 'Support',             'type': 'field', 'path': 'support'},
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
@@ -5140,6 +5166,41 @@ class Codico(models.Model):
         # Show that this overwriting took place
         details = dict(id=self.id, savetype="change", old={path: old_value}, changes={path: new_value})
         Action.add(username, "Codico", self.id, actiontype, json.dumps(details))
+
+    def add_one_daterange(self, sDateItem):
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            years = sDateItem.split("-")
+            yearstart = years[0].strip()
+            yearfinish = yearstart
+            if len(years) > 1: yearfinish = years[1].strip()
+            # Double check the lengths
+            if len(yearstart) > 4 or len(yearfinish) > 4:
+                # We need to do better
+                years = re.findall(r'\d{4}', value)
+                yearstart = years[0]
+                if len(years) == 0:
+                    yearfinish = yearstart
+                else:
+                    yearfinish = years[1]
+            else:
+                # Check for question mark dates
+                if "?" in yearfinish:
+                    yearfinish = yearstart
+                if "?" in yearstart:
+                    # No problem, but we cannot process this
+                    return bResult
+
+            obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
+            if obj == None:
+                # Doesn't exist, so create it
+                obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_one_daterange")
+            bResult = False
+        return bResult
 
     def custom_add(oCodico, **kwargs):
         """Add a codico according to the specifications provided"""
@@ -5219,7 +5280,7 @@ class Codico(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
-            if path == "dateranges":
+            if path == "dateranges" or path == "date":
                 qs = self.codico_dateranges.all().order_by('yearstart')
                 dates = []
                 for obj in qs:
@@ -5290,29 +5351,30 @@ class Codico(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
-            if path == "dateranges":
+            if path == "dateranges" or path == "date":
                 # TRanslate the string into a list
                 dates = value_lst # json.loads(value)
                 # Possibly add each item from the list, if it doesn't yet exist
                 for date_item in dates:
-                    years = date_item.split("-")
-                    yearstart = years[0].strip()
-                    yearfinish = yearstart
-                    if len(years) > 0: yearfinish = years[1].strip()
-                    # Double check the lengths
-                    if len(yearstart) > 4 or len(yearfinish) > 4:
-                        # We need to do better
-                        years = re.findall(r'\d{4}', value)
-                        yearstart = years[0]
-                        if len(years) == 0:
-                            yearfinish = yearstart
-                        else:
-                            yearfinish = years[1]
+                    self.add_one_daterange(date_item)
+                    #years = date_item.split("-")
+                    #yearstart = years[0].strip()
+                    #yearfinish = yearstart
+                    #if len(years) > 0: yearfinish = years[1].strip()
+                    ## Double check the lengths
+                    #if len(yearstart) > 4 or len(yearfinish) > 4:
+                    #    # We need to do better
+                    #    years = re.findall(r'\d{4}', value)
+                    #    yearstart = years[0]
+                    #    if len(years) == 0:
+                    #        yearfinish = yearstart
+                    #    else:
+                    #        yearfinish = years[1]
 
-                    obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
-                    if obj == None:
-                        # Doesn't exist, so create it
-                        obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
+                    #obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
+                    #if obj == None:
+                    #    # Doesn't exist, so create it
+                    #    obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
                 # Ready
             elif path == "origin":
                 if value != "" and value != "-":
@@ -5537,12 +5599,6 @@ class Codico(models.Model):
             # sBack = ", ".join(lHtml)
             sBack = "".join(lHtml)
         return sBack
-
-    #def get_project_markdown(self):
-    #    sBack = "-"
-    #    if self.manuscript != None and self.manuscript.project != None:
-    #        sBack = '<span class="project">{}</span>'.format(self.manuscript.project.name)
-    #    return sBack
 
     def get_project_markdown2(self): 
         lHtml = []
@@ -8297,7 +8353,7 @@ class SermonDescr(models.Model):
             bStatus = False
         return bStatus, msg
 
-    def custom_add(oSermo, manuscript, order=None, **kwargs):
+    def custom_add(oSermo, manuscript, codico, order=None, **kwargs):
         """Add a sermon to a manuscript according to the specifications provided"""
 
         oErr = ErrHandle()
@@ -8319,8 +8375,8 @@ class SermonDescr(models.Model):
                 else:
                     obj = SermonDescr.objects.filter(msitem__manu=manuscript, locus=locus, mtype="man").first()
             if obj == None:
-                # Create a MsItem
-                msitem = MsItem(manu=manuscript)
+                # Create a MsItem, linked to the correct CODICO
+                msitem = MsItem(manu=manuscript, codico=codico)
                 # Possibly add order, parent, firstchild, next
                 if order != None: msitem.order = order
                 # Save the msitem
@@ -8345,7 +8401,8 @@ class SermonDescr(models.Model):
             else:
                 # Process all fields in the Specification
                 for oField in SermonDescr.specification:
-                    field = oField.get(keyfield).lower()
+                    field = oField.get(keyfield)
+                    field_lower = field.lower()
                     if keyfield == "path" and oField.get("type") == "fk_id":
                         field = "{}_id".format(field)
                     value = oSermo.get(field)
@@ -8467,8 +8524,17 @@ class SermonDescr(models.Model):
     def custom_set(self, path, value, **kwargs):
         """Set related items"""
 
+        def add_note(srm, sNote):
+            note_now = srm.note
+            if note_now is None:
+                srm.note = sNote
+            else:
+                srm.note = "{}\\n{}".format(note_now, sNote)
+
+
         bResult = True
         oErr = ErrHandle()
+        bDebug = False
         try:
             profile = kwargs.get("profile")
             username = kwargs.get("username")
@@ -8489,15 +8555,6 @@ class SermonDescr(models.Model):
                 self.bibleref = value
                 # Turn this into BibRange
                 self.do_ranges()
-            elif path == "keywordsU":
-                # Get the list of keywords
-                user_keywords = value_lst #  get_json_list(value)
-                for kw in user_keywords:
-                    # Find the keyword
-                    keyword = Keyword.objects.filter(name__iexact=kw).first()
-                    if keyword != None:
-                        # Add this keyword to the sermon for this user
-                        UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
             elif path == "datasets":
                 # Walk the personal datasets
                 datasets = value_lst #  get_json_list(value)
@@ -8512,6 +8569,19 @@ class SermonDescr(models.Model):
                     highest = collection.collections_sermon.all().order_by('-order').first()
                     order = 1 if higest == None else highest + 1
                     CollectionSerm.objects.create(collection=collection, sermon=self, order=order)
+            elif path == "keywordsU":
+                # Get the list of keywords
+                user_keywords = value_lst #  get_json_list(value)
+                for kw in user_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the sermon for this user
+                        UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
+            elif path == "literature":
+                # NOTE: a SermonDescr does *NOT* have its own literature
+                pass
+                # Ready
             elif path == "ssglinks":
                 ssglink_names = value_lst #  get_json_list(value)
                 for ssg_code in ssglink_names:
@@ -8551,19 +8621,22 @@ class SermonDescr(models.Model):
                     signature = Signature.objects.filter(code__iexact=code).first()
                     if signature is None:
                         # Show what is happening
-                        oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
+                        if bDebug: oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
+                        add_note(self, "[A] Link this sermon to: [{}]".format(code))
                     else:
                         # Find the SG
                         sg = signature.gold
                         if sg is None:
                             # Show what is happening
-                            oErr.Status("Reading signaturesA: no SG defined for signature [{}]".format(code))
+                            if bDebug: oErr.Status("Reading signaturesA: no SG defined for signature [{}]".format(code))
+                            add_note(self, "[B] Link this sermon to: [{}]".format(code))
                         else:
                             # Find the accompanying SSG
                             ssg = sg.equal
                             if ssg is None:
                                 # Show what is happening
-                                oErr.Status("Reading signaturesA: empty SSG for signature [{}]".format(code))
+                                if bDebug: oErr.Status("Reading signaturesA: empty SSG for signature [{}]".format(code))
+                                add_note(self, "[C] Link this sermon to: [{}]".format(code))
                             else:
                                 # Make the connection from the Sermon to the SSG
                                 obj = SermonDescrEqual.objects.create(
@@ -8571,7 +8644,7 @@ class SermonDescr(models.Model):
                                     manu = self.msitem.manu,
                                     super = ssg)
                                 # Log what has happened
-                                oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
+                                if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
             else:
                 # Figure out what to do in this case
                 pass

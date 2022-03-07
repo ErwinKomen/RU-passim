@@ -3977,7 +3977,7 @@ class ManuscriptForm(PassimModelForm):
 
         model = Manuscript
         fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 'project' 
-                  'origin', 'url', 'support', 'extent', 'format', 'stype']
+                  'origin', 'url', 'support', 'extent', 'format', 'stype', 'editornotes']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -3993,6 +3993,7 @@ class ManuscriptForm(PassimModelForm):
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+                 'editornotes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
@@ -4006,6 +4007,7 @@ class ManuscriptForm(PassimModelForm):
             profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
+            self.fields['editornotes'].required = False
             #self.fields['yearstart'].required = False
             #self.fields['yearfinish'].required = False
             self.fields['name'].required = False

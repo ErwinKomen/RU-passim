@@ -21,7 +21,7 @@ from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
 
 # General imports
-import io, sys, os
+import io, sys, os, re
 import openpyxl, json
 from openpyxl.utils.cell import get_column_letter
 from openpyxl.cell import Cell
@@ -121,8 +121,10 @@ class ManuscriptUploadExcel(ReaderImport):
                                         row_num += 1
                                         k = k.lower()
                                         oManu[k] = v
+
+                                params = {}
                                 # We have an object with key/value pairs: process it
-                                manu = Manuscript.custom_add(oManu, **kwargs)
+                                manu = Manuscript.custom_add(oManu, params, **kwargs)
 
                                 # Now get the codicological unit that has been automatically created and adapt it
                                 codico = manu.manuscriptcodicounits.first()
@@ -163,7 +165,7 @@ class ManuscriptUploadExcel(ReaderImport):
                                             oSermon[col_name] = ws_sermo.cell(row=row_num, column=column).value
                                         # Process this sermon
                                         order = oSermon['order']
-                                        sermon = SermonDescr.custom_add(oSermon, manu, order)
+                                        sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
 
                                         oResult['sermons'] += 1
 
@@ -229,6 +231,62 @@ class ManuscriptUploadJson(ReaderImport):
 
 
     def process_files(self, request, source, lResults, lHeader):
+
+        def sermones_fixes(oManu):
+            """Several fixes for importing sermones - but they are generic
+            
+            1 - If there is literature on the Sermon level, copy that to the manu level
+            2 - If there is a manuscript identifier like [ms.381], then add a space after the period
+            3 - Change the project from "Passim" into None, so that the default projects are assigned
+            """
+
+            oErr = ErrHandle()
+            bResult = True
+            re_manuidno = re.compile( r'^[Mm][Ss]\.[0-9].*')
+            try:
+                msitems = oManu['msitems']
+                if not msitems is None and len(msitems) > 0:
+                    msitem = msitems[0]
+
+                    # Fix 1: literature
+                    oSermon = msitem.get("sermon")
+                    if not oSermon is None:
+                        # Does this sermon have any literature
+                        sLiterature = oSermon.get("literature")
+                        if not sLiterature is None:
+                            # Check out the manuscript level
+                            if "literature" in oManu:
+                                literatures = oManu['literature']
+                                iCount = len(literatures)
+                                if iCount == 1:
+                                    if len(literatures[0]) == 0:
+                                        # Replace
+                                        literatures[0] = sLiterature
+                                    else:
+                                        # Add it
+                                        literatures.append(sLiterature)
+                                else:
+                                    # Just add it
+                                    literatures.append(sLiterature)
+
+                # Fix 2: space after ms.
+                idno = oManu.get("idno")
+                if re_manuidno.match(idno):
+                    # Repair the first part of the idno
+                    idno = "Ms. {}".format(idno[3:])
+                    oManu['idno'] = idno
+
+                # Fix 3: Remove project specification
+                project = oManu.get("project")
+                if not project is None:
+                    oManu['project'] = None
+                # Okay, no problems
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("sermones_fixes")
+                bResult = False
+            return bResult
+
         file_list = []
         oErr = ErrHandle()
         bOkay = True
@@ -274,74 +332,159 @@ class ManuscriptUploadJson(ReaderImport):
                             if isinstance(lst_manu, dict):
                                 # It is a dictionary: turn it into a list
                                 oManuList = lst_manu
-                                lst_manu = [v for k,v in oManuList.items()]
+                                sorted_keys = sorted(oManuList.keys(), key=lambda x: int(re.search(r'\d+', x).group()))
+                                lst_manu = [oManuList[x] for x in sorted_keys]
+                                # lst_manu = [v for k,v in sorted(oManuList.items(), key=lambda key: int(re.search(r'\d+', key).group()))]
 
                             # Walk through the manuscripts
-                            for oManu in lst_manu:
+                            count_manu = len(lst_manu)
+                            for idx, oManu in enumerate(lst_manu):
+                                # There is one result per manuscript
+                                oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+
+
+                                # Issue #509: literature fix
+                                sermones_fixes(oManu)
+                                # Make sure the stype is set to "imported"
+                                oManu['stype'] = "imp"
+
                                 # Each manuscript has some stuff of its own
                                 # We have an object with key/value pairs: process it
-                                manu = Manuscript.custom_add(oManu, **kwargs)
+                                params = dict(overwriting = False)
+                                manu = Manuscript.custom_add(oManu, params, **kwargs)
 
-                                # Now get the codicological unit that has been automatically created and adapt it
-                                codico = manu.manuscriptcodicounits.first()
-                                if codico != None:
-                                    oManu['manuscript'] = manu
-                                    codico = Codico.custom_add(oManu, **kwargs)
+                                # Show where we are
+                                if params['overwriting']:
+                                    # Skip, do not overwrite
+                                    oErr.Status("{}/{}: {} - NOT OVERWRITING".format(idx+1, count_manu, manu.idno))
 
-                                oResult['count'] += 1
-                                oResult['obj'] = manu
-                                oResult['name'] = manu.idno
+                                    # The only things we look at are: editornotes, date, and list of sermons
 
-                                # Process all the MsItems into a list of sermons
-                                sermon_list = []
-                                for oMsItem in oManu['msitems']:
-                                    # Get the sermon object
-                                    oSermon = oMsItem['sermon']
-                                    order = oMsItem['order']
-                                    sermon = SermonDescr.custom_add(oSermon, manu, order, **kwargs)
+                                    # (1) date
+                                    daterange = oManu.get("date")
+                                    codico = manu.manuscriptcodicounits.first()
+                                    if not daterange is None or daterange == "":
+                                        if codico.codico_dateranges.count() == 0:
+                                            # Get the date
+                                            codico.add_one_daterange(daterange)
 
-                                    # Keep track of the number of sermons read
-                                    oResult['sermons'] += 1
+                                    # (2) list of sermons
+                                    html_en = []
+                                    editornotes = manu.editornotes
+                                    if not editornotes is None: 
+                                        html_en.append(editornotes)
+                                    msitems = oManu.get("msitems")
+                                    if not msitems is None and len(msitems) > 0:
+                                        sermon_siglist = []
+                                        for msitem in msitems:
+                                            oSermon = msitem.get("sermon")
+                                            sig = oSermon.get("signaturesA")
+                                            if not sig is None:
+                                                sermon_siglist.append(sig)
+                                    html_en.append("Sermons: {}".format(", ".join(sermon_siglist)))
 
-                                    # Get parent, firstchild, next
-                                    parent = oMsItem['parent']
-                                    firstchild = oMsItem['firstchild']
-                                    nextone = oMsItem['next']
+                                    # (3) Editornotes
+                                    en = oManu.get("editornotes")
+                                    if not en is None:
+                                        html_en.append(en)
 
-                                    # Add to list
-                                    sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
-                                                        'next': nextone, 'sermon': sermon})
+                                    # COmbine the editor notes
+                                    manu.editornotes = "\n\n".join(html_en)
+                                    manu.save()
 
-                                # Now process the parent/firstchild/next items
-                                with transaction.atomic():
-                                    for oSermo in sermon_list:
-                                        # Get the p/f/n numbers
-                                        parent_id = oSermo['parent']
-                                        firstchild_id = oSermo['firstchild']
-                                        next_id = oSermo['next']
-                                        # Process parent
-                                        if parent_id != '' and parent_id != None:
-                                            # parent_id = str(parent_id)
-                                            parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
-                                            oSermo['sermon'].msitem.parent = parent.msitem
-                                            oSermo['sermon'].msitem.save()
-                                        # Process firstchild
-                                        if firstchild_id != '' and firstchild_id != None:
-                                            # firstchild_id = str(firstchild_id)
-                                            firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
-                                            oSermo['sermon'].msitem.firstchild = firstchild.msitem
-                                            oSermo['sermon'].msitem.save()
-                                        # Process next
-                                        if next_id != '' and next_id != None:
-                                            # next_id = str(next_id)
-                                            nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
-                                            oSermo['sermon'].msitem.next = nextone.msitem
-                                            oSermo['sermon'].msitem.save()
+                                    oResult['count'] += 1
+                                    oResult['obj'] = manu
+                                    oResult['name'] = manu.idno
+                                    oResult['msg'] = "NOT OVERWRITING this manuscript"
 
+                                    # Append this result
+                                    lResults.append(oResult)
+                                else:
+                                    oErr.Status("{}/{}: {}".format(idx+1, count_manu, manu.idno))
+
+                                    # Now get the codicological unit that has been automatically created and adapt it
+                                    codico = manu.manuscriptcodicounits.first()
+                                    if codico != None:
+                                        oManu['manuscript'] = manu
+                                        codico = Codico.custom_add(oManu, **kwargs)
+
+                                    oResult['count'] += 1
+                                    oResult['obj'] = manu
+                                    oResult['name'] = manu.idno
+
+                                    # Process all the MsItems into a list of sermons
+                                    sermon_list = []
+                                    for oMsItem in oManu['msitems']:
+                                        # Get the sermon object
+                                        oSermon = oMsItem['sermon']
+                                        order = oMsItem['order']
+
+                                        # Make sure the stype is set to "imported"
+                                        oSermon['stype'] = "imp"
+
+                                        sermon = SermonDescr.custom_add(oSermon, manu, codico, order, **kwargs)
+
+                                        # Keep track of the number of sermons read
+                                        oResult['sermons'] += 1
+
+                                        # Get parent, firstchild, next
+                                        parent = oMsItem['parent']
+                                        firstchild = oMsItem['firstchild']
+                                        nextone = oMsItem['next']
+
+                                        # Add to list
+                                        sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
+                                                            'next': nextone, 'sermon': sermon})
+
+                                    # Now process the parent/firstchild/next items
+                                    with transaction.atomic():
+                                        for oSermo in sermon_list:
+                                            # Get the p/f/n numbers
+                                            parent_id = oSermo['parent']
+                                            firstchild_id = oSermo['firstchild']
+                                            next_id = oSermo['next']
+                                            # Process parent
+                                            if parent_id != '' and parent_id != None:
+                                                # parent_id = str(parent_id)
+                                                parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
+                                                oSermo['sermon'].msitem.parent = parent.msitem
+                                                oSermo['sermon'].msitem.save()
+                                            # Process firstchild
+                                            if firstchild_id != '' and firstchild_id != None:
+                                                # firstchild_id = str(firstchild_id)
+                                                firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
+                                                oSermo['sermon'].msitem.firstchild = firstchild.msitem
+                                                oSermo['sermon'].msitem.save()
+                                            # Process next
+                                            if next_id != '' and next_id != None:
+                                                # next_id = str(next_id)
+                                                nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
+                                                oSermo['sermon'].msitem.next = nextone.msitem
+                                                oSermo['sermon'].msitem.save()
+
+                                    # Append this result
+                                    lResults.append(oResult)
+
+                                # Prepare a 'read' item
+                                # Fields: ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
+                                yearstart = -1
+                                yearfinish = -1
+                                daterange = codico.codico_dateranges.first()
+                                if not daterange is None:
+                                    yearstart = daterange.yearstart
+                                    yearfinish = daterange.yearfinish
+                                library = manu.get_library()
+                                idno = manu.idno
+                                msg = "read" if not params['overwriting'] else "overwriting"
+                                oRead = dict(status="ok", msg=msg, name="-", 
+                                                yearstart=yearstart, yearfinish=yearfinish,
+                                                library=library, idno=idno, filename="-", url="-")
+                                lst_read.append(oRead)
 
                         # Create a report and add it to what we return
+                        
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
-                        oReport = Report.make(username, "ixlsx", json.dumps(oContents))
+                        oReport = Report.make(username, "ijson", json.dumps(oContents))
                                 
                         # Determine a status code
                         statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
@@ -464,7 +607,8 @@ class ManuscriptUploadGalway(ReaderImport):
                                             libname = "{}, {}, {}".format(oManu['country_name'], oManu['city_name'], oManu['library_name'])
 
                                             # Add manuscript (if not yet there)
-                                            manu = Manuscript.custom_add(oManu, **kwargs)
+                                            params = {}
+                                            manu = Manuscript.custom_add(oManu, params, **kwargs)
 
                                             if manu.library == None:
                                                 # Log that the library is not recognized

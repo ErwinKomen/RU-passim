@@ -1,0 +1,26 @@
+<table class="func-view compact-simple resizable" style="width: 100%;">
+  <thead>
+    <tr>
+      <th class="tdnowrap">#</th>
+      <th class="tdnowrap">Approver</th>
+      <th class="tdnowrap">Project(s)</th>
+      <th class="tdnowrap">Approval status</th>
+      <th class="tdnowrap" style="width: 100%;">Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for oItem in approvals %}
+      <tr>
+        <td>{{forloop.counter}}</td>
+        <td class="clickable">
+          <a href="{% url 'equaladdapprovaluser_details' approval.id %}" class="nostyle">{{oItem.profile.user.username}}</a> 
+        </td>
+        <td>{{oItem.profile.get_projects_markdown|safe}}</td>
+        <td class="clickable">
+          <a href="{% url 'equaladdapprovaluser_details' approval.id %}" class="nostyle">{{oItem.get_atype_display}}</a> 
+        </td>
+        <td style="width: 100%;">{{oItem.get_comment_html}}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

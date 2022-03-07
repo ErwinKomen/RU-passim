@@ -183,7 +183,8 @@ class EqualChange(models.Model):
                         if not prj_id in project_acc:
                             project_acc.append(prj_id)
                 # The [project_acc] now contains the id's of all projects for which the SSG has been approved
-                iCount = len(project_acc)
+                #   (We want to know how many projects there are *left*)
+                iCount = iTotal - len(project_acc)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChange/get_approval_count")
@@ -466,10 +467,7 @@ class EqualAdd(models.Model):
         method = "per_approver" # This was used prior to issue #527
         method = "per_project"  # See issue #527
         try:
-            # Count the number of approvals I need to have
-            iTotal = self.addapprovals.count()
-            # Count the number of non-accepting approvals
-            iCount = self.addapprovals.exclude(atype="acc").count()
+            # Action depends on the method above
             if method == "per_approver":
                 # Count the number of approvals I need to have
                 iTotal = self.addapprovals.count()
@@ -477,10 +475,11 @@ class EqualAdd(models.Model):
                 iCount = self.addapprovals.exclude(atype="acc").count()
             elif method == "per_project":
                 # Need at least one person per project
-                # First: get a list of projects linked to the SSG
-                project_ids = [x.id for x in self.super.projects.all()]
-                # Then count the number of projects linked to it
+                # This SSG is being added to ONE project
+                project_ids = [ self.project.id ]
+                # Then count the number of projects that should be linked to it (should be just '1')
                 iTotal = len(project_ids)
+
                 # Now go through all approvals and see which projects have already made an approval
                 project_acc = []
                 for obj in self.addapprovals.filter(atype="acc"):
@@ -490,7 +489,8 @@ class EqualAdd(models.Model):
                         if not prj_id in project_acc:
                             project_acc.append(prj_id)
                 # The [project_acc] now contains the id's of all projects for which the SSG has been approved
-                iCount = len(project_acc)
+                #  (We want to know how many there are *left*)
+                iCount = iTotal - len(project_acc)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualAdd/get_approval_count") 
