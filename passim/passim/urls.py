@@ -128,7 +128,7 @@ urlpatterns = [
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
-    url(r'^ssg/import/huwa/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
+    url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
 
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
     url(r'^ssg/graph/download(?:/(?P<pk>\d+))?/$', EqualGoldGraphDownload.as_view(), name='equalgold_graph_download'),
