@@ -70,7 +70,7 @@ def equaladd_to_accept(instance):
             # The action is to delete the SSG altogether
             instance.atype = "acc"
             # Perform the actual deletion
-            super.remove()
+            super.delete()
         else:
             oErr.Status("equaladd_to_accept: unknown action [{}]".format(action))
             return bBack

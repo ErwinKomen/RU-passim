@@ -12019,11 +12019,16 @@ class EqualGoldEdit(BasicDetails):
         oErr = ErrHandle()
                 
         try:
+            # Need to know who I am for some operations
+            profile = Profile.get_user_profile(self.request.user.username)
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
-            collist_ssg_id = form.cleaned_data['collist_ssg'].values('id') 
-            collist_hist_id = form.cleaned_data['collist_hist'].values('id')
-            collist_ssg = Collection.objects.filter(Q(id__in=collist_ssg_id) | Q(id__in=collist_hist_id))
+            collist_ssg_id = [x['id'] for x in form.cleaned_data['collist_ssg'].values('id') ]
+            collist_hist_id = [x['id'] for x in form.cleaned_data['collist_hist'].values('id')]
+            collist_others_id = [x['id'] for x in instance.collections.filter(scope="priv", type="super").exclude(owner=profile).values('id')]
+            collist_id = collist_ssg_id + collist_hist_id + collist_others_id
+            collist_ssg = Collection.objects.filter(Q(id__in=collist_id))
             adapt_m2m(CollectionSuper, instance, "super", collist_ssg, "collection")
 
             # (2) links from one SSG to another SSG
@@ -12071,7 +12076,6 @@ class EqualGoldEdit(BasicDetails):
 
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
-            profile = Profile.get_user_profile(self.request.user.username)
             adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, 
                       extrargs = {'profile': profile, 'type': 'super'})
 

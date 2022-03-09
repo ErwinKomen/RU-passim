@@ -475,21 +475,45 @@ class EqualAdd(models.Model):
                 iCount = self.addapprovals.exclude(atype="acc").count()
             elif method == "per_project":
                 # Need at least one person per project
-                # This SSG is being added to ONE project
-                project_ids = [ self.project.id ]
-                # Then count the number of projects that should be linked to it (should be just '1')
-                iTotal = len(project_ids)
+                project_ids = []
 
-                # Now go through all approvals and see which projects have already made an approval
-                project_acc = []
-                for obj in self.addapprovals.filter(atype="acc"):
-                    # check out which projects this approver has rights for
-                    approver_project_ids = [x.id for x in obj.profile.projects.all()]
-                    for prj_id in approver_project_ids:
-                        if not prj_id in project_acc:
-                            project_acc.append(prj_id)
+                # What we do now depends on the action
+                if self.action == "del":
+                    # For deletion: get all the EqualAdd objects that focus on deleting the same SSG
+                    equaladds = EqualAdd.objects.filter(atype="def", action="del", super=self.super)
+                    for obj in equaladds:
+                        id = obj.project.id
+                        if not id in project_ids:
+                            project_ids.append(id)
+                    # Get the total number of projects that need to decide on deletion
+                    iTotal = len(project_ids)
+
+                    # Now go through all approvals and see which projects have already made an approval
+                    project_acc = []
+                    for equaladd in equaladds:
+                        for obj in equaladd.addapprovals.filter(atype="acc"):
+                            # check out which projects this approver has rights for
+                            approver_project_ids = [x.id for x in obj.profile.projects.all()]
+                            for prj_id in approver_project_ids:
+                                if not prj_id in project_acc and prj_id in project_ids:
+                                    project_acc.append(prj_id)
+                else:
+                    # This is 'add' and 'rem' (add project to SSG and remove project from SSG)
+                    # This is about the relation between one SSG and ONE project
+                    project_ids = [ self.project.id ]
+                    # Then count the number of projects that should be linked to it (should be just '1')
+                    iTotal = len(project_ids)
+
+                    # Now go through all approvals and see which projects have already made an approval
+                    project_acc = []
+                    for obj in self.addapprovals.filter(atype="acc"):
+                        # check out which projects this approver has rights for
+                        approver_project_ids = [x.id for x in obj.profile.projects.all()]
+                        for prj_id in approver_project_ids:
+                            if not prj_id in project_acc and prj_id in project_ids:
+                                project_acc.append(prj_id)
                 # The [project_acc] now contains the id's of all projects for which the SSG has been approved
-                #  (We want to know how many there are *left*)
+                #  (We want to know if the desired project is still *left*)
                 iCount = iTotal - len(project_acc)
         except:
             msg = oErr.get_error_message()
