@@ -26,7 +26,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin'],
+                        'codico_origin', 'daterange_codico'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -398,18 +398,42 @@ def add_codico_to_manuscript(manu):
                     obj = CodicoKeyword.objects.create(
                         codico=codi, keyword=mk.keyword)
 
-        # Copy date ranges
-        if codi.codico_dateranges.count() == 0:
-            for md in manu.manuscript_dateranges.all():
-                if md.codico_id == None or md.codico_id == 0 or md.codico == None or md.codic.id != codi.id:
-                    md.codico = codi
-                    md.save()
+        ## Copy date ranges
+        #if codi.codico_dateranges.count() == 0:
+        #    for md in manu.manuscript_dateranges.all():
+        #        if md.codico_id == None or md.codico_id == 0 or md.codico == None or md.codic.id != codi.id:
+        #            md.codico = codi
+        #            md.save()
 
         # Tie all MsItems that need be to the Codico
         for msitem in manu.manuitems.all().order_by('order'):
             if msitem.codico_id == None or msitem.codico == None or msitem.codico.id != codi.id:
                 msitem.codico = codi
                 msitem.save()
+        bResult = True
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_codico_to_manuscript")
+        bResult = False
+    return bResult, msg
+
+def adapt_daterange_codico():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Check all date ranges, that they are connected to a Codico (instead of manuscript)
+        qs = Daterange.objects.filter(codico__isnull=True)
+        for obj in qs:
+            # Get the correct codico from the manuscript
+            codico = obj.manuscript.manuscriptcodicounits.first()
+            if codico is None:
+                oErr.Status("Cannot find a CODICO for manuscript {}".format(obj.manuscript.id))
+            else:
+                # Set the right codico
+                obj.codico = codico
+                obj.save()
+        # Getting here means that all went well
         bResult = True
     except:
         msg = oErr.get_error_message()

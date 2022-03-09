@@ -78,7 +78,6 @@ urlpatterns = [
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
     url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),
-    url(r'^tools/daterange/$', passim.seeker.views.do_daterange, name='do_daterange'),
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),

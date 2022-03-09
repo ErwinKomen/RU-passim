@@ -3880,7 +3880,7 @@ class Manuscript(models.Model):
     def get_dates(self):
         lhtml = []
         # Get all the date ranges in the correct order
-        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
         # Walk the date range objects
         for obj in qs:
             # Determine the output for this one daterange
@@ -3904,7 +3904,7 @@ class Manuscript(models.Model):
 
         lhtml = []
         # Get all the date ranges in the correct order
-        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
         # Walk the date range objects
         for obj in qs:
             # Determine the output for this one daterange
@@ -5715,8 +5715,8 @@ class Daterange(models.Model):
     # ========================================================================
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
-    manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
-    # [0-1] Well actually each daterange belongs (or should belong) to exactly one Codico
+    #manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
+    # [0-1] Each daterange belongs (or should belong) to exactly one Codico
     codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
 
     def __str__(self):
@@ -5724,9 +5724,9 @@ class Daterange(models.Model):
         return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Fill in manuscript, if not yet given
-        if self.codico_id != None and self.codico != None and self.manuscript_id == None or self.manuscript == None:
-            self.manuscript = self.codico.manuscript
+        ## Fill in manuscript, if not yet given
+        #if self.codico_id != None and self.codico != None and self.manuscript_id == None or self.manuscript == None:
+        #    self.manuscript = self.codico.manuscript
         # Perform the actual saving
         response = super(Daterange, self).save(force_insert, force_update, using, update_fields)
         # Possibly adapt the dates of the related manuscript
@@ -5745,23 +5745,27 @@ class Daterange(models.Model):
         oErr = ErrHandle()
         bBack = False
         try:
-            manu_start = self.manuscript.yearstart
-            manu_finish = self.manuscript.yearfinish
+            manuscript = self.codico.manuscript
+            manu_start = manuscript.yearstart
+            manu_finish = manuscript.yearfinish
             current_start = 3000
             current_finish = 0
-            for dr in self.manuscript.manuscript_dateranges.all():
+
+            # WAS: for dr in self.manuscript.manuscript_dateranges.all():
+            # Should be: look at the CODICO dateranges
+            for dr in Daterange.objects.filter(codico__manuscript=manuscript):
                 if dr.yearstart < current_start: current_start = dr.yearstart
                 if dr.yearfinish > current_finish: current_finish = dr.yearfinish
 
             # Need any changes in *MANUSCRIPT*?
             bNeedSaving = False
             if manu_start != current_start:
-                self.manuscript.yearstart = current_start
+                manuscript.yearstart = current_start
                 bNeedSaving = True
             if manu_finish != current_finish:
-                self.manuscript.yearfinish = current_finish
+                manuscript.yearfinish = current_finish
                 bNeedSaving = True
-            if bNeedSaving: self.manuscript.save()
+            if bNeedSaving: manuscript.save()
 
             # Need any changes in *CODICO*?
             bNeedSaving = False
@@ -8449,7 +8453,8 @@ class SermonDescr(models.Model):
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
             if path == "dateranges":
-                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                # WAS: qs = self.manuscript_dateranges.all().order_by('yearstart')
+                qs = Daterange.objects.filter(msitem__codico__manuscript=self).order_by('yearstart')
                 dates = []
                 for obj in qs:
                     dates.append(obj.__str__())
