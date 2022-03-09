@@ -2387,63 +2387,68 @@ class ReaderImport(View):
             # Make sure the status is available
             self.oStatus = oStatus
 
-            form = self.mForm(request.POST, request.FILES)
             lResults = []
-            if form.is_valid():
-                # NOTE: from here a breakpoint may be inserted!
-                print('import_{}: valid form'.format(self.import_type))
-                oErr = ErrHandle()
-                try:
-                    # The list of headers to be shown
-                    lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
-                    # Get profile 
-                    profile = Profile.get_user_profile(username) 
+            # Get profile 
+            profile = Profile.get_user_profile(username) 
                     
-                    # Create a SourceInfo object for this extraction
-                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
 
-                    # Process the request
-                    bOkay, code = self.process_files(request, source, lResults, lHeader)
+            # The list of headers to be shown
+            lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
-                    if bOkay:
-                        # Adapt the 'source' to tell what we did 
-                        source.code = code
-                        oErr.Status(code)
-                        source.save()
-                        # Indicate we are ready
-                        oStatus.set("readyclose")
-                        # Get a list of errors
-                        error_list = [str(item) for item in self.arErr]
-
-                        statuscode = "error" if len(error_list) > 0 else "completed"
-
-                        # Create the context
-                        context = dict(
-                            statuscode=statuscode,
-                            results=lResults,
-                            error_list=error_list
-                            )
-                    else:
-                        self.arErr.append(code)
-
-                    if len(self.arErr) == 0:
-                        # Get the HTML response
-                        self.data['html'] = render_to_string(self.template_name, context, request)
-                    else:
-                        lHtml = []
-                        for item in self.arErr:
-                            lHtml.append(item)
-                        self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
-                except:
-                    msg = oErr.get_error_message()
-                    oErr.DoError("import_{}".format(self.import_type))
-                    self.data['html'] = msg
-                    self.data['status'] = "error"
-
+            if self.mForm is None:
+                pass
             else:
-                self.data['html'] = 'invalid form: {}'.format(form.errors)
-                self.data['status'] = "error"
+                form = self.mForm(request.POST, request.FILES)
+                if form.is_valid():
+                    # NOTE: from here a breakpoint may be inserted!
+                    print('import_{}: valid form'.format(self.import_type))
+                    oErr = ErrHandle()
+                    try:
+
+                        # Process the request
+                        bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                        if bOkay:
+                            # Adapt the 'source' to tell what we did 
+                            source.code = code
+                            oErr.Status(code)
+                            source.save()
+                            # Indicate we are ready
+                            oStatus.set("readyclose")
+                            # Get a list of errors
+                            error_list = [str(item) for item in self.arErr]
+
+                            statuscode = "error" if len(error_list) > 0 else "completed"
+
+                            # Create the context
+                            context = dict(
+                                statuscode=statuscode,
+                                results=lResults,
+                                error_list=error_list
+                                )
+                        else:
+                            self.arErr.append(code)
+
+                        if len(self.arErr) == 0:
+                            # Get the HTML response
+                            self.data['html'] = render_to_string(self.template_name, context, request)
+                        else:
+                            lHtml = []
+                            for item in self.arErr:
+                                lHtml.append(item)
+                            self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+                    except:
+                        msg = oErr.get_error_message()
+                        oErr.DoError("import_{}".format(self.import_type))
+                        self.data['html'] = msg
+                        self.data['status'] = "error"
+
+                else:
+                    self.data['html'] = 'invalid form: {}'.format(form.errors)
+                    self.data['status'] = "error"
         
             # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
         else:
@@ -2816,4 +2821,71 @@ class ManuEadDownload(BasicPart):
         return sData
 
 
+class EqualGoldHuwaToJson(ReaderImport):
+    """Convert (part of) HUWA database into EqualGold objects"""
+
+    # Initialisations
+    mForm = None
+    import_type = "hssg"    # Huwa to SSG
+    sourceinfo_url = "https://www.ru.nl/passim/huwa2ssg"
+
+    def process_files(self, request, source, lResults, lHeader):
+        bOkay = True
+        code = ""
+        oErr = ErrHandle()
+        oStatus = self.oStatus
+        try:
+            # Read the HUWA db into a table
+            table_info = self.read_huwa()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/process_files")
+        return bOkay, code
+
+    def read_huwa(self):
+        oErr = ErrHandle()
+        table_info = {}
+        try:
+            # Get the location of the HUWA database
+            huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+            with sqlite3.connect(huwa_db) as db:
+                standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+                cursor = db.cursor()
+                db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+                tables = [x[0] for x in db_results]
+
+                count_tbl = len(tables)
+
+                # Walk all tables
+                for table_name in tables:
+                    oInfo = {}
+                    # Find out what fields this table has
+                    db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                    fields = []
+                    for field in db_results:
+                        field_name = field[1]
+                        fields.append(field_name)
+
+                        field_info = dict(type=field[2],
+                                          not_null=(field[3] == 1),
+                                          default=field[4])
+                        oInfo[field_name] = field_info
+                    oInfo['fields'] = fields
+                    oInfo['links'] = []
+
+                    # Read the table
+                    table_contents = cursor.execute("SELECT * FROM {}".format(table_name)).fetchall()
+                    oInfo['contents'] = table_contents
+
+                    table_info[table_name] = oInfo
+
+                # Close the database again
+                cursor.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_huwa")
+        # Return the table that we found
+        return table_info
 

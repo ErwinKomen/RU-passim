@@ -145,25 +145,25 @@
             <tr><td colspan="3">&nbsp;</td></tr>
             <tr>
               <td colspan="3">
-                <h4>Authority File project additions and removals</h4>
+                <h4>Authority File project additions, removals and deletions</h4>
               </td>
             </tr>
             
             <!-- Submitted new AF additions--> 
             <tr>            
-              <td valign="top" class="hangingindent">My Authority File project additions / removals:</td>
+              <td valign="top" class="hangingindent">My Authority File project additions / removals / deletions:</td>
               <td valign="top">
-                <a href="{% url 'equaladduser_list' %}" role="button" title="View all my Authority File project additions and removals" 
+                <a href="{% url 'equaladduser_list' %}" role="button" title="View all my Authority File project additions, removals and deletions" 
                    class="btn btn-xs jumbo-1 approval-history hidden">
                   {{count_afadd_all}}
-                  <span class="glyphicon glyphicon-check" title="View all my Authority File project additions and removals"></span>
+                  <span class="glyphicon glyphicon-check" title="View all my Authority File project additions, removals and deletions"></span>
                 </a>
               </td>
               <td valign="top" align="right">
-                <a href="{% url 'equaladduser_list' %}?user-atype=def" role="button" title="View my pending project Authority File additions and removals" 
+                <a href="{% url 'equaladduser_list' %}?user-atype=def" role="button" title="View my pending project Authority File additions, removals and deletions" 
                    class="btn btn-xs {% if count_afadd_open == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
                   {{count_afadd_open}}
-                  <span class="glyphicon glyphicon-edit" title="View my pending project Authority File additions and removals"></span>
+                  <span class="glyphicon glyphicon-edit" title="View my pending project Authority File additions, removals and deletions"></span>
                 </a>
               </td>
             </tr>
@@ -173,19 +173,19 @@
 
             <!-- New AF additions for me to review -->
             <tr>
-              <td valign="top" class="hangingindent">AF project additions and removals that I need to review:</td>
+              <td valign="top" class="hangingindent">AF project additions, removals and deletions that I need to review:</td>
               <td valign="top">
-                <a href="{% url 'equaladdapprovaluser_list' %}" role="button" title="View all my reviews of AF project additions and removals" 
+                <a href="{% url 'equaladdapprovaluser_list' %}" role="button" title="View all my reviews of AF project additions, removals and deletions" 
                    class="btn btn-xs jumbo-1 approval-history hidden">
                   {{count_afaddapprove_all}}
-                  <span class="glyphicon glyphicon-check" title="View all my reviews of AF project additions and removals"></span>
+                  <span class="glyphicon glyphicon-check" title="View all my reviews of AF project additions, removals and deletions"></span>
                 </a>
               </td>
               <td valign="top" align="right">
-                <a href="{% url 'equaladdapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF project additions and removals" 
+                <a href="{% url 'equaladdapprovaluser_list' %}?user-atype=def" role="button" title="View my pending reviews of AF project additions, removals and deletions" 
                    class="btn btn-xs {% if count_afaddapprove_task == 0 %}jumbo-1{% else %}jumbo-2{% endif %}">
                   {{count_afaddapprove_task}}
-                  <span class="glyphicon glyphicon-edit" title="View my pending reviews of AF project additions and removals"></span>
+                  <span class="glyphicon glyphicon-edit" title="View my pending reviews of AF project additions, removals and deletions"></span>
                 </a>
               </td>
             </tr>
