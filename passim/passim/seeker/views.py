@@ -1521,57 +1521,58 @@ def do_provenance(request):
         oErr.DoError("do_provenance")
         return reverse('home')
 
-def do_daterange(request):
-    """Copy data ranges from manuscripts to separate tables - if not already there"""
+# Issue #426: should be removed in due course
+#def do_daterange(request):
+#    """Copy data ranges from manuscripts to separate tables - if not already there"""
 
-    oErr = ErrHandle()
-    try:
-        assert isinstance(request, HttpRequest)
-        # Specify the template
-        template_name = 'tools.html'
-        # Define the initial context
-        context =  {'title':'RU-passim-tools',
-                    'year':get_current_datetime().year,
-                    'pfx': APP_PREFIX,
-                    'site_url': admin.site.site_url}
-        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-        context['is_app_editor'] = user_is_ingroup(request, app_editor)
+#    oErr = ErrHandle()
+#    try:
+#        assert isinstance(request, HttpRequest)
+#        # Specify the template
+#        template_name = 'tools.html'
+#        # Define the initial context
+#        context =  {'title':'RU-passim-tools',
+#                    'year':get_current_datetime().year,
+#                    'pfx': APP_PREFIX,
+#                    'site_url': admin.site.site_url}
+#        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+#        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
-        # Only passim uploaders can do this
-        if not context['is_app_uploader']: return reverse('home')
+#        # Only passim uploaders can do this
+#        if not context['is_app_uploader']: return reverse('home')
 
-        # Indicate the necessary tools sub-part
-        context['tools_part'] = "Update from Manuscript to Daterange table"
+#        # Indicate the necessary tools sub-part
+#        context['tools_part'] = "Update from Manuscript to Daterange table"
 
-        # Process this visit
-        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
+#        # Process this visit
+#        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
 
-        # Create list to be returned
-        result_list = []
+#        # Create list to be returned
+#        result_list = []
 
-        # Visit all Manuscripts
-        qs = Manuscript.objects.all()
-        lst_add = []
-        for obj in qs:
-            # Check if there are any associated Dateranges
-            if obj.manuscript_dateranges.all().count() == 0:
-                # There are no date ranges yet: create just ONE
-                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
-                # Show that we added it
-                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
-                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
-                lst_add.append(sAdd)
+#        # Visit all Manuscripts
+#        qs = Manuscript.objects.all()
+#        lst_add = []
+#        for obj in qs:
+#            # Check if there are any associated Dateranges
+#            if obj.manuscript_dateranges.all().count() == 0:
+#                # There are no date ranges yet: create just ONE
+#                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
+#                # Show that we added it
+#                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
+#                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
+#                lst_add.append(sAdd)
 
-        # Wrapping it up
-        result_list.append(dict(part="Added", result= lst_add))
-        context['result_list'] = result_list
+#        # Wrapping it up
+#        result_list.append(dict(part="Added", result= lst_add))
+#        context['result_list'] = result_list
 
-        # Render and return the page
-        return render(request, template_name, context)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("do_daterange")
-        return reverse('home')
+#        # Render and return the page
+#        return render(request, template_name, context)
+#    except:
+#        msg = oErr.get_error_message()
+#        oErr.DoError("do_daterange")
+#        return reverse('home')
 
 def do_mext(request):
     """Copy all 'url' fields from Manuscript instances to separate ManuscriptExt instances and link them to the Manuscript"""
@@ -8970,10 +8971,10 @@ class ManuscriptEdit(BasicDetails):
     use_team_group = True
     history_button = True
     
-    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-                                         form=DaterangeForm, min_num=0,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
+    #MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+    #                                     form=DaterangeForm, min_num=0,
+    #                                     fk_name = "manuscript",
+    #                                     extra=0, can_delete=True, can_order=False)
     McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
                                        form=ManuscriptCollectionForm, min_num=0,
                                        fk_name="manuscript", extra=0)
@@ -8995,7 +8996,7 @@ class ManuscriptEdit(BasicDetails):
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+    formset_objects = [# {'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
@@ -9074,15 +9075,15 @@ class ManuscriptEdit(BasicDetails):
                     {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
                      'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                        'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
+                        'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[0] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
-                        'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
+                        'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[1], 'template_selection': 'ru.passim.litref_template' },
 
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
 
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
+                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[2] }
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -9098,7 +9099,7 @@ class ManuscriptEdit(BasicDetails):
 
                 # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
-                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
+                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[3] })
                 context['mainitems'].append(
                     {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
@@ -9301,29 +9302,29 @@ class ManuscriptEdit(BasicDetails):
                 cleaned = form.cleaned_data
                 # Action depends on prefix
 
-                if prefix == "mdr":
-                    # Processing one daterange
-                    newstart = cleaned.get('newstart', None)
-                    newfinish = cleaned.get('newfinish', None)
-                    oneref = cleaned.get('oneref', None)
-                    newpages = cleaned.get('newpages', None)
+                #if prefix == "mdr":
+                #    # Processing one daterange
+                #    newstart = cleaned.get('newstart', None)
+                #    newfinish = cleaned.get('newfinish', None)
+                #    oneref = cleaned.get('oneref', None)
+                #    newpages = cleaned.get('newpages', None)
 
-                    if newstart:
-                        # Possibly set newfinish equal to newstart
-                        if newfinish == None or newfinish == "":
-                            newfinish = newstart
-                        # Double check if this one already exists for the current instance
-                        obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
-                        if obj == None:
-                            form.instance.yearstart = int(newstart)
-                            form.instance.yearfinish = int(newfinish)
-                        # Do we have a reference?
-                        if oneref != None:
-                            form.instance.reference = oneref
-                            if newpages != None:
-                                form.instance.pages = newpages
-                        # Note: it will get saved with formset.save()
-                elif prefix == "mcol":
+                #    if newstart:
+                #        # Possibly set newfinish equal to newstart
+                #        if newfinish == None or newfinish == "":
+                #            newfinish = newstart
+                #        # Double check if this one already exists for the current instance
+                #        obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
+                #        if obj == None:
+                #            form.instance.yearstart = int(newstart)
+                #            form.instance.yearfinish = int(newfinish)
+                #        # Do we have a reference?
+                #        if oneref != None:
+                #            form.instance.reference = oneref
+                #            if newpages != None:
+                #                form.instance.pages = newpages
+                #        # Note: it will get saved with formset.save()
+                if prefix == "mcol":
                     # Collection processing
                     newcol = cleaned.get('newcol', None)
                     if newcol != None:
@@ -9469,9 +9470,11 @@ class ManuscriptEdit(BasicDetails):
                     ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
-            # (1) links from SG to SSG
-            datelist = form.cleaned_data['datelist']
-            adapt_m2o(Daterange, instance, "manuscript", datelist)
+
+            # Issue #426: the following is OBSOLETE, since daterange is now coupled to codico
+            ## (1) links from Daterange to Manuscript
+            #datelist = form.cleaned_data['datelist']
+            #adapt_m2o(Daterange, instance, "manuscript", datelist)
 
             # (2) external URLs
             extlist = form.cleaned_data['extlist']
@@ -10128,10 +10131,13 @@ class ManuscriptListView(BasicList):
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
         elif custom == "from":
-            for item in instance.manuscript_dateranges.all():
+            # for item in instance.manuscript_dateranges.all():
+            # Walk all codico's
+            for item in Daterange.objects.filter(codico__manuscript=instance).order_by('yearstart'):
                 html.append("<div>{}</div>".format(item.yearstart))
         elif custom == "until":
-            for item in instance.manuscript_dateranges.all():
+            # for item in instance.manuscript_dateranges.all():
+            for item in Daterange.objects.filter(codico__manuscript=instance).order_by('yearfinish'):
                 html.append("<div>{}</div>".format(item.yearfinish))
         elif custom == "status":
             # html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
@@ -10325,7 +10331,8 @@ class ManuscriptDownload(BasicPart):
     def get_func(self, instance, path, profile, username, team_group):
         sBack = ""
         if path == "dateranges":
-            qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            # qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            qs = Daterange.objects.filter(codico__manuscript=instance).order_by('yearstart')
             dates = []
             for obj in qs:
                 dates.append(obj.__str__())

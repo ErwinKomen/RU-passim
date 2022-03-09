@@ -3880,7 +3880,7 @@ class Manuscript(models.Model):
     def get_dates(self):
         lhtml = []
         # Get all the date ranges in the correct order
-        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
         # Walk the date range objects
         for obj in qs:
             # Determine the output for this one daterange
@@ -3904,7 +3904,7 @@ class Manuscript(models.Model):
 
         lhtml = []
         # Get all the date ranges in the correct order
-        qs = self.manuscript_dateranges.all().order_by('yearstart')
+        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
         # Walk the date range objects
         for obj in qs:
             # Determine the output for this one daterange
@@ -5716,7 +5716,7 @@ class Daterange(models.Model):
     # [1] Every daterange belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated Daterange objects are also removed
     manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
-    # [0-1] Well actually each daterange belongs (or should belong) to exactly one Codico
+    # [0-1] Each daterange belongs (or should belong) to exactly one Codico
     codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
 
     def __str__(self):
@@ -5749,7 +5749,10 @@ class Daterange(models.Model):
             manu_finish = self.manuscript.yearfinish
             current_start = 3000
             current_finish = 0
-            for dr in self.manuscript.manuscript_dateranges.all():
+
+            # WAS: for dr in self.manuscript.manuscript_dateranges.all():
+            # Should be: look at the CODICO dateranges
+            for dr in Daterange.objects.filter(codico__manuscript=self.manuscript):
                 if dr.yearstart < current_start: current_start = dr.yearstart
                 if dr.yearfinish > current_finish: current_finish = dr.yearfinish
 
@@ -8449,7 +8452,8 @@ class SermonDescr(models.Model):
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
             if path == "dateranges":
-                qs = self.manuscript_dateranges.all().order_by('yearstart')
+                # WAS: qs = self.manuscript_dateranges.all().order_by('yearstart')
+                qs = Daterange.objects.filter(msitem__codico__manuscript=self).order_by('yearstart')
                 dates = []
                 for obj in qs:
                     dates.append(obj.__str__())

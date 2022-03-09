@@ -3964,12 +3964,12 @@ class ManuscriptForm(PassimModelForm):
                 widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
-    datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
-                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'datelist', 'projlist'] 
+                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'projlist'] # , 'datelist'] 
     exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
@@ -4044,12 +4044,12 @@ class ManuscriptForm(PassimModelForm):
             #self.fields['provlist'].queryset = Provenance.objects.none()
             self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
-            self.fields['datelist'].queryset = Daterange.objects.none()
+            # self.fields['datelist'].queryset = Daterange.objects.none()
 
-           # self.fields['provlist'].widget.addonly = True
+            # self.fields['provlist'].widget.addonly = True
             self.fields['mprovlist'].widget.addonly = True
             self.fields['extlist'].widget.addonly = True
-            self.fields['datelist'].widget.addonly = True
+            # self.fields['datelist'].widget.addonly = True
         
             # Get the instance
             if 'instance' in kwargs:
@@ -4092,14 +4092,14 @@ class ManuscriptForm(PassimModelForm):
       
                 self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
-                self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
+                # self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
                 
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
                 #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
-                self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
+                # self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
 
                 #self.fields['provlist'].widget.manu = instance
