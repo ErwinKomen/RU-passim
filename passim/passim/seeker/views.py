@@ -12505,6 +12505,12 @@ class EqualGoldListView(BasicList):
 
         # ======== One-time adaptations ==============
         listview_adaptations("equalgold_list")
+
+        # Should json be added?
+        if user_is_superuser(self.request):
+            self.downloads = [
+                {"label": "Huwa AFs: json", "dtype": "json", "url": 'equalgold_huwajson'}]
+
         return None
     
     def add_to_context(self, context, initial):

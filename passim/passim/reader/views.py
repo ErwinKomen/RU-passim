@@ -37,6 +37,7 @@ import csv, re
 import requests
 import demjson
 import openpyxl
+import sqlite3
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -51,6 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
+    EqualGold, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime
 
@@ -2387,63 +2389,99 @@ class ReaderImport(View):
             # Make sure the status is available
             self.oStatus = oStatus
 
-            form = self.mForm(request.POST, request.FILES)
             lResults = []
-            if form.is_valid():
-                # NOTE: from here a breakpoint may be inserted!
-                print('import_{}: valid form'.format(self.import_type))
-                oErr = ErrHandle()
-                try:
-                    # The list of headers to be shown
-                    lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
-                    # Get profile 
-                    profile = Profile.get_user_profile(username) 
+            # Get profile 
+            profile = Profile.get_user_profile(username) 
                     
-                    # Create a SourceInfo object for this extraction
-                    source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
 
-                    # Process the request
-                    bOkay, code = self.process_files(request, source, lResults, lHeader)
+            # The list of headers to be shown
+            lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
 
-                    if bOkay:
-                        # Adapt the 'source' to tell what we did 
-                        source.code = code
-                        oErr.Status(code)
-                        source.save()
-                        # Indicate we are ready
-                        oStatus.set("readyclose")
-                        # Get a list of errors
-                        error_list = [str(item) for item in self.arErr]
+            if self.mForm is None:
+                # Process the request
+                bOkay, code = self.process_files(request, source, lResults, lHeader)
 
-                        statuscode = "error" if len(error_list) > 0 else "completed"
+                if bOkay:
+                    # Adapt the 'source' to tell what we did 
+                    source.code = code
+                    oErr.Status(code)
+                    source.save()
+                    # Indicate we are ready
+                    oStatus.set("readyclose")
+                    # Get a list of errors
+                    error_list = [str(item) for item in self.arErr]
 
-                        # Create the context
-                        context = dict(
-                            statuscode=statuscode,
-                            results=lResults,
-                            error_list=error_list
-                            )
-                    else:
-                        self.arErr.append(code)
+                    statuscode = "error" if len(error_list) > 0 else "completed"
 
-                    if len(self.arErr) == 0:
-                        # Get the HTML response
-                        self.data['html'] = render_to_string(self.template_name, context, request)
-                    else:
-                        lHtml = []
-                        for item in self.arErr:
-                            lHtml.append(item)
-                        self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
-                except:
-                    msg = oErr.get_error_message()
-                    oErr.DoError("import_{}".format(self.import_type))
-                    self.data['html'] = msg
-                    self.data['status'] = "error"
+                    # Create the context
+                    context = dict(
+                        statuscode=statuscode,
+                        results=lResults,
+                        error_list=error_list
+                        )
+                else:
+                    self.arErr.append(code)
 
+                if len(self.arErr) == 0:
+                    # Get the HTML response
+                    self.data['html'] = render_to_string(self.template_name, context, request)
+                else:
+                    lHtml = []
+                    for item in self.arErr:
+                        lHtml.append(item)
+                    self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
             else:
-                self.data['html'] = 'invalid form: {}'.format(form.errors)
-                self.data['status'] = "error"
+                form = self.mForm(request.POST, request.FILES)
+                if form.is_valid():
+                    # NOTE: from here a breakpoint may be inserted!
+                    print('import_{}: valid form'.format(self.import_type))
+                    oErr = ErrHandle()
+                    try:
+
+                        # Process the request
+                        bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                        if bOkay:
+                            # Adapt the 'source' to tell what we did 
+                            source.code = code
+                            oErr.Status(code)
+                            source.save()
+                            # Indicate we are ready
+                            oStatus.set("readyclose")
+                            # Get a list of errors
+                            error_list = [str(item) for item in self.arErr]
+
+                            statuscode = "error" if len(error_list) > 0 else "completed"
+
+                            # Create the context
+                            context = dict(
+                                statuscode=statuscode,
+                                results=lResults,
+                                error_list=error_list
+                                )
+                        else:
+                            self.arErr.append(code)
+
+                        if len(self.arErr) == 0:
+                            # Get the HTML response
+                            self.data['html'] = render_to_string(self.template_name, context, request)
+                        else:
+                            lHtml = []
+                            for item in self.arErr:
+                                lHtml.append(item)
+                            self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+                    except:
+                        msg = oErr.get_error_message()
+                        oErr.DoError("import_{}".format(self.import_type))
+                        self.data['html'] = msg
+                        self.data['status'] = "error"
+
+                else:
+                    self.data['html'] = 'invalid form: {}'.format(form.errors)
+                    self.data['status'] = "error"
         
             # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
         else:
@@ -2815,5 +2853,191 @@ class ManuEadDownload(BasicPart):
 
         return sData
 
+
+class EqualGoldHuwaToJson(BasicPart):
+    """Convert (part of) HUWA database into EqualGold objects and download the resulting JSON"""
+
+    MainModel = EqualGold
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "json"       # downloadtype
+
+    # Specify the relationships
+    relationships = [
+        {'id': 1, 'linktype': 'neq'},
+        {'id': 2, 'linktype': 'prt'},
+        {'id': 3, 'linktype': 'ech'},
+        {'id': 4, 'linktype': 'neq'},
+        {'id': 5, 'linktype': 'neq'},
+        {'id': 6, 'linktype': 'neq'},
+        {'id': 7, 'linktype': 'neq'},
+        {'id': 8, 'linktype': 'neq'},
+        {'id': 9, 'linktype': 'neq'},
+        {'id': 10, 'linktype': 'neq'},
+        {'id': 11, 'linktype': 'neq'},
+        {'id': 12, 'linktype': 'neq'},
+        {'id': 13, 'linktype': 'neq'},
+        {'id': 14, 'linktype': 'neq'},
+        {'id': 15, 'linktype': 'neq'},
+        {'id': 16, 'linktype': 'neq'},
+        {'id': 17, 'linktype': 'neq'},
+        {'id': 18, 'linktype': 'neq'},
+        {'id': 19, 'linktype': 'neq'},
+        ]
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        def get_table_list(lTable, opera_id, sField):
+            lBack = []
+            for oItem in lTable:
+                if oItem['opera'] == opera_id:
+                    lBack.append( oItem[sField])
+            return lBack
+
+        def get_table_field(lTable, id, sField, sIdField="id"):
+            sBack = ""
+            if id != 0:
+                for oItem in lTable:
+                    if oItem[sIdField] == id:
+                        sBack = oItem[sField]
+                        break
+            return sBack
+
+        # Initialize
+        lData = []
+        sData = ""
+        huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit']
+
+        oErr = ErrHandle()
+        table_info = {}
+        try:
+            # Read the HUWA db as tables
+            table_info = self.read_huwa()
+
+            # Load the tables that we need
+            tables = self.get_table(table_info, huwa_tables)
+
+            # Walk through the table with AF information
+            for idx, oOpera in enumerate(tables['opera']):
+                opera_id = oOpera['id']
+                # Take over any information that should
+                oSsg = dict(id=idx+1, opera=opera_id)
+
+                # Get the signature(s)
+                signaturesA = []
+                other = oOpera.get("abk")
+                if not other is None and other != "":
+                    signaturesA.append(dict(editype="ot", code=other))
+                clavis = get_table_list(tables['clavis'], opera_id, "name")
+                for sig in clavis:
+                    signaturesA.append(dict(editype="cl", code="CPL {}".format(sig)))
+                frede = get_table_list(tables['frede'], opera_id, "name")
+                for sig in frede:
+                    signaturesA.append(dict(editype="gr", code=sig))
+                cppm = get_table_list(tables['cppm'], opera_id, "name")
+                for sig in cppm:
+                    signaturesA.append(dict(editype="cl", code="CPPM {}".format(sig)))
+                oSsg['signaturesA'] = signaturesA
+
+                # Get the Incipit and the Explicit
+                oSsg['incipit'] = get_table_field(tables['incipit'], int(oOpera.get('incipit')), "incipit_text")
+                oSsg['explicit'] = get_table_field(tables['desinit'], int(oOpera.get('desinit')), "desinit_text")
+
+                # Make good notes for further processing
+                oSsg['note_langname'] = oOpera.get("opera_langname","")
+                oSsg['notes'] = oOpera.get("bemerkungen", "")
+
+                # Get to the [datum_opera]
+                oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
+
+                # Add this to the list of SSGs
+                lData.append(oSsg)
+
+            # Convert lData to stringified JSON
+            if dtype == "json":
+                # convert to string
+                sData = json.dumps(lData, indent=2)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/get_data")
+
+        return sData
+
+    def read_huwa(self):
+        oErr = ErrHandle()
+        table_info = {}
+        try:
+            # Get the location of the HUWA database
+            huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+            with sqlite3.connect(huwa_db) as db:
+                standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+                cursor = db.cursor()
+                db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+                tables = [x[0] for x in db_results]
+
+                count_tbl = len(tables)
+
+                # Walk all tables
+                for table_name in tables:
+                    oInfo = {}
+                    # Find out what fields this table has
+                    db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                    fields = []
+                    for field in db_results:
+                        field_name = field[1]
+                        fields.append(field_name)
+
+                        field_info = dict(type=field[2],
+                                          not_null=(field[3] == 1),
+                                          default=field[4])
+                        oInfo[field_name] = field_info
+                    oInfo['fields'] = fields
+                    oInfo['links'] = []
+
+                    # Read the table
+                    table_contents = cursor.execute("SELECT * FROM {}".format(table_name)).fetchall()
+                    oInfo['contents'] = table_contents
+
+                    table_info[table_name] = oInfo
+
+                # Close the database again
+                cursor.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_huwa")
+        # Return the table that we found
+        return table_info
+
+    def get_tables(self, table_info, lst_names):
+        """Read table [sName] from [table_info]"""
+
+        oErr = ErrHandle()
+        oTables = {}
+        try:
+            for sName in lst_names:
+                oTable = table_info[sName]
+                lFields = oTable['fields']
+                lContent = oTable['contents']
+                lTable = []
+                for lRow in lContent:
+                    oNew = {}
+                    for idx, oPart in enumerate(lRow):
+                        oNew[lFields[idx]] = oPart
+                    lTable.append(oNew)
+                oTables[sName] = lTable
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/get_table")
+
+        return oTables
 
 
