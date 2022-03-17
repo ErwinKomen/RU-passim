@@ -2861,6 +2861,7 @@ class EqualGoldHuwaToJson(BasicPart):
     template_name = "seeker/download_status.html"
     action = "download"
     dtype = "json"       # downloadtype
+    prefix_type = "simple"
 
     # Specify the relationships
     relationships = [
@@ -2914,16 +2915,24 @@ class EqualGoldHuwaToJson(BasicPart):
         # Initialize
         lData = []
         sData = ""
-        huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit']
+        huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
+            'autor', 'autor_opera', 'datum_opera']
 
         oErr = ErrHandle()
         table_info = {}
+        author_info = {}
         try:
+            # Read the Huwa to Passim author JSON
+            lst_authors = self.read_authors()
+
+            # Get the author id for 'Undecided'
+            undecided = Author.objects.filter(name__iexact="undecided").first()
+
             # Read the HUWA db as tables
             table_info = self.read_huwa()
 
             # Load the tables that we need
-            tables = self.get_table(table_info, huwa_tables)
+            tables = self.get_tables(table_info, huwa_tables)
 
             # Walk through the table with AF information
             for idx, oOpera in enumerate(tables['opera']):
@@ -2957,6 +2966,17 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Get to the [datum_opera]
                 oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
+
+                # Get the *AUTHOR* (obligatory) for this entry
+                huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
+                if huwa_autor_id == "": 
+                    passim_author = undecided
+                else:
+                    passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
+                    if passim_author is None:
+                        # What to do now?
+                        passim_author = undecided
+                oSsg['author'] = dict(id=passim_author.id, name= passim_author.name)
 
                 # Add this to the list of SSGs
                 lData.append(oSsg)
@@ -3017,8 +3037,57 @@ class EqualGoldHuwaToJson(BasicPart):
         # Return the table that we found
         return table_info
 
+    def read_authors(self):
+        oErr = ErrHandle()
+        lst_authors = []
+        try:
+            authors_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_passim_author.json"))
+            with open(authors_json, "r", encoding="utf-8") as f:
+                lst_authors = json.load(f)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_authors")
+        # Return the table that we found
+        return lst_authors
+
+    def get_passim_author(self, lst_authors, huwa_id, tbl_autor):
+        """Return the Passim author ID for [huwa_id]"""
+
+        oErr = ErrHandle()
+        passim = None
+        try:
+            shuwa_id = str(huwa_id)
+            passim_id = None
+            for item in lst_authors:
+                if item['huwa_id'] == shuwa_id:
+                    # Found it!
+                    passim_id = item['passim_id']
+                    break
+            if passim_id is None:
+                # Did not find it: 
+                sName = ""
+                for item in tbl_autor:
+                    if item['id'] == huwa_id:
+                        sName = item['name']
+                        break
+                if sName == "":
+                    # There is a problem
+                    oErr.Status("Cannot process HUWA author with id: {}".format(huwa_id))
+                else:
+                    # Check this in Passim table Author
+                    author = Author.find_or_create(sName)
+                    passim = author
+            else:
+                # Also get to the actual item
+                passim = Author.objects.filter(id=passim_id).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/get_passim_author")
+        # Return the author id
+        return passim
+
     def get_tables(self, table_info, lst_names):
-        """Read table [sName] from [table_info]"""
+        """Read all tables in [lst_names] from [table_info]"""
 
         oErr = ErrHandle()
         oTables = {}
