@@ -2968,15 +2968,35 @@ class EqualGoldHuwaToJson(BasicPart):
                 oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
 
                 # Get the *AUTHOR* (obligatory) for this entry
+                passim_author = undecided
                 huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
-                if huwa_autor_id == "": 
-                    passim_author = undecided
-                else:
+                if huwa_autor_id != "": 
                     passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
                     if passim_author is None:
                         # What to do now?
                         passim_author = undecided
                 oSsg['author'] = dict(id=passim_author.id, name= passim_author.name)
+
+                # Check if there already is a SSG with the inc/expl
+                qs = EqualGold.objects.filter(incipit__iexact=oSsg['incipit'], explicit__iexact=oSsg['explicit'])
+                count = qs.count()
+                if count == 0:
+                    existing_ssg = dict(id=None, type="ssgmN: no inc/exp match")
+                elif count == 1:
+                    # This must be a match
+                    obj = qs.first()
+                    existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmF: full inc/exp match")
+                elif count > 1 and (oSsg['incipit'] == "" or oSsg['explicit'] == ""):
+                    existing_ssg = dict(id=None, type="ssgmE: empty inc or exp")
+                else:
+                    # Check further on the author
+                    obj = qs.filter(author=passim_author).first()
+                    if obj is None:
+                        # Found matching inc/exp, but not a matching author
+                        existing_ssg = [dict(id=x.id, code=x.code, type="ssgmAM: author mismatch") for x in qs]
+                    else:
+                        existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmFA: full inc/exp/author match")
+                oSsg['existing_ssg'] = existing_ssg
 
                 # Add this to the list of SSGs
                 lData.append(oSsg)
