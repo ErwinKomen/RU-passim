@@ -1896,3 +1896,12 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     color: darkblue;
 }
 
+/* Make sure that references scroll down enough to see them */
+.reference a {
+    display: block;
+    position: relative;
+    top: -100px;
+    visibility: hidden;
+}
+
+
