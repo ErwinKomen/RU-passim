@@ -9857,6 +9857,16 @@ class ManuscriptCodico(ManuscriptDetails):
                         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
                     else:
                         # This is a common manuscript (or a template, but I'm not sure that should be allowed)
+                        delete_lst = []
+                        current_lst = [x.id for x in manu.manuscriptcodicounits.all().order_by('order')]
+                        for id in current_lst:
+                            if id not in codico_lst:
+                                delete_lst.append(id)
+                        # Remove the codico's that need deletion
+                        if len(delete_lst) > 0:
+                            Codico.objects.filter(id__in=delete_lst).delete()
+
+                        # Double check the order of the items
                         order = 1
                         # (1) Put the codicological units in the correct order
                         with transaction.atomic():
@@ -9864,16 +9874,18 @@ class ManuscriptCodico(ManuscriptDetails):
                                 # Get the codico
                                 codi = Codico.objects.filter(id=id).first()
                                 # Set the correct order
-                                codi.order = order
-                                codi.save()
+                                if codi.order != order:
+                                    codi.order = order
+                                    codi.save()
                                 # Go to the next order count
                                 order += 1
                         order = 1
                         # (2) Put the MsItem-s in the correct order
                         with transaction.atomic():
                             for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
-                                msitem.order = order
-                                msitem.save()
+                                if msitem.order != order:
+                                    msitem.order = order
+                                    msitem.save()
                                 order += 1
 
                         # Make sure to set the correct redirect page
