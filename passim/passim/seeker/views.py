@@ -9664,6 +9664,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 changes = {}
                 hierarchy = []
                 codi = None
+                codi_order = 1
                 with transaction.atomic():
                     for idx, item in enumerate(hlist):
                         bNeedSaving = False
@@ -9681,6 +9682,11 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         if codi_id != None:
                             if codi == None or codi.id != codi_id:
                                 codi = Codico.objects.filter(id=codi_id).first()
+                                # Possibly reset the codi order
+                                if codi_order != codi.order:
+                                    codi.order = codi_order
+                                    codi.save()
+                                codi_order += 1
 
                         # Safe guarding
                         if codi is None:
@@ -9867,8 +9873,9 @@ class ManuscriptCodico(ManuscriptDetails):
                             Codico.objects.filter(id__in=delete_lst).delete()
 
                         # Double check the order of the items
-                        order = 1
                         # (1) Put the codicological units in the correct order
+                        #     (the order in which they were presented by the user in hList)
+                        order = 1
                         with transaction.atomic():
                             for id in codico_lst:
                                 # Get the codico
@@ -9879,14 +9886,19 @@ class ManuscriptCodico(ManuscriptDetails):
                                     codi.save()
                                 # Go to the next order count
                                 order += 1
+
+                        # (2) Put the MsItem-s in the correct order: first codico-order then their own
                         order = 1
-                        # (2) Put the MsItem-s in the correct order
+                        do_order = []
+                        for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
+                            if msitem.order != order:
+                                do_order.append(dict(obj=msitem, order=order))
+                            order += 1
                         with transaction.atomic():
-                            for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
-                                if msitem.order != order:
-                                    msitem.order = order
-                                    msitem.save()
-                                order += 1
+                            for oItemOrder in do_order:
+                                obj = oItemOrder['obj']
+                                obj.order = oItemOrder['order']
+                                obj.save()
 
                         # Make sure to set the correct redirect page
                         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
