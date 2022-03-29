@@ -1453,8 +1453,10 @@ class Profile(models.Model):
                 oStack.append({'name': "Home", 'url': path_home })
                 if path != path_home:
                     oStack.append({'name': name, 'url': path })
-                self.stack = json.dumps(oStack)
-                bNeedSaving = True
+                sStack = json.dumps(oStack)
+                if self.stack != sStack:
+                    self.stack = json.dumps(oStack)
+                    bNeedSaving = True
             else:
                 # Unpack the current stack
                 lst_stack = json.loads(self.stack)
@@ -1481,9 +1483,11 @@ class Profile(models.Model):
                 if bNew:
                     # Add item to the stack
                     lst_stack.append({'name': name, 'url': path })
+                sStack = json.dumps(lst_stack)
                 # Add changes
-                self.stack = json.dumps(lst_stack)
-                bNeedSaving = True
+                if self.stack != sStack:
+                    self.stack = json.dumps(lst_stack)
+                    bNeedSaving = True
             # All should have been done by now...
             if bNeedSaving:
                 self.save()
@@ -1709,6 +1713,8 @@ class Visit(models.Model):
     # [1] Every visit needs to have a URL
     path = models.URLField("URL")
 
+    bDebug = False
+
     def __str__(self):
         msg = "{} ({})".format(self.name, self.path)
         return msg
@@ -1723,9 +1729,13 @@ class Visit(models.Model):
             # Get the user
             user = User.objects.filter(username=username).first()
             # Adapt the path if there are kwargs
-            # Add an item
-            obj = Visit(user=user, name=name, path=path)
-            obj.save()
+
+            if Visit.bDebug:
+                # Add an item
+                obj = Visit(user=user, name=name, path=path)
+                obj.save()
+
+
             # Get to the stack of this user
             profile = Profile.objects.filter(user=user).first()
             if profile == None:
