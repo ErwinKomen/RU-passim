@@ -46,6 +46,7 @@ import sqlite3
 from io import StringIO
 from itertools import chain
 
+
 # ======== imports for PDF creation ==========
 import io  
 from markdown import markdown 
@@ -71,7 +72,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
-    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm
+    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -83,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
-    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, \
+    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
@@ -5283,6 +5284,94 @@ class SermonListView(BasicList):
         return get_helptext(name)
 
 
+class OnlineSourceEdit(BasicDetails):
+    """The details of one online source"""
+
+    model = OnlineSources
+    mForm = OnlineSourceForm
+    prefix = 'onsc'
+    title = "OnlineSourceEdit"
+    rtype = "json"
+    history_button = True
+    mainitems = []
+    
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'plain', 'label': "Name: ",    'value': instance.name, 'field_key': 'name'},     
+            {'type': 'plain', 'label': "URL:",  'value': instance.get_onlinesource_url(),  'field_key': 'url'} # --> instance.get_onlinesource_markdown()
+            ]
+        # Return the context we have made
+        return context
+
+    # get_external_markdown
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+
+class OnlineSourceDetails(OnlineSourceEdit):
+    """Like OnlineSource Edit, but then html output"""
+    rtype = "html"
+
+
+class OnlineSourceListView(BasicList):
+    """Search and list projects"""
+
+    model = OnlineSources
+    listform = OnlineSourceForm
+    prefix = "onsc"
+    has_select2 = True
+    paginate_by = 20
+    sg_name = "Online source"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
+    plural_name = "Online sources"
+    # page_function = "ru.passim.seeker.search_paged_start"
+    order_cols = ['name', '']
+    order_default = order_cols
+    order_heads = [{'name': 'Name','order': 'o=1', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True}, #'field': 'name', 'main': True, 'default': "(unnamed)", 
+                   {'name': 'URL', 'order': 'o=2', 'type': 'str', 'custom': 'url'}]
+                   
+    #filters = [ {"name": "Name",       "id": "filter_name",     "enabled": False},
+    #            {"name": "URL",        "id": "filter_url",      "enabled": False},
+    #           ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name',   'dbfield': 'name',   'keyS': '_ta',  'infield': 'name' }, 
+            {'filter': 'url',    'dbfield': 'url',    'keyFk': 'name', 'infield': 'url'}
+            ]}
+        ] 
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        html = []
+        oErr = ErrHandle()
+        try:
+            if custom == "url":
+             #   html = []
+                # Give the URL a new look, see if css can be modified  
+                html.append("<span class='collection'><a href='{}'>{}</a></span>".format(instance.url, instance.url))
+        
+            elif custom == "name":
+                sName = instance.name
+                # Make sure that the records without name are given a name so that one can select the record.
+                if sName == "": sName = "<i>(unnamed)</i>"
+                html.append(sName)
+        
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectListView/get_field_value")
+        
+        # Combine the HTML code
+        sBack = "\n".join(html)
+        return sBack, sTitle              
+
+
 class KeywordEdit(BasicDetails):
     """The details of one keyword"""
 
@@ -5329,6 +5418,8 @@ class KeywordListView(BasicList):
     # template_name = 'seeker/keyword_list.html'
     has_select2 = True
     in_team = False
+    sg_name = "Keyword"     
+    plural_name = "Keywords"
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', 'visibility', '']
     order_default = order_cols
@@ -5801,6 +5892,8 @@ class ProvenanceListView(BasicList):
     model = Provenance
     listform = ProvenanceForm
     prefix = "prov"
+    plural_name = "Provenances"
+    sg_name = "Provenance"
     has_select2 = True
     new_button = True   # Provenances are added in the Manuscript view; each provenance belongs to one manuscript
                         # Issue #289: provenances are to be added *HERE*
@@ -6511,7 +6604,7 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Last login:",   'value': instance.user.last_login.strftime("%d/%b/%Y %H:%M"), },
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
             {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
-            {'type': 'line',  'label': "Afiliation:",   'value': instance.affiliation,                  'field_key': 'affiliation'},
+            {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
         # Return the context we have made
@@ -8351,7 +8444,7 @@ class CollectionListView(BasicList):
         {'section': 'other', 'filterlist': [
             {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
             {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
-            {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+            ]} # {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'} eruit
         ]
 
     def initializations(self):
@@ -8388,8 +8481,8 @@ class CollectionListView(BasicList):
         elif self.prefix == "priv":
             self.new_button = False
             self.titlesg = "Personal Dataset"
-            self.plural_name = "My Datasets"
-            self.sg_name = "My Dataset"  
+            self.plural_name = "Datasets"
+            self.sg_name = "Dataset"  
             self.order_cols = ['type', 'name', 'scope', 'owner__user__username', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
@@ -8400,15 +8493,20 @@ class CollectionListView(BasicList):
                 {'name': 'Created',     'order': 'o=5', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
-            self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False}]
+            self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False},
+                             {"name": "Type", "id": "filter_coltype", "enabled": False},
+                             {"name": "Scope", "id": "filter_colscope", "enabled": False}]
             self.searches = [
                 {'section': '', 'filterlist': [
-                    {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'}]},
+                    {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'},
+                    {'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'colscope', 'keyType': 'fieldchoice', 'infield': 'abbr'}
+                    ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
-                    {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
-                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
-                    {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+                    {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type'},
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'}
+                    #{'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'scope'}
+                    ]}
                 ]
         elif self.prefix == "publ":
             self.new_button = False
@@ -8431,20 +8529,20 @@ class CollectionListView(BasicList):
                 {'section': 'other', 'filterlist': [
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type',  'keyList': 'typelist' },
                     {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
-                    {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
+                   ]}#  {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}
                 ]
         elif self.prefix == "hist":
             self.new_button = False
             self.settype = "hc"
-            self.plural_name = "Historical Collections"
-            self.sg_name = "Historical Collection"  
+            self.plural_name = "Historical collections"
+            self.sg_name = "Historical collection"  
             self.order_cols = ['name', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
                 {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
                 {'name': 'Author count',            'order': 'o=3', 'type': 'int', 'custom': 'authcount'},
-                {'name': 'Created',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
+                {'name': 'Added',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
             ]  
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
@@ -8623,13 +8721,44 @@ class CollectionListView(BasicList):
             if fields['ssgcode'] != '':
                 fields['atype'] = 'acc'
         elif self.prefix == "priv":
-            # Show private datasets as well as those with scope "team", provided the person is in the team
-            fields['settype'] = "pd"
+            # Show private, team and public datasets, provided the person is in the team
+            # Bij navigeren naar Datasets is scope leeg                                 
+            fields['settype'] = "pd"          
             ownlist = self.get_own_list()
             if user_is_ingroup(self.request, app_editor):
-                fields['scope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ) | Q(scope="team") )
-            else:
-                fields['scope'] = ( Q(scope="priv") & Q(owner__in=ownlist)  )
+            # When filtering on scope:  
+                # When navigating to My Datasets, scope is empty and colscope is None:
+                if fields['scope'] == "":
+                    # For the complete overview (private datasets of the user, team and public):
+                    if fields['colscope'] == None:                        
+                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                    # Filtering on scope Public:
+                    elif fields['colscope'].abbr == 'publ':           
+                        fields['colscope'] = (Q(scope="publ") )
+                    # Filtering on scope Team:
+                    elif fields['colscope'].abbr == 'team':                        
+                        fields['colscope'] = (Q(scope="team") )
+                    # Filtering on scope Private: 
+                    elif fields['colscope'].abbr == 'priv':
+                        fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ))
+                # Somehow after the initial first view of all datasets and the first filtering, scope remains "priv" 
+                # whether you filter on any of the three options. Only colscope is changed when filtering on Private, Team or Public.        
+                elif fields['scope'] == "priv":                                      
+                    if fields['colscope'] != None:
+                        # Filtering on scope Private:
+                        if fields['colscope'].abbr == 'priv':
+                            fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  )) 
+                        # Filtering on scope Public:
+                        elif fields['colscope'].abbr == 'publ':
+                            fields['colscope'] = (Q(scope="publ") )
+                        # Filtering on scope Team:
+                        elif fields['colscope'].abbr == 'team':
+                            fields['colscope'] = (Q(scope="team") )
+                    # For the complete overview (private datasets of the user, team and public):
+                    elif fields['colscope'] == None:                        
+                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+             
+        
         elif self.prefix == "publ":
             # Show only public datasets
             fields['settype'] = "pd"
@@ -9060,7 +9189,7 @@ class ManuscriptEdit(BasicDetails):
                 {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
                  'title': 'City, village or abbey (monastery) of the library'},
                 {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
-                {'type': 'plain', 'label': "Shelf mark:",   'value': instance.idno,                 'field_key': 'idno'},
+                {'type': 'plain', 'label': "Shelfmark:",   'value': instance.idno,                 'field_key': 'idno'},
                 # Project assignment: see below
                 # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
                 # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
@@ -12160,7 +12289,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
 
                 # List of manuscripts related to the SSG via sermon descriptions
-                manuscripts = dict(title="Manuscripts", prefix="manu", gridclass="resizable")
+                manuscripts = dict(title="Manifestations", prefix="manu", gridclass="resizable")
 
                 # WAS: Get all SermonDescr instances linking to the correct eqg instance
                 # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
@@ -12355,7 +12484,7 @@ class EqualGoldListView(BasicList):
     bUseFilter = True  
     plural_name = "Authority files"
     sg_name = "Authority file"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype']
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -12367,16 +12496,14 @@ class EqualGoldListView(BasicList):
         {'name': 'Gryson/Clavis',           'order': 'o=3', 'type': 'str', 'custom': 'sig', 'allowwrap': True, 'options': "abcd",
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
-         'title': "The incipit...explicit that has been chosen for this Authority file"},
-        {'name': 'HC', 'title': "Historical collections associated with this Authority file", 
-         'order': '', 'allowwrap': True, 'type': 'str', 'custom': 'hclist'},
-        {'name': 'Sermons',                 'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
+         'title': "The incipit...explicit that has been chosen for this Authority file"},        
+        {'name': 'Manifestations',                 'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
-        {'name': 'Gold',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
+        {'name': 'Contains',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Authority',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
-        {'name': 'HCs',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'Hist. Coll.',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
         {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}        
         ]
@@ -13500,7 +13627,11 @@ class SourceDetails(SourceEdit):
     """The HTML variant of [SourceEdit]"""
 
     rtype = "html"
-    
+
+#class OnlineSourcesListView(Listview):
+#    """Listview of online sources used in PASSIM"""
+#    model=OnlineSources
+#    template_name = 'seeker/literature_list.html'
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""
@@ -13541,6 +13672,12 @@ class LitRefListView(ListView):
         # Determine the count for edition references
         context['entrycount_edition'] = self.entrycount_edition
 
+        # Change name of the qs for online references 
+        context['online_list'] = self.create_onlineset() 
+
+        # Determine the count for online references
+        context['entrycount_online'] = self.entrycount_online
+
         # Check if user may upload
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
@@ -13553,7 +13690,7 @@ class LitRefListView(ListView):
 
         # Return the calculated context
         return context
-    
+
     def get_paginate_by(self, queryset):
         """
         Paginate by specified value in default class property value.
@@ -13574,10 +13711,34 @@ class LitRefListView(ListView):
 
         # Combine the two qs into one and filter
         litref_ids = chain(litref_ids_man, litref_ids_sg)
-        qs = Litref.objects.filter(id__in=litref_ids).order_by('short')
+        qs = Litref.objects.filter(id__in=litref_ids).order_by('full')
 
         # Determine the length
         self.entrycount = len(qs)
+
+        # Return the resulting filtered and sorted queryset
+        return qs
+
+    # list  online resources??
+    def create_onlineset(self):
+        #Get the parameters passed on with the GET or the POST request
+        get = self.request.GET if self.request.method == "GET" else self.request.POST
+        get = get.copy()
+        self.get = get
+
+        online_list=[]
+
+        online_list.append
+        
+        # Calculate the final qs for the manuscript litrefs MODIFY!
+        #ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
+       
+        # Sort and filter all editions MODIFY
+        #qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
+        qs = OnlineSources.objects.order_by('name').order_by('name')
+
+        # Determine the length
+        self.entrycount_online = len(qs)
 
         # Return the resulting filtered and sorted queryset
         return qs
@@ -13593,7 +13754,7 @@ class LitRefListView(ListView):
         ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
        
         # Sort and filter all editions
-        qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
+        qs = Litref.objects.filter(id__in=ediref_ids).order_by('full')
 
         # Determine the length
         self.entrycount_edition = len(qs)

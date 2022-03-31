@@ -191,6 +191,31 @@ def equalchange_json_to_html(instance, type, profile=None):
     sBack = "\n".join(html)
     return sBack
 
+#def equaladd_json_to_accept(instance):
+#    """Accept the add: implement it and set my status"""
+
+#    def link_add(super, oItem):
+#        """Add the superlink, connecting it to [super]"""
+
+#        obj = None
+#        try:
+
+
+
+
+
+        
+            
+#        # Make sure that our state changes to accepted
+#        instance.atype = "acc"
+#        instance.comment = "This change has been successfully processed on: {}".format(get_crpp_date(get_current_datetime(), True))
+#        instance.save()
+#    except:
+#        msg = oErr.get_error_message()
+#        oErr.DoError("equaladd_json_to_accept")
+#        bBack = False
+#    return bBack
+
 def equalchange_json_to_accept(instance):
     """Accept the change: implement it and set my status"""
 
@@ -1702,7 +1727,7 @@ class EqualAddApprovalEdit(BasicDetails):
             # Signal that we do have select2
             context['has_select2'] = True
         except:
-            msg = oErr.get_error_message()
+            msg = oErr.get_error_message() # hier mis
             oErr.DoError("EqualAddApprovalEdit/add_to_context")
 
         # Return the context we have made
@@ -1721,16 +1746,16 @@ class EqualAddApprovalEdit(BasicDetails):
 
                 # Is this EqualAdd object already finished?
                 if not add is None and add.atype != "acc":
-                    # Check how many approvals there should be and how many are left
-                    iLeft, iNeeded = add.get_approval_count()
-                    if iNeeded > 0 and iLeft == 0:
+                    # Check if there is at least 1 approver available 
+                    iLeft, iNeeded = add.get_approval_count() # dit werkt toch wel
+                    if iNeeded > 0 : # and iLeft == 0:
                         # The last approval has been saved: we may implement the addition
-                        equaladd_json_to_accept(add)
+                        equaladd_json_to_accept(add) # tot hier goed blijkbaar
                     elif add.addapprovals.exclude(atype="def").count() == 0:
-                        # Do some more careful checking: all approvals are now known
+                        # Do some more careful checking: all addapprovals are now known
                         iRejected = add.addapprovals.filter(atype='rej').count()
                         if iRejected == iNeeded:
-                            # This suggestion has been rejected completely
+                            # This addition has been rejected completely
                             add.atype = "rej"
                             add.save()
                         else:
@@ -1738,7 +1763,7 @@ class EqualAddApprovalEdit(BasicDetails):
                             add.atype = "mod"
                             add.save()
                     elif add.addapprovals.filter(atype='rej').count() == iNeeded:
-                        # This suggestion has been rejected completely
+                        # This addition has been rejected completely
                         add.atype = "rej"
                         add.save()
 

@@ -26,8 +26,7 @@ from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChang
     EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
     EqualAddDetails, EqualAddEdit, EqualAddUserDetails, EqualAddUserEdit, EqualAddApprovalList, EqualAddApprovalUList,\
-    EqualAddApprovalDetails, EqualAddApprovalEdit, EqualAddApprovalUserDetails, EqualAddApprovalUserEdit
-
+    EqualAddApprovalDetails, EqualAddApprovalEdit, EqualAddApprovalUserDetails, EqualAddApprovalUserEdit 
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
 
@@ -170,9 +169,9 @@ urlpatterns = [
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
-    
-    url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'),
-    url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),
+        
+    url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
+    url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'), # Can be deleted, merged with the one above   
     url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
     url(r'^collection/any/list', CollectionListView.as_view(prefix="any"), name='collany_list'),
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
@@ -268,6 +267,10 @@ urlpatterns = [
     # url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetails.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
+
+    url(r'^onlinesource/list', OnlineSourceListView.as_view(), name='onlinesources_list'),
+    url(r'^onlinesource/details(?:/(?P<pk>\d+))?/$', OnlineSourceDetails.as_view(), name='onlinesources_details'),
+    url(r'^onlinesource/edit(?:/(?P<pk>\d+))?/$', OnlineSourceEdit.as_view(), name='onlinesources_edit'),
 
     url(r'^template/list', TemplateListView.as_view(), name='template_list'),
     url(r'^template/details(?:/(?P<pk>\d+))?/$', TemplateDetails.as_view(), name='template_details'),

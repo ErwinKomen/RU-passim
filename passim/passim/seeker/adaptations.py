@@ -5,6 +5,10 @@ Adaptations of the database that are called up from the (list)views in the SEEKE
 from django.db import transaction
 import re
 import json
+import os
+import csv
+import pandas as pd
+from passim.settings import MEDIA_DIR
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
@@ -19,21 +23,21 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
-    CollectionProject, EqualGoldProject, \
+    CollectionProject, EqualGoldProject, OnlineSources, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin'],
+                        'codico_origin', 'import_onlinesources'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
                        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
                        'atype_def_equal', 'atype_acc_equal'],
     'provenance_list': ['manuprov_m2m'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless'] 
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless']    
     }
 
 
@@ -952,6 +956,44 @@ def adapt_coll_ownerless():
     try:
         qs = Collection.objects.filter(owner__isnull=True)
         qs.delete()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+# =========== Part of literature_list ==================
+def adapt_import_onlinesources(): 
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Import online_sources.csv that holds the names and URLs of the online sources used in PASSIM
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, 'online_sources.csv'))
+        # Open the file...
+        with open(filename, encoding='utf-8') as f:            
+            # ...and read the file...
+            reader = csv.reader(f, dialect='excel', delimiter=';') 
+            
+            # Transpose the result     
+            name, url = zip(*reader)
+
+            # Make lists of the tuples
+            name_list = list(name)
+            url_list = list(url)
+            
+            # Delete the first records in order to 
+            # get rid of the fieldnames 
+            name_list.pop(0)
+            url_list.pop(0)
+            
+            # Iterate over the two combined lists:
+            for name, url in zip(name_list, url_list):                
+                print(name, url)
+                # Store the records in the OnlineCourses table:
+                OnlineSources.objects.create(name = name, url = url)               
+                            
     except:
         bResult = False
         msg = oErr.get_error_message()

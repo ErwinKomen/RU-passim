@@ -200,7 +200,7 @@ class CollectionWidget(ModelSelect2MultipleWidget):
         username = self.attrs.pop('username', '')
         team_group = self.attrs.pop('team_group', '')
         settype = self.attrs.pop('settype', '')
-        scope = self.attrs.pop('scope', '')
+        scope = self.attrs.pop('scope', '') # blijft priv
         if self.type:
             qs = Collection.get_scoped_queryset(self.type, username, team_group, settype=settype, scope=scope)
         else:
@@ -756,6 +756,20 @@ class OriginCodWidget(ModelSelect2MultipleWidget):
 #    def get_queryset(self):
 #        return Project.objects.all().order_by('name').distinct()
 
+class OnlineSourcesWidget(ModelSelect2MultipleWidget):
+    model = OnlineSources
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.queryset == None:
+            qs = OnlineSources.objects.all().order_by('name').distinct()
+        else:
+            qs = self.queryset
+        return qs
+
 
 class Project2Widget(ModelSelect2MultipleWidget):
     model = Project2
@@ -1083,6 +1097,15 @@ class ManutypeWidget(ModelSelect2Widget):
     def get_queryset(self):
         return FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
+class ScopeTypeWidget(ModelSelect2Widget):
+    model = FieldChoice
+    search_fields = ['english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
 
 class StypeWidget(ModelSelect2MultipleWidget):
     model = FieldChoice
@@ -1768,6 +1791,38 @@ class SermonForm(PassimModelForm):
             oErr.DoError("SermonForm-init")
         return None
 
+class OnlineSourceForm(forms.ModelForm):
+    """Online Sources list"""
+
+    onlinesources_ta = forms.CharField(label=_("Online source"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching online sources input-sm', 'placeholder': 'Online source(s)...', 'style': 'width: 100%;'}))
+    newurl = forms.CharField(label=_("URL (new)"), required=False, help_text="editable", 
+               widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'URL...',  'style': 'width: 100%;'}))
+       
+    typeaheads = ["onlinesources"]    
+    
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = OnlineSources
+        fields = ['name', 'url']
+        widgets={'name':    forms.TextInput(attrs={'placeholder': 'Name of the online source...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'url':     forms.URLInput(attrs={'placeholder': 'External link (URL) of the online source...', 'style': 'width: 100%;'})
+                 }
+                   
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(OnlineSourceForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['name'].required = False
+        self.fields['url'].required = False
+        #self.fields['onsclist'].queryset = OnlineSources.objects.all().order_by('name')         
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']    
+    
+
 
 class KeywordForm(forms.ModelForm):
     """Keyword list"""
@@ -2045,6 +2100,12 @@ class CollectionForm(PassimModelForm):
                 widget=LitrefColWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    colscope    = ModelChoiceField(queryset=None, required=False, 
+                widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
+
+    #manutype    = forms.ModelChoiceField(queryset=None, required=False, 
+    #            widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
+    
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2097,6 +2158,7 @@ class CollectionForm(PassimModelForm):
                 widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     sermoauthorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
     # MANUSCRIPT-specific
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
@@ -2120,7 +2182,6 @@ class CollectionForm(PassimModelForm):
     typeaheads = ["collections", "authors", "signatures", "gldincipits", "gldexplicits",
                   "countries", "cities", "libraries", "origins", "manuidnos"]
 
-
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
@@ -2131,7 +2192,8 @@ class CollectionForm(PassimModelForm):
                  'descrip':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'readonly':    forms.CheckboxInput(),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'scope':       forms.Select(attrs={'style': 'width: 100%;'})
+                 'type':        forms.Select(attrs={'style': 'width: 100%;'})
+                 
                  }
 
     def __init__(self, *args, **kwargs):
@@ -2157,6 +2219,8 @@ class CollectionForm(PassimModelForm):
         self.fields['scope'].required = False
         self.fields['url'].required = False
         self.fields['collone'].required = False
+        
+        self.fields['colscope'].queryset = FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
 
         self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 

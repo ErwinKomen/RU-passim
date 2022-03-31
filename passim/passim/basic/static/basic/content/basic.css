@@ -28,6 +28,18 @@ th div a.clickable.ordered:hover {
     opacity: 1.0;
     color: red;
 }
+/*
+.anchor {
+    padding-top: 90px;
+}*/
+
+a.anchor {
+    display: block;
+    position: relative;
+    top: 100px;
+    visibility: hidden;
+}
+
 
 table thead th.sortable .sortoptions {
     color: dimgray;

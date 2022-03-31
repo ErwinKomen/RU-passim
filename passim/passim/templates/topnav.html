@@ -21,72 +21,92 @@
                     {% if user.is_authenticated %}
                       <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
-                           aria-haspopup="true" aria-expanded="false">Search<span class="caret"></span></a>
+                           aria-haspopup="true" aria-expanded="false">Browse<span class="caret"></span></a>
                         <ul class="dropdown-menu">
                           <!-- Used to be 'search_sermon' -->
-                          <li><a href="{% url 'sermon_list' %}">Sermon</a></li>
-                          <li><a href="{% url 'search_manuscript' %}">Manuscript</a></li>
-                          <li><a href="{% url 'collhist_list' %}" title="List and search historical collections">Collection</a></li>
-                          <li><a href="{% url 'library_search' %}">Library</a></li>
-                          <li><a href="{% url 'author_search' %}">Author</a></li>
+                          <li><a href="{% url 'sermon_list' %}"  title="List and search manifestations">Manifestations</a></li>
+                          <li><a href="{% url 'search_manuscript' %}"  title="List and search manuscripts">Manuscripts</a></li>
+                          <li><a href="{% url 'equalgold_list' %}"  title="List and search Authority files">Authority files</a></li>
+                          <li><a href="{% url 'collhist_list' %}" title="List and search historical collections">Historical collections</a></li>
                           <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'equalgold_list' %}">Authority file</a></li>
-                          <li><a href="{% url 'search_gold' %}">Gold-Sermon</a></li>
+                          <li><a href="{% url 'keyword_list' %}" title="List of keywords">Keywords</a></li>
+                          <li><a href="{% url 'feast_list' %}" title="List of feasts">Feasts</a></li>
+                          <li><a href="{% url 'bibrange_list' %}" title="List of Bible references">Bible references</a></li>                          
                         </ul>
                       </li>
-
-                      <li class="dropdown">
+                      
+                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                            aria-haspopup="true" aria-expanded="false">Tools<span class="caret"></span></a>
-                        
-                       <ul class="dropdown-menu">
-                          <li><a href="{% url 'mypassim' %}" title="Personal Research Environment">My Passim</a></li>
-                          <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li> 
-                          <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'collpriv_list' %}" title="My own datasets">My Datasets</a></li>
-                          <li><a href="{% url 'collpubl_list' %}" title="Public datasets">Public Datasets</a></li>
-                         <!--
-                          <li><a href="{% url 'collsermo_list' %}" title="Collections of Sermons">Collections of Sermons</a></li>
-                          <li><a href="{% url 'collmanu_list' %}" title="Collections of Manuscripts">Collections of Manuscripts</a></li>
-                          <li><a href="{% url 'collgold_list' %}" title="Collections of Sermon Gold">Collections of Sermon Gold</a></li>
-                          <li><a href="{% url 'collsuper_list' %}" title="Collections of Super Sermon Gold">Collections of Super Sermon Gold</a></li>
-                           -->
-                          {% if is_app_editor %}
-                            <li><a href="{% url 'template_list' %}" title="List of available manuscript templates">Templates</a></li>
+                        <ul class="dropdown-menu">
+                          <!-- Used to be 'search_sermon' -->
+                          <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li>
+                          <li><a href="{% url 'literature_list' %}" title="Visualizations">Visualizations</a></li>                          
+                          <li><a href="{% url 'collpriv_list' %}" title="List of datasets">Datasets</a></li>                         
+                          {% if is_app_editor %}                            
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'sync_passim' %}" title="Synchronization of Zotero and other items">Synchronization...</a></li>
-                            
-                          {% endif %}
-                          <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'keyword_list' %}" title="Keywords">Keywords</a></li> 
-                          <li><a href="{% url 'location_list' %}" title="List of source information">Locations</a></li>
-                          <li><a href="{% url 'feast_list' %}" title="List of Feasts">Feasts</a></li>
-                          {% if is_app_editor %}
-                            <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'provenance_list' %}" title="List of provenances">Provenances</a></li>
-                            <li><a href="{% url 'bibrange_list' %}" title="List of Bible references">Bible references</a></li>
-                            <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
-                            <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
-                            <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>
-                            <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li> 
-                            <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li> 
+                            <li><a href="{% url 'userkeyword_list' %}" title="User keywords">User Keywords</a></li> 
+                            <li><a href="{% url 'comment_list' %}" title="User comments">User Comments</a></li> 
+                            <li><a href="{% url 'onlinesources_list' %}" title="Online sources">Onlines sources</a></li> 
                           {% endif %}
                           {% if is_app_uploader %}
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>  
                           {% endif %}
+                        </ul>
+                      </li>
+                    
+
+                      <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                           aria-haspopup="true" aria-expanded="false">Import tools<span class="caret"></span></a>
+                        
+                       <ul class="dropdown-menu">                                                                              
+                         <!--
+                          <li><a href="{% url 'collsermo_list' %}" title="Collections of Sermons">Collections of Sermons</a></li>
+                          <li><a href="{% url 'collmanu_list' %}" title="Collections of Manuscripts">Collections of Manuscripts</a></li>
+                          <li><a href="{% url 'collgold_list' %}" title="Collections of Sermon Gold">Collections of Sermon Gold</a></li>
+                          <li><a href="{% url 'collsuper_list' %}" title="Collections of Super Sermon Gold">Collections of Super Sermon Gold</a></li>
+                           -->                                                                                                        
+                           <li><a href="{% url 'author_search' %}" title="List of authors">Author</a></li>
+                           <li><a href="{% url 'search_gold' %}" title="List and search Gold Sermons">Gold sermon</a></li>
+                           <li><a href="{% url 'library_search' %}" title="List of libraries">Repository</a></li> 
+                          {% if is_app_editor %}
+                           <li role="separator" class="divider"></li> 
+                           <li><a href="{% url 'template_list' %}" title="List of available manuscript templates">Templates</a></li>
+                           <li role="separator" class="divider"></li> 
+                           <li><a href="{% url 'sync_passim' %}" title="Synchronisation of Zotero and other items">Synchronisation</a></li>                           
+                          {% endif %}
+                          
+                          {% if is_app_editor %}
+                            <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'origin_list' %}" title="List of defined manuscript origins">Origins</a></li>
+                            <li><a href="{% url 'provenance_list' %}" title="List of provenances">Provenances</a></li>
+                            <li><a href="{% url 'location_list' %}" title="List of location information">Locations</a></li>                            
+                          {% endif %}                          
                           {% if is_app_moderator %}
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'profile_list' %}" title="Projects">User profiles</a></li> 
+                            <li><a href="{% url 'profile_list' %}" title="User profiles">User profiles</a></li>
+                          {% endif %}
+                          {% if user.is_superuser %}
                             <li><a href="{% url 'equalchangeall_list' %}" title="SSG Field changes">Field changes</a></li> 
                             <li><a href="{% url 'equalapprovalall_list' %}" title="SSG Field change approvals">Field approvals</a></li> 
                           {% endif %}
                           {% if 0 and user.is_superuser %}
                             <li><a href="{% url 'testunit_list' %}">Enrich: test units</a></li>
-                            <li><a href="{% url 'testset_list' %}">Enrich: test sets</a></li>
+                            <li><a href="{% url 'testset_list' %}">Enrich: test sets</a></li>                            
                           {% endif %}
                         </ul>
                       </li>
+
+                      <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                           aria-haspopup="true" aria-expanded="false">My PASSIM<span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                          <!-- Used to be 'search_sermon' -->
+                          <li><a href="{% url 'mypassim' %}" title="Personal Research Environment">My Passim</a></li>
+                        </ul>
+                      </li>                     
 
                       {% if 0 and is_enrich_editor %}
                         <li class="dropdown">
@@ -148,25 +168,37 @@
                   <form id="logoutForm" action="{% url 'logout' %}" method="post" class="navbar-right">
                       {% csrf_token %}
                   </form>
-                {% endif %}
+                {% endif %}                
+
+
                 <ul class="nav navbar-nav navbar-right">
                     <li class="dropdown">
                       <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
-                         aria-haspopup="true" aria-expanded="false">Extra... <span class="caret"></span></a>
+                         aria-haspopup="true" aria-expanded="false">Help<span class="caret"></span></a>
                       <ul class="dropdown-menu">
-                        <li><a href="{% url 'about' %}">About</a></li>
-                        <li><a href="{% url 'technical' %}">Technical</a></li>
-                        <li><a href="{% url 'guide' %}">Guide</a></li>
-                        <li><a href="{% url 'contact' %}">Contact</a></li>
-                        <li role="separator" class="divider"></li>
-                        {% if user.is_authenticated %}
-                          <li><a href="javascript:document.getElementById('logoutForm').submit()">Log off</a></li>
-                          <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
-                        {% else %}
-                          <li><a href="{% url 'login' %}"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>Log in</a></li>
-                          <li><a href="{% url 'signup' %}">Sign up</a></li>
-                        {% endif %}
+                        <li><a href="{% url 'about' %}" title="The about page of the PASSIM application">About</a></li>
+                        <li><a href="{% url 'about' %}" title="How to quote" >How to quote</a></li>
+                        <li><a href="{% url 'technical' %}" title="Technical">Technical</a></li>
+                        <li><a href="{% url 'guide' %}" title="The user manual of the PASSIM application">User manual</a></li>
+                        <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual</a></li>                        
+                        <li><a href="{% url 'contact' %}" title="How to contact the PASSIM team" >Contact</a></li>
+                        <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
+                        <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>             
                       </ul>
+                    </li>
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                           aria-haspopup="true" aria-expanded="false">User profile<span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                          <!-- Used to be 'search_sermon' -->
+                          {% if user.is_authenticated %}
+                            <li><a href="javascript:document.getElementById('logoutForm').submit()">Log off</a></li>
+                            <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
+                          {% else %}
+                            <li><a href="{% url 'login' %}"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>Log in</a></li>
+                            <li><a href="{% url 'signup' %}">Sign up</a></li>
+                          {% endif %}
+                        </ul>
                     </li>
                 </ul>
 

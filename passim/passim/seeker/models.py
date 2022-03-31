@@ -238,6 +238,7 @@ def adapt_markdown(val, lowercase=True):
         sBack = sBack.replace("</p>", "")
         if lowercase:
             sBack = sBack.lower()
+        #print(sBack)
     return sBack
 
 def is_number(s_input):
@@ -2434,6 +2435,8 @@ class Litref(models.Model):
     full = models.TextField("Full reference", blank=True, default="")
     # [0-1] A short reference: including possible markdown symbols
     short = models.TextField("Short reference", blank=True, default="")
+    # [0-1] A unicode version of the full reference to aid in the correct sorting of the references
+    sortref = models.TextField("Unicode version of short reference", blank=True, default="")
 
     ok_types = ['book', 'bookSection', 'conferencePaper', 'journalArticle', 'manuscript', 'thesis']
 
@@ -3021,14 +3024,14 @@ class Litref(models.Model):
         """Get the full text, reading from Zotero if not yet done"""
 
         if self.full == "":
-            self.read_zotero()
+            self.read_zotero()        
         return self.full
 
     def get_full_markdown(self):
         """Get the full text in markdown, reading from Zotero if not yet done"""
 
         if self.full == "":
-            self.read_zotero()
+            self.read_zotero()        
         return adapt_markdown(self.full, lowercase=False)
 
     def get_short(self):
@@ -3047,8 +3050,9 @@ class Litref(models.Model):
         if plain:
             sBack = self.short
         else:
-            adapt_markdown(self.short, lowercase=False)
-        return sBack
+            return adapt_markdown(self.short, lowercase=False)
+            #print(self.short)
+            #return self.short
 
 
 class Project2(models.Model):
@@ -4061,7 +4065,6 @@ class Manuscript(models.Model):
                     url = "{}#lit_{}".format(reverse('literature_list'), litref.reference.id)
                     # Create a display for this item
                     lHtml.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url,litref.get_short_markdown()))
-
             if plain:
                 sBack = json.dumps(lHtml)
             else:
@@ -7028,7 +7031,7 @@ class SermonGold(models.Model):
         if self.author:
             lHtml.append("(by {}) ".format(self.author.name))
         else:
-            lHtml.append("(by Unknwon Author) ")
+            lHtml.append("(by Unknown Author) ")
 
         if do_incexpl:
             # Treat incipit
@@ -7130,7 +7133,7 @@ class SermonGold(models.Model):
         if self.author:
             lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
         else:
-            lHtml.append("(by <i>Unknwon Author</i>) ")
+            lHtml.append("(by <i>Unknown Author</i>) ")
         # Treat incipit
         if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
         # Treat intermediate dots
@@ -7822,12 +7825,12 @@ class Collection(models.Model):
         
     def get_scoped_queryset(type, username, team_group, settype="pd", scope = None):
         """Get a filtered queryset, depending on type and username"""
-
+        
         # Initialisations
         if scope == None or scope == "":
-            non_private = ['publ', 'team']
+            non_private = ['publ', 'team'] # Hier aanpassen? 'priv'toegevoegd, werkt dit?
         elif scope == "priv":
-            non_private = ['team']
+            non_private = ['team'] # toegevoegd 'publ', 'priv' geen zin?
         if settype == None or settype == "":
             settype="pd"
         oErr = ErrHandle()
@@ -7849,11 +7852,11 @@ class Collection(models.Model):
                     else:
                         filter = ( filter ) | ( Q(scope__in=non_private)  )
                 elif scope == "priv":
-                    # THis is a general user: may only see the public ones
+                    # This is a general user: may only see the public ones
                     if type:
                         filter = ( filter & Q(type=type))
                 else:
-                    # THis is a general user: may only see the public ones
+                    # This is a general user: may only see the public ones
                     if type:
                         filter = ( filter & Q(type=type)) | ( Q(scope="publ") & Q(type=type) )
                     else:
@@ -10883,3 +10886,25 @@ class CollOverlap(models.Model):
         self.saved = get_current_datetime()
         response = super(CollOverlap, self).save(force_insert, force_update, using, update_fields)
         return response
+
+class OnlineSources(models.Model):
+    """The table where the online sources used in PASSIM are stored"""
+    # [1] Name of the online source
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [1] The URL of the online source
+    url = models.URLField("External URL", max_length=LONG_STRING)
+    # [0-1] A unicode version of the name of the online source to aid in the correct sorting the list of online sources
+    sortname = models.TextField("Unicode version of the name of the online source", blank=True, default="") 
+
+    def __str__(self):
+        sName = self.name
+        if sName == None or sName == "":
+            sName = "(unnamed)"
+        return sName
+
+    def get_onlinesource_url(self):
+        sBack = ""
+        if self.url != None:
+            # Give the URL the same look as is done in other places
+            sBack = "<span class='collection'><a href='{}'>{}</a></span>".format(self.url, self.url)
+        return sBack
