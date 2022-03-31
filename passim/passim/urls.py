@@ -77,7 +77,6 @@ urlpatterns = [
     url(r'^tools/stype/$', passim.seeker.views.do_stype, name='do_stype'),
     url(r'^tools/locations/$', passim.seeker.views.do_locations, name='do_locations'),
     url(r'^tools/provenance/$', passim.seeker.views.do_provenance, name='do_provenance'),
-    url(r'^tools/daterange/$', passim.seeker.views.do_daterange, name='do_daterange'),
     url(r'^tools/mext/$', passim.seeker.views.do_mext, name='do_mext'),
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
@@ -128,6 +127,7 @@ urlpatterns = [
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
+    url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
 
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
     url(r'^ssg/graph/download(?:/(?P<pk>\d+))?/$', EqualGoldGraphDownload.as_view(), name='equalgold_graph_download'),

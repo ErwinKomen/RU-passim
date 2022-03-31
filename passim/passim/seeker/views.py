@@ -90,7 +90,7 @@ from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
-    approval_parse_adding, approval_parse_removing, addapproval_pending
+    approval_parse_adding, approval_parse_removing, approval_parse_deleting, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
@@ -1522,57 +1522,58 @@ def do_provenance(request):
         oErr.DoError("do_provenance")
         return reverse('home')
 
-def do_daterange(request):
-    """Copy data ranges from manuscripts to separate tables - if not already there"""
+# Issue #426: should be removed in due course
+#def do_daterange(request):
+#    """Copy data ranges from manuscripts to separate tables - if not already there"""
 
-    oErr = ErrHandle()
-    try:
-        assert isinstance(request, HttpRequest)
-        # Specify the template
-        template_name = 'tools.html'
-        # Define the initial context
-        context =  {'title':'RU-passim-tools',
-                    'year':get_current_datetime().year,
-                    'pfx': APP_PREFIX,
-                    'site_url': admin.site.site_url}
-        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-        context['is_app_editor'] = user_is_ingroup(request, app_editor)
+#    oErr = ErrHandle()
+#    try:
+#        assert isinstance(request, HttpRequest)
+#        # Specify the template
+#        template_name = 'tools.html'
+#        # Define the initial context
+#        context =  {'title':'RU-passim-tools',
+#                    'year':get_current_datetime().year,
+#                    'pfx': APP_PREFIX,
+#                    'site_url': admin.site.site_url}
+#        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+#        context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
-        # Only passim uploaders can do this
-        if not context['is_app_uploader']: return reverse('home')
+#        # Only passim uploaders can do this
+#        if not context['is_app_uploader']: return reverse('home')
 
-        # Indicate the necessary tools sub-part
-        context['tools_part'] = "Update from Manuscript to Daterange table"
+#        # Indicate the necessary tools sub-part
+#        context['tools_part'] = "Update from Manuscript to Daterange table"
 
-        # Process this visit
-        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
+#        # Process this visit
+#        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
 
-        # Create list to be returned
-        result_list = []
+#        # Create list to be returned
+#        result_list = []
 
-        # Visit all Manuscripts
-        qs = Manuscript.objects.all()
-        lst_add = []
-        for obj in qs:
-            # Check if there are any associated Dateranges
-            if obj.manuscript_dateranges.all().count() == 0:
-                # There are no date ranges yet: create just ONE
-                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
-                # Show that we added it
-                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
-                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
-                lst_add.append(sAdd)
+#        # Visit all Manuscripts
+#        qs = Manuscript.objects.all()
+#        lst_add = []
+#        for obj in qs:
+#            # Check if there are any associated Dateranges
+#            if obj.manuscript_dateranges.all().count() == 0:
+#                # There are no date ranges yet: create just ONE
+#                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
+#                # Show that we added it
+#                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
+#                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
+#                lst_add.append(sAdd)
 
-        # Wrapping it up
-        result_list.append(dict(part="Added", result= lst_add))
-        context['result_list'] = result_list
+#        # Wrapping it up
+#        result_list.append(dict(part="Added", result= lst_add))
+#        context['result_list'] = result_list
 
-        # Render and return the page
-        return render(request, template_name, context)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("do_daterange")
-        return reverse('home')
+#        # Render and return the page
+#        return render(request, template_name, context)
+#    except:
+#        msg = oErr.get_error_message()
+#        oErr.DoError("do_daterange")
+#        return reverse('home')
 
 def do_mext(request):
     """Copy all 'url' fields from Manuscript instances to separate ManuscriptExt instances and link them to the Manuscript"""
@@ -9099,10 +9100,10 @@ class ManuscriptEdit(BasicDetails):
     use_team_group = True
     history_button = True
     
-    MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-                                         form=DaterangeForm, min_num=0,
-                                         fk_name = "manuscript",
-                                         extra=0, can_delete=True, can_order=False)
+    #MdrFormSet = inlineformset_factory(Manuscript, Daterange,
+    #                                     form=DaterangeForm, min_num=0,
+    #                                     fk_name = "manuscript",
+    #                                     extra=0, can_delete=True, can_order=False)
     McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
                                        form=ManuscriptCollectionForm, min_num=0,
                                        fk_name="manuscript", extra=0)
@@ -9124,7 +9125,7 @@ class ManuscriptEdit(BasicDetails):
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+    formset_objects = [# {'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
                        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
@@ -9203,15 +9204,15 @@ class ManuscriptEdit(BasicDetails):
                     {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
                      'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                        'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[1] },
+                        'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[0] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
-                        'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[2], 'template_selection': 'ru.passim.litref_template' },
+                        'multiple': True, 'field_list': 'litlist', 'fso': self.formset_objects[1], 'template_selection': 'ru.passim.litref_template' },
 
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
 
                     {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[3] }
+                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[2] }
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -9219,10 +9220,15 @@ class ManuscriptEdit(BasicDetails):
                 if user_is_ingroup(self.request, app_editor):
                     context['mainitems'].append(
                         {'type': 'plain', 'label': "Notes:",       'value': instance.get_notes_markdown(),  'field_key': 'notes'}  )
+                    # Also add a view on the editornotes, if available
+                    editornotes = instance.editornotes
+                    if not editornotes is None:
+                        context['mainitems'].append(
+                            {'type': 'safe', 'label': "Editor notes (Dutch):", 'value': markdown(editornotes),  'field_key': 'editornotes'}  )
 
                 # Always append external links and the buttons for codicological units
                 context['mainitems'].append({'type': 'plain', 'label': "External links:",   'value': instance.get_external_markdown(), 
-                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[4] })
+                        'multiple': True, 'field_list': 'extlist', 'fso': self.formset_objects[3] })
                 context['mainitems'].append(
                     {'type': 'safe', 'label': 'Codicological:', 'value': self.get_codico_buttons(instance, context)}
                     )
@@ -9425,29 +9431,29 @@ class ManuscriptEdit(BasicDetails):
                 cleaned = form.cleaned_data
                 # Action depends on prefix
 
-                if prefix == "mdr":
-                    # Processing one daterange
-                    newstart = cleaned.get('newstart', None)
-                    newfinish = cleaned.get('newfinish', None)
-                    oneref = cleaned.get('oneref', None)
-                    newpages = cleaned.get('newpages', None)
+                #if prefix == "mdr":
+                #    # Processing one daterange
+                #    newstart = cleaned.get('newstart', None)
+                #    newfinish = cleaned.get('newfinish', None)
+                #    oneref = cleaned.get('oneref', None)
+                #    newpages = cleaned.get('newpages', None)
 
-                    if newstart:
-                        # Possibly set newfinish equal to newstart
-                        if newfinish == None or newfinish == "":
-                            newfinish = newstart
-                        # Double check if this one already exists for the current instance
-                        obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
-                        if obj == None:
-                            form.instance.yearstart = int(newstart)
-                            form.instance.yearfinish = int(newfinish)
-                        # Do we have a reference?
-                        if oneref != None:
-                            form.instance.reference = oneref
-                            if newpages != None:
-                                form.instance.pages = newpages
-                        # Note: it will get saved with formset.save()
-                elif prefix == "mcol":
+                #    if newstart:
+                #        # Possibly set newfinish equal to newstart
+                #        if newfinish == None or newfinish == "":
+                #            newfinish = newstart
+                #        # Double check if this one already exists for the current instance
+                #        obj = instance.manuscript_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
+                #        if obj == None:
+                #            form.instance.yearstart = int(newstart)
+                #            form.instance.yearfinish = int(newfinish)
+                #        # Do we have a reference?
+                #        if oneref != None:
+                #            form.instance.reference = oneref
+                #            if newpages != None:
+                #                form.instance.pages = newpages
+                #        # Note: it will get saved with formset.save()
+                if prefix == "mcol":
                     # Collection processing
                     newcol = cleaned.get('newcol', None)
                     if newcol != None:
@@ -9593,9 +9599,11 @@ class ManuscriptEdit(BasicDetails):
                     ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
-            # (1) links from SG to SSG
-            datelist = form.cleaned_data['datelist']
-            adapt_m2o(Daterange, instance, "manuscript", datelist)
+
+            # Issue #426: the following is OBSOLETE, since daterange is now coupled to codico
+            ## (1) links from Daterange to Manuscript
+            #datelist = form.cleaned_data['datelist']
+            #adapt_m2o(Daterange, instance, "manuscript", datelist)
 
             # (2) external URLs
             extlist = form.cleaned_data['extlist']
@@ -9785,6 +9793,7 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 changes = {}
                 hierarchy = []
                 codi = None
+                codi_order = 1
                 with transaction.atomic():
                     for idx, item in enumerate(hlist):
                         bNeedSaving = False
@@ -9802,6 +9811,11 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         if codi_id != None:
                             if codi == None or codi.id != codi_id:
                                 codi = Codico.objects.filter(id=codi_id).first()
+                                # Possibly reset the codi order
+                                if codi_order != codi.order:
+                                    codi.order = codi_order
+                                    codi.save()
+                                codi_order += 1
 
                         # Safe guarding
                         if codi is None:
@@ -9978,24 +9992,42 @@ class ManuscriptCodico(ManuscriptDetails):
                         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
                     else:
                         # This is a common manuscript (or a template, but I'm not sure that should be allowed)
-                        order = 1
+                        delete_lst = []
+                        current_lst = [x.id for x in manu.manuscriptcodicounits.all().order_by('order')]
+                        for id in current_lst:
+                            if id not in codico_lst:
+                                delete_lst.append(id)
+                        # Remove the codico's that need deletion
+                        if len(delete_lst) > 0:
+                            Codico.objects.filter(id__in=delete_lst).delete()
+
+                        # Double check the order of the items
                         # (1) Put the codicological units in the correct order
+                        #     (the order in which they were presented by the user in hList)
+                        order = 1
                         with transaction.atomic():
                             for id in codico_lst:
                                 # Get the codico
                                 codi = Codico.objects.filter(id=id).first()
                                 # Set the correct order
-                                codi.order = order
-                                codi.save()
+                                if codi.order != order:
+                                    codi.order = order
+                                    codi.save()
                                 # Go to the next order count
                                 order += 1
+
+                        # (2) Put the MsItem-s in the correct order: first codico-order then their own
                         order = 1
-                        # (2) Put the MsItem-s in the correct order
+                        do_order = []
+                        for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
+                            if msitem.order != order:
+                                do_order.append(dict(obj=msitem, order=order))
+                            order += 1
                         with transaction.atomic():
-                            for msitem in MsItem.objects.filter(manu=manu).order_by('codico__order', 'order'):
-                                msitem.order = order
-                                msitem.save()
-                                order += 1
+                            for oItemOrder in do_order:
+                                obj = oItemOrder['obj']
+                                obj.order = oItemOrder['order']
+                                obj.save()
 
                         # Make sure to set the correct redirect page
                         self.redirectpage = reverse("manuscript_details", kwargs={'pk': manu_id})
@@ -10252,10 +10284,13 @@ class ManuscriptListView(BasicList):
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
         elif custom == "from":
-            for item in instance.manuscript_dateranges.all():
+            # for item in instance.manuscript_dateranges.all():
+            # Walk all codico's
+            for item in Daterange.objects.filter(codico__manuscript=instance).order_by('yearstart'):
                 html.append("<div>{}</div>".format(item.yearstart))
         elif custom == "until":
-            for item in instance.manuscript_dateranges.all():
+            # for item in instance.manuscript_dateranges.all():
+            for item in Daterange.objects.filter(codico__manuscript=instance).order_by('yearfinish'):
                 html.append("<div>{}</div>".format(item.yearfinish))
         elif custom == "status":
             # html.append("<span class='badge'>{}</span>".format(instance.stype[:1]))
@@ -10449,7 +10484,8 @@ class ManuscriptDownload(BasicPart):
     def get_func(self, instance, path, profile, username, team_group):
         sBack = ""
         if path == "dateranges":
-            qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            # qs = instance.manuscript_dateranges.all().order_by('yearstart')
+            qs = Daterange.objects.filter(codico__manuscript=instance).order_by('yearstart')
             dates = []
             for obj in qs:
                 dates.append(obj.__str__())
@@ -11732,14 +11768,14 @@ class EqualGoldEdit(BasicDetails):
                     oItem = dict(type="plain", 
                                  label="Add to project",
                                  title="Submit a request to add this SSG to the following project(s)",
-                                 value=self.get_prj_submitted(instance))
+                                 value=self.get_prj_submitted(instance, "other", profile))
                     oItem['field_list'] = "addprojlist"
                     context['mainitems'].append(oItem)
                     # Any editor may suggest that an SSG be deleted from particular project(s)
                     oItem = dict(type="plain", 
                                  label="Remove from project",
                                  title="Submit a request to remove this SSG from the following project(s)",
-                                 value=self.get_prj_submitted(instance))
+                                 value=self.get_prj_submitted(instance, 'current'))
                     oItem['field_list'] = "delprojlist"
                     context['mainitems'].append(oItem)
 
@@ -11900,18 +11936,33 @@ class EqualGoldEdit(BasicDetails):
 
         return oBack
 
-    def get_prj_submitted(self, instance):
+    def get_prj_submitted(self, instance, type=None, profile=None):
         """Get an HTML list of projects to which this SSG has already been submitted"""
+
         oErr = ErrHandle()
         sBack = ""
         try:
-            # Get the list of EqualAdd objects (with atype ['def', 'mod'], i.e. not yet accepted)
-            qs = addapproval_pending(instance)
+            # Determine which projects should be shown
+            if type is None:
+                # Get the list of EqualAdd objects (with atype ['def', 'mod'], i.e. not yet accepted)
+                qs = addapproval_pending(instance)
+            elif type == "current":
+                # Show the projects currently connected to this AF
+                qs = instance.projects.all()
+            elif type == "other":
+                # Show the list of projects to which I am not an approver
+                #      and to which this AF has not been attached yet
+                approval_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+                current_project_ids = [x['id'] for x in instance.projects.all().values('id')]
+                qs = Project2.objects.exclude(id__in=approval_project_ids).exclude(id__in=current_project_ids)
 
             lHtml = []
             # Visit all project items
             for obj in qs:
-                project = obj.project
+                if type is None:
+                    project = obj.project
+                else:
+                    project = obj
                 # Determine where clicking should lead to
                 url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project.id) 
                 # Create a display for this topic
@@ -11923,6 +11974,34 @@ class EqualGoldEdit(BasicDetails):
             bBack = ""
 
         return sBack
+
+    def before_delete(self, instance):
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Who is this?
+            profile = Profile.get_user_profile(self.request.user.username)
+            # Check if deleting may take place
+            qs = instance.projects.all()
+            if qs.count() > 1:
+                # Get the list of projects
+                projlist = qs
+                iCountNeeded = approval_parse_deleting(profile, projlist, instance) 
+                if iCountNeeded == 0:
+                    # The SSG may be deleted right away
+                    pass
+                else:
+                    # It may not be delete
+                    bResult = False
+                    msg = "ok"
+            else:
+                # There is no problem deleting this SSG, since it is only attached to one project
+                pass
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
            
     def before_save(self, form, instance):
         oErr = ErrHandle()
@@ -12093,11 +12172,16 @@ class EqualGoldEdit(BasicDetails):
         oErr = ErrHandle()
                 
         try:
+            # Need to know who I am for some operations
+            profile = Profile.get_user_profile(self.request.user.username)
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
-            collist_ssg_id = form.cleaned_data['collist_ssg'].values('id') 
-            collist_hist_id = form.cleaned_data['collist_hist'].values('id')
-            collist_ssg = Collection.objects.filter(Q(id__in=collist_ssg_id) | Q(id__in=collist_hist_id))
+            collist_ssg_id = [x['id'] for x in form.cleaned_data['collist_ssg'].values('id') ]
+            collist_hist_id = [x['id'] for x in form.cleaned_data['collist_hist'].values('id')]
+            collist_others_id = [x['id'] for x in instance.collections.filter(scope="priv", type="super").exclude(owner=profile).values('id')]
+            collist_id = collist_ssg_id + collist_hist_id + collist_others_id
+            collist_ssg = Collection.objects.filter(Q(id__in=collist_id))
             adapt_m2m(CollectionSuper, instance, "super", collist_ssg, "collection")
 
             # (2) links from one SSG to another SSG
@@ -12145,7 +12229,6 @@ class EqualGoldEdit(BasicDetails):
 
             # (4) user-specific 'keywords'
             ukwlist = form.cleaned_data['ukwlist']
-            profile = Profile.get_user_profile(self.request.user.username)
             adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, 
                       extrargs = {'profile': profile, 'type': 'super'})
 
@@ -12573,6 +12656,12 @@ class EqualGoldListView(BasicList):
 
         # ======== One-time adaptations ==============
         listview_adaptations("equalgold_list")
+
+        # Should json be added?
+        if user_is_superuser(self.request):
+            self.downloads = [
+                {"label": "Huwa AFs: json", "dtype": "json", "url": 'equalgold_huwajson'}]
+
         return None
     
     def add_to_context(self, context, initial):
@@ -13437,44 +13526,53 @@ class ReportDownload(BasicPart):
 
         # Initialize
         lData = []
+        sData = ""
+        oErr = ErrHandle()
 
-        # Unpack the report contents
-        sData = self.obj.contents
+        try:
+            # Unpack the report contents
+            sData = self.obj.contents
 
-        if dtype == "json":
-            # no need to do anything: the information is already in sData
-            pass
-        else:
-            # Convert the JSON to a Python object
-            oContents = json.loads(sData)
-            # Get the headers and the list
-            headers = oContents['headers']
+            if dtype == "json":
+                # no need to do anything: the information is already in sData
+                pass
+            else:
+                # Convert the JSON to a Python object
+                oContents = json.loads(sData)
+                # Get the headers and the list
+                headers = oContents['headers']
 
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
 
-            # Write Headers
-            csvwriter.writerow(headers)
+                # Write Headers
+                csvwriter.writerow(headers)
 
-            # Two lists
-            todo = [oContents['list'], oContents['read'] ]
-            for lst_report in todo:
+                # Two lists
+                todo = [oContents['list'], oContents['read'] ]
+                for lst_report in todo:
 
-                # Loop
-                for item in lst_report:
-                    row = []
-                    for key in headers:
-                        if key in item:
-                            row.append(item[key].replace("\r", " ").replace("\n", " "))
-                        else:
-                            row.append("")
-                    csvwriter.writerow(row)
+                    # Loop
+                    for item in lst_report:
+                        row = []
+                        for key in headers:
+                            if key in item:
+                                element = item[key]
+                                if isinstance(element, str):
+                                    element = element.replace("\r", " ").replace("\n", " ")
+                                row.append(element)
+                            else:
+                                row.append("")
+                        csvwriter.writerow(row)
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ReportDownload/get_data")
 
         return sData
 

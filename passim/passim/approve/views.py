@@ -2,6 +2,7 @@
 Definition of views for the APPROVE app.
 """
 
+from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.shortcuts import render
@@ -10,7 +11,7 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectEditor
 from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
@@ -34,6 +35,56 @@ def get_goldset_html(goldlist):
         # Calculate with the template
         sBack = render_to_string(template_name, context)
     return sBack
+
+def equaladd_to_accept(instance):
+    """Accept the addition or deletion of the SSG : implement it and set my status
+    
+    Note: the [instance] is an object EqualAdd
+    """
+
+    oErr = ErrHandle()
+    bBack = True
+    try:
+        # Figure out whether this is an addition or a delection
+        action = instance.action
+        action_message = "addition to" if action == "add" else "removal from"
+
+        # Get to the actual SSG
+        super = instance.super
+
+        if action == "add":
+            # We must add the SSG: change the SSG's atype to 'acc'
+            super.atype = "acc"
+            super.save()
+            # Add the project to this SSG
+            super.projects.add(instance.project)
+            # Make sure that our addition or deletion to accepted
+            instance.atype = "acc"
+
+        elif action == "rem":
+            # The action is to delete the project from this SSG
+            super.projects.remove(instance.project)
+            # Make sure that our deletion is set to accepted
+            instance.atype = "acc"
+        elif action == "del":
+            # The action is to delete the SSG altogether
+            instance.atype = "acc"
+            # Perform the actual deletion
+            super.delete()
+        else:
+            oErr.Status("equaladd_to_accept: unknown action [{}]".format(action))
+            return bBack
+
+        # Finish off the comment
+        instance.comment = "This project {} the SSG/AF has been successfully processed on: {}".format(
+            action_message, get_crpp_date(get_current_datetime(), True))
+        instance.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("equaladd_to_accept")
+        bBack = False
+    return bBack
 
 def equalchange_json_to_html(instance, type, profile=None):
     """Convert the proposed change from JSON into an HTML representation"""
@@ -447,6 +498,47 @@ def approval_parse_removing(profile, qs_projlist, super, allow_removing = None):
         iCount = 0
     return iCount
 
+def approval_parse_deleting(profile, qs_projlist, super):
+    """Process this user [profile] suggesting to REMOVE SSG [super] altogether
+    
+    Note: this function is called from seeker/view EqualGoldEdit, before_save()
+    """
+
+    oErr = ErrHandle()
+    iCount = 0
+    action = "del"
+    try:
+        # Walk all the projects to which this SSG belongs
+        if qs_projlist.count() > 1:
+            # (1) Get all projects attached to this SSG
+            proj_all_ids = [x.id for x in super.projects.all()]
+            # (2) Figur out all projects to which [profile] has editor access
+            proj_profile_ids = [x.id for x in profile.projects.all()]
+            # proj_profile_ids = [x.project.id for x in ProjectEditor.objects.filter(profile=profile, status="incl")]
+            # (3) get the list of projects for which consent is needed
+            proj_need_ids = []
+            for prj_id in proj_all_ids:
+                if not prj_id in proj_profile_ids:
+                    proj_need_ids.append(prj_id)
+            # Check if any action is required
+            if len(proj_need_ids) > 0:
+                # We need to check agreement for all projects in this list
+                for prj_id in proj_need_ids:
+                    # Check if we have an EqualAdd object for this
+                    #  (don't include [profile] in this test; a different user may have suggested the same thing)
+                    obj = EqualAdd.objects.filter(project_id=prj_id, super=super, action=action).first()                
+                    if obj is None:
+                        # Create an object
+                        obj = EqualAdd.objects.create(project_id=prj_id, super=super, profile=profile, action=action) 
+                    # Increment the counter
+                    iCount += 1
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("approval_parse_deleting")
+        iCount = 0
+    return iCount
+
 def approval_parse_changes(profile, cleaned_data, super):
     """Check if there are any changes, add them into EqualChange objects, and return how many there are"""
 
@@ -664,13 +756,15 @@ class EqualAddList(BasicList):
     use_team_group = True
     prefix = "all"
     basic_name_prefix = "equaladd"
-    order_cols = ['profile__user__username', 'saved', 'super__code', 'atype']
-    order_default = ['profile__user__username', '-saved', 'super__code', 'atype']
+    order_cols = ['profile__user__username', 'saved', 'action', 'project__name', 'super__code', 'atype']
+    order_default = ['profile__user__username', '-saved', 'action', 'project__name', 'super__code', 'atype']
     order_heads = [
         {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
         {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True},        
-        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        {'name': 'Action ',         'order': 'o=3', 'type': 'str', 'custom': 'action',  'linkdetails': True},
+        {'name': 'Project ',        'order': 'o=4', 'type': 'str', 'custom': 'project', 'linkdetails': True},        
+        {'name': 'Authority File',  'order': 'o=5', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'main': True},
+        {'name': 'Status',          'order': 'o=6', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
         {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -693,18 +787,20 @@ class EqualAddList(BasicList):
     def initializations(self):
         if self.prefix == "all":
             # Provide all changes
-            self.plural_name = "All Authority File additions"
-            self.sg_name = "Authority File addition"
+            self.plural_name = "All Authority File project changes"
+            self.sg_name = "Authority File project addition/removal"
         elif self.prefix == "user":
             # Restricted to a particular user...
-            self.plural_name = "User Authority Files additions"
-            self.sg_name = "User Authority File addition"
-            self.order_cols = ['saved', 'super__code', 'atype']
-            self.order_default = ['saved', 'super__code', 'atype']
+            self.plural_name = "User Authority File project changes"
+            self.sg_name = "User Authority File project addition/removal"
+            self.order_cols = ['saved', 'action', 'project__name', 'super__code', 'atype']
+            self.order_default = ['saved', 'action', 'project__name', 'super__code', 'atype']
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True},              
-                {'name': 'Status',          'order': 'o=3', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                {'name': 'Action ',         'order': 'o=2', 'type': 'str', 'custom': 'action',  'linkdetails': True},
+                {'name': 'Project ',        'order': 'o=3', 'type': 'str', 'custom': 'project', 'linkdetails': True},        
+                {'name': 'Authority File',  'order': 'o=4', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'main': True},
+                {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
                 {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -734,6 +830,10 @@ class EqualAddList(BasicList):
             sBack = instance.profile.user.username
         elif custom == "atype":
             sBack = instance.get_atype_display()
+        elif custom == "action":
+            sBack = instance.get_action_display()
+        elif custom == "project":
+            sBack = instance.project.name
         elif custom == "code":
             sBack = instance.get_code()        
         return sBack, sTitle
@@ -834,6 +934,7 @@ class EqualChangeList(BasicList):
                     ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'atype',     'dbfield': 'atype',    'keyS': 'atype'},
+                    # {'filter': 'superacc',  'dbfield': '$dummy',   'keyS': 'superacc'},
                     {'filter': 'user', 'fkfield': 'profile', 'keyFk': 'id', 'keyList': 'profilelist', 'infield': 'id'}
                     ]}
                  ]
@@ -871,6 +972,9 @@ class EqualChangeList(BasicList):
                 # Restrict the profile
                 fields['profilelist'] = Profile.objects.filter(id=profile.id)
 
+                # Make sure to exclude all field changes, that have already perculated
+                # lstExclude.append(Q(super__atype='acc'))
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChangeListView/adapt_search")
@@ -891,6 +995,24 @@ class EqualAddEdit(BasicDetails): # Waarom is dit niet op basis van BasicEdit?
     title = "Authority File addition"
     no_delete = True            # Don't allow users to remove an addition (?)
     mainitems = []
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            if not instance is None:
+                # Need to know who this user (profile) is
+                profile = Profile.get_user_profile(self.request.user.username)
+
+                # Am I the owner of this record?
+                if profile.id == instance.profile.id:
+                    # Is this the 'user' one?
+                    if self.prefix == "user" and instance.atype != "acc":
+                        # Allow myself to delete this suggestion, since it has not been accepted yet
+                        self.no_delete = False
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChangeEdit/custom_init")
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -915,6 +1037,7 @@ class EqualAddEdit(BasicDetails): # Waarom is dit niet op basis van BasicEdit?
             # --------------------------------------------
             {'type': 'plain', 'label': "Authority File:",'value': instance.get_code_html()},        #,   'field_key': 'super'},
             #{'type': 'plain', 'label': "Field:",        'value': instance.get_display_name()},      #,   'field_key': 'field'},
+            {'type': 'plain', 'label': "Action:",       'value': instance.get_action_display()},     #,  'field_key': 'action'},
             {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
             {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},     #,  'field_key': 'atype'},
             #{'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance, "current", profile)},
@@ -950,7 +1073,7 @@ class EqualChangeEdit(BasicDetails):
                 profile = Profile.get_user_profile(self.request.user.username)
 
                 # Am I the owner of this record?
-                if profile is instance.profile:
+                if profile.id == instance.profile.id:
                     # Is this the 'user' one?
                     if self.prefix == "user" and instance.atype != "acc":
                         # Allow myself to delete this suggestion, since it has not been accepted yet
@@ -1327,13 +1450,14 @@ class EqualAddApprovalList(BasicList):
     use_team_group = True
     prefix = "all"
     basic_name_prefix = "equaladdapproval"
-    order_cols = ['profile__user__username', 'saved', 'add__super__code', 'atype']
-    order_default = ['profile__user__username', '-saved', 'add__super__code', 'atype']
+    order_cols = ['profile__user__username', 'saved', 'add__action', 'add__super__code', 'atype']
+    order_default = ['profile__user__username', '-saved', 'add__action', 'add__super__code', 'atype']
     order_heads = [
         {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
         {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-        {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True},       
-        {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+        {'name': 'Action',          'order': 'o=3', 'type': 'str', 'custom': 'action',  'linkdetails': True},       
+        {'name': 'Authority File',  'order': 'o=4', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'main': True},
+        {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
         {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -1356,18 +1480,19 @@ class EqualAddApprovalList(BasicList):
     def initializations(self):
         if self.prefix == "all":
             # Provide all additions
-            self.plural_name = "All Authority File approvals"
-            self.sg_name = "Authority File approval"
+            self.plural_name = "All Authority File project approvals"
+            self.sg_name = "Authority File project approval"
         elif self.prefix == "user":
             # Restricted to a particular user...
-            self.plural_name = "Authority File approvals"
-            self.sg_name = "Authority File approval"
-            self.order_cols = ['saved', 'add__super__code', 'atype']
-            self.order_default = ['-saved', 'add__super__code', 'atype']
+            self.plural_name = "Authority File project approvals"
+            self.sg_name = "Authority File project approval"
+            self.order_cols = ['saved', 'add__action', 'add__super__code', 'atype']
+            self.order_default = ['-saved', 'add__action', 'add__super__code', 'atype']
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
-                {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True},                
-                {'name': 'Status',          'order': 'o=3', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                {'name': 'Action',          'order': 'o=2', 'type': 'str', 'custom': 'action',  'linkdetails': True},       
+                {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'main': True},
+                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
                 {"name": "Authority File",  "id": "filter_code",      "enabled": False},
@@ -1397,6 +1522,9 @@ class EqualAddApprovalList(BasicList):
             sBack = instance.profile.user.username
         elif custom == "atype":
             sBack = instance.get_atype_display()
+        elif custom == "action":
+            sBack = "{} {}".format(
+                instance.add.get_action_display(), instance.add.project.name)
         elif custom == "code":
             sBack = instance.add.get_code()
         return sBack, sTitle
@@ -1525,10 +1653,21 @@ class EqualApprovalEdit(BasicDetails):
                 # Is this EqualChange object already finished?
                 if not change is None and change.atype != "acc":
                     # Check how many approvals there should be and how many are left
+                    #   (issue #527 changed this to be the number of projects needed and left)
                     iLeft, iNeeded = change.get_approval_count()
                     if iNeeded > 0 and iLeft == 0:
                         # The last approval has been saved: we may implement the change
                         equalchange_json_to_accept(change)
+                        # Look for any left-over EqualApproval objects
+                        with transaction.atomic():
+                            for obj in change.changeapprovals.all():
+                                # Check if this has been processed
+                                if obj.atype == "def":
+                                    # THis has not been processed, it is still at the default value
+                                    # Issue #527: set it to [aut] (automatically accepted)
+                                    obj.atype = "aut"
+                                    obj.save()
+                                    # Result: this EqualApproval object will no longer appear on the list of SSG changes to be approved
                     elif change.changeapprovals.exclude(atype="def").count() == 0:
                         # Do some more careful checking: all approvals are now known
                         iRejected = change.changeapprovals.filter(atype='rej').count()
@@ -1657,7 +1796,7 @@ class EqualAddApprovalEdit(BasicDetails):
     mForm = EqualAddApprovalForm
     prefix = "all"
     basic_name_prefix = "equaladdapproval"
-    title = "Addition approval"
+    title = "Authority File project approval"
     no_delete = True            # Don't allow users to remove a field change that they have entered
     mainitems = []
 
@@ -1704,10 +1843,12 @@ class EqualAddApprovalEdit(BasicDetails):
                 # --------------------------------------------
                 {'type': 'plain', 'label': "Authority File:",'value': instance.add.get_code_html()},         #,   'field_key': 'super'},                
                 {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+                {'type': 'plain', 'label': "Action:",       'value': instance.add.get_action_display()}, 
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},             #,   'field_key': 'atype'},
                 {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment_html()},              #,   'field_key': 'comment'},
                 #{'type': 'safe',  'label': "Current:",      'value': equaladd_json_to_html(instance.add, "current", profile)},
                 #{'type': 'safe',  'label': "Proposed:",     'value': equaladd_json_to_html(instance.add, "add", profile)},
+                {'type': 'safe',  'label': 'Approvals:',    'value': self.get_approvals_html(instance)},
                 ]
             # Only add the 'comment', if it is there (and read-only)
             if locked:
@@ -1733,6 +1874,22 @@ class EqualAddApprovalEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def get_approvals_html(self, instance):
+        """Get the approvals for this particular project addition/removal"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        template = "approve/add_approval.html"
+        try:
+            approvals = instance.add.addapprovals.all().order_by('atype', '-saved')
+            context = dict(approval=instance, approvals=approvals)
+            sBack = render_to_string(template, context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualAddApprovalEdit/get_approvals_html")
+            bResult = False
+        return sBack
+
     def after_save(self, form, instance):
         msg = ""
         bResult = True
@@ -1746,11 +1903,22 @@ class EqualAddApprovalEdit(BasicDetails):
 
                 # Is this EqualAdd object already finished?
                 if not add is None and add.atype != "acc":
-                    # Check if there is at least 1 approver available 
-                    iLeft, iNeeded = add.get_approval_count() # dit werkt toch wel
-                    if iNeeded > 0 : # and iLeft == 0:
+                    # Check how many approvals there should be and how many are left
+                    #  EK, issue #528: get_approval_count() has been changed to provide the number of projects left and needed
+                    iLeft, iNeeded = add.get_approval_count()
+                    if iNeeded > 0 and iLeft == 0:
+                        # Look for any left-over EqualApproval objects
+                        with transaction.atomic():
+                            for obj in add.addapprovals.all():
+                                # Check if this has been processed
+                                if obj.atype == "def":
+                                    # THis has not been processed, it is still at the default value
+                                    # Issue #527: set it to [aut] (automatically accepted)
+                                    obj.atype = "aut"
+                                    obj.save()
+                                    # Result: this EqualApproval object will no longer appear on the list of SSG changes to be approved
                         # The last approval has been saved: we may implement the addition
-                        equaladd_json_to_accept(add) # tot hier goed blijkbaar
+                        equaladd_to_accept(add)
                     elif add.addapprovals.exclude(atype="def").count() == 0:
                         # Do some more careful checking: all addapprovals are now known
                         iRejected = add.addapprovals.filter(atype='rej').count()
@@ -1851,7 +2019,7 @@ class EqualAddApprovalDetails(EqualAddApprovalEdit):
             related_objects.append(approvers)
             
             # Add all related objects to the context
-            context['related_objects'] = related_objects
+            context['related_objects'] = None # related_objects
 
         except:
             msg = oErr.get_error_message()

@@ -172,7 +172,8 @@ DATABASES = {
         'NAME': os.path.join(WRITABLE_DIR, 'passim.db'),
         'TEST': {
             'NAME': os.path.join(WRITABLE_DIR, 'passim-test.db'),
-            }
+            },
+        'OPTIONS': {'timeout': 20}
     }
 }
 

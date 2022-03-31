@@ -402,18 +402,42 @@ def add_codico_to_manuscript(manu):
                     obj = CodicoKeyword.objects.create(
                         codico=codi, keyword=mk.keyword)
 
-        # Copy date ranges
-        if codi.codico_dateranges.count() == 0:
-            for md in manu.manuscript_dateranges.all():
-                if md.codico_id == None or md.codico_id == 0 or md.codico == None or md.codic.id != codi.id:
-                    md.codico = codi
-                    md.save()
+        ## Copy date ranges
+        #if codi.codico_dateranges.count() == 0:
+        #    for md in manu.manuscript_dateranges.all():
+        #        if md.codico_id == None or md.codico_id == 0 or md.codico == None or md.codic.id != codi.id:
+        #            md.codico = codi
+        #            md.save()
 
         # Tie all MsItems that need be to the Codico
         for msitem in manu.manuitems.all().order_by('order'):
             if msitem.codico_id == None or msitem.codico == None or msitem.codico.id != codi.id:
                 msitem.codico = codi
                 msitem.save()
+        bResult = True
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("add_codico_to_manuscript")
+        bResult = False
+    return bResult, msg
+
+def adapt_daterange_codico():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Check all date ranges, that they are connected to a Codico (instead of manuscript)
+        qs = Daterange.objects.filter(codico__isnull=True)
+        for obj in qs:
+            # Get the correct codico from the manuscript
+            codico = obj.manuscript.manuscriptcodicounits.first()
+            if codico is None:
+                oErr.Status("Cannot find a CODICO for manuscript {}".format(obj.manuscript.id))
+            else:
+                # Set the right codico
+                obj.codico = codico
+                obj.save()
+        # Getting here means that all went well
         bResult = True
     except:
         msg = oErr.get_error_message()

@@ -2912,7 +2912,6 @@ class SuperSermonGoldForm(PassimModelForm):
 
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
-            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
             self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
         
            # Get the instance
@@ -2935,9 +2934,15 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
+
+                # TO BE DELETED in time...
                 #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 #self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
+                # ==================================
+
+                self.fields['delprojlist'].queryset = Project2.objects.filter(id__in=self.fields['projlist'].initial).order_by('name').distinct()
+                self.fields['delprojlist'].widget.queryset = self.fields['delprojlist'].queryset
                 qs = instance.equalgold_dst.all()
         except:
             msg = oErr.get_error_message()
@@ -4023,12 +4028,12 @@ class ManuscriptForm(PassimModelForm):
                 widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
-    datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+    #            widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
-                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'datelist', 'projlist'] 
+                  'ukwlist', 'kwlist', 'litlist', 'collist', 'mprovlist', 'extlist', 'projlist'] # , 'datelist'] 
     exclude = ['country_ta', 'city_ta', 'libname_ta', 'origname_ta']
 
     class Meta:
@@ -4036,7 +4041,7 @@ class ManuscriptForm(PassimModelForm):
 
         model = Manuscript
         fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 'project' 
-                  'origin', 'url', 'support', 'extent', 'format', 'stype']
+                  'origin', 'url', 'support', 'extent', 'format', 'stype', 'editornotes']
         widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -4052,6 +4057,7 @@ class ManuscriptForm(PassimModelForm):
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+                 'editornotes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
@@ -4065,6 +4071,7 @@ class ManuscriptForm(PassimModelForm):
             profile = Profile.get_user_profile(username)
             # Some fields are not required
             self.fields['stype'].required = False
+            self.fields['editornotes'].required = False
             #self.fields['yearstart'].required = False
             #self.fields['yearfinish'].required = False
             self.fields['name'].required = False
@@ -4101,12 +4108,12 @@ class ManuscriptForm(PassimModelForm):
             #self.fields['provlist'].queryset = Provenance.objects.none()
             self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
-            self.fields['datelist'].queryset = Daterange.objects.none()
+            # self.fields['datelist'].queryset = Daterange.objects.none()
 
-           # self.fields['provlist'].widget.addonly = True
+            # self.fields['provlist'].widget.addonly = True
             self.fields['mprovlist'].widget.addonly = True
             self.fields['extlist'].widget.addonly = True
-            self.fields['datelist'].widget.addonly = True
+            # self.fields['datelist'].widget.addonly = True
         
             # Get the instance
             if 'instance' in kwargs:
@@ -4149,14 +4156,14 @@ class ManuscriptForm(PassimModelForm):
       
                 self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
-                self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
+                # self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
                 
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
                 #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
-                self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
+                # self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
 
                 #self.fields['provlist'].widget.manu = instance
