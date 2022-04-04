@@ -7165,7 +7165,7 @@ class SermonGold(models.Model):
             lHtml.append("[-]")
         # Treat the author
         if self.author:
-            lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
+            lHtml.append(" (by <span class='sermon-author'>{}</span>) ".format(self.author.name))
         else:
             lHtml.append("(by <i>Unknown Author</i>) ")
         # Treat incipit
