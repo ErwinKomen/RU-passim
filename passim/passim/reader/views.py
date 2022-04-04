@@ -2928,6 +2928,33 @@ class EqualGoldHuwaToJson(BasicPart):
             else:
                 existing_dict[sKey] += 1
 
+        def get_signatures(oSsg, editype):
+            """Get a list of signatures as string from this object"""
+
+            sBack = ""
+            lSig = []
+            for oSig in oSsg.get("signaturesA"):
+                if oSig['editype'] == editype:
+                    lSig.append(oSig['code'])
+
+            sBack = json.dumps(lSig)
+            return sBack
+
+        def get_good_string(oSsg, field, second=None):
+            """Get a good string from [oSsg]"""
+
+            sBack = oSsg[field]
+            if not sBack is None:
+                if not second is None:
+                    sBack = sBack[second]
+                elif isinstance(sBack, int):
+                    sBack = str(sBack)
+            if sBack == None or sBack == "":
+                sBack = "'-"
+            elif sBack[0] == "=":
+                sBack = "'{}".format(sBack)
+            return sBack
+
         # Initialize
         lData = []
         sData = ""
@@ -2938,10 +2965,13 @@ class EqualGoldHuwaToJson(BasicPart):
         table_info = {}
         author_info = {}
         existing_dict = {}
+        bDoCounting = True
+        rHasNumber = re.compile(r'.*[0-9].*')
 
-        count_manu_zero = 0 # Number of items linked to ZERO manuscripts
-        count_manu_one = 0  # Number of items linked to just one manuscript
-        count_manu_many = 0 # Number of items linked to many manuscripts
+        count_manu_zero = 0     # Number of items linked to ZERO manuscripts
+        count_manu_one = 0      # Number of items linked to just one manuscript
+        count_manu_many_num = 0 # Number of items linked to many manuscripts - with number in ABK
+        count_manu_many_oth = 0 # Number of items linked to many manuscripts - without number in ABK
 
         try:
             # Read the Huwa to Passim author JSON
@@ -2957,14 +2987,18 @@ class EqualGoldHuwaToJson(BasicPart):
             tables = self.get_tables(table_info, huwa_tables)
 
             # Walk through the table with AF information
+            count_opera = len(tables['opera'])
             for idx, oOpera in enumerate(tables['opera']):
                 opera_id = oOpera['id']
                 # Take over any information that should
                 oSsg = dict(id=idx+1, opera=opera_id)
 
+                # Show where we are
+                oErr.Status("EqualGoldHuwaToJson: {}/{}".format(idx+1, count_opera))
+
                 # Get the signature(s)
                 signaturesA = []
-                other = oOpera.get("abk")
+                other = oOpera.get("abk", "")
                 if not other is None and other != "":
                     signaturesA.append(dict(editype="ot", code=other))
                 clavis = get_table_list(tables['clavis'], opera_id, "name")
@@ -2999,40 +3033,54 @@ class EqualGoldHuwaToJson(BasicPart):
                         passim_author = undecided
                 oSsg['author'] = dict(id=passim_author.id, name= passim_author.name)
 
-                # Get the number of manuscripts linked to this particular opera entry
-                oSsg['manuscripts'] = get_table_fk_count(tables['inhalt'], opera_id, "opera")
-                if oSsg['manuscripts'] == 0:
-                    count_manu_zero += 1
-                elif oSsg['manuscripts'] == 1:
-                    count_manu_one += 1
-                elif oSsg['manuscripts'] > 1:
-                    count_manu_many += 1
+                if bDoCounting:
+                    # Check if the [abq] field contains a number or not
+                    bAbqHasNumber = False
+                    if rHasNumber.match(other): bAbqHasNumber = True
 
-                # Check if there already is a SSG with the inc/expl
-                qs = EqualGold.objects.filter(incipit__iexact=oSsg['incipit'], explicit__iexact=oSsg['explicit'])
-                count = qs.count()
-                if count == 0:
-                    existing_ssg = dict(id=None, type="ssgmN: no inc/exp match")
-                    add_existing("ssgmN")
-                elif count == 1:
-                    # This must be a match
-                    obj = qs.first()
-                    existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmF: full inc/exp match")
-                    add_existing("ssgmF")
-                elif count > 1 and (oSsg['incipit'] == "" or oSsg['explicit'] == ""):
-                    existing_ssg = dict(id=None, type="ssgmE: empty inc or exp")
-                    add_existing("ssgmE")
-                else:
-                    # Check further on the author
-                    obj = qs.filter(author=passim_author).first()
-                    if obj is None:
-                        # Found matching inc/exp, but not a matching author
-                        existing_ssg = [dict(id=x.id, code=x.code, type="ssgmAM: author mismatch") for x in qs]
-                        add_existing("ssgmAM")
+                    # Get the number of manuscripts linked to this particular opera entry
+                    oSsg['manuscripts'] = get_table_fk_count(tables['inhalt'], opera_id, "opera")
+                    manu_type = "-"
+                    if oSsg['manuscripts'] == 0:
+                        count_manu_zero += 1
+                        manu_type = "zero links"
+                    elif oSsg['manuscripts'] == 1:
+                        count_manu_one += 1
+                        manu_type = "one link"
+                    elif oSsg['manuscripts'] > 1:
+                        if bAbqHasNumber:
+                            count_manu_many_num += 1
+                            manu_type = "many links ABK has number"
+                        else:
+                            count_manu_many_oth += 1
+                            manu_type = "many links ABK text only"
+                    oSsg['manu_type'] = manu_type
+
+                    # Check if there already is a SSG with the inc/expl
+                    qs = EqualGold.objects.filter(incipit__iexact=oSsg['incipit'], explicit__iexact=oSsg['explicit'])
+                    count = qs.count()
+                    if count == 0:
+                        existing_ssg = dict(id=None, type="ssgmN: no inc/exp match")
+                        add_existing("ssgmN")
+                    elif count == 1:
+                        # This must be a match
+                        obj = qs.first()
+                        existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmF: full inc/exp match")
+                        add_existing("ssgmF")
+                    elif count > 1 and (oSsg['incipit'] == "" or oSsg['explicit'] == ""):
+                        existing_ssg = dict(id=None, type="ssgmE: empty inc or exp")
+                        add_existing("ssgmE")
                     else:
-                        existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmFA: full inc/exp/author match")
-                        add_existing("ssgmFA")
-                oSsg['existing_ssg'] = existing_ssg
+                        # Check further on the author
+                        obj = qs.filter(author=passim_author).first()
+                        if obj is None:
+                            # Found matching inc/exp, but not a matching author
+                            existing_ssg = [dict(id=x.id, code=x.code, type="ssgmAM: author mismatch") for x in qs]
+                            add_existing("ssgmAM")
+                        else:
+                            existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmFA: full inc/exp/author match")
+                            add_existing("ssgmFA")
+                    oSsg['existing_ssg'] = existing_ssg
 
                 # Add this to the list of SSGs
                 lData.append(oSsg)
@@ -3042,9 +3090,51 @@ class EqualGoldHuwaToJson(BasicPart):
                 # convert to string
                 sData = json.dumps(lData, indent=2)
 
+            elif dtype == "csv" or dtype == "xlsx":
+                # 
+
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+
+                # Determine the headers
+                headers = ['opera', 'sig_Clavis', 'sig_Gryson', 'sig_Other', 'inc', 'exp', 'note_langname', 'notes', 
+                           'date_estimate', 'author_name', 'count_manu', 'manu_type', 'existing_ssg']
+                # Output this header row
+                csvwriter.writerow(headers)
+
+                # Process all objects in the data
+                for oSsg in lData:
+                    # Start an output row
+                    row = []
+
+                    # Append all field values into this row (as TEXT)
+                    row.append(get_good_string(oSsg, 'opera'))
+                    row.append(get_signatures(oSsg, 'cl'))
+                    row.append(get_signatures(oSsg, 'gr'))
+                    row.append(get_signatures(oSsg, 'ot'))
+                    row.append(get_good_string(oSsg,'incipit'))
+                    row.append(get_good_string(oSsg,'explicit'))
+                    row.append(get_good_string(oSsg,'note_langname'))
+                    row.append(get_good_string(oSsg,'notes'))
+                    row.append(get_good_string(oSsg,'date_estimate'))
+                    row.append(get_good_string(oSsg,'author','name'))
+                    row.append(get_good_string(oSsg,'manuscripts'))
+                    row.append(get_good_string(oSsg,'manu_type'))
+                    row.append(get_good_string(oSsg,'existing_ssg','type'))
+
+                    # Output this row
+                    csvwriter.writerow(row)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+
+            if bDoCounting:
                 # Also show results of counting:
-                oErr.Status("Potential SSGs with manuscripts: 0={}, 1={}, many={}".format(
-                    count_manu_zero, count_manu_one, count_manu_many))
+                oErr.Status("Potential SSGs with manuscripts: 0={}, 1={}, many (with num)={} many (no num)={}".format(
+                    count_manu_zero, count_manu_one, count_manu_many_num, count_manu_many_oth))
                 # Show the existing stuff
                 for k,v in existing_dict.items():
                     oErr.Status("Existing {}: {}".format(k,v))
