@@ -5419,7 +5419,7 @@ class KeywordEdit(BasicDetails):
     model = Keyword
     mForm = KeywordForm
     prefix = 'kw'
-    title = "KeywordEditZ"
+    title = "KeywordEdit"
     rtype = "json"
     history_button = True
     mainitems = []
