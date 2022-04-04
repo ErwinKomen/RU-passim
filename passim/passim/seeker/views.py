@@ -4564,6 +4564,28 @@ class SermonEdit(BasicDetails):
             # Make sure the new sermon gets changed
             form.instance.order = sermon_count
 
+        if manu:
+            # Need to know who is 'talking'...
+            username = self.request.user.username
+            profile = Profile.get_user_profile(username)
+            profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
+
+            project_count = instance.projects.count()
+
+            if project_count == 0:
+                # How many projects are attached to this manuscript
+                manu_project_count = manu.projects.count()
+                if manu_project_count == 1:
+                    # Issue #546: if the manuscript is for one project, continue checking
+                    # Assign this sermon to the project of the manuscript
+                    project = manu.projects.first()
+                    instance.projects.add(project)
+                elif profile_projects.count() == 1:
+                    # This editor is only editor for one project
+                    # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                    project = profile_projects.first().project
+                    instance.projects.add(project)
+
         # Return positively
         return True, "" 
 
@@ -4728,6 +4750,7 @@ class SermonEdit(BasicDetails):
                     # Need to know who is 'talking'...
                     username = self.request.user.username
                     profile = Profile.get_user_profile(username)
+                    profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
 
                     # Always get the project list
                     projlist = form.cleaned_data.get("projlist")
@@ -4746,6 +4769,19 @@ class SermonEdit(BasicDetails):
                         #    # Add a warning that the user must manually provide a project
                         #    msg = "Add a project: A sermon must belong to at least one project"
                         #    bBack = False
+                    elif manu_project_count == 1:
+                        # Issue #546: if the manuscript is for one project, continue checking
+                        if len(projlist) == 0:
+                            # Assign this sermon to the project of the manuscript
+                            project = manu.projects.first()
+                            instance.projects.add(project)
+                        else:
+                            bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+                    elif profile_projects.count() == 1:
+                        # This editor is only editor for one project
+                        # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                        project = profile_projects.first().project
+                        instance.projects.add(project)
                     else:
                         # It would seem that this kind of check is needed anyway...
                         bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
@@ -13729,10 +13765,6 @@ class SourceDetails(SourceEdit):
 
     rtype = "html"
 
-#class OnlineSourcesListView(Listview):
-#    """Listview of online sources used in PASSIM"""
-#    model=OnlineSources
-#    template_name = 'seeker/literature_list.html'
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""
