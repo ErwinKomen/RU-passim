@@ -2876,7 +2876,7 @@ class EqualGoldHuwaToJson(BasicPart):
         {'rel_id': 8,  'dir': 'yes', 'linktypes': ['rel'],        'spectypes': ['cso', 'cdo']},   # comments on / commented on
         {'rel_id': 9,  'dir': 'yes', 'linktypes': ['prt'],        'spectypes': ['pto', 'pth']},   # is part of / has as its part
         {'rel_id': 10, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['cap']},          # capitula
-        {'rel_id': 11, 'dir': 'no',  'linktypes': ['prt'],        'spectypes': ['pto', 'pth']},   # Excerpt (use keyword 'excerpt')
+        {'rel_id': 11, 'dir': 'yes', 'linktypes': ['prt'],        'spectypes': ['pto', 'pth']},   # Excerpt (use keyword 'excerpt')
         {'rel_id': 12, 'dir': 'no',  'linktypes': [],             'spectypes': []},               # additional text follows
         {'rel_id': 13, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['tki']},          # tabula/key/index
         {'rel_id': 14, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['pro']},          # prologue
@@ -3107,21 +3107,39 @@ class EqualGoldHuwaToJson(BasicPart):
                 spectypes = oRel.get("spectypes", [])
                 bDirectional = (oRel.get("dir") == "yes")
 
-                # Start creating this opera relation
-                for dst in opera_dst:
-                    oOperaRel = dict(src=opera_src, dst=dst)
-                    oReverse = None
-                    if bDirectional:
-                        pass
-                    else:
-                        oOperaRel['linktype']
+                # If this relation does *NOT* contain a linktype, then we cannot process it!!!
+                if len(linktypes) > 0 and len(spectypes) > 0:
+
+                    # Start creating this opera relation
+                    for dst in opera_dst:
+                        for linktype in linktypes:
+                            oOperaRel = dict(src=opera_src, dst=dst)
+                            oReverse = None
+                            if bDirectional and len(spectypes) > 1:
+                                oOperaRel['linktype'] = linktype
+                                oOperaRel['spectype'] = spectypes[0]
+                                oReverse['linktype'] = linktype
+                                oReverse['spectype'] = spectypes[1]
+                                if rel_id == 11:
+                                    # Signal excerpt
+                                    oOperaRel['keyword'] = 'excerpt'
+                                    oReverse['keyword'] = 'excerpt'
+                            else:
+                                oOperaRel['linktype'] = linktype
+                                oOperaRel['spectype'] = spectypes[0]
+                            # Add items to list
+                            lst_opera_rel.append(oOperaRel)
+                            if not oReverse is None:
+                                lst_opera_rel.append(oReverse)
+                else:
+                    # Show that we are skipping this relation
+                    msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
+                    oErr.Status(msg)
 
 
             # (7) combine the sections into one object
             oData['operas'] = lst_opera
             oData['opera_relations'] = lst_opera_rel
-
-
             
             # Convert oData to stringified JSON
             if dtype == "json":
