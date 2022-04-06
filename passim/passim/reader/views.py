@@ -2999,7 +2999,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 oSsg = dict(id=idx+1, opera=opera_id)
 
                 # Show where we are
-                oErr.Status("EqualGoldHuwaToJson: {}/{}".format(idx+1, count_opera))
+                if idx % 100 == 0:
+                    oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
 
                 # Get the signature(s)
                 signaturesA = []
@@ -3092,8 +3093,13 @@ class EqualGoldHuwaToJson(BasicPart):
 
             # (6) Process the inter-opera relations 
             lst_opera_rel = []
-            oRelationship = {x['rel_id']:x  for x in relationships }
+            oRelationship = {x['rel_id']:x  for x in EqualGoldHuwaToJson.relationships }
+            count_rel = len(lst_relations)
             for idx, oRel in enumerate(lst_relations):
+                # Show where we are
+                if idx % 100 == 0:
+                    oErr.Status("EqualGoldHuwaToJson relations: {}/{}".format(idx+1, count_rel))
+
                 opera_src = oRel.get('opera_src')
                 opera_dst = oRel.get('opera_dst')
                 rel_id = oRel.get('rel_id')
@@ -3116,6 +3122,7 @@ class EqualGoldHuwaToJson(BasicPart):
                             oOperaRel = dict(src=opera_src, dst=dst)
                             oReverse = None
                             if bDirectional and len(spectypes) > 1:
+                                oReverse = dict(src=dst, dst=opera_src)
                                 oOperaRel['linktype'] = linktype
                                 oOperaRel['spectype'] = spectypes[0]
                                 oReverse['linktype'] = linktype
