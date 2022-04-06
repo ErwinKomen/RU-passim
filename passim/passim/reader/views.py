@@ -2863,27 +2863,28 @@ class EqualGoldHuwaToJson(BasicPart):
     dtype = "json"       # downloadtype
     prefix_type = "simple"
 
-    # Specify the relationships
+    # Specify the relationships (see issue #526)
     relationships = [
-        {'id': 1, 'linktype': 'neq'},
-        {'id': 2, 'linktype': 'prt'},
-        {'id': 3, 'linktype': 'ech'},
-        {'id': 4, 'linktype': 'neq'},
-        {'id': 5, 'linktype': 'neq'},
-        {'id': 6, 'linktype': 'neq'},
-        {'id': 7, 'linktype': 'neq'},
-        {'id': 8, 'linktype': 'neq'},
-        {'id': 9, 'linktype': 'neq'},
-        {'id': 10, 'linktype': 'neq'},
-        {'id': 11, 'linktype': 'neq'},
-        {'id': 12, 'linktype': 'neq'},
-        {'id': 13, 'linktype': 'neq'},
-        {'id': 14, 'linktype': 'neq'},
-        {'id': 15, 'linktype': 'neq'},
-        {'id': 16, 'linktype': 'neq'},
-        {'id': 17, 'linktype': 'neq'},
-        {'id': 18, 'linktype': 'neq'},
-        {'id': 19, 'linktype': 'neq'},
+        {'rel_id': 0,  'dir': 'no',  'linktypes': ['eqs'],        'spectypes': []},               # Equals
+        {'rel_id': 1,  'dir': 'no',  'linktypes': ['neq'],        'spectypes': []},               # Nearly equals
+        {'rel_id': 2,  'dir': 'no',  'linktypes': ['prt'],        'spectypes': []},               # Partially equals
+        {'rel_id': 3,  'dir': 'no',  'linktypes': ['ech'],        'spectypes': []},               # echoes
+        {'rel_id': 4,  'dir': 'yes', 'linktypes': [],             'spectypes': ['usd', 'udd']},   # uses/used by (direct)
+        {'rel_id': 5,  'dir': 'yes', 'linktypes': [],             'spectypes': ['usi', 'udi']},   # uses/used by (indirect)
+        {'rel_id': 6,  'dir': 'no',  'linktypes': [],             'spectypes': ['com']},          # common source
+        {'rel_id': 7,  'dir': 'no',  'linktypes': [],             'spectypes': ['uns']},          # unspecified
+        {'rel_id': 8,  'dir': 'yes', 'linktypes': ['rel'],        'spectypes': ['cso', 'cdo']},   # comments on / commented on
+        {'rel_id': 9,  'dir': 'yes', 'linktypes': ['prt'],        'spectypes': ['pto', 'pth']},   # is part of / has as its part
+        {'rel_id': 10, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['cap']},          # capitula
+        {'rel_id': 11, 'dir': 'no',  'linktypes': ['prt'],        'spectypes': ['pto', 'pth']},   # Excerpt (use keyword 'excerpt')
+        {'rel_id': 12, 'dir': 'no',  'linktypes': [],             'spectypes': []},               # additional text follows
+        {'rel_id': 13, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['tki']},          # tabula/key/index
+        {'rel_id': 14, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['pro']},          # prologue
+        {'rel_id': 15, 'dir': 'yes', 'linktypes': ['neq', 'prt'], 'spectypes': ['tro', 'tra']},   # translation of / translated as
+        {'rel_id': 16, 'dir': 'no',  'linktypes': ['ech'],        'spectypes': ['pas']},          # paraphrases
+        {'rel_id': 17, 'dir': 'no',  'linktypes': ['rel'],        'spectypes': ['epi']},          # epilogue
+        {'rel_id': 18, 'dir': 'yes', 'linktypes': ['ech'],        'spectypes': ['pad']},          # paraphrased
+        {'rel_id': 19, 'dir': 'no',  'linktypes': [],             'spectypes': []},               # collection (no HC, but compilations?)
         ]
 
     def custom_init(self):
@@ -2956,7 +2957,7 @@ class EqualGoldHuwaToJson(BasicPart):
             return sBack
 
         # Initialize
-        lData = []
+        oData = {}
         sData = ""
         huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
             'autor', 'autor_opera', 'datum_opera', 'inhalt']
@@ -2974,20 +2975,24 @@ class EqualGoldHuwaToJson(BasicPart):
         count_manu_many_oth = 0 # Number of items linked to many manuscripts - without number in ABK
 
         try:
-            # Read the Huwa to Passim author JSON
+            # (1) Read the Huwa to Passim author JSON
             lst_authors = self.read_authors()
 
-            # Get the author id for 'Undecided'
+            # (2) Read the Huwa inter-opera relations JSON
+            lst_relations = self.read_relations()
+
+            # (3) Get the author id for 'Undecided'
             undecided = Author.objects.filter(name__iexact="undecided").first()
 
-            # Read the HUWA db as tables
+            # (4) Read the HUWA db as tables
             table_info = self.read_huwa()
 
-            # Load the tables that we need
+            # (5) Load the tables that we need
             tables = self.get_tables(table_info, huwa_tables)
 
-            # Walk through the table with AF information
+            # (6) Walk through the table with AF information
             count_opera = len(tables['opera'])
+            lst_opera = []
             for idx, oOpera in enumerate(tables['opera']):
                 opera_id = oOpera['id']
                 # Take over any information that should
@@ -3083,12 +3088,45 @@ class EqualGoldHuwaToJson(BasicPart):
                     oSsg['existing_ssg'] = existing_ssg
 
                 # Add this to the list of SSGs
-                lData.append(oSsg)
+                lst_opera.append(oSsg)
 
-            # Convert lData to stringified JSON
+            # (6) Process the inter-opera relations 
+            lst_opera_rel = []
+            oRelationship = {x['rel_id']:x  for x in relationships }
+            for idx, oRel in enumerate(lst_relations):
+                opera_src = oRel.get('opera_src')
+                opera_dst = oRel.get('opera_dst')
+                rel_id = oRel.get('rel_id')
+
+                # Make sure that the destination always is a list
+                opera_dst = [ opera_dst ] if isinstance(opera_dst, int) else opera_dst
+
+                # Get the row of this relation
+                oRel = oRelationship[rel_id]
+                linktypes = oRel.get("linktypes", [])
+                spectypes = oRel.get("spectypes", [])
+                bDirectional = (oRel.get("dir") == "yes")
+
+                # Start creating this opera relation
+                for dst in opera_dst:
+                    oOperaRel = dict(src=opera_src, dst=dst)
+                    oReverse = None
+                    if bDirectional:
+                        pass
+                    else:
+                        oOperaRel['linktype']
+
+
+            # (7) combine the sections into one object
+            oData['operas'] = lst_opera
+            oData['opera_relations'] = lst_opera_rel
+
+
+            
+            # Convert oData to stringified JSON
             if dtype == "json":
                 # convert to string
-                sData = json.dumps(lData, indent=2)
+                sData = json.dumps(oData, indent=2)
 
             elif dtype == "csv" or dtype == "xlsx":
                 # 
@@ -3105,6 +3143,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 csvwriter.writerow(headers)
 
                 # Process all objects in the data
+                lData = oData.get("operas")
                 for oSsg in lData:
                     # Start an output row
                     row = []
@@ -3138,6 +3177,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Show the existing stuff
                 for k,v in existing_dict.items():
                     oErr.Status("Existing {}: {}".format(k,v))
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("HuwaEqualGoldToJson/get_data")
@@ -3191,6 +3231,8 @@ class EqualGoldHuwaToJson(BasicPart):
         return table_info
 
     def read_authors(self):
+        """Load the JSON that specifies the relationship between HUWA and Passim author"""
+
         oErr = ErrHandle()
         lst_authors = []
         try:
@@ -3202,6 +3244,21 @@ class EqualGoldHuwaToJson(BasicPart):
             oErr.DoError("HuwaEqualGoldToJson/read_authors")
         # Return the table that we found
         return lst_authors
+
+    def read_relations(self):
+        """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+
+        oErr = ErrHandle()
+        lst_relations = []
+        try:
+            relations_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_relations.json"))
+            with open(relations_json, "r", encoding="utf-8") as f:
+                lst_relations = json.load(f)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_relations")
+        # Return the table that we found
+        return lst_relations
 
     def get_passim_author(self, lst_authors, huwa_id, tbl_autor):
         """Return the Passim author ID for [huwa_id]"""
