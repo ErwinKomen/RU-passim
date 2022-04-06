@@ -1881,8 +1881,7 @@ class BasicDetails(DetailView):
                     except:
                         pass
                 context['modelname'] = self.model._meta.object_name
-                context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
-
+       
                 # Make sure we have a url for editing
                 if instance and instance.id:
                     # There is a details and edit url
@@ -1890,7 +1889,10 @@ class BasicDetails(DetailView):
                     context['detailsview'] = reverse("{}_details".format(basic_name), kwargs={'pk': instance.id})
                 # Make sure we have an url for new
                 context['addview'] = reverse("{}_details".format(basic_name))
-
+            
+            # Determine title as shown in the template
+            context['titlesg'] = self.titlesg if self.titlesg else self.title if self.title != "" else basic_name.capitalize()
+            
             # Determine breadcrumbs and previous page
             if self.is_basic:
                 title = self.title if self.title != "" else basic_name

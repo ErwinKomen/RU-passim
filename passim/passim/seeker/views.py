@@ -8997,14 +8997,14 @@ class CommentEdit(BasicDetails):
                 {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
                 {'type': 'plain', 'label': "Comment:",      'value': instance.content,     },
                 {'type': 'plain', 'label': "Item type:",    'value': instance.get_otype()},
-                {'type': 'safe', 'label': "Link:",          'value': self.get_link(instance)}
+                {'type': 'safe',  'label': "Link:",         'value': self.get_link(instance)}
                 ]
 
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CommentEdit/add_to_context")
 
-        # Return the context we have made HERE is the title ok
+        # Return the context we have made 
         return context
 
     def get_link(self, instance):
