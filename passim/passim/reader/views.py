@@ -3114,14 +3114,16 @@ class EqualGoldHuwaToJson(BasicPart):
                 bDirectional = (oRel.get("dir") == "yes")
 
                 # If this relation does *NOT* contain a linktype, then we cannot process it!!!
-                if len(linktypes) > 0 and len(spectypes) > 0:
+                if len(linktypes) > 0:
 
                     # Start creating this opera relation
                     for dst in opera_dst:
                         for linktype in linktypes:
                             oOperaRel = dict(src=opera_src, dst=dst)
                             oReverse = None
-                            if bDirectional and len(spectypes) > 1:
+                            if len(spectypes) == 0:
+                                oOperaRel['linktype'] = linktype
+                            elif bDirectional and len(spectypes) > 1:
                                 oReverse = dict(src=dst, dst=opera_src)
                                 oOperaRel['linktype'] = linktype
                                 oOperaRel['spectype'] = spectypes[0]
