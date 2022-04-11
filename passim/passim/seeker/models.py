@@ -69,16 +69,22 @@ RIGHTS_TYPE = "seeker.rights"
 PROJ_DEFAULT = "seeker.prjdeftype"
 VISIBILITY_TYPE = "seeker.visibility"
 
+# All the linktypes that are actually used
 LINK_EQUAL = 'eqs'
 LINK_PARTIAL = 'prt'
 LINK_NEAR = 'neq'
 LINK_ECHO = 'ech'
 LINK_SIM = "sim"
 LINK_UNSPECIFIED = "uns"
+LINK_REL = 'rel'
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
-LINK_SPEC_A = ['usd', 'usi', 'com', 'uns', 'udd', 'udi']
-LINK_SPEC_B = ['udd', 'udi', 'com', 'uns', 'usd', 'usi']
+
+# All spec types with their possible bi-directional partners
+LINK_SPEC_A = ['usd', 'usi', 'udd', 'udi', 'cso', 'cdo', 'pto', 'pth', 'tro', 'tra',
+               'cap', 'com', 'uns', 'tki', 'pro', 'pas', 'epi', 'pad']
+LINK_SPEC_B = ['udd', 'udi', 'usd', 'usi', 'cdo', 'cso', 'pth', 'pto', 'tra', 'tro',
+               'cap', 'com', 'uns', 'tki', 'pro', 'pas', 'epi', 'pad']
 
 # Author certainty levels
 CERTAIN_LOWEST = 'vun'  # very uncertain

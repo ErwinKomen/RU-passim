@@ -7108,7 +7108,7 @@ class CollAnyEdit(BasicDetails):
             if self.manu == None:
                 context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
         # Historical collections may have literature references
-        if instance.settype == "hc":
+        if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
             oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
             if context['is_app_editor']:
                 oLitref['multiple'] = True
