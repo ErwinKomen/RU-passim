@@ -4504,8 +4504,8 @@ class SermonEdit(BasicDetails):
         topleftlist = []
         if instance.get_manuscript():
             manu = instance.get_manuscript()
-            buttonspecs = {'label': "M", 
-                 'title': "Go to manuscript {}".format(manu.idno), 
+            buttonspecs = {'label': "Manuscript", 
+                 'title': "Return to manuscript {}".format(manu.idno), 
                  'url': reverse('manuscript_details', kwargs={'pk': manu.id})}
             topleftlist.append(buttonspecs)
             lcity = "" if manu.lcity == None else "{}, ".format(manu.lcity.name)
@@ -4990,7 +4990,7 @@ class SermonListView(BasicList):
     basic_name = "sermon"
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'sectiontitle', 'title', '','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
@@ -4998,10 +4998,10 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Title',       'order': 'o=5', 'type': 'str', 'custom': 'title', 
-         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},
-        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Section',     'order': 'o=5', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
+        {'name': 'Title',       'order': 'o=6', 'type': 'str', 'custom': 'title', 
+         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
         {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
@@ -5010,9 +5010,9 @@ class SermonListView(BasicList):
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
-                {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
-                {"name": "Title",            "id": "filter_title",          "enabled": False},
+                {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
                 {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
+                {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
