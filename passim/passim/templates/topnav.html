@@ -26,12 +26,12 @@
                           <!-- Used to be 'search_sermon' -->
                           <li><a href="{% url 'sermon_list' %}"  title="List and search manifestations">Manifestations</a></li>
                           <li><a href="{% url 'search_manuscript' %}"  title="List and search manuscripts">Manuscripts</a></li>
-                          <li><a href="{% url 'equalgold_list' %}"  title="List and search Authority files">Authority files</a></li>
-                          <li><a href="{% url 'collhist_list' %}" title="List and search historical collections">Historical collections</a></li>
+                          <li><a href="{% url 'equalgold_list' %}"  title="List and search Authority Files">Authority Files</a></li>
+                          <li><a href="{% url 'collhist_list' %}" title="List and search historical collections">Historical Collections</a></li>
                           <li role="separator" class="divider"></li>
                           <li><a href="{% url 'keyword_list' %}" title="List of keywords">Keywords</a></li>
                           <li><a href="{% url 'feast_list' %}" title="List of feasts">Feasts</a></li>
-                          <li><a href="{% url 'bibrange_list' %}" title="List of Bible references">Bible references</a></li>                          
+                          <li><a href="{% url 'bibrange_list' %}" title="List of Bible references">Bible References</a></li>                          
                         </ul>
                       </li>
                       
@@ -45,9 +45,9 @@
                           <li><a href="{% url 'collpriv_list' %}" title="List of datasets">Datasets</a></li>                         
                           {% if is_app_editor %}                            
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'userkeyword_list' %}" title="User keywords">User Keywords</a></li> 
-                            <li><a href="{% url 'comment_list' %}" title="User comments">User Comments</a></li> 
-                            <li><a href="{% url 'onlinesources_list' %}" title="Online sources">Onlines sources</a></li> 
+                            <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li> 
+                            <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li> 
+                            <li><a href="{% url 'onlinesources_list' %}" title="Online Sources">Onlines Sources</a></li> 
                           {% endif %}
                           {% if is_app_uploader %}
                             <li role="separator" class="divider"></li>
@@ -69,7 +69,7 @@
                           <li><a href="{% url 'collsuper_list' %}" title="Collections of Super Sermon Gold">Collections of Super Sermon Gold</a></li>
                            -->                                                                                                        
                            <li><a href="{% url 'author_search' %}" title="List of authors">Author</a></li>
-                           <li><a href="{% url 'search_gold' %}" title="List and search Gold Sermons">Gold sermon</a></li>
+                           <li><a href="{% url 'search_gold' %}" title="List and search Gold Sermons">Gold Sermon</a></li>
                            <li><a href="{% url 'library_search' %}" title="List of libraries">Repository</a></li> 
                           {% if is_app_editor %}
                            <li role="separator" class="divider"></li> 
@@ -86,11 +86,11 @@
                           {% endif %}                          
                           {% if is_app_moderator %}
                             <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'profile_list' %}" title="User profiles">User profiles</a></li>
+                            <li><a href="{% url 'profile_list' %}" title="User Profiles">User Profiles</a></li>
                           {% endif %}
                           {% if user.is_superuser %}
-                            <li><a href="{% url 'equalchangeall_list' %}" title="SSG Field changes">Field changes</a></li> 
-                            <li><a href="{% url 'equalapprovalall_list' %}" title="SSG Field change approvals">Field approvals</a></li> 
+                            <li><a href="{% url 'equalchangeall_list' %}" title="SSG Field changes">Field Changes</a></li> 
+                            <li><a href="{% url 'equalapprovalall_list' %}" title="SSG Field change approvals">Field Approvals</a></li> 
                           {% endif %}
                           {% if 0 and user.is_superuser %}
                             <li><a href="{% url 'testunit_list' %}">Enrich: test units</a></li>

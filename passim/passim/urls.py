@@ -171,7 +171,7 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
         
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
-    url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'), # Can be deleted, merged with the one above   
+    url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),  
     url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
     url(r'^collection/any/list', CollectionListView.as_view(prefix="any"), name='collany_list'),
     url(r'^collection/sermo/list', CollectionListView.as_view(prefix="sermo"), name='collsermo_list'),
@@ -180,7 +180,7 @@ urlpatterns = [
     url(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
 
     url(r'^dataset/private/details(?:/(?P<pk>\d+))?/$', CollPrivDetails.as_view(), name='collpriv_details'),
-    url(r'^dataset/public/details(?:/(?P<pk>\d+))?/$', CollPublDetails.as_view(), name='collpubl_details'),
+    url(r'^dataset/public/details(?:/(?P<pk>\d+))?/$', CollPublDetails.as_view(), name='collpubl_details'), 
     url(r'^collection/hist/details(?:/(?P<pk>\d+))?/$', CollHistDetails.as_view(), name='collhist_details'),
     url(r'^collection/any/details(?:/(?P<pk>\d+))?/$', CollAnyDetails.as_view(), name='collany_details'),
     url(r'^collection/sermo/details(?:/(?P<pk>\d+))?/$', CollSermoDetails.as_view(), name='collsermo_details'),
@@ -189,7 +189,7 @@ urlpatterns = [
     url(r'^collection/super/details(?:/(?P<pk>\d+))?/$', CollSuperDetails.as_view(), name='collsuper_details'),
 
     url(r'^dataset/private/edit(?:/(?P<pk>\d+))?/$', CollPrivEdit.as_view(), name='collpriv_edit'),
-    url(r'^dataset/public/edit(?:/(?P<pk>\d+))?/$', CollPublEdit.as_view(), name='collpubl_edit'),
+    url(r'^dataset/public/edit(?:/(?P<pk>\d+))?/$', CollPublEdit.as_view(), name='collpubl_edit'), 
     url(r'^collection/hist/edit(?:/(?P<pk>\d+))?/$', CollHistEdit.as_view(), name='collhist_edit'),
     url(r'^collection/any/edit(?:/(?P<pk>\d+))?/$', CollAnyEdit.as_view(), name='collany_edit'),
     url(r'^collection/sermo/edit(?:/(?P<pk>\d+))?/$', CollSermoEdit.as_view(), name='collsermo_edit'),

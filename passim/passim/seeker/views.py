@@ -4088,6 +4088,8 @@ class LocationListView(BasicList):
     listform = LocationForm
     paginate_by = 15
     prefix = "loc"
+    sg_name = "Location"     
+    plural_name = "Locations"
     has_select2 = True
     order_cols = ['name', 'loctype__name', '', '']
     order_default = order_cols
@@ -4131,7 +4133,7 @@ class LocationEdit(BasicDetails):
     model = Location
     mForm = LocationForm
     prefix = "loc"
-    title = "Location details"
+    title = "Location"
     history_button = True
     mainitems = []
 
@@ -4190,6 +4192,8 @@ class OriginListView(BasicList):
     model = Origin
     listform = OriginForm
     prefix = "prj"
+    sg_name = "Origin"     
+    plural_name = "Origins"
     has_select2 = True
     paginate_by = 15
     page_function = "ru.passim.seeker.search_paged_start"
@@ -4323,7 +4327,7 @@ class SermonEdit(BasicDetails):
     model = SermonDescr
     mForm = SermonForm
     prefix = "sermo"
-    title = "Sermon" 
+    title = "Manifestation" 
     rtype = "json"
     mainitems = []
     basic_name = "sermon"
@@ -4982,7 +4986,7 @@ class SermonListView(BasicList):
     prefix = "sermo"
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
-    plural_name = "Sermons"
+    plural_name = "Manifestations"
     basic_name = "sermon"
     template_help = "seeker/filter_help.html"
 
@@ -5645,6 +5649,8 @@ class UserKeywordListView(BasicList):
     model = UserKeyword
     listform = UserKeywordForm
     prefix = "ukw"
+    sg_name = "User Keyword"     
+    plural_name = "User Keywords"
     paginate_by = 20
     has_select2 = True
     in_team = False
@@ -6573,6 +6579,8 @@ class TemplateListView(BasicList):
     model = Template
     listform = TemplateForm
     prefix = "tmpl"
+    sg_name = "Template"     
+    plural_name = "Templates"
     has_select2 = True
     new_button = False  # Templates are added in the Manuscript view; each template belongs to one manuscript
     use_team_group = True
@@ -6677,6 +6685,8 @@ class ProfileListView(BasicList):
     model = Profile
     listform = ProfileForm
     prefix = "prof"
+    sg_name = "Profile"     
+    plural_name = "Profiles"
     new_button = False      # Do not allow adding new ones here
     order_cols = ['user__username', '', 'ptype', 'affiliation', '', '']
     order_default = order_cols
@@ -6848,7 +6858,7 @@ class ProjectListView(BasicList):
     prefix = "proj"
     has_select2 = True
     paginate_by = 20
-    sg_name = "Project"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
+    sg_name = "Project"     
     plural_name = "Projects"
     # page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['name', '']
@@ -7000,7 +7010,7 @@ class CollAnyEdit(BasicDetails):
                             this_type = ""
                             if instance.settype == "hc": this_type = "hist"
                             elif instance.scope == "priv": this_type = "priv"
-                            else: this_type = "publ"
+                            else: this_type = "publ" 
                             self.redirectpage = reverse('coll{}_details'.format(this_type), kwargs={'pk': instance.id})
                         else:
                             self.redirectpage = self.redirectpage.replace(original.id, instance.id)
@@ -7381,7 +7391,7 @@ class CollHistEdit(CollAnyEdit):
     prefix = "super"
     settype = "hc"
     basic_name = "collhist"
-    title = "Historical collection"
+    title = "Historical Collection"
 
     def before_save(self, form, instance):
         # Make sure the [CollAnyEdit] is executed
@@ -7468,32 +7478,46 @@ class CollAnyDetails(CollAnyEdit):
 
 class CollPrivDetails(CollAnyEdit):
     """Like CollPrivEdit, but then with html"""
-
+    
     prefix = "priv"
     basic_name = "collpriv"
-    title = "My Dataset"
+    title = ""
     rtype = "html"
     custombuttons = []
 
     def custom_init(self, instance):
         if instance != None:
-            # Check if someone acts as if this is a public dataset, whil it is not
-            if instance.settype == "pd":
-                # Determine what kind of dataset/collection this is
-                if instance.owner != Profile.get_user_profile(self.request.user.username):
-                    # It is a public dataset after all!
-                    self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
-            elif instance.settype == "hc":
+            # Check if someone acts as if this is a public dataset, while it is not
+            #if instance.settype == "pd":
+            #    # Determine what kind of dataset/collection this is          
+            #    if instance.scope == "publ":
+            #        self.title = "Public Dataset"
+            #        if instance.owner != Profile.get_user_profile(self.request.user.username):
+            #           # It is a public dataset after all! er is geen owner
+            #           self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id}) # priv ipv publ
+            if instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
 
             if instance.type == "super":
                 self.custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
-
+            
+            # Give the title correct name using the scope of each collection:
+            # For public datasets:
+            if instance.scope == "publ":
+                self.title = "Public Dataset"
+            # For team datasets:
+            elif instance.scope == "team":
+                self.title = "Team Dataset"
+            # For private datasets:
+            else:
+                self.title = "Private Dataset"
+            
             # Check for hlist saving
             self.check_hlist(instance)
         return None
+
 
     def add_to_context(self, context, instance):
         # Perform the standard initializations:
@@ -7818,7 +7842,7 @@ class CollPublDetails(CollPrivDetails):
 
     def custom_init(self, instance):
         if instance != None:
-            # Check if someone acts as if this is a public dataset, whil it is not
+            # Check if someone acts as if this is a public dataset, while it is not
             if instance.settype == "pd":
                 # Determine what kind of dataset/collection this is
                 if instance.owner == Profile.get_user_profile(self.request.user.username):
@@ -8571,8 +8595,8 @@ class CollectionListView(BasicList):
         elif self.prefix == "hist":
             self.new_button = False
             self.settype = "hc"
-            self.plural_name = "Historical collections"
-            self.sg_name = "Historical collection"  
+            self.plural_name = "Historical Collections"
+            self.sg_name = "Historical Collection"  
             self.order_cols = ['name', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
@@ -8953,9 +8977,10 @@ class CommentSend(BasicPart):
 class CommentEdit(BasicDetails):
     """The details of one comment"""
 
-    model = Comment
+    model = Comment        
     mForm = None        # We are not using a form here!
     prefix = 'com'
+    title = "UserCommentEdit"
     new_button = False
     # no_delete = True
     permission = "readonly"
@@ -8972,14 +8997,14 @@ class CommentEdit(BasicDetails):
                 {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
                 {'type': 'plain', 'label': "Comment:",      'value': instance.content,     },
                 {'type': 'plain', 'label': "Item type:",    'value': instance.get_otype()},
-                {'type': 'safe', 'label': "Link:",          'value': self.get_link(instance)}
+                {'type': 'safe',  'label': "Link:",         'value': self.get_link(instance)}
                 ]
 
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CommentEdit/add_to_context")
 
-        # Return the context we have made
+        # Return the context we have made 
         return context
 
     def get_link(self, instance):
@@ -9019,6 +9044,8 @@ class CommentListView(BasicList):
     model = Comment
     listform = CommentForm
     prefix = "com"
+    sg_name = "User Comment"     
+    plural_name = "User Comments"
     paginate_by = 20
     has_select2 = True
     order_cols = ['created', 'profile__user__username', 'otype', '']
@@ -12601,8 +12628,8 @@ class EqualGoldListView(BasicList):
     template_help = "seeker/filter_help.html"
     prefix = "ssg"
     bUseFilter = True  
-    plural_name = "Authority files"
-    sg_name = "Authority file"
+    plural_name = "Authority Files"
+    sg_name = "Authority File"
     order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
     order_default= order_cols
     order_heads = [
