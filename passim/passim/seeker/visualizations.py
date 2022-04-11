@@ -233,7 +233,7 @@ class EqualGoldOverlap(BasicPart):
                                    max_value=max_value,
                                    max_group=max_group,
                                    networkslider=networkslider,
-                                   legend="SSG overlap network")
+                                   legend="AF overlap network")
             
         except:
             msg = oErr.get_error_message()
@@ -416,7 +416,7 @@ class EqualGoldTrans(BasicPart):
                                    author_list=author_list,
                                    max_value=max_value,
                                    networkslider=networkslider,
-                                   legend="SSG network")
+                                   legend="AF network")
             
             # Can remove the lock
             ssg_corpus.status = "ready"
@@ -661,7 +661,7 @@ class EqualGoldGraph(BasicPart):
                                    watermark=get_watermark(),
                                    max_value=max_value,
                                    networkslider=networkslider,
-                                   legend="SSG network")
+                                   legend="AF network")
             
             # Can remove the lock
             ssg_corpus.status = "ready"
@@ -908,7 +908,7 @@ class EqualGoldPca(BasicPart):
                                    link_list=link_list,
                                    watermark=get_watermark(),
                                    max_value=max_value,
-                                   legend="SSG network")
+                                   legend="AF network")
             
             # Can remove the lock
             ssg_corpus.status = "ready"
