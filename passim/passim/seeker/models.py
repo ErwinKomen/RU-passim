@@ -7758,10 +7758,18 @@ class Collection(models.Model):
         return sBack
         
     def get_created(self):
-        """REturn the creation date in a readable form"""
+        """Rturn the creation date in a readable form"""
 
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
+
+    def get_created2(self):
+        """Rturn the creation date in a readable form"""
+        # owner
+        #owner = self.owner_id # opzoeken
+        sDate = self.created.strftime("%d/%b/%Y %H:%M")
+        return sDate
+
 
     def get_copy(self, owner=None):
         """Create a copy of myself and return it"""

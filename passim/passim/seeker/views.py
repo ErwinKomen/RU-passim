@@ -7099,7 +7099,7 @@ class CollAnyEdit(BasicDetails):
             size_value = instance.get_size_markdown()
         
         # Always add Created and Size
-        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
+        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created2})
         context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': size_value})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
@@ -9049,7 +9049,7 @@ class CommentListView(BasicList):
     paginate_by = 20
     has_select2 = True
     order_cols = ['created', 'profile__user__username', 'otype', '']
-    order_default = order_cols
+    order_default = ['-created', 'profile__user__username', 'otype']
     order_heads = [
         {'name': 'Timestamp',   'order': 'o=1', 'type': 'str', 'custom': 'created', 'main': True, 'linkdetails': True},
         {'name': 'User name',   'order': 'o=2', 'type': 'str', 'custom': 'username'},
