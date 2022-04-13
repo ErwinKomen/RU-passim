@@ -206,7 +206,7 @@ def mypassim(request):
 
         # Specify the template
         template_name = 'mypassim.html'
-        context =  {'title':'My Passim',
+        context =  {'title':'My PASSIM',
                     'year':get_current_datetime().year,
                     'pfx': APP_PREFIX,
                     'site_url': admin.site.site_url}
@@ -264,7 +264,7 @@ def mypassim(request):
         # How many do I need to approve?
 
         # Process this visit
-        context['breadcrumbs'] = get_breadcrumbs(request, "My Passim", True)
+        context['breadcrumbs'] = get_breadcrumbs(request, "My PASSIM", True)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("mypassim")
