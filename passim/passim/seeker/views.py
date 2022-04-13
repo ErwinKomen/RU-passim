@@ -4519,7 +4519,7 @@ class SermonEdit(BasicDetails):
         # Changed in issue #241: show the PASSIM code
         context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
-        title_right = ["<span class='manuscript-idno' title='Manuscript'>{}</span>".format(
+        title_right = ["<span class='manuscript-manifes' title='Manuscript'>{}</span>".format(
             idno)]
         #    ... as well as the *title* of the Codico to which I belong
         codico = instance.msitem.codico
@@ -4527,7 +4527,7 @@ class SermonEdit(BasicDetails):
         # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
         # Issue #422: change the text of the [codi_title]
         codi_title = "cod. unit. {}".format(codico.order)
-        title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
+        title_right.append("&nbsp;<span class='codico-title-manifes' title='Codicologial unit'>{}</span>".format(codi_title))
         context['title_right'] = "".join(title_right)
 
         # Signal that we have select2
@@ -5536,7 +5536,7 @@ class KeywordListView(BasicList):
             if number > 0:
                 url = reverse('equalgold_list')
                 html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-4 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+                html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
         elif custom == "visibility":

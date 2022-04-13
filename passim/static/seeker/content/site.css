@@ -1143,11 +1143,25 @@ table.compact-table td:hover {
     font-size: 9pt;
     padding: 0px 4px;
 }
-.manuscript-idno:hover {
+
+ .manuscript-idno:hover {
     color: whitesmoke;
-    background-color: darkblue;
+    background-color: green;
     cursor: pointer;
+    }
+
+.manuscript-manifes {
+    color: darkblue;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 9pt;
+    padding: 0px 4px;
 }
+
+
+
 
 .codico-title {
     color: darkred;
@@ -1164,8 +1178,18 @@ table.compact-table td:hover {
     cursor: pointer;
 }
 
+.codico-title-manifes {
+    color: darkred;
+    font-family: monospace;
+    background-color: lightgray;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 9pt;
+    padding: 0px 4px;
+}
+
 .manuscript-city, .manuscript-library {
-  min-width: 92px;
+    min-width: 92px;
 }
 
 .passimlink {
