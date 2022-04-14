@@ -3067,8 +3067,6 @@ class Litref(models.Model):
             sBack = self.short
         else:
             return adapt_markdown(self.short, lowercase=False)
-            #print(self.short)
-            #return self.short
 
 
 class Project2(models.Model):
@@ -10945,6 +10943,7 @@ class CollOverlap(models.Model):
         response = super(CollOverlap, self).save(force_insert, force_update, using, update_fields)
         return response
 
+
 class OnlineSources(models.Model):
     """The table where the online sources used in PASSIM are stored"""
     # [1] Name of the online source
@@ -10966,3 +10965,5 @@ class OnlineSources(models.Model):
             # Give the URL the same look as is done in other places
             sBack = "<span class='collection'><a href='{}'>{}</a></span>".format(self.url, self.url)
         return sBack
+
+
