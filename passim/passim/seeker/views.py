@@ -4504,8 +4504,8 @@ class SermonEdit(BasicDetails):
         topleftlist = []
         if instance.get_manuscript():
             manu = instance.get_manuscript()
-            buttonspecs = {'label': "M", 
-                 'title': "Go to manuscript {}".format(manu.idno), 
+            buttonspecs = {'label': "Manuscript", 
+                 'title': "Return to manuscript {}".format(manu.idno), 
                  'url': reverse('manuscript_details', kwargs={'pk': manu.id})}
             topleftlist.append(buttonspecs)
             lcity = "" if manu.lcity == None else "{}, ".format(manu.lcity.name)
@@ -4519,7 +4519,7 @@ class SermonEdit(BasicDetails):
         # Changed in issue #241: show the PASSIM code
         context['title_addition'] = instance.get_passimcode_markdown()
         # Add the manuscript's IDNO completely right
-        title_right = ["<span class='manuscript-idno' title='Manuscript'>{}</span>".format(
+        title_right = ["<span class='manuscript-manifes' title='Manuscript'>{}</span>".format(
             idno)]
         #    ... as well as the *title* of the Codico to which I belong
         codico = instance.msitem.codico
@@ -4527,7 +4527,7 @@ class SermonEdit(BasicDetails):
         # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
         # Issue #422: change the text of the [codi_title]
         codi_title = "cod. unit. {}".format(codico.order)
-        title_right.append("&nbsp;<span class='codico-title' title='Codicologial unit'>{}</span>".format(codi_title))
+        title_right.append("&nbsp;<span class='codico-title-manifes' title='Codicologial unit'>{}</span>".format(codi_title))
         context['title_right'] = "".join(title_right)
 
         # Signal that we have select2
@@ -4990,7 +4990,7 @@ class SermonListView(BasicList):
     basic_name = "sermon"
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'title', 'sectiontitle', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'sectiontitle', 'title', '','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
@@ -4998,10 +4998,10 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Title',       'order': 'o=5', 'type': 'str', 'custom': 'title', 
-         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},
-        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Section',     'order': 'o=5', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
+        {'name': 'Title',       'order': 'o=6', 'type': 'str', 'custom': 'title', 
+         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
         {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
@@ -5010,9 +5010,9 @@ class SermonListView(BasicList):
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
-                {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},
-                {"name": "Title",            "id": "filter_title",          "enabled": False},
+                {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
                 {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
+                {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
@@ -5536,7 +5536,7 @@ class KeywordListView(BasicList):
             if number > 0:
                 url = reverse('equalgold_list')
                 html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-4 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+                html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
         elif custom == "visibility":
@@ -7099,7 +7099,7 @@ class CollAnyEdit(BasicDetails):
             size_value = instance.get_size_markdown()
         
         # Always add Created and Size
-        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created})
+        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created2})
         context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': size_value})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
@@ -9049,7 +9049,7 @@ class CommentListView(BasicList):
     paginate_by = 20
     has_select2 = True
     order_cols = ['created', 'profile__user__username', 'otype', '']
-    order_default = order_cols
+    order_default = ['-created', 'profile__user__username', 'otype']
     order_heads = [
         {'name': 'Timestamp',   'order': 'o=1', 'type': 'str', 'custom': 'created', 'main': True, 'linkdetails': True},
         {'name': 'User name',   'order': 'o=2', 'type': 'str', 'custom': 'username'},
