@@ -6583,19 +6583,23 @@ class EqualGold(models.Model):
         oErr = ErrHandle()
         try:
             for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-                lHtml.append("<tr class='view-row'>")
+                # Initializations
                 sSpectype = ""
                 sAlternatives = ""
+                sTitle = ""
+                sNoteShow = ""
+                sNoteDiv = ""
+
+                # Get the URL for this particular link
+                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
+                lHtml.append("<tr class='view-row'>")
                 if superlink.spectype != None and len(superlink.spectype) > 1:
                     # Show the specification type
                     sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
                 if superlink.alternatives != None and superlink.alternatives == "true":
                     sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
-                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}</td>".format(
-                    superlink.get_linktype_display(), sSpectype))
-                sTitle = ""
-                sNoteShow = ""
-                sNoteDiv = ""
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span>{}</td>".format(
+                    link_url, superlink.get_linktype_display(), sSpectype))
                 if superlink.note != None and len(superlink.note) > 1:
                     sTitle = "title='{}'".format(superlink.note)
                     sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
@@ -6639,20 +6643,27 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_view(self):
+    def get_view(self, bShort = False):
         """Get a HTML valid view of myself"""
 
         lHtml = []
         # Add the PASSIM code
-        code = self.code if self.code else "(no Passim code)"
-        lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+        if bShort:
+            lHtml.append(self.get_passimcode_markdown())
+        else:
+            code = self.code if self.code else "(no Passim code)"
+            lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
         qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
-            for item in qs:
-                lSign.append(item.short())
+            if bShort:
+                lSign.append(qs.first().short())
+            else:
+                for item in qs:
+                    lSign.append(item.short())
             lHtml.append("<span class='signature'>{}</span>".format(" | ".join(lSign)))
         else:
             lHtml.append("[-]")
@@ -6661,12 +6672,15 @@ class EqualGold(models.Model):
             lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
         else:
             lHtml.append("(by <i>Unknown Author</i>) ")
-        # Treat incipit
-        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
-        # Treat intermediate dots
-        if self.incipit and self.explicit: lHtml.append("...-...")
-        # Treat explicit
-        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+
+        if not bShort:
+            # Treat incipit
+            if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+            # Treat intermediate dots
+            if self.incipit and self.explicit: lHtml.append("...-...")
+            # Treat explicit
+            if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+
         # Return the results
         return "".join(lHtml)
 
@@ -7562,8 +7576,22 @@ class EqualGoldLink(models.Model):
             obj.set_ssgcount()
         return response
 
+    def get_alternatives(self):
+        sBack = ""
+        if self.alternatives == "yes":
+            sBack = "yes"
+        else:
+            sBack = "no"
+        return sBack
+
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 

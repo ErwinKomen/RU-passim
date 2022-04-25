@@ -3016,7 +3016,7 @@ class EqualGoldLinkForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGoldLink
-        fields = ['src', 'linktype', 'dst' ]
+        fields = ['src', 'linktype', 'dst', 'spectype', 'alternatives', 'note' ]
         widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -3027,19 +3027,25 @@ class EqualGoldLinkForm(forms.ModelForm):
             super_id = kwargs.pop("super_id", "")
             # Start by executing the standard handling
             super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['spectype'].required = False
+            self.fields['alternatives'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newspectype'].required = False
+            self.fields['newalt'].required = False
+            self.fields['newsuper'].required = False
+
             # Initialize choices for linktype
             init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
             init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
             init_choices(self, 'newspectype', SPEC_TYPE, bUseAbbr=True, maybe_empty=True, use_helptext=False)
             init_choices(self, 'alternatives', YESNO_TYPE, bUseAbbr=True,maybe_empty=True, use_helptext=False)
-            # Make sure to set required and optional fields
-            self.fields['linktype'].required = False
-            self.fields['newlinktype'].required = False
-            self.fields['newspectype'].required = False
-            self.fields['newalt'].required = False
-            self.fields['note'].required = False
-            self.fields['dst'].required = False
-            self.fields['newsuper'].required = False
 
             # For searching/listing
             self.fields['newlinktype'].initial = "prt"
