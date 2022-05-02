@@ -165,6 +165,10 @@ urlpatterns = [
     url(r'^ssg/ufield/approval/list', EqualApprovalUlist.as_view(), name='equalapprovaluser_list'),
     url(r'^ssg/ufield/approval/details(?:/(?P<pk>\d+))?/$', EqualApprovalUserDetails.as_view(), name='equalapprovaluser_details'),
     url(r'^ssg/ufield/approval/edit(?:/(?P<pk>\d+))?/$', EqualApprovalUserEdit.as_view(), name='equalapprovaluser_edit'),
+
+    url(r'^ssglink/list', EqualGoldLinkListView.as_view(), name='equalgoldlink_list'),
+    url(r'^ssglink/details(?:/(?P<pk>\d+))?/$', EqualGoldLinkDetails.as_view(), name='equalgoldlink_details'),
+    url(r'^ssglink/edit(?:/(?P<pk>\d+))?/$', EqualGoldLinkEdit.as_view(), name='equalgoldlink_edit'),
     
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),

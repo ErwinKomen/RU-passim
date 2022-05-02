@@ -11706,6 +11706,8 @@ class SermonGoldDetails(SermonGoldEdit):
         return True, ""
 
 
+# ================= EQUALGOLD =============================
+
 class EqualGoldEdit(BasicDetails):
     model = EqualGold
     mForm = SuperSermonGoldForm
@@ -13017,6 +13019,107 @@ class EqualGoldOverlapDownload(EqualGoldVisDownload):
     vistype = "overlap"
 
 
+# ================= EQUALGOLDLINK ======================
+
+class EqualGoldLinkEdit(BasicDetails):
+    model = EqualGoldLink
+    mForm = EqualGoldLinkForm
+    prefix = 'ssglink'
+    title = "Authority file link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this SSG is
+            self.listview = reverse('equalgold_details', kwargs={'pk': src.id})
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Source AF:",    'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target AF:",    'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",    'value': instance.get_linktype_display(),       'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Spec type:",    'value': instance.get_spectype_display(),       'field_key': 'spectype'},
+            {'type': 'plain', 'label': "Alternatives:", "value": instance.get_alternatives(),           'field_key': 'alternatives'},
+            {'type': 'plain', 'label': "Note:",         "value": instance.get_note(),                   'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class EqualGoldLinkDetails(EqualGoldLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class EqualGoldLinkListView(BasicList):
+    """List super sermon gold instances"""
+
+    model = EqualGoldLink
+    listform = EqualGoldLinkForm
+    has_select2 = True  # Check
+    template_help = "seeker/filter_help.html"
+    prefix = "ssglink"
+    bUseFilter = True  
+    plural_name = "Authority File links"
+    sg_name = "Authority File Link"
+    order_cols = ['src__code', 'dst__code', 'linktype', 'spectype', 'alternatives'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        {'name': 'Spec type',       'order': 'o=4', 'type': 'str', 'custom': 'spectype',    'linkdetails': True, 'main': True},        
+        {'name': 'Alternatives',    'order': 'o=5', 'type': 'str', 'custom': 'alternatives','linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+        {"name": "Spec type",   "id": "filter_spectype",    "enabled": False}
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'code', 'keyList': 'srclist', 'infield': 'code'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'code', 'keyList': 'dstlist', 'infield': 'code'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            {'filter': 'spectype',    'dbfield': 'spectype',    'keyList': 'spectypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+        elif custom == "spectype":
+            sBack = instance.get_spectype_display()
+        elif custom == "alternatives":
+            sBack = instance.get_alternatives_display()
+
+        return sBack, sTitle
+
+
+# ================= AUTHOR =============================
+
 class AuthorEdit(BasicDetails):
     """The details of one author"""
 
@@ -13101,6 +13204,73 @@ class AuthorListView(BasicList):
             sBack = "\n".join(html)
         return sBack, sTitle
 
+
+class AuthorListDownload(BasicPart):
+    MainModel = Author
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
+        #context['search_name'] = self.basket.research.name
+        return context
+
+    def get_queryset(self, prefix):
+
+        # Get parameters
+        name = self.qd.get("name", "")
+
+        # Construct the QS
+        lstQ = []
+        if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+        qs = Author.objects.filter(*lstQ).order_by('name')
+
+        return qs
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = {"id": author.id, "name": author.name}
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['id', 'name']
+            csvwriter.writerow(headers)
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = [author.id, author.name]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+# ================= LIBRARY =============================
 
 class LibraryListView(BasicList):
     """Listview of libraries in countries/cities"""
@@ -13402,70 +13572,7 @@ class LibraryDetails(LibraryEdit):
         return context
 
 
-class AuthorListDownload(BasicPart):
-    MainModel = Author
-    template_name = "seeker/download_status.html"
-    action = "download"
-    dtype = "csv"       # downloadtype
-
-    def custom_init(self):
-        """Calculate stuff"""
-        
-        dt = self.qd.get('downloadtype', "")
-        if dt != None and dt != '':
-            self.dtype = dt
-
-    def add_to_context(self, context):
-        # Provide search URL and search name
-        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
-        #context['search_name'] = self.basket.research.name
-        return context
-
-    def get_queryset(self, prefix):
-
-        # Get parameters
-        name = self.qd.get("name", "")
-
-        # Construct the QS
-        lstQ = []
-        if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
-        qs = Author.objects.filter(*lstQ).order_by('name')
-
-        return qs
-
-    def get_data(self, prefix, dtype, response=None):
-        """Gather the data as CSV, including a header line and comma-separated"""
-
-        # Initialize
-        lData = []
-        sData = ""
-
-        if dtype == "json":
-            # Loop
-            for author in self.get_queryset(prefix):
-                row = {"id": author.id, "name": author.name}
-                lData.append(row)
-            # convert to string
-            sData = json.dumps(lData)
-        else:
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['id', 'name']
-            csvwriter.writerow(headers)
-            # Loop
-            for author in self.get_queryset(prefix):
-                row = [author.id, author.name]
-                csvwriter.writerow(row)
-
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
-
-        return sData
-
+# ================= REPORT =============================
 
 class ReportListView(BasicList):
     """Listview of reports"""
@@ -13643,6 +13750,8 @@ class ReportDownload(BasicPart):
         return sData
 
 
+# ================= SOURCE =============================
+
 class SourceListView(BasicList):
     """Listview of sources"""
 
@@ -13792,6 +13901,8 @@ class SourceDetails(SourceEdit):
 
     rtype = "html"
 
+
+# =======================================================
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""
