@@ -91,17 +91,20 @@ ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.rich.ru.nl', 't
 
 # Caching
 if USE_REDIS:
-    CACHES = {"default": {
-                "BACKEND": "django_redis.cache.RedisCache",
-                "LOCATION": "redis://127.0.0.1:7779/1",
-                "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
-                },
-                "select2": {
-                "BACKEND": "django_redis.cache.RedisCache",
-                "LOCATION": "redis://127.0.0.1:7779/2",
-                "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
-                }
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": "redis://127.0.0.1:7779/1",
+            "TIMEOUT": None,
+            "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
+            },
+        "select2": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": "redis://127.0.0.1:7779/2",
+            "TIMEOUT": None,
+            "OPTIONS": { "CLIENT_CLASS": "django_redis.client.DefaultClient", }
             }
+        }
     # Set the cache backend to select2
     SELECT2_CACHE_BACKEND = 'select2'
 # TESTING PURPOSES: SELECT2_JS = "basic/scripts/select2.js"
