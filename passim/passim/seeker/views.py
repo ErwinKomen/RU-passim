@@ -8671,8 +8671,9 @@ class CollectionListView(BasicList):
                 {'section': 'other', 'filterlist': [
                     {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type'},
-                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'}
-                    #{'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'scope'}
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    # {'filter': 'scope',  'dbfield': 'scope',  'keyS': 'scope'}
+                    {'filter': 'defscope',  'dbfield': '$dummy', 'keyS': 'defscope'}
                     ]}
                 ]
         elif self.prefix == "publ":
@@ -8897,8 +8898,10 @@ class CollectionListView(BasicList):
                 # When navigating to My Datasets, scope is empty and colscope is None:
                 if fields['scope'] == "":
                     # For the complete overview (private datasets of the user, team and public):
-                    if fields['colscope'] == None:                        
-                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                    if fields['colscope'] == None:
+                        # issue #446: use [defscope] for default setting
+                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
                     # Filtering on scope Public:
                     elif fields['colscope'].abbr == 'publ':           
                         fields['colscope'] = (Q(scope="publ") )
@@ -8922,8 +8925,10 @@ class CollectionListView(BasicList):
                         elif fields['colscope'].abbr == 'team':
                             fields['colscope'] = (Q(scope="team") )
                     # For the complete overview (private datasets of the user, team and public):
-                    elif fields['colscope'] == None:                        
-                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                    elif fields['colscope'] == None:
+                        # issue #446: use [defscope] for default setting
+                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
              
         
         elif self.prefix == "publ":
