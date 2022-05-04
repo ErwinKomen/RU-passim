@@ -1,6 +1,6 @@
 {% load i18n %}
 
-<span class="manusermo sig-auto">
+<span class="manusermo sig-auto hidden">
   <span class="signature">{{sermon.signature_auto_string}}</span>
 </span>
 <span class="manusermo sig-manual hidden">
@@ -9,6 +9,18 @@
   {% elif sermon.goldsignatures.all|length > 0 %}
     <span class="signature ma">{{sermon.signature_string}}</span>
   {% else %}
+    [-]
+  {% endif %}
+</span>
+
+<span class="manusermo sig-all">
+  <span class="signature">{{sermon.signature_auto_string}}</span>
+  {% if sermon.sermonsignatures.all|length > 0 %}
+    <span class="signature ma">{{sermon.signature_string}}</span>
+  {% elif sermon.goldsignatures.all|length > 0 %}
+    <span class="signature ma">{{sermon.signature_string}}</span>
+  {% endif %}
+  {% if sermon.signature_auto_string|length == 0 and sermon.sermonsignatures.all|length == 0 and sermon.goldsignatures.all|length == 0 %}
     [-]
   {% endif %}
 </span>
