@@ -75,7 +75,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
     UserForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
-    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
@@ -86,7 +86,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
-    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
+    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
@@ -4049,14 +4049,31 @@ def get_pie_data():
     combidata = {}
     ptypes = ['sermo', 'super', 'manu']
     try:
+        # Get the values for app, edi, imp, man
+        stype_list = FieldChoice.objects.filter(field="seeker.stype").values('id', 'abbr')
+        oStype = {}
+        for oItem in stype_list:
+            oStype[oItem['abbr']] = oItem['id']
         for ptype in ptypes:
             qs = None
+            url_red = ""
+            url_ora = ""
+            url_gre = ""
             if ptype == "sermo":
                 qs = SermonDescr.objects.filter(msitem__isnull=False).order_by('stype').values('stype')
+                url_red = "{}?sermo-stypelist={}&sermo-stypelist={}".format(reverse('sermon_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['edi'])
+                url_gre = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['app'])
             elif ptype == "super":
                 qs = EqualGold.objects.filter(moved__isnull=True).order_by('stype').values('stype')
+                url_red = "{}?ssg-stypelist={}&ssg-stypelist={}".format(reverse('equalgold_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['edi'])
+                url_gre = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['app'])
             elif ptype == "manu":
                 qs = Manuscript.objects.filter(mtype='man').order_by('stype').values('stype')
+                url_red = "{}?manu-stypelist={}&manu-stypelist={}".format(reverse('manuscript_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['edi'])
+                url_gre = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['app'])
             # Calculate the different stype values
             if qs != None:
                 app = sum(x['stype'] == "app" for x in qs)  # Approved
@@ -4070,9 +4087,9 @@ def get_pie_data():
             total = red + green + orange
             # Create a list of data
             data = []
-            data.append({'name': 'Initial', 'value': red, 'total': total})
-            data.append({'name': 'Edited', 'value': orange, 'total': total})
-            data.append({'name': 'Approved', 'value': green, 'total': total})
+            data.append({'name': 'Initial', 'value': red, 'total': total, 'url': url_red})
+            data.append({'name': 'Edited', 'value': orange, 'total': total, 'url': url_ora})
+            data.append({'name': 'Approved', 'value': green, 'total': total, 'url': url_gre})
             combidata[ptype] = data
     except:
         msg = oErr.get_error_message()

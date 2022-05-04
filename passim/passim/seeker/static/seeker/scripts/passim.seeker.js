@@ -1426,6 +1426,7 @@ var ru = (function ($, ru) {
             colidx = -1,    // COlor index into array [color]
             i = 0,
             showGuide = null,
+            openListview = null,
             tooltip = null, showTooltip = null, moveTooltip = null, hideTooltip = null;
 
         try {
@@ -1498,6 +1499,13 @@ var ru = (function ($, ru) {
             window.location.href = $(elDiv).attr("targeturl");
           };
 
+          // New way to handle click function
+          openListview = function (event, d) {
+            var elDiv = null;
+            elDiv = d.data.url;
+            window.location.href = elDiv;
+          }
+
           path = d3.arc().outerRadius(radius - 10).innerRadius(0);
           label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
           arcLabel = d3.arc().innerRadius(arcRadius).outerRadius(arcRadius);
@@ -1509,7 +1517,8 @@ var ru = (function ($, ru) {
                  .enter()
                  .append("g")
                  .attr("class", "arc passim-pie-arc")
-                 .on("click", showGuide)
+                 // .on("click", showGuide)
+                 .on("click", openListview)
                  .on("mouseover", showTooltip)
                  .on("mousemove", moveTooltip)
                  .on("mouseleave", hideTooltip);
