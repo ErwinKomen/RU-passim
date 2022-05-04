@@ -188,7 +188,9 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                            aria-haspopup="true" aria-expanded="false">User profile<span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                          <li><a href="{% url 'user_details' user.id  %}" title="Edit user name and email">User</a></li>
+                          {% if user.id %}
+                            <li><a href="{% url 'user_details' user.id  %}" title="Edit user name and email">User</a></li>
+                          {% endif %}
                           <li role="separator" class="divider"></li> 
                           <!-- Used to be 'search_sermon' -->
                           {% if user.is_authenticated %}
