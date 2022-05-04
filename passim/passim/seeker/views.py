@@ -72,7 +72,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
-    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm
+    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
+    UserForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -6454,6 +6455,8 @@ class FeastListView(BasicList):
         return sBack, sTitle
 
 
+# ================= TEMPLATE =============================
+
 class TemplateEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
 
@@ -6620,6 +6623,60 @@ class TemplateListView(BasicList):
         return context
 
 
+# ================= PROFILE and USER =============================
+
+class UserEdit(BasicDetails):
+    """Changing a user's changeable attributes"""
+
+    model = User
+    mForm = UserForm
+    prefix = "usr"
+    title = "UserEdit"
+    no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+
+        # Set the LISTVIEW to the MyPassim page
+        self.listview = reverse('mypassim')
+        self.listviewtitle = "My Passim"
+
+        # Return nothing
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            # Issue #435: user must be able to change: email, pw, name
+            {'type': 'plain', 'label': "Username:",     'value': instance.username,    'field_key': "username"},
+            {'type': 'plain', 'label': "Email:",        'value': instance.email,       'field_key': "email"},
+            {'type': 'plain', 'label': "First name:",   'value': instance.first_name,  'field_key': "first_name"},
+            {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},
+            ]
+
+        # Adapt the permission, if this is the actual user that is logged in
+        if context['authenticated'] and not context['is_app_moderator']:
+            # Check who this is
+            user = self.request.user
+            # Compare with instance
+            if user.id == instance.id:
+                self.permission = "write"
+            else:
+                # This is not the current user
+                self.permission = "readonly"
+            context['permission'] = self.permission
+
+        # Return the context we have made
+        return context
+
+
+class UserDetails(UserEdit):
+    """Like User Edit, but then with HTML output"""
+    rtype = "html"
+
+
 class ProfileEdit(BasicDetails):
     """Details view of profile"""
 
@@ -6638,11 +6695,13 @@ class ProfileEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
+            # The user.id must be passed on, but non-visibly
             {'type': 'plain', 'label': "User",          'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
-            {'type': 'plain', 'label': "Username:",     'value': instance.user.username, },
-            {'type': 'plain', 'label': "Email:",        'value': instance.user.email, },
-            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name, },
-            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name, },
+            # Issue #435: user must be able to change: email, pw, name
+            {'type': 'plain', 'label': "Username:",     'value': instance.user.username,    'field_key': "newusername"},
+            {'type': 'plain', 'label': "Email:",        'value': instance.user.email,       'field_key': "newemail"},
+            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name,  'field_key': "newfirst_name"},
+            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name,   'field_key': "newlast_name"},
             {'type': 'plain', 'label': "Is staff:",     'value': instance.user.is_staff, },
             {'type': 'plain', 'label': "Is superuser:", 'value': instance.user.is_superuser, },
             {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
@@ -6652,6 +6711,19 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
+
+        # Adapt the permission, if this is the actual user that is logged in
+        if context['authenticated'] and not context['is_app_moderator']:
+            # Check who this is
+            user = self.request.user
+            # Compare with instance
+            if user.id == instance.user.id:
+                self.permission = "write"
+            else:
+                # This is not the current user
+                self.permission = "readonly"
+            context['permission'] = self.permission
+
         # Return the context we have made
         return context
 
@@ -6661,6 +6733,36 @@ class ProfileEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            bSaveUser = False
+
+            # (1) Process newusername
+            newusername = form.cleaned_data['newusername']
+            if instance.user.username != newusername:
+                instance.user.username = newusername
+                bSaveUser = True
+
+            # (2) Process newemail
+            newemail = form.cleaned_data['newemail']
+            if instance.user.email != newemail:
+                instance.user.email = newemail
+                bSaveUser = True
+
+            # (3) Process newfirst_name
+            newfirst_name = form.cleaned_data['newfirst_name']
+            if instance.user.first_name != newfirst_name:
+                instance.user.first_name = newfirst_name
+                bSaveUser = True
+
+            # (4) Process newlast_name
+            newlast_name = form.cleaned_data['newlast_name']
+            if instance.user.last_name != newlast_name:
+                instance.user.last_name = newlast_name
+                bSaveUser = True
+
+            # Possibly save the user
+            if bSaveUser:
+                instance.user.save()
+
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
             adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
@@ -6775,6 +6877,8 @@ class DefaultDetails(DefaultEdit):
 
     rtype = "html"
 
+
+# ================= PROJECT =============================
 
 class ProjectEdit(BasicDetails):
     """Details and editing of a project (nov 2021 version)"""
@@ -6930,6 +7034,8 @@ class ProjectListView(BasicList):
         sBack = "\n".join(html)
         return sBack, sTitle
 
+
+# ================= COLLECTION =============================
 
 class CollAnyEdit(BasicDetails):
     """Manu: Manuscript collections"""

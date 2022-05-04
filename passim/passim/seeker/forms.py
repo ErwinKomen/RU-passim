@@ -735,27 +735,6 @@ class OriginCodWidget(ModelSelect2MultipleWidget):
         return qs        
 
 
-#class ProjectOneWidget(ModelSelect2Widget):
-#    model = Project
-#    search_fields = [ 'name__icontains' ]
-
-#    def label_from_instance(self, obj):
-#        return obj.name
-
-#    def get_queryset(self):
-#        return Project.objects.all().order_by('name').distinct()
-    
-
-#class ProjectWidget(ModelSelect2MultipleWidget):
-#    model = Project
-#    search_fields = [ 'name__icontains' ]
-
-#    def label_from_instance(self, obj):
-#        return obj.name
-
-#    def get_queryset(self):
-#        return Project.objects.all().order_by('name').distinct()
-
 class OnlineSourcesWidget(ModelSelect2MultipleWidget):
     model = OnlineSources
     search_fields = [ 'name__icontains' ]
@@ -979,6 +958,7 @@ class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
 
 
 class SermonDescrGoldAddOnlyWidget(SermonDescrGoldWidget):
+    """Realization of SermonDescrGoldWidget"""
     add_only = True
 
 
@@ -1004,6 +984,7 @@ class SermonDescrSuperWidget(ModelSelect2MultipleWidget):
 
 
 class SermonDescrSuperAddOnlyWidget(SermonDescrSuperWidget):
+    """Realization of SermonDescrSuperWidget"""
     add_only = True
 
 
@@ -1076,14 +1057,17 @@ class SignatureOneWidget(ModelSelect2Widget):
 
 
 class SignatureGrysonWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "gr"
 
 
 class SignatureClavisWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "cl"
 
 
 class SignatureOtherWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "ot"
 
 
@@ -1097,6 +1081,7 @@ class ManutypeWidget(ModelSelect2Widget):
     def get_queryset(self):
         return FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
+
 class ScopeTypeWidget(ModelSelect2Widget):
     model = FieldChoice
     search_fields = ['english_name__icontains']
@@ -1106,6 +1091,7 @@ class ScopeTypeWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
+
 
 class StypeWidget(ModelSelect2MultipleWidget):
     model = FieldChoice
@@ -1197,10 +1183,6 @@ class UserWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return User.objects.all().order_by('username').distinct()
-
-
-
-
 
 
 
@@ -1791,6 +1773,7 @@ class SermonForm(PassimModelForm):
             oErr.DoError("SermonForm-init")
         return None
 
+
 class OnlineSourceForm(forms.ModelForm):
     """Online Sources list"""
 
@@ -1822,7 +1805,6 @@ class OnlineSourceForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']    
     
-
 
 class KeywordForm(forms.ModelForm):
     """Keyword list"""
@@ -1984,6 +1966,32 @@ class ProvenanceManForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+
+
+class UserForm(forms.ModelForm):
+    """Allow changing some user attributes"""
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(UserForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Adapt the widgets to have width 100%
+            sStyle = 'width: 100%;'
+            self.fields['username'].widget.attrs['style'] = sStyle
+            self.fields['email'].widget.attrs['style'] = sStyle
+            self.fields['first_name'].widget.attrs['style'] = sStyle
+            self.fields['last_name'].widget.attrs['style'] = sStyle
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileForm-init")
+        # We are okay
+        return None
             
 
 class ProfileForm(forms.ModelForm):
@@ -1993,6 +2001,16 @@ class ProfileForm(forms.ModelForm):
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
+    # Issue #435: facilitate changing [email, (user)name]
+    newusername = forms.CharField(label=_("User name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'User name...', 'style': 'width: 100%;'}))
+    newemail = forms.CharField(label=_("Email"), required=False,
+                widget=forms.EmailInput(attrs={'class': 'searching input-sm', 'placeholder': 'Email...', 'style': 'width: 100%;'}))
+    newfirst_name = forms.CharField(label=_("First name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'First name...', 'style': 'width: 100%;'}))
+    newlast_name = forms.CharField(label=_("Last name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Last name...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2035,6 +2053,13 @@ class ProfileForm(forms.ModelForm):
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
                 self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
+
+                # Fill in the user informatino
+                self.fields['newusername'].initial = instance.user.username
+                self.fields['newemail'].initial = instance.user.email
+                self.fields['newfirst_name'].initial = instance.user.first_name
+                self.fields['newlast_name'].initial = instance.user.last_name
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileForm-init")

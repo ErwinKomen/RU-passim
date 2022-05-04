@@ -262,6 +262,8 @@ urlpatterns = [
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
     url(r'^default/details(?:/(?P<pk>\d+))?/$', DefaultDetails.as_view(), name='default_details'), 
     url(r'^default/edit(?:/(?P<pk>\d+))?/$', DefaultEdit.as_view(), name='default_edit'), 
+    url(r'^user/details(?:/(?P<pk>\d+))?/$', UserDetails.as_view(), name='user_details'),
+    url(r'^user/edit(?:/(?P<pk>\d+))?/$', UserEdit.as_view(), name='user_edit'),
 
     url(r'^project/list', ProjectListView.as_view(), name='project2_list'), 
     url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project2_details'), 
