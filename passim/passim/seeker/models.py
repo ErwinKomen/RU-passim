@@ -6321,7 +6321,15 @@ class EqualGold(models.Model):
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('super', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            # Previous code: this provides a section of the SSG *list* view
+            # url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            # EK: what the user expects is a link to the Collection *details* view
+            details_name = 'collany_details'
+            if settype == "hc":
+                details_name = 'collhist_details'
+            elif settype == "pd":
+                details_name = 'collsuper_details'
+            url = reverse(details_name, kwargs={'pk': col.id})
             lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
