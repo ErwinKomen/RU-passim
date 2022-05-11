@@ -12773,15 +12773,15 @@ class EqualGoldListView(BasicList):
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Authority file"},        
-        {'name': 'Manifestations',                 'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
+        {'name': 'Manifestations',          'order': 'o=5'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
-        {'name': 'Contains',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
+        {'name': 'Contains',                'order': 'o=6'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Links',                   'order': 'o=7'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
-        {'name': 'Hist. Coll.',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'Hist. Coll.',             'order': 'o=8'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
-        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}        
+        {'name': 'Status',                  'order': 'o=9',   'type': 'str', 'custom': 'status'}        
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
