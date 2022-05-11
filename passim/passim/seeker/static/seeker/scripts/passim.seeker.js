@@ -1420,7 +1420,7 @@ var ru = (function ($, ru) {
             title = {
               'pie_sermo': 'Sermon manifestations',
               'pie_manu': 'Manuscripts',
-              'pie_super': 'SSGs'},
+              'pie_super': 'Authority files'},
             g = null,
             color = null,
             colidx = -1,    // COlor index into array [color]

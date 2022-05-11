@@ -4060,17 +4060,17 @@ def get_pie_data():
             url_ora = ""
             url_gre = ""
             if ptype == "sermo":
-                qs = SermonDescr.objects.filter(msitem__isnull=False).order_by('stype').values('stype')
+                qs = SermonDescr.objects.exclude(Q(mtype='tem') & Q(msitem__isnull=True)).order_by('stype').values('stype')
                 url_red = "{}?sermo-stypelist={}&sermo-stypelist={}".format(reverse('sermon_list'), oStype['imp'], oStype['man'])
                 url_ora = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['edi'])
                 url_gre = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['app'])
             elif ptype == "super":
-                qs = EqualGold.objects.filter(moved__isnull=True).order_by('stype').values('stype')
+                qs = EqualGold.objects.filter(moved__isnull=True,atype='acc').order_by('stype').values('stype')
                 url_red = "{}?ssg-stypelist={}&ssg-stypelist={}".format(reverse('equalgold_list'), oStype['imp'], oStype['man'])
                 url_ora = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['edi'])
                 url_gre = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['app'])
             elif ptype == "manu":
-                qs = Manuscript.objects.filter(mtype='man').order_by('stype').values('stype')
+                qs = Manuscript.objects.exclude(Q(mtype='tem')).order_by('stype').values('stype')
                 url_red = "{}?manu-stypelist={}&manu-stypelist={}".format(reverse('manuscript_list'), oStype['imp'], oStype['man'])
                 url_ora = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['edi'])
                 url_gre = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['app'])
@@ -5215,7 +5215,7 @@ class SermonListView(BasicList):
 
         try:
             # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
-            lstExclude.append(Q(mtype='tem') )
+            lstExclude.append(Q(mtype='tem') & Q(msitem__isnull=True))
             ## Make sure to only show mtype manifestations
             #fields['mtype'] = "man"
 
@@ -12996,7 +12996,7 @@ class EqualGoldListView(BasicList):
         
         # Make sure we only show the SSG/AF's that have accepted modifications
         # (fields['atype'] = 'acc'), so exclude the others:
-        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) ]      
+        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]      
        
         return fields, lstExclude, qAlternative        
 
