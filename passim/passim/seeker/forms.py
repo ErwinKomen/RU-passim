@@ -400,7 +400,7 @@ class EqualGoldWidget(ModelSelect2Widget):
         sLabel = obj.get_label(do_incexpl = True)
 
         # Determine here what to return...
-        return full
+        return sLabel
 
     def get_queryset(self):
         if self.addonly:
