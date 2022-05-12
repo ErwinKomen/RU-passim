@@ -1686,6 +1686,10 @@ var ru = (function ($, ru) {
             private_methods.sortshowDo(el);
           });
 
+          // fixed-header table
+          ru.basic.fixed_header();
+          $(window).resize(ru.basic.fixed_header);
+
           // Add actions to related-remove
           $("table td .related-remove").unbind("click").on("click", ru.basic.related_remove);
 
@@ -1705,6 +1709,17 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
+      },
+
+      fixed_header: function() {
+        $("div .fixed-header-container").each(function (idx, el) {
+          var iHeight,
+              elDiv;
+
+          iHeight = $("footer").get(0).offsetTop - 300;
+          $(el).height(iHeight);
+        });
+
       },
 
       ///**
