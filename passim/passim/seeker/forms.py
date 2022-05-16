@@ -1716,7 +1716,7 @@ class SermonForm(PassimModelForm):
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 30%;', 
-                                             'class': 'searching', 'placeholder': 'Term to look for (use * or #)'}))
+                                             'class': 'searching', 'placeholder': 'Term to look for (use * or # or @)'}))
                 #widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Term to look for (use * or #)'}))
     free_include = forms.ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=FreeWidget(attrs={'data-placeholder': 'May occur in any of...', 'style': 'width: 35%;', 'class': 'searching'}))

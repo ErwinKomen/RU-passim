@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
-    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
@@ -5277,36 +5277,88 @@ class SermonListView(BasicList):
             # Adapt according to the 'free' fields
             free_term = fields.get("free_term", "")
             if free_term != None and free_term != "":
+                all_fields = "all_fields"
+
                 free_include = fields.get("free_include", [])
                 free_exclude = fields.get("free_exclude", [])
 
-                # Look for include fields
-                s_q_i_lst = ""
-                for obj in free_include:
-                    val = free_term
-                    if "*" in val or "#" in val:
-                        val = adapt_search(val)
-                        s_q = Q(**{"{}__iregex".format(obj.field): val})
-                    else:
-                        s_q = Q(**{"{}__iexact".format(obj.field): val})
-                    if s_q_i_lst == "":
-                        s_q_i_lst = s_q
-                    else:
-                        s_q_i_lst |= s_q
+                # Look for include field(s)
+                if len(free_include) == 1 and free_include[0].field == all_fields:
+                    # Include all fields from Free
+                    s_q_i_lst = ""
+                    for obj in Free.objects.exclude(field=all_fields):
+                        val = free_term
+                        if "*" in val or "#" in val:
+                            val = adapt_search(val)
+                            s_q = Q(**{"{}__iregex".format(obj.field): val})
+                        elif "@" in val:
+                            val = val.replace("@", "").strip()
+                            s_q = Q(**{"{}__icontains".format(obj.field): val})
+                        else:
+                            s_q = Q(**{"{}__iexact".format(obj.field): val})
+                        if s_q_i_lst == "":
+                            s_q_i_lst = s_q
+                        else:
+                            s_q_i_lst |= s_q
+                else:
+                    s_q_i_lst = ""
+                    for obj in free_include:
+                        if obj.field == all_fields:
+                            # skip it
+                            pass
+                        else:
+                            val = free_term
+                            if "*" in val or "#" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(obj.field): val})
+                            elif "@" in val:
+                                val = val.replace("@", "").strip()
+                                s_q = Q(**{"{}__icontains".format(obj.field): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(obj.field): val})
+                            if s_q_i_lst == "":
+                                s_q_i_lst = s_q
+                            else:
+                                s_q_i_lst |= s_q
 
                 # Look for exclude fields
-                s_q_e_lst = ""
-                for obj in free_exclude:
-                    val = free_term
-                    if "*" in val or "#" in val:
-                        val = adapt_search(val)
-                        s_q = Q(**{"{}__iregex".format(obj.field): val})
-                    else:
-                        s_q = Q(**{"{}__iexact".format(obj.field): val})
-                    if s_q_e_lst == "":
-                        s_q_e_lst = s_q
-                    else:
-                        s_q_e_lst |= s_q
+                if len(free_exclude) == 1 and free_exclude[0].field == all_fields:
+                    # Include all fields from Free
+                    s_q_e_lst = ""
+                    for obj in Free.objects.exclude(field=all_fields):
+                        val = free_term
+                        if "*" in val or "#" in val:
+                            val = adapt_search(val)
+                            s_q = Q(**{"{}__iregex".format(obj.field): val})
+                        elif "@" in val:
+                            val = val.replace("@", "").strip()
+                            s_q = Q(**{"{}__icontains".format(obj.field): val})
+                        else:
+                            s_q = Q(**{"{}__iexact".format(obj.field): val})
+                        if s_q_e_lst == "":
+                            s_q_e_lst = s_q
+                        else:
+                            s_q_e_lst |= s_q
+                else:
+                    s_q_e_lst = ""
+                    for obj in free_exclude:
+                        if obj.field == all_fields:
+                            # skip it
+                            pass
+                        else:
+                            val = free_term
+                            if "*" in val or "#" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(obj.field): val})
+                            elif "@" in val:
+                                val = val.replace("@", "").strip()
+                                s_q = Q(**{"{}__icontains".format(obj.field): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(obj.field): val})
+                            if s_q_e_lst == "":
+                                s_q_e_lst = s_q
+                            else:
+                                s_q_e_lst |= s_q
 
                 if s_q_i_lst != "":
                     qAlternative = s_q_i_lst
