@@ -13157,30 +13157,124 @@ class EqualGoldVisDownload(BasicPart):
         # Initialize
         lData = []
         sData = ""
+        oErr = ErrHandle()
 
-        if dtype == "json":
-            # Retrieve the actual data from self.data
-            oData = dict(legend=self.data['legend'],
-                         link_list=self.data['link_list'],
-                         node_list=self.data['node_list'])
-            sData = json.dumps(oData, indent=2)
-        elif dtype == "hist-svg":
-            pass
-        elif dtype == "hist-png":
-            pass
-        elif dtype == "csv" or dtype == "xlsx":
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
-            csvwriter.writerow(headers)
-            pass
+        try:
+            if dtype == "json":
+                # Retrieve the actual data from self.data
+                oData = dict(legend=self.data['legend'],
+                             link_list=self.data['link_list'],
+                             node_list=self.data['node_list'])
+                sData = json.dumps(oData, indent=2)
+            elif dtype == "hist-svg":
+                pass
+            elif dtype == "hist-png":
+                pass
+            elif dtype == "csv":
+                # THIS IS NOT YET IMPLEMENTED
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Headers
+                headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+                csvwriter.writerow(headers)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+            elif dtype == "excel":
+
+                if self.vistype in ['trans', 'overlap']:
+                    # Start workbook
+                    wb = openpyxl.Workbook()
+
+                    # First worksheet: Name of the legend
+                    ws = wb.get_active_sheet()
+                    ws.title="Data"
+                    c = ws.cell(row=1, column=1)
+                    c.value = "Legend"
+                    c = ws.cell(row=1, column=2)
+                    c.value = self.data['legend']
+
+                    # Second sheet: node data
+                    ws = wb.create_sheet("Nodes")
+                    node_list=self.data['node_list']
+
+                    # (2): headers
+                    if self.vistype == "overlap":
+                        headers = ["group", "HCs", "id", "label", "passim", "scount"]
+                    elif self.vistype == "trans":
+                        headers = ["id", "scount", "label", "category", "rating", "sig"]
+                    for col_num in range(len(headers)):
+                        c = ws.cell(row=1, column=col_num+1)
+                        c.value = headers[col_num]
+                        c.font = openpyxl.styles.Font(bold=True)
+                        # Set width to a fixed size
+                        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0    
+                    
+                    # (2): items   
+                    row_num = 2 
+                    for item in node_list:
+                        if self.vistype == "overlap":
+                            ws.cell(row=row_num, column=1).value = item.get("group")
+                            ws.cell(row=row_num, column=2).value = json.dumps(item.get("hcs"))
+                            ws.cell(row=row_num, column=3).value = item.get("id")
+                            ws.cell(row=row_num, column=4).value = item.get("label")
+                            ws.cell(row=row_num, column=5).value = item.get("passim")
+                            ws.cell(row=row_num, column=6).value = item.get("scount")
+                        elif self.vistype == "trans":
+                            ws.cell(row=row_num, column=1).value = item.get("id")
+                            ws.cell(row=row_num, column=2).value = item.get("scount")
+                            ws.cell(row=row_num, column=3).value = item.get("label")
+                            ws.cell(row=row_num, column=4).value = item.get("category")
+                            ws.cell(row=row_num, column=5).value = item.get("rating")
+                            ws.cell(row=row_num, column=6).value = item.get("sig")
+
+                        row_num += 1
+
+                    # Third sheet: link data
+                    ws = wb.create_sheet("Links")
+                    link_list=self.data['link_list']
+                
+                    # (3): headers
+                    if self.vistype == "overlap":
+                        headers = ["value", "spectype", "spec", "linktype", "source", "target", "alternatives", "link", "note"]
+                    elif self.vistype == "trans":
+                        headers = ["source", "target", "value"]
+                    for col_num in range(len(headers)):
+                        c = ws.cell(row=1, column=col_num+1)
+                        c.value = headers[col_num]
+                        c.font = openpyxl.styles.Font(bold=True)
+                        # Set width to a fixed size
+                        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+                    # (3): items   
+                    row_num = 2 
+                    for item in link_list:
+                        if self.vistype == "overlap":
+                            ws.cell(row=row_num, column=1).value = item.get("value")
+                            ws.cell(row=row_num, column=2).value = item.get("spectype")
+                            ws.cell(row=row_num, column=3).value = item.get("spec")
+                            ws.cell(row=row_num, column=4).value = item.get("linktype")
+                            ws.cell(row=row_num, column=5).value = item.get("source")
+                            ws.cell(row=row_num, column=6).value = item.get("target")
+                            ws.cell(row=row_num, column=7).value = item.get("alternatives")
+                            ws.cell(row=row_num, column=8).value = item.get("link")
+                            ws.cell(row=row_num, column=9).value = item.get("note")
+                        elif self.vistype == "trans":
+                            ws.cell(row=row_num, column=1).value = item.get("source")
+                            ws.cell(row=row_num, column=2).value = item.get("target")
+                            ws.cell(row=row_num, column=3).value = item.get("value")
+                        row_num += 1
+
+                # Save it
+                wb.save(response)
+                sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldVisDownload/get_data")
 
         return sData
 

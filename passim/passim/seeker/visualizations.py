@@ -555,6 +555,7 @@ class EqualGoldGraph(BasicPart):
     """Prepare for a network graph"""
 
     MainModel = EqualGold
+    isRelevant = False      # See issue #549
 
     def add_to_context(self, context):
         def get_author(code):
@@ -573,99 +574,100 @@ class EqualGoldGraph(BasicPart):
                     
         oErr = ErrHandle()
         try:
-            # Need to figure out who I am
-            profile = Profile.get_user_profile(self.request.user.username)
-            instance = self.obj
+            if self.isRelevant:
+                # Need to figure out who I am
+                profile = Profile.get_user_profile(self.request.user.username)
+                instance = self.obj
 
-            networkslider = self.qd.get("networkslider", "1")            
-            if isinstance(networkslider, str):
-                networkslider = int(networkslider)
+                networkslider = self.qd.get("networkslider", "1")            
+                if isinstance(networkslider, str):
+                    networkslider = int(networkslider)
 
-            # Get the 'manuscript-corpus': the manuscripts in which the same kind of sermon like me is
-            manu_list = SermonDescrEqual.objects.filter(super=instance).distinct().values("manu_id")
-            manu_dict = {}
-            for idx, manu in enumerate(manu_list):
-                manu_dict[manu['manu_id']] = idx + 1
-            author_dict = {}
+                # Get the 'manuscript-corpus': the manuscripts in which the same kind of sermon like me is
+                manu_list = SermonDescrEqual.objects.filter(super=instance).distinct().values("manu_id")
+                manu_dict = {}
+                for idx, manu in enumerate(manu_list):
+                    manu_dict[manu['manu_id']] = idx + 1
+                author_dict = {}
 
-            lock_status = "new"
-            # Set the lock, or return if we are busy with this ssg_corpus
-            ssg_corpus = EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).last()
-            if ssg_corpus != None:
-                lock_status = ssg_corpus.status
-                # Check the status
-                if lock_status == "busy":
-                    # Already busy
-                    return context
-            else:
-                # Need to create a lock
-                ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance)
-                lock_status = "busy"
+                lock_status = "new"
+                # Set the lock, or return if we are busy with this ssg_corpus
+                ssg_corpus = EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).last()
+                if ssg_corpus != None:
+                    lock_status = ssg_corpus.status
+                    # Check the status
+                    if lock_status == "busy":
+                        # Already busy
+                        return context
+                else:
+                    # Need to create a lock
+                    ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance)
+                    lock_status = "busy"
 
-            # Save the status
-            ssg_corpus.status = lock_status
-            ssg_corpus.save()
-
-            if lock_status == "new":
-                # Remove earlier corpora made by me based on this SSG
-                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
-
-                # Create a new one
-                ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance, status="busy")
-
-            if lock_status != "ready":
-
-                # Create an EqualGoldCorpus based on the SSGs in these manuscripts
-                ssg_list = SermonDescrEqual.objects.filter(manu__id__in=manu_list).order_by(
-                    'super_id').distinct().values('super_id')
-                ssg_list_id = [x['super_id'] for x in ssg_list]
-                all_words = {}
-                with transaction.atomic():
-                    for ssg in EqualGold.objects.filter(id__in=ssg_list_id):
-                        # Add this item to the ssg_corpus
-                        latin = {}
-                        if ssg.incipit != None:
-                            for item in ssg.srchincipit.replace(",", "").replace("…", "").split(" "): 
-                                add_to_dict(latin, item)
-                                add_to_dict(all_words, item)
-                        if ssg.explicit != None:
-                            for item in ssg.srchexplicit.replace(",", "").replace("…", "").split(" "): 
-                                add_to_dict(latin, item)
-                                add_to_dict(all_words, item)
-                        # Get the name of the author
-                        authorname = "empty" if ssg.author==None else ssg.author.name
-                        # Get the scount
-                        scount = ssg.scount
-                        # Create new ssg_corpus item
-                        obj = EqualGoldCorpusItem.objects.create(
-                            corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, 
-                            authorname=authorname, scount=scount)
-
-                # What are the 100 MFWs in all_words?
-                mfw = [dict(word=k, count=v) for k,v in all_words.items()]
-                mfw_sorted = sorted(mfw, key = lambda x: -1 * x['count'])
-                mfw_cento = mfw_sorted[:100]
-                mfw = []
-                for item in mfw_cento: mfw.append(item['word'])
-                # Add this list to the ssg_corpus
-                ssg_corpus.mfw = json.dumps(mfw)
-                ssg_corpus.status = "ready"
+                # Save the status
+                ssg_corpus.status = lock_status
                 ssg_corpus.save()
 
-            node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
+                if lock_status == "new":
+                    # Remove earlier corpora made by me based on this SSG
+                    EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+
+                    # Create a new one
+                    ssg_corpus = EqualGoldCorpus.objects.create(profile=profile, ssg=instance, status="busy")
+
+                if lock_status != "ready":
+
+                    # Create an EqualGoldCorpus based on the SSGs in these manuscripts
+                    ssg_list = SermonDescrEqual.objects.filter(manu__id__in=manu_list).order_by(
+                        'super_id').distinct().values('super_id')
+                    ssg_list_id = [x['super_id'] for x in ssg_list]
+                    all_words = {}
+                    with transaction.atomic():
+                        for ssg in EqualGold.objects.filter(id__in=ssg_list_id):
+                            # Add this item to the ssg_corpus
+                            latin = {}
+                            if ssg.incipit != None:
+                                for item in ssg.srchincipit.replace(",", "").replace("…", "").split(" "): 
+                                    add_to_dict(latin, item)
+                                    add_to_dict(all_words, item)
+                            if ssg.explicit != None:
+                                for item in ssg.srchexplicit.replace(",", "").replace("…", "").split(" "): 
+                                    add_to_dict(latin, item)
+                                    add_to_dict(all_words, item)
+                            # Get the name of the author
+                            authorname = "empty" if ssg.author==None else ssg.author.name
+                            # Get the scount
+                            scount = ssg.scount
+                            # Create new ssg_corpus item
+                            obj = EqualGoldCorpusItem.objects.create(
+                                corpus=ssg_corpus, words=json.dumps(latin), equal=ssg, 
+                                authorname=authorname, scount=scount)
+
+                    # What are the 100 MFWs in all_words?
+                    mfw = [dict(word=k, count=v) for k,v in all_words.items()]
+                    mfw_sorted = sorted(mfw, key = lambda x: -1 * x['count'])
+                    mfw_cento = mfw_sorted[:100]
+                    mfw = []
+                    for item in mfw_cento: mfw.append(item['word'])
+                    # Add this list to the ssg_corpus
+                    ssg_corpus.mfw = json.dumps(mfw)
+                    ssg_corpus.status = "ready"
+                    ssg_corpus.save()
+
+                node_list, link_list, max_value = self.do_manu_method(ssg_corpus, manu_list, networkslider)
 
 
-            # Add the information to the context in data
-            context['data'] = dict(node_list=node_list, 
-                                   link_list=link_list,
-                                   watermark=get_watermark(),
-                                   max_value=max_value,
-                                   networkslider=networkslider,
-                                   legend="AF network")
+                # Add the information to the context in data
+                context['data'] = dict(node_list=node_list, 
+                                       link_list=link_list,
+                                       watermark=get_watermark(),
+                                       max_value=max_value,
+                                       networkslider=networkslider,
+                                       legend="AF network")
             
-            # Can remove the lock
-            ssg_corpus.status = "ready"
-            ssg_corpus.save()
+                # Can remove the lock
+                ssg_corpus.status = "ready"
+                ssg_corpus.save()
 
 
         except:

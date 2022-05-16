@@ -2515,6 +2515,7 @@ var ru = (function ($, ru) {
                     break;
                   case "json":
                   case "xlsx":
+                  case "excel":
                     // Now submit the form
                     oBack = frm.submit();
                     break;

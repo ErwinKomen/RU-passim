@@ -31,5 +31,14 @@
         contentid="#super_network_{{downloadid}}"
         ajaxurl="{% url urlname object_id %}">Data (json)</a>
   </li>
+
+  <!-- Downloading Excel data -->
+  <li>
+    <a href="#" 
+        downloadtype="excel"
+        onclick="ru.basic.post_download(this);"
+        contentid="#super_network_{{downloadid}}"
+        ajaxurl="{% url urlname object_id %}">Data (Excel)</a>
+  </li>
 </ul>
 
