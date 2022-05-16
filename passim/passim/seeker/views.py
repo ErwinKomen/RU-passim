@@ -5215,7 +5215,8 @@ class SermonListView(BasicList):
 
         try:
             # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
-            lstExclude.append(Q(mtype='tem') & Q(msitem__isnull=True))
+            lstExclude.append(Q(mtype='tem'))
+            lstExclude.append(Q(msitem__isnull=True))
             ## Make sure to only show mtype manifestations
             #fields['mtype'] = "man"
 
