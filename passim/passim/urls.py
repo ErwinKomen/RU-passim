@@ -81,6 +81,7 @@ urlpatterns = [
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
     url(r'^tools/huwa/$', passim.seeker.views.do_huwa, name='do_huwa'),
+    url(r'^tools/sermones/reset$', passim.dct.views.sermones_reset, name='sermones_reset'),
 
     url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),

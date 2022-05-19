@@ -1324,7 +1324,7 @@ class BasicList(ListView):
 
                 # Combine exclude filters with logical or
                 exclude = None
-                if len(lstExclude) > 0:
+                if not lstExclude is None and len(lstExclude) > 0:
                     exclude = lstExclude[0]
                     for expr in lstExclude[1:]:
                         exclude |= expr

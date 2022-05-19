@@ -25,8 +25,8 @@ import csv
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
-from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated
-from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection
+from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
+from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
 from passim.dct.forms import ResearchSetForm, SetDefForm
@@ -52,6 +52,33 @@ app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_developer = "{}_developer".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
+
+def sermones_reset(request):
+    """Reset SERMONES"""
+
+    oErr = ErrHandle()
+    stype = "imp"
+    mtype = "man"
+    try:
+        # Make sure this is a HTTP request
+        assert isinstance(request, HttpRequest)
+
+        # Find the project that we need to 'cancel'
+        project = Project2.objects.filter(name__icontains="luc de coninck").first()
+        if not project is None:
+            # Find all the manuscripts that need removing
+            qs = Manuscript.objects.filter(manuscript_proj__project=project, stype=stype, mtype=mtype)
+
+            # Remove them
+            qs.delete()
+
+        # Render and return the page
+        return redirect('mypassim')
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("sermones_reset")
+        return redirect('home')
+
 
 def manuscript_ssgs(manu, bDebug = False):
     """Get the ordered list of SSGs related to a manuscript"""
@@ -217,6 +244,28 @@ def mypassim(request):
         context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
         context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
         context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+
+        # COunting table sizes for the super user
+        if user_is_superuser(request):
+            table_infos = []
+            tables = [
+                {'app': 'seeker',
+                 'models': ['Collection', 'Profile', 'Manuscript', 'SermonDescr', 'SermonHead', 'SermonGold', 
+                      'Codico', 'MsItem', 'Author', 'Keyword', 'Library', 'Origin', 'Provenance', 'SourceInfo', 'Signature',
+                      'SermonDescrEqual']},
+                {'app': 'dct', 
+                 'models': ['ResearchSet', 'SetList', 'SetDef'] }
+                      ]
+            for oApp in tables:
+                app_name = oApp['app']
+                models = oApp['models']
+                models.sort()
+                for model in models:
+                    cls = apps.app_configs[app_name].get_model(model)
+                    count = cls.objects.count()
+                    oInfo = dict(app_name=app_name, model_name=model, count=count)
+                    table_infos.append(oInfo)
+            context['table_infos'] = table_infos
 
         # Figure out any editing rights
         qs = profile.projects.all()

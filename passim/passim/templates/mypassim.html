@@ -58,6 +58,42 @@
         </p>
       </section>
 
+      {% if user.is_superuser %}
+        <section>
+          <h3>
+            <span>Table counts</span>
+            <span class="pull-right"><code>admin</code></span>
+          </h3>
+          <p>Size of a number of tables for administrative purposes.
+            <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', true);">
+              Reset Sermones
+            </a>
+          </p>
+          <div id="sermones_confirmation" class="row hidden" >
+            <div class="col-md-6">Do you really want to reset SERMONES?</div>
+            <div class="col-md-6">
+              <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', false);">Cancel</a>
+              <a class="btn btn-xs jumbo-4" href="{% url 'sermones_reset' %}">Yes</a>
+            </div>
+          </div>
+          <table class="func-view table-hover" style="width: 100%;">
+            <thead>
+              <tr><th>No.</th><th>App</th><th>Table</th><th>Count</th></tr>
+            </thead>
+            <tbody>
+              {% for info in table_infos %}
+              <tr>
+                <td align="right">{{forloop.counter}} &nbsp;</td>
+                <td>{{info.app_name}}</td>
+                <td>{{info.model_name}}</td>
+                <td align="right">{{info.count}}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+
     </div>
 
     <div class="col-md-6">

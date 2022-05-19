@@ -5593,6 +5593,23 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_sermones
+       *    Open or close [elStart]
+       *
+       */
+      do_sermones: function (elStart, bOpen) {
+        try {
+          if (bOpen) {
+            $(elStart).removeClass("hidden");
+          } else {
+            $(elStart).addClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("do_sermones", ex);
+        }
+      },
+
+      /**
        * manu_edit
        *   Switch between edit modes on this <tr>
        *   And if saving is required, then call the [targeturl] to send a POST of the form data

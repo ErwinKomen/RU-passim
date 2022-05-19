@@ -14109,9 +14109,10 @@ class SourceListView(BasicList):
                     manu = qs_t.first()
                     # Get the ID of the template with this manuscript
                     obj_t = Template.objects.filter(manu=manu).first()
-                    url = reverse("template_details", kwargs={'pk': obj_t.id})
-                    sBack = "<a href='{}' title='One template manuscript'><span class='badge jumbo-2 clickable'>{}</span></a>".format(
-                        url, count_t)
+                    if not obj_t is None:
+                        url = reverse("template_details", kwargs={'pk': obj_t.id})
+                        sBack = "<a href='{}' title='One template manuscript'><span class='badge jumbo-2 clickable'>{}</span></a>".format(
+                            url, count_t)
                 else:
                     url = reverse('template_list')
                     sBack = "<a href='{}?tmp-srclist={}' title='Template manuscripts'><span class='badge jumbo-1 clickable'>{}</span></a>".format(
