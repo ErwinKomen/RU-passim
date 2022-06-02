@@ -40,6 +40,55 @@ SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less t
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 
 
+# =================== HELPER FUNCTIONS ==========================
+
+def order_search(qs, term):
+    """Given a query and a search term, provide better ordered results"""
+
+    oErr = ErrHandle()
+    try:
+        # Divide terms into list of words
+        term_list = term.split()
+
+        # New attempt
+        if len(term_list) > 1:
+            # There are multiple words in the search request - count the presence of each of them
+            term_keys = []
+            hitdict = {}
+            for idx, term in enumerate(term_list):
+                key = "hits{}".format(idx+1)
+                term_keys.append(key)
+                condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                    Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                    Q(equal_goldsermons__siglist__icontains=term)
+                hitdict[key] = Case( When(condition, then=Value(1)), default=Value(0), output_field=IntegerField())
+            # Annotate with the hitdict
+            qs = qs.annotate(**hitdict)
+            # Now annotate with the Sum of these hit-fields
+            sumdict = {}
+            sumdict['hitcount'] = F(term_keys[0])
+            for key in term_keys[1:]:
+                sumdict['hitcount'] += F(key)
+            qs = qs.annotate(**sumdict).order_by("-hitcount", "code", "id")
+        else:
+
+            # Adapt: behaviour from issue #292
+            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                        Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                        Q(equal_goldsermons__siglist__icontains=term)
+            qs = qs.annotate(
+                full_string_order=Case(
+                    When(condition, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                ),
+            )
+            qs = qs.order_by("-full_string_order", "code", "id")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("order_search")
+    return qs
+
 # ================= WIDGETS =====================================
 
 
@@ -482,18 +531,20 @@ class EqualGoldWidget(ModelSelect2Widget):
                     bAdapted = True
 
         if not bAdapted:
-            # Adapt: behaviour from issue #292
-            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
-                        Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
-                        Q(equal_goldsermons__siglist__icontains=term)
-            qs = qs.annotate(
-                full_string_order=Case(
-                    When(condition, then=Value(1)),
-                    default=Value(0),
-                    output_field=IntegerField()
-                ),
-            )
-            qs = qs.order_by("-full_string_order", "code", "id")
+            qs = order_search(qs, term)
+
+            ## Adapt: behaviour from issue #292
+            #condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+            #            Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+            #            Q(equal_goldsermons__siglist__icontains=term)
+            #qs = qs.annotate(
+            #    full_string_order=Case(
+            #        When(condition, then=Value(1)),
+            #        default=Value(0),
+            #        output_field=IntegerField()
+            #    ),
+            #)
+            #qs = qs.order_by("-full_string_order", "code", "id")
 
         # Return result
         return qs
@@ -1237,8 +1288,10 @@ class SuperOneWidget(ModelSelect2Widget):
         term_for_now = ""
         qs = super(SuperOneWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
         
-        # Check if this contains a string literal
         bAdapted = False
+        bIssue432 = True
+
+        # Check if this contains a string literal
         if term.count('"') >= 2:
             # Need to look for a literal string
             arTerm = term.split('"')
@@ -1300,22 +1353,10 @@ class SuperOneWidget(ModelSelect2Widget):
  
                     qs = qs.order_by("-term_string_order", "code", "id")
                     bAdapted = True
-                    # qs = qs.filter(term_string_order=5).count()
-                    # obj = qs.filter(equal_goldsermons__siglist__icontains=term_ordered[0]).first()
 
         if not bAdapted:
-            # Adapt: behaviour from issue #292
-            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
-                        Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
-                        Q(equal_goldsermons__siglist__icontains=term)
-            qs = qs.annotate(
-                full_string_order=Case(
-                    When(condition, then=Value(1)),
-                    default=Value(0),
-                    output_field=IntegerField()
-                ),
-            )
-            qs = qs.order_by("-full_string_order", "code", "id")
+
+            qs = order_search(qs, term)
 
         # Return result
         return qs
