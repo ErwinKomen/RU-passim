@@ -2956,6 +2956,36 @@ class EqualGoldHuwaToJson(BasicPart):
                 sBack = "'{}".format(sBack)
             return sBack
 
+        def add_sig_to_list(signatures, lst_sig, editype, code_format):
+            oErr = ErrHandle()
+            try:
+                if not lst_sig is None:
+                    if isinstance(lst_sig, int):
+                        if lst_sig == 0:
+                            return;
+                        lst_sig = [ str(lst_sig) ]
+                    elif isinstance(lst_sig, str):
+                        lst_sig = lst_sig.split(";")
+                    for sig in lst_sig:
+                        oAdd = dict(editype=editype, code=code_format.format(sig))
+                        signatures.append(oAdd)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_sig_to_list")
+
+        def add_sig_replacing(signatures, item, key, number, editype):
+            oErr = ErrHandle()
+            try:
+                element = item.get(key)
+                if not element is None:
+                    # Convert Clavis
+                    transformed = re.sub(r'\#.*', number, element)
+                    oAdd = dict(editype=editype, code=transformed)
+                    signatures.append(oAdd)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_sig_replacing")
+
         # Initialize
         oData = {}
         sData = ""
@@ -2967,6 +2997,7 @@ class EqualGoldHuwaToJson(BasicPart):
         author_info = {}
         existing_dict = {}
         bDoCounting = True
+        bUseOperaPassim = True
         rHasNumber = re.compile(r'.*[0-9].*')
 
         count_manu_zero = 0     # Number of items linked to ZERO manuscripts
@@ -2990,9 +3021,15 @@ class EqualGoldHuwaToJson(BasicPart):
             # (5) Load the tables that we need
             tables = self.get_tables(table_info, huwa_tables)
 
+            # (5b) Load the 'opera_passim' object, which is needed for correct Clavis / Frede / Cppm
+            opera_passim = self.read_opera_passim()
+
+            # (5c) Load the 'huwa_conv_sig' object: calculate Clavis/Frede/Cppm based on [abk]
+            huwa_conv_sig = self.read_huwa_conv_sig()
+
             # (6) Walk through the table with AF information
-            count_opera = len(tables['opera'])
             lst_opera = []
+            count_opera = len(tables['opera'])
             for idx, oOpera in enumerate(tables['opera']):
                 opera_id = oOpera['id']
                 # Take over any information that should
@@ -3004,18 +3041,59 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Get the signature(s)
                 signaturesA = []
-                other = oOpera.get("abk", "")
-                if not other is None and other != "":
-                    signaturesA.append(dict(editype="ot", code=other))
-                clavis = get_table_list(tables['clavis'], opera_id, "name")
-                for sig in clavis:
-                    signaturesA.append(dict(editype="cl", code="CPL {}".format(sig)))
-                frede = get_table_list(tables['frede'], opera_id, "name")
-                for sig in frede:
-                    signaturesA.append(dict(editype="gr", code=sig))
-                cppm = get_table_list(tables['cppm'], opera_id, "name")
-                for sig in cppm:
-                    signaturesA.append(dict(editype="cl", code="CPPM {}".format(sig)))
+                if bUseOperaPassim and opera_id in opera_passim:
+                    # Get the relevant record
+                    oOperaNew = opera_passim[opera_id]
+                    # Look for clavis/frede/cppm
+                    add_sig_to_list(signaturesA, oOperaNew.get("clavis"), "cl", "CPL {}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("frede"), "gr", "{}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("cppm"), "cl", "CPPM {}")
+
+                    other = oOperaNew.get("abk", "")
+                    if not other is None and other != "" and len(signaturesA) == 0:
+                        # Check if we can convert this
+                        bFound = False
+                        number = ""
+                        for item in huwa_conv_sig:
+                            mask = item['mask']
+                            huwa = item['huwa']
+                            m = re.match(mask, other)
+                            if m:
+                                bFound = True
+                                # Now get the number
+                                if len(m.groups(0)) > 0:
+                                    number = m.groups(0)[0]
+                                    if huwa.count('#') > 1:
+                                        iStop = 1
+                                    
+                                # Show what we are doing
+                                oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
+                                # Now we can break from the loop
+                                break
+                        if bFound:
+                            # Look for clavis/frede/cppm
+                            add_sig_replacing(signaturesA, item, "clavis", number, "cl")
+                            add_sig_replacing(signaturesA, item, "gryson", number, "gr")
+                            add_sig_replacing(signaturesA, item, "other", number, "ot")
+
+                        else:
+                            signaturesA.append(dict(editype="ot", code=other))
+                else:
+                    other = oOpera.get("abk", "")
+                    if not other is None and other != "":
+                        signaturesA.append(dict(editype="ot", code=other))
+                    clavis = get_table_list(tables['clavis'], opera_id, "name")
+                    add_sig_to_list(signaturesA, clavis, "cl", "CPL {}")
+                    #for sig in clavis:
+                    #    signaturesA.append(dict(editype="cl", code="CPL {}".format(sig)))
+                    frede = get_table_list(tables['frede'], opera_id, "name")
+                    add_sig_to_list(signaturesA, frede, "gr", "{}")
+                    #for sig in frede:
+                    #    signaturesA.append(dict(editype="gr", code=sig))
+                    cppm = get_table_list(tables['cppm'], opera_id, "name")
+                    add_sig_to_list(signaturesA, cppm, "cl", "CPPM {}")
+                    #for sig in cppm:
+                    #    signaturesA.append(dict(editype="cl", code="CPPM {}".format(sig)))
                 oSsg['signaturesA'] = signaturesA
 
                 # Get the Incipit and the Explicit
@@ -3271,6 +3349,44 @@ class EqualGoldHuwaToJson(BasicPart):
             oErr.DoError("HuwaEqualGoldToJson/read_authors")
         # Return the table that we found
         return lst_authors
+
+    def read_opera_passim(self):
+        """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+
+        oErr = ErrHandle()
+        dict_operapassim = {}
+        try:
+            lst_operapassim = None
+            operapassim_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "Opera_passim_MR.json"))
+            with open(operapassim_json, "r", encoding="utf-8") as f:
+                oOperaPassim = json.load(f)
+            # Process the list into a dictionary
+            if not oOperaPassim is None:
+                dict_operapassim = {x['id']: x for x in oOperaPassim['opera_passim']}
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_opera_passim")
+        # Return the table that we found
+        return dict_operapassim
+
+    def read_huwa_conv_sig(self):
+        """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""
+
+        oErr = ErrHandle()
+        lst_huwa_conv_sig = []
+        try:
+            huwa_conv_sig_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_conv_sig.json"))
+            with open(huwa_conv_sig_json, "r", encoding="utf-8") as f:
+                lst_huwa_conv_sig = json.load(f)
+            # Add the 'mask' to each item
+            for item in lst_huwa_conv_sig:
+                mask = item['huwa'].replace("#", "(\\d+)(.*)")
+                item['mask'] = mask
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_huwa_conv_sig")
+        # Return the table that we found
+        return lst_huwa_conv_sig
 
     def read_relations(self):
         """Load the JSON that specifies the inter-SSG relations according to Opera id's """
