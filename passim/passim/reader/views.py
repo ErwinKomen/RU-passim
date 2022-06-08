@@ -2993,6 +2993,7 @@ class EqualGoldHuwaToJson(BasicPart):
         # Initialize
         oData = {}
         sData = ""
+        bAcceptNewOtherSignatures = False
         huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
             'autor', 'autor_opera', 'datum_opera', 'inhalt']
 
@@ -3046,6 +3047,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Get the signature(s)
                 signaturesA = []
+                lst_notes = []
                 if bUseOperaPassim and opera_id in opera_passim:
                     # Get the relevant record
                     oOperaNew = opera_passim[opera_id]
@@ -3081,8 +3083,22 @@ class EqualGoldHuwaToJson(BasicPart):
                             add_sig_replacing(signaturesA, item, "gryson", number, "gr")
                             add_sig_replacing(signaturesA, item, "other", number, "ot")
 
+                        elif bAcceptNewOtherSignatures:
+                            # Check how long this [other] is
+                            if len(other) > 10:
+                                # Just add it to notes
+                                lst_notes.append("abk: {}".format(other))
+                            else:
+                                # THis is 10 characters or below, so it could actually be a real code
+                                signaturesA.append(dict(editype="ot", code=other))
                         else:
-                            signaturesA.append(dict(editype="ot", code=other))
+                            # Just add it to notes
+                            lst_notes.append("abk: {}".format(other))
+                    # Look for possible field [correction of abk]
+                    for k, v in oOperaNew.items():
+                        if "correction" in k and "abk" in k:
+                            # There is a correction: put it into notes
+                            lst_notes.append("{}: {}".format(k, v))
                 else:
                     other = oOpera.get("abk", "")
                     if not other is None and other != "":
@@ -3107,7 +3123,9 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Make good notes for further processing
                 oSsg['note_langname'] = oOpera.get("opera_langname","")
-                oSsg['notes'] = oOpera.get("bemerkungen", "")
+                remarks = oOpera.get("bemerkungen", "")
+                if remarks != "": lst_notes.append("Remarks: {}".format(remarks))
+                oSsg['notes'] = "\n".join(lst_notes)
 
                 # Get to the [datum_opera]
                 oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
