@@ -1279,6 +1279,7 @@ class SuperOneWidget(ModelSelect2Widget):
                     case_list = []
                     counter = len(term_ordered)
                     for term in  term_ordered:
+                        term = term.strip()
                         if term != "":
                             condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
                                 Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
