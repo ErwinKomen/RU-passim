@@ -3022,6 +3022,7 @@ class EqualGoldHuwaToJson(BasicPart):
         table_info = {}
         author_info = {}
         existing_dict = {}
+        sig_matching = {}
         bDoCounting = True
         bUseOperaPassim = True
         rHasNumber = re.compile(r'.*[0-9].*')
@@ -3210,7 +3211,7 @@ class EqualGoldHuwaToJson(BasicPart):
                             add_existing("ssgmFA")
                     oSsg['existing_ssg'] = existing_ssg
 
-                    same_sig_ssgs = 0
+                    same_sig_ssgs = []
                     if len(signaturesA) > 0:
                         # Build a Q-expression
                         expr = ( Q(code__iexact=signaturesA[0]['code']) & Q(editype=signaturesA[0]['editype']) )
@@ -3222,8 +3223,10 @@ class EqualGoldHuwaToJson(BasicPart):
 
                         if len(sig_ids) > 0:
                             # Check if there already is a SSG with one of the signatures in the list
-                            qs = EqualGold.objects.filter(equal_goldsermons__goldsignatures__id__in=sig_ids)
-                            same_sig_ssgs = qs.count()
+                            qs = EqualGold.objects.filter(equal_goldsermons__goldsignatures__id__in=sig_ids).distinct().values('id')
+                            # same_sig_ssgs = qs.count()
+                            # Better: give a list of SSG ids with the same sigs
+                            same_sig_ssgs = [x['id'] for x in qs]
 
                     # Add the results of the SSG match
                     oSsg['same_sig_ssgs'] = same_sig_ssgs
@@ -3285,8 +3288,48 @@ class EqualGoldHuwaToJson(BasicPart):
                     msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
                     oErr.Status(msg)
 
+            # (7) Calculate the signature status (see issue #533)
+            for idx, oOperaSsg in enumerate(lst_opera):
+                sig_status = "unknown"
+                # Get the opera signatures
+                signaturesA = ["{}: {}".format(x['editype'], x['code']) for x in oOperaSsg['signaturesA'] ]
 
-            # (7) combine the sections into one object
+                # Get matching existing Passim SSG/AFs via these signature(s)
+                same_sig_ssgs = oOperaSsg['same_sig_ssgs']
+
+                if len(same_sig_ssgs) == 0:
+                    # There are no matching existing Passim SSGs
+                    sig_status = "opera_ssg_1_0"
+                elif len(signaturesA) == 0:
+                    # There are no Opera signatures
+                    sig_status = "opera_ssg_0_1"
+                else:
+                    # Get the signatures of the Passim SSG
+                    signaturesP = [ "{}: {}".format(x.editype, x.code) for x in Signature.objects.filter(gold__equal__id__in=same_sig_ssgs) ]
+                    count = 0
+                    for sigA in signaturesA:
+                        if sigA in signaturesP:
+                            count += 1
+                    if len(signaturesA) == len(signaturesP) and count == len(signaturesA):
+                        # There is a full 1-1 match between Opara and Passim signatures
+                        sig_status = "opera_ssg_1_1"
+                    else:
+                        if count == 0:
+                            sig_status = "opera_ssg_0_n"
+                        elif count == len(signaturesA):
+                            # everything of Opera is in Passim, but Passim has more
+                            sig_status = "opera_ssg_1_n"
+                        else:
+                            sig_status = "opera_ssg_n_1"
+                if bDoCounting:
+                    if not sig_status in sig_matching:
+                        sig_matching[sig_status] = 0
+                    sig_matching[sig_status] += 1
+
+                # Save the sig_status                
+                oOperaSsg['existing_ssg']['sig_status'] = sig_status
+
+            # (8) combine the sections into one object
             oData['operas'] = lst_opera
             oData['opera_relations'] = lst_opera_rel
             oData['sig_dict'] = signature_dict
@@ -3306,7 +3349,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Determine the headers
                 headers = ['opera', 'sig_Clavis', 'sig_Gryson', 'sig_Other', 'inc', 'exp', 'note_langname', 'notes', 
-                           'date_estimate', 'author_name', 'count_manu', 'manu_type', 'existing_ssg']
+                           'date_estimate', 'author_name', 'count_manu', 'manu_type', 'existing_ssg', 'sig_status']
                 # Output this header row
                 csvwriter.writerow(headers)
 
@@ -3330,6 +3373,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     row.append(get_good_string(oSsg,'manuscripts'))
                     row.append(get_good_string(oSsg,'manu_type'))
                     row.append(get_good_string(oSsg,'existing_ssg','type'))
+                    row.append(get_good_string(oSsg,'existing_ssg','sig_status'))
 
                     # Output this row
                     csvwriter.writerow(row)
@@ -3345,6 +3389,9 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Show the existing stuff
                 for k,v in existing_dict.items():
                     oErr.Status("Existing {}: {}".format(k,v))
+                # Show the signature matching
+                for k,v in sig_matching.items():
+                    oErr.Status("Signature status {}: {}".format(k,v))
 
         except:
             msg = oErr.get_error_message()
