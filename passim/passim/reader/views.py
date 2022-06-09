@@ -3299,9 +3299,12 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 if len(same_sig_ssgs) == 0:
                     # There are no matching existing Passim SSGs
-                    sig_status = "opera_ssg_1_0"
+                    if len(signaturesA) == 0:
+                        sig_status = "opera_ssg_0_0"
+                    else:
+                        sig_status = "opera_ssg_1_0"
                 elif len(signaturesA) == 0:
-                    # There are no Opera signatures
+                    # There are no Opera signatures, but there are 
                     sig_status = "opera_ssg_0_1"
                 else:
                     # Get the signatures of the Passim SSG
