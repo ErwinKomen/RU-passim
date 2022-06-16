@@ -2979,7 +2979,11 @@ class EqualGoldHuwaToJson(BasicPart):
                 element = item.get(key)
                 if not element is None:
                     # Convert Clavis
-                    transformed = re.sub(r'\#.*', number, element)
+                    # transformed = re.sub(r'\#.*', number, element)
+                    transformed = rHashTag.sub(number, element).strip()
+                    # Remove final ',' if needed
+                    if transformed[-1] == ",":
+                        transformed = transformed.strip(",")
                     oAdd = dict(editype=editype, code=transformed)
                     signatures.append(oAdd)
             except:
@@ -2999,6 +3003,7 @@ class EqualGoldHuwaToJson(BasicPart):
         bDoCounting = True
         bUseOperaPassim = True
         rHasNumber = re.compile(r'.*[0-9].*')
+        rHashTag = re.compile(r'\#.*')
 
         count_manu_zero = 0     # Number of items linked to ZERO manuscripts
         count_manu_one = 0      # Number of items linked to just one manuscript
@@ -3380,7 +3385,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 lst_huwa_conv_sig = json.load(f)
             # Add the 'mask' to each item
             for item in lst_huwa_conv_sig:
-                mask = item['huwa'].replace("#", "(\\d+)(.*)")
+                mask = item['huwa'].replace("#", r"(\d[\d\s\,\-]*)(.*)")
                 item['mask'] = mask
         except:
             msg = oErr.get_error_message()
