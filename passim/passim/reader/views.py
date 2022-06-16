@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    EqualGold, Signature, \
+    EqualGold, Signature, SermonGold, Project2, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime
 
@@ -2505,6 +2505,7 @@ class ReaderImport(View):
         self.custom_init()
 
     def custom_init(self):
+        """Allow user to add code"""
         pass    
 
     def checkAuthentication(self,request):
@@ -3575,4 +3576,401 @@ class EqualGoldHuwaToJson(BasicPart):
 
         return oTables
 
+
+class ReaderEqualGold(View):
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'reader/import_ssgs.html'
+    obj = None
+    oStatus = None
+    data_file = ""
+    bClean = False
+    import_type = "undefined"
+    sourceinfo_url = "undefined"
+    username = ""
+    mForm = UploadFilesForm
+
+    def custom_init(self):
+        """Allow user to add code"""
+        pass    
+
+    def initializations(self, request, object_id):
+        # Clear errors
+        self.arErr = []
+        # COpy the request
+        self.request = request
+
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+        # ALWAYS: perform some custom initialisations
+        self.custom_init()
+
+    def post(self, request, pk=None):
+        # A POST request means we are trying to SAVE something
+        self.initializations(request, pk)
+
+        # Explicitly set the status to OK
+        self.data['status'] = "ok"
+
+        username = request.user.username
+        self.username = username
+
+        if self.checkAuthentication(request):
+            # Remove previous status object for this user
+            Status.objects.filter(user=username).delete()
+            # Create a status object
+            oStatus = Status(user=username, type=self.import_type, status="preparing")
+            oStatus.save()
+            # Make sure the status is available
+            self.oStatus = oStatus
+
+            lResults = []
+
+            # Get profile 
+            profile = Profile.get_user_profile(username) 
+                    
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
+
+            # The list of headers to be shown
+            lHeader = ['status', 'msg', 'name', 'idno', 'filename', 'url']
+
+            if self.mForm is None:
+                # Process the request
+                bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                if bOkay:
+                    # Adapt the 'source' to tell what we did 
+                    source.code = code
+                    oErr.Status(code)
+                    source.save()
+                    # Indicate we are ready
+                    oStatus.set("readyclose")
+                    # Get a list of errors
+                    error_list = [str(item) for item in self.arErr]
+
+                    statuscode = "error" if len(error_list) > 0 else "completed"
+
+                    # Create the context
+                    context = dict(
+                        statuscode=statuscode,
+                        results=lResults,
+                        error_list=error_list
+                        )
+                else:
+                    self.arErr.append(code)
+
+                if len(self.arErr) == 0:
+                    # Get the HTML response
+                    self.data['html'] = render_to_string(self.template_name, context, request)
+                else:
+                    lHtml = []
+                    for item in self.arErr:
+                        lHtml.append(item)
+                    self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+            else:
+                form = self.mForm(request.POST, request.FILES)
+                if form.is_valid():
+                    # NOTE: from here a breakpoint may be inserted!
+                    print('import_{}: valid form'.format(self.import_type))
+                    oErr = ErrHandle()
+                    try:
+
+                        # Process the request
+                        bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                        if bOkay:
+                            # Adapt the 'source' to tell what we did 
+                            source.code = code
+                            oErr.Status(code)
+                            source.save()
+                            # Indicate we are ready
+                            oStatus.set("readyclose")
+                            # Get a list of errors
+                            error_list = [str(item) for item in self.arErr]
+
+                            statuscode = "error" if len(error_list) > 0 else "completed"
+
+                            # Create the context
+                            context = dict(
+                                statuscode=statuscode,
+                                results=lResults,
+                                error_list=error_list
+                                )
+                        else:
+                            self.arErr.append(code)
+
+                        if len(self.arErr) == 0:
+                            # Get the HTML response
+                            self.data['html'] = render_to_string(self.template_name, context, request)
+                        else:
+                            lHtml = []
+                            for item in self.arErr:
+                                lHtml.append(item)
+                            self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+                    except:
+                        msg = oErr.get_error_message()
+                        oErr.DoError("import_{}".format(self.import_type))
+                        self.data['html'] = msg
+                        self.data['status'] = "error"
+
+                else:
+                    self.data['html'] = 'invalid form: {}'.format(form.errors)
+                    self.data['status'] = "error"
+        
+            # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+
+    def checkAuthentication(self,request):
+        # first check for authentication
+        if not request.user.is_authenticated:
+            # Provide error message
+            self.data['html'] = "Please log in to work on this project"
+            return False
+        elif not user_is_ingroup(request, 'passim_uploader'):
+            # Provide error message
+            self.data['html'] = "Sorry, you do not have the rights to upload anything"
+            return False
+        else:
+            return True
+
+    def process_files(self, request, source, lResults, lHeader):
+        """This is a wrapper, that needs to be specified for each individual import function"""
+
+        bOkay = True
+        code = ""
+        return bOkay, code
+
+
+class ReaderHuwaImport(ReaderEqualGold):
+    """HUWA import via a JSON file"""
+
+    import_type = "huwajson"
+    sourceinfo_url = "http://www.ru.nl"
+
+    def process_files(self, request, source, lResults, lHeader):
+        """Process a JSON file for HUWA import"""
+
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        file_list = []
+        oErr = ErrHandle()
+        try:
+            # Make sure we have the username
+            username = self.username
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "json":
+                            # This is a JSON file
+                            oResult = self.read_json(username, data_file, filename, self.arErr, source=source)
+
+                            if oResult == None or oResult['status'] == "error":
+                                # Process results
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
+                                                filename=oResult['filename'])
+                            else:
+                                # Get the results from oResult
+                                obj = oResult['obj']
+                                # Process results
+                                self.add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
+                                                name=oResult['name'], 
+                                                idno=obj.idno,filename=oResult['filename'])
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "ijson", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No AFs (SSGs) have been added")
+                        else:
+                            lResults.append(oResult)
+
+            code = "Imported using the import_type [huwajson] on these JSON file(s): {}".format(", ".join(file_list))
+
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+            oErr.DoError("ReaderHuwaImport/process_files")
+
+        return bOkay, code
+
+    def read_json(self, username, data_file, filename, arErr, jsondoc=None, sName = None, source=None):
+        """Read one HUWA JSON file"""
+
+        oErr = ErrHandle()
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        lst_imported = []
+        msg = ""
+        try:
+            # This is a JSON file: Load the file into a variable
+            sData = data_file.read()
+            oOperaData = json.loads( sData.decode(encoding="utf8"))
+
+            # Load the relations separately
+            opera_relations = oOperaData.get("opera_relations")
+            # Load the opera definitions
+            operas = oOperaData.get("operas")
+
+            # Figure out what the HUWA project is
+            project_huwa = Project2.objects.filter(name__icontains="huwa").first()
+
+            # Now read and process the input according to issue #534
+            for oOpera in operas:
+                oImported = None
+
+                # Get the parameters that are needed
+                existing_ssg = oOpera.get("existing_ssg")
+                sig_status = existing_ssg.get("sig_status")
+                ssg_type = existing_ssg.get("type").split(":")[0]
+                manu_type = oOpera.get("manu_type")
+
+                # First criterion: skip all manu_type 'zero_links']
+                if manu_type != 'zero_links':
+                    # Second criterion: look at possible sig_status
+                    if sig_status == "opera_ssg_0_0":
+                        # Skip for now
+                        pass
+                    elif sig_status == "opera_ssg_0_n":
+                        # Skip for now
+                        pass
+                    elif sig_status == "opera_ssg_1_0":
+                        # Depending on ssg_type (though this appears to be irrelevant)
+                        if ssg_type == "ssgmF":
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,project_huwa)
+                        else:
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,project_huwa)
+                    elif sig_status == "opera_ssg_1_1":
+                        if ssg_type in ["ssgmF", "ssgmE"]:
+                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                            oImported = self.import_one_json(oOpera,project_huwa)
+                    elif sig_status == "opera_ssg_1_n":
+                        # Skip for now
+                        pass
+                    elif sig_status == "opera_ssg_n_1":
+                        # Skip for now
+                        pass
+                # Process the [oImported]
+                # TODO
+                if not oImported is None:
+                    lst_imported.append(oImported)
+
+            # Add the list to the stuff we return
+            oBack['imported'] = lst_imported
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("read_json")
+            oResult['status'] = 'error'
+            oResult['msg'] = msg
+
+        return oBack
+
+    def import_one_json(self, oOpera, project_huwa):
+        """Import one OPERA definition of a SSG/AF"""
+
+        oErr = ErrHandle()
+        oImported = dict(status="ok")
+        existing_ssg_option = "add_to_project"
+        try:
+            # extract all parameters that *could* be relevant
+            opera_id = oImported.get("opera")
+            signatures = oImported.get("signaturesA")
+            incipit = oImported.get("incipit")
+            explicit = oImported.get("explicit")
+            note_langname = oImported.get("note_langname")
+            notes = oImported.get("notes")
+            date_estimate = oImported.get("date_estimate")
+            author_id = oImported.get("author").get("id")
+            same_sig_ssgs = oImported.get("same_sig_ssgs")
+
+            # If there is an existing SSG with the same Signature(s)...
+            if len(same_sig_ssgs) == 0:
+                # No, there are no SSGs with the same sig yet
+
+                # (1) Get ID's for the signatures
+                sig_ids = []
+                for oSig in signatures:
+                    editype = oSig.get("editype")
+                    code = oSig.get("code")
+                    sig = Signature.objects.filter(code=code, editype=editype).first()
+                    if sig is None:
+                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+
+                # (1) Look for the SG with the correct signature(s)
+                
+                gold = SermonGold.objects.create(
+                    author_id=author_id, incipit=incipit, explicit=explicit,
+                    equal=ssg)
+
+                # Add all the signatures
+                for oSig in signatures:
+                    # Create a signature that is linked to the correct SG
+                    editype = oSig.get("editype")
+                    code = oSig.get("code")
+                    sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+            else:
+                # There already is a SSG with the same Signature(s)
+                ssg = same_sig_ssgs[0]
+
+                # Options:
+                # add_gold: All we can do is add a SG with the characteristics here?
+                # add_to_project: just add the existing SSG to the HUWA project
+                
+                if existing_ssg_option == "add_gold":
+                    gold = SermonGold.objects.create(
+                        author_id=author_id, incipit=incipit, explicit=explicit,
+                        equal=ssg)
+
+                    # Add all the signatures
+                    for oSig in signatures:
+                        # Create a signature that is linked to the correct SG
+                        editype = oSig.get("editype")
+                        code = oSig.get("code")
+                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                elif existing_ssg_option == "add_to_project":
+                    # Just add the existing SSG to the project HUWA
+                    ssg.projects.add(project_huwa)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("import_one_json")
+            oImported['status'] = "error"
+            oImported['msg'] = msg
+
+        return oImported
 

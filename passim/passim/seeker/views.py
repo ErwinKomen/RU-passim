@@ -12910,6 +12910,24 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
                 ]
+            # Possibly add to 'uploads'
+            bHasJson = False
+            for item in self.uploads:
+                if item['title'] == "huwajson":
+                    bHasJson = True
+
+            # Should json be added?
+            if not bHasJson:
+                # Add a reference to the Json upload method
+                html = []
+                html.append("Upload SSGs/AFs from a HUWA json specification.")
+                html.append("<b>Note 1:</b> this may OVERWRITE existing information!")
+                html.append("<b>Note 2:</b> PROJECT assignment is according to issue #534")
+                msg = "<br />".join(html)
+                oJson = dict(title="huwajson", label="HUWA json",
+                              url=reverse('import_huwa'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
 
         return None
     
