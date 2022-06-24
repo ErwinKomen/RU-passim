@@ -52,9 +52,9 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    EqualGold, Signature, SermonGold, Project2, \
+    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime
+    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -3905,7 +3905,10 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         oErr = ErrHandle()
         oImported = dict(status="ok")
-        existing_ssg_option = "add_to_project"
+
+        # Make the correct choice here (see 'options' below)
+        existing_ssg_option = "add_gold_and_project"
+
         try:
             # extract all parameters that *could* be relevant
             opera_id = oImported.get("opera")
@@ -3917,6 +3920,7 @@ class ReaderHuwaImport(ReaderEqualGold):
             date_estimate = oImported.get("date_estimate")
             author_id = oImported.get("author").get("id")
             same_sig_ssgs = oImported.get("same_sig_ssgs")
+            sig_status = oImported['existing_ssg']['sig_status']
 
             # If there is an existing SSG with the same Signature(s)...
             if len(same_sig_ssgs) == 0:
@@ -3930,6 +3934,8 @@ class ReaderHuwaImport(ReaderEqualGold):
                     sig = Signature.objects.filter(code=code, editype=editype).first()
                     if sig is None:
                         sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                    # Make sure all relevant ID's are in the array
+                    sig_ids.append(sig.id)
 
                 # (1) Look for the SG with the correct signature(s)
                 
@@ -3947,9 +3953,16 @@ class ReaderHuwaImport(ReaderEqualGold):
                 # There already is a SSG with the same Signature(s)
                 ssg = same_sig_ssgs[0]
 
+                # Create a link between the SSG and the opera identifier
+                EqualGoldExternal.objects.create(
+                    equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                    subset = sig_status)
+
                 # Options:
-                # add_gold: All we can do is add a SG with the characteristics here?
-                # add_to_project: just add the existing SSG to the HUWA project
+                # - add_gold: All we can do is add a SG with the characteristics here?
+                # - add_to_project: just add the existing SSG to the HUWA project
+                # - add_gold_and_project: add existing SSG to HUWA project + add SG and link it to that SSG
+                # NOTE: according to issue #534, the [add_gold_and_project] is the correct method
                 
                 if existing_ssg_option == "add_gold":
                     gold = SermonGold.objects.create(
@@ -3965,6 +3978,22 @@ class ReaderHuwaImport(ReaderEqualGold):
                 elif existing_ssg_option == "add_to_project":
                     # Just add the existing SSG to the project HUWA
                     ssg.projects.add(project_huwa)
+                elif existing_ssg_option == "add_gold_and_project":
+                    # Add the existing SSG to the project HUWA
+                    ssg.projects.add(project_huwa)
+
+                    # Add an SG, linking it to the existing [ssg]
+                    gold = SermonGold.objects.create(
+                        author_id=author_id, incipit=incipit, explicit=explicit,
+                        equal=ssg)
+
+                    # Add all the signatures, linking them to the correct SG
+                    for oSig in signatures:
+                        # Create a signature that is linked to the correct SG
+                        editype = oSig.get("editype")
+                        code = oSig.get("code")
+                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+
 
         except:
             msg = oErr.get_error_message()

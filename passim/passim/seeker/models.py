@@ -54,6 +54,7 @@ SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+EXTERNAL_TYPE = "seeker.extype"
 SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
@@ -92,6 +93,9 @@ CERTAIN_LOW = 'unc'     # uncertain
 CERTAIN_AVE = 'ave'     # average
 CERTAIN_HIGH = 'rea'    # reasonably certain
 CERTAIN_HIGHEST = 'vce' # very certain
+
+# EXTERNAL TYPES
+EXTERNAL_HUWA_OPERA = "huwop"
 
 STYPE_IMPORTED = 'imp'
 STYPE_MANUAL = 'man'
@@ -7632,6 +7636,28 @@ class EqualGoldProject(models.Model):
         else:
             response = None
         return response
+
+
+class EqualGoldExternal(models.Model):
+    """Link between an SSG/AF and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a EqualGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equalexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+    # [0-1] Possible subset
+    subset = models.CharField("Subset", max_length=MAX_TEXT_LEN, blank=True, null=True)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "SSG_{} to id_{} ({})".format(self.equal.id, self.externalid, self.externaltype)
+        return sBack
+
     
 
 class SermonGoldSame(models.Model):
