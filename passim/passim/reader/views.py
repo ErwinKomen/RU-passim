@@ -3845,8 +3845,9 @@ class ReaderHuwaImport(ReaderEqualGold):
             # Load the opera definitions
             operas = oOperaData.get("operas")
 
-            # Figure out what the HUWA project is
+            # Figure out what the HUWA and the PASSIM project is
             project_huwa = Project2.objects.filter(name__icontains="huwa").first()
+            project_passim = Project2.objects.filter(name__icontains="passim").first()
 
             # Now read and process the input according to issue #534
             for oOpera in operas:
@@ -3858,8 +3859,21 @@ class ReaderHuwaImport(ReaderEqualGold):
                 ssg_type = existing_ssg.get("type").split(":")[0]
                 manu_type = oOpera.get("manu_type")
 
+                # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
+                if manu_type == "zero_links":
+                    # This Opera has no links to inhalt
+                    # Second criterion: check Gryson/Clavis code (via sig_status)
+                    if sig_status == "opera_ssg_1_0":
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera, [project_huwa, project_passim])
+                    elif sig_status == "opera_ssg_1_1":
+                        # Only create SSG if there is a match in inc/exp
+                        if ssg_type in ["ssgmF", "ssgmE"]:
+                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                            oImported = self.import_one_json(oOpera,[project_huwa])
+
                 # First criterion: skip all manu_type 'zero_links']
-                if manu_type != 'zero_links':
+                elif manu_type != 'zero_links':
                     # Second criterion: look at possible sig_status
                     if sig_status == "opera_ssg_0_0":
                         # Skip for now
@@ -3871,14 +3885,14 @@ class ReaderHuwaImport(ReaderEqualGold):
                         # Depending on ssg_type (though this appears to be irrelevant)
                         if ssg_type == "ssgmF":
                             # Yes: import this one
-                            oImported = self.import_one_json(oOpera,project_huwa)
+                            oImported = self.import_one_json(oOpera,[project_huwa])
                         else:
                             # Yes: import this one
-                            oImported = self.import_one_json(oOpera,project_huwa)
+                            oImported = self.import_one_json(oOpera,[project_huwa])
                     elif sig_status == "opera_ssg_1_1":
                         if ssg_type in ["ssgmF", "ssgmE"]:
                             # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,project_huwa)
+                            oImported = self.import_one_json(oOpera,[project_huwa])
                     elif sig_status == "opera_ssg_1_n":
                         # Skip for now
                         pass
@@ -3900,14 +3914,11 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         return oBack
 
-    def import_one_json(self, oOpera, project_huwa):
+    def import_one_json(self, oOpera, projects):
         """Import one OPERA definition of a SSG/AF"""
 
         oErr = ErrHandle()
         oImported = dict(status="ok")
-
-        # Make the correct choice here (see 'options' below)
-        existing_ssg_option = "add_gold_and_project"
 
         try:
             # extract all parameters that *could* be relevant
@@ -3958,41 +3969,23 @@ class ReaderHuwaImport(ReaderEqualGold):
                     equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
                     subset = sig_status)
 
-                # Options:
-                # - add_gold: All we can do is add a SG with the characteristics here?
-                # - add_to_project: just add the existing SSG to the HUWA project
-                # - add_gold_and_project: add existing SSG to HUWA project + add SG and link it to that SSG
-                # NOTE: according to issue #534, the [add_gold_and_project] is the correct method
-                
-                if existing_ssg_option == "add_gold":
-                    gold = SermonGold.objects.create(
-                        author_id=author_id, incipit=incipit, explicit=explicit,
-                        equal=ssg)
+                # Note: see issue #534 - add existing SSG to list of projects + add SG and link it to SSG
+                # (1) Add the existing SSG to the project HUWA
+                for project in projects:
+                    if ssg.projects.filter(project=project).count() == 0:
+                        ssg.projects.add(project)
 
-                    # Add all the signatures
-                    for oSig in signatures:
-                        # Create a signature that is linked to the correct SG
-                        editype = oSig.get("editype")
-                        code = oSig.get("code")
-                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
-                elif existing_ssg_option == "add_to_project":
-                    # Just add the existing SSG to the project HUWA
-                    ssg.projects.add(project_huwa)
-                elif existing_ssg_option == "add_gold_and_project":
-                    # Add the existing SSG to the project HUWA
-                    ssg.projects.add(project_huwa)
+                # (2) Add an SG, linking it to the existing [ssg]
+                gold = SermonGold.objects.create(
+                    author_id=author_id, incipit=incipit, explicit=explicit,
+                    equal=ssg)
 
-                    # Add an SG, linking it to the existing [ssg]
-                    gold = SermonGold.objects.create(
-                        author_id=author_id, incipit=incipit, explicit=explicit,
-                        equal=ssg)
-
-                    # Add all the signatures, linking them to the correct SG
-                    for oSig in signatures:
-                        # Create a signature that is linked to the correct SG
-                        editype = oSig.get("editype")
-                        code = oSig.get("code")
-                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                # (3) Add all the signatures, linking them to the correct SG
+                for oSig in signatures:
+                    # Create a signature that is linked to the correct SG
+                    editype = oSig.get("editype")
+                    code = oSig.get("code")
+                    sig = Signature.objects.create(code=code, editype=editype, gold=gold)
 
 
         except:
