@@ -5008,7 +5008,8 @@ class SermonListView(BasicList):
     basic_name = "sermon"
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'sectiontitle', 'title', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
+                  'manu__yearstart', 'sectiontitle', 'title', '','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
@@ -5016,13 +5017,14 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Section',     'order': 'o=5', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate'},
+        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
-        {'name': 'Title',       'order': 'o=6', 'type': 'str', 'custom': 'title', 
+        {'name': 'Title',       'order': 'o=7', 'type': 'str', 'custom': 'title', 
          'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Status',      'order': 'o=10', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
                 {"name": "Author",           "id": "filter_author",         "enabled": False},
@@ -5033,7 +5035,7 @@ class SermonListView(BasicList):
                 {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
-                {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
+                {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
@@ -5049,12 +5051,12 @@ class SermonListView(BasicList):
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "City/location",    "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Library",          "id": "filter_library",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Origin",           "id": "filter_origin",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Provenance",       "id": "filter_provenance",     "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "Date from",        "id": "filter_datestart",      "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Date range",       "id": "filter_daterange",      "enabled": False, "head_id": "filter_manuscript"},
+                # {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Manuscript type",  "id": "filter_manutype",       "enabled": False, "head_id": "filter_manuscript"},
                 ]
     
@@ -5100,8 +5102,8 @@ class SermonListView(BasicList):
             {'filter': 'origin',        'fkfield': 'msitem__codico__origin',          'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'msitem__codico__provenances|msitem__codico__provenances__location',     
              'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
+            {'filter': 'daterange',     'dbfield': 'msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
             {'filter': 'manutype',      'dbfield': 'msitem__manu__mtype',     'keyS': 'manutype',     'keyType': 'fieldchoice', 'infield': 'abbr'},
             ]},
         {'section': 'other', 'filterlist': [
@@ -5181,6 +5183,10 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "msdate":
+            manu = instance.get_manuscript()
+            # Get the yearstart-yearfinish
+            html.append(manu.get_dates(True))
         elif custom == "title":
             sTitle = ""
             if instance.title != None and instance.title != "":

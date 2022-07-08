@@ -3899,25 +3899,51 @@ class Manuscript(models.Model):
             oErr.DoError("get_country")
         return country
 
-    def get_dates(self):
+    def get_dates(self, bOverall=False):
         lhtml = []
-        # Get all the date ranges in the correct order
-        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
-        # Walk the date range objects
-        for obj in qs:
-            # Determine the output for this one daterange
-            ref = ""
-            if obj.reference: 
-                if obj.pages: 
-                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+        oErr = ErrHandle()
+        try:
+            # Get all the date ranges in the correct order
+            qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
+            min_date = 3000
+            max_date = 0
+            # Walk the date range objects
+            for obj in qs:
+                if bOverall:
+                    if not obj.yearstart is None:
+                        if obj.yearstart < min_date: min_date = obj.yearstart
+                    if not obj.yearfinish is None:
+                        if obj.yearfinish > max_date: max_date = obj.yearfinish
                 else:
-                    ref = " (see {})".format(obj.reference.get_full_markdown())
-            if obj.yearstart == obj.yearfinish:
-                years = "{}".format(obj.yearstart)
-            else:
-                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
-            item = "{} {}".format(years, ref)
-            lhtml.append(item)
+                    # Determine the output for this one daterange
+                    ref = ""
+                    if obj.reference: 
+                        if obj.pages: 
+                            ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                        else:
+                            ref = " (see {})".format(obj.reference.get_full_markdown())
+                    if obj.yearstart == obj.yearfinish:
+                        years = "{}".format(obj.yearstart)
+                    else:
+                        years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+                    item = "{} {}".format(years, ref)
+                    lhtml.append(item)
+            if bOverall:
+                if min_date < 3000:
+                    if max_date > 0:
+                        if min_date == max_date:
+                            lhtml.append("{}".format(min_date))
+                        else:
+                            lhtml.append("{}-{}".format(min_date, max_date))
+                    else:
+                        lhtml.append("{}".format(min_date))
+                elif max_date > 0:
+                    lhtml.append("{}".format(max_date))
+                else:
+                    lhtml.append("-")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_dates")
 
         return ", ".join(lhtml)
 
