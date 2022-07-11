@@ -52,7 +52,7 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, \
+    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
@@ -3324,6 +3324,8 @@ class EqualGoldHuwaToJson(BasicPart):
                             # everything of Opera is in Passim, but Passim has more
                             sig_status = "opera_ssg_1_n"
                         else:
+                            # There is an overlap between opera/passim signatures > 1
+                            # but the number of Opera and Passim signatures is not entirely equal
                             sig_status = "opera_ssg_n_1"
                 if bDoCounting:
                     if not sig_status in sig_matching:
@@ -3858,19 +3860,25 @@ class ReaderHuwaImport(ReaderEqualGold):
                 sig_status = existing_ssg.get("sig_status")
                 ssg_type = existing_ssg.get("type").split(":")[0]
                 manu_type = oOpera.get("manu_type")
+                bMakeSG = False
 
                 # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
                 if manu_type == "zero_links":
                     # This Opera has no links to inhalt
-                    # Second criterion: check Gryson/Clavis code (via sig_status)
-                    if sig_status == "opera_ssg_1_0":
-                        # Yes: import this one
-                        oImported = self.import_one_json(oOpera, [project_huwa, project_passim])
-                    elif sig_status == "opera_ssg_1_1":
-                        # Only create SSG if there is a match in inc/exp
-                        if ssg_type in ["ssgmF", "ssgmE"]:
-                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,[project_huwa])
+                    # DOUBLE CHECK - at first we don't do anything with them
+                    pass
+
+                    # ============= PLEASE LEAVE THIS UNTIL issue #534 is SORTED OUT ======================
+                    ## Second criterion: check Gryson/Clavis code (via sig_status)
+                    #if sig_status == "opera_ssg_1_0":
+                    #    # Yes: import this one
+                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim])
+                    #elif sig_status == "opera_ssg_1_1":
+                    #    # Only create SSG if there is a match in inc/exp
+                    #    if ssg_type in ["ssgmF", "ssgmE"]:
+                    #        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                    #        oImported = self.import_one_json(oOpera,[project_huwa])
+                    # =====================================================================================
 
                 # First criterion: skip all manu_type 'zero_links']
                 elif manu_type != 'zero_links':
@@ -3890,9 +3898,14 @@ class ReaderHuwaImport(ReaderEqualGold):
                             # Yes: import this one
                             oImported = self.import_one_json(oOpera,[project_huwa])
                     elif sig_status == "opera_ssg_1_1":
+                        # Indicate that a new SG must be made for these
+                        bMakeSG = True
                         if ssg_type in ["ssgmF", "ssgmE"]:
                             # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,[project_huwa])
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG)
+                        else:
+                            # Skip these: a subset is made of/for them
+                            pass
                     elif sig_status == "opera_ssg_1_n":
                         # Skip for now
                         pass
@@ -3914,7 +3927,7 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         return oBack
 
-    def import_one_json(self, oOpera, projects):
+    def import_one_json(self, oOpera, projects, bMakeSG=False):
         """Import one OPERA definition of a SSG/AF"""
 
         oErr = ErrHandle()
@@ -3922,70 +3935,96 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         try:
             # extract all parameters that *could* be relevant
-            opera_id = oImported.get("opera")
-            signatures = oImported.get("signaturesA")
-            incipit = oImported.get("incipit")
-            explicit = oImported.get("explicit")
-            note_langname = oImported.get("note_langname")
-            notes = oImported.get("notes")
-            date_estimate = oImported.get("date_estimate")
-            author_id = oImported.get("author").get("id")
-            same_sig_ssgs = oImported.get("same_sig_ssgs")
-            sig_status = oImported['existing_ssg']['sig_status']
+            opera_id = oOpera.get("opera")
+            signatures = oOpera.get("signaturesA")
+            incipit = oOpera.get("incipit")
+            explicit = oOpera.get("explicit")
+            note_langname = oOpera.get("note_langname")
+            notes = oOpera.get("notes")
+            date_estimate = oOpera.get("date_estimate")
+            author_id = oOpera.get("author").get("id")
+            same_sig_ssgs = oOpera.get("same_sig_ssgs")
+            sig_status = oOpera['existing_ssg']['sig_status']
+            existing_type = oOpera['existing_ssg']['type']
+            manu_type = oOpera['manu_type']
+
+            # Make a subset identifier
+            existing_type = existing_type.split(":")[0]
+            manu_type= manu_type.split("_")[0]
+            subset = json.dumps(dict(sig=sig_status, manu=manu_type, existing=existing_type ))
 
             # If there is an existing SSG with the same Signature(s)...
             if len(same_sig_ssgs) == 0:
                 # No, there are no SSGs with the same sig yet
 
-                # (1) Get ID's for the signatures
-                sig_ids = []
-                for oSig in signatures:
-                    editype = oSig.get("editype")
-                    code = oSig.get("code")
-                    sig = Signature.objects.filter(code=code, editype=editype).first()
-                    if sig is None:
-                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
-                    # Make sure all relevant ID's are in the array
-                    sig_ids.append(sig.id)
+                # For the moment: not yet implemented
+                bZeroOperaImplemented = False
 
-                # (1) Look for the SG with the correct signature(s)
+                if bZeroOperaImplemented:
+
+                    # (1) Get ID's for the signatures
+                    sig_ids = []
+                    for oSig in signatures:
+                        editype = oSig.get("editype")
+                        code = oSig.get("code")
+                        sig = Signature.objects.filter(code=code, editype=editype).first()
+                        if sig is None:
+                            sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                        # Make sure all relevant ID's are in the array
+                        sig_ids.append(sig.id)
+
+                    # (1) Look for the SG with the correct signature(s)
                 
-                gold = SermonGold.objects.create(
-                    author_id=author_id, incipit=incipit, explicit=explicit,
-                    equal=ssg)
+                    gold = SermonGold.objects.create(
+                        author_id=author_id, incipit=incipit, explicit=explicit,
+                        equal=ssg)
 
-                # Add all the signatures
-                for oSig in signatures:
-                    # Create a signature that is linked to the correct SG
-                    editype = oSig.get("editype")
-                    code = oSig.get("code")
-                    sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                    # Add all the signatures
+                    for oSig in signatures:
+                        # Create a signature that is linked to the correct SG
+                        editype = oSig.get("editype")
+                        code = oSig.get("code")
+                        sig = Signature.objects.create(code=code, editype=editype, gold=gold)
             else:
-                # There already is a SSG with the same Signature(s)
-                ssg = same_sig_ssgs[0]
+                # There already is at least one SSG with the same Signature(s)
+                ssg_id = same_sig_ssgs[0]
+                ssg = EqualGold.objects.filter(id=ssg_id).first()
 
-                # Create a link between the SSG and the opera identifier
-                EqualGoldExternal.objects.create(
-                    equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
-                    subset = sig_status)
+                # Double check if this has already been done...
+                obj = EqualGoldExternal.objects.filter(
+                    equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA).first()
 
-                # Note: see issue #534 - add existing SSG to list of projects + add SG and link it to SSG
-                # (1) Add the existing SSG to the project HUWA
-                for project in projects:
-                    if ssg.projects.filter(project=project).count() == 0:
-                        ssg.projects.add(project)
+                if obj is None:
+                    # This one has not been imported yet...
 
-                # (2) Add an SG, linking it to the existing [ssg]
-                gold = SermonGold.objects.create(
-                    author_id=author_id, incipit=incipit, explicit=explicit,
-                    equal=ssg)
+                    # Note: see issue #534 - add existing SSG to list of projects + add SG and link it to SSG
+                    # (1) Add the existing SSG to the project HUWA
+                    for project in projects:
+                        if EqualGoldProject.objects.filter(equal=ssg, project=project).count() == 0:
+                            EqualGoldProject.objects.create(equal=ssg, project=project)
 
-                # (3) Add all the signatures, linking them to the correct SG
-                for oSig in signatures:
-                    # Create a signature that is linked to the correct SG
-                    editype = oSig.get("editype")
-                    code = oSig.get("code")
-                    sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                    if bMakeSG:
+                        # (2) Add an SG, linking it to the existing [ssg]
+                        gold = SermonGold.objects.create(
+                            author_id=author_id, incipit=incipit, explicit=explicit,
+                            equal=ssg)
+
+                        # (3) Add all the signatures, linking them to the correct SG
+                        for oSig in signatures:
+                            # Create a signature that is linked to the correct SG
+                            editype = oSig.get("editype")
+                            code = oSig.get("code")
+                            sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+
+                        # (4) Add a keyword to the SG to indicate this is from HUWA
+                        kw_huwa = Keyword.objects.filter(name__contains="HUWA", visibility="edi").first()
+                        if not kw_huwa is None:
+                            gold.keywords.add(kw_huwa)
+
+                    # Create a link between the SSG and the opera identifier
+                    EqualGoldExternal.objects.create(
+                        equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                        subset = subset)
 
 
         except:
