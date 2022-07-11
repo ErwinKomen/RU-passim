@@ -4137,10 +4137,6 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
-    #def get_project(self):
-    #    sBack = "-" if self.project == None else self.project.name
-    #    return sBack
-
     def get_projects(self):
         sBack = "-" 
         if self.projects.count() > 0:
@@ -4149,12 +4145,6 @@ class Manuscript(models.Model):
                 html.append(obj.name)
             sBack = ", ".join(html)
         return sBack
-
-    #def get_project_markdown(self):
-    #    sBack = "-"
-    #    if self.project:
-    #        sBack = '<span class="project">{}</span>'.format(self.project.name)
-    #    return sBack
 
     def get_project_markdown2(self): 
         lHtml = []

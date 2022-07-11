@@ -1523,59 +1523,6 @@ def do_provenance(request):
         oErr.DoError("do_provenance")
         return reverse('home')
 
-# Issue #426: should be removed in due course
-#def do_daterange(request):
-#    """Copy data ranges from manuscripts to separate tables - if not already there"""
-
-#    oErr = ErrHandle()
-#    try:
-#        assert isinstance(request, HttpRequest)
-#        # Specify the template
-#        template_name = 'tools.html'
-#        # Define the initial context
-#        context =  {'title':'RU-passim-tools',
-#                    'year':get_current_datetime().year,
-#                    'pfx': APP_PREFIX,
-#                    'site_url': admin.site.site_url}
-#        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-#        context['is_app_editor'] = user_is_ingroup(request, app_editor)
-
-#        # Only passim uploaders can do this
-#        if not context['is_app_uploader']: return reverse('home')
-
-#        # Indicate the necessary tools sub-part
-#        context['tools_part'] = "Update from Manuscript to Daterange table"
-
-#        # Process this visit
-#        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
-
-#        # Create list to be returned
-#        result_list = []
-
-#        # Visit all Manuscripts
-#        qs = Manuscript.objects.all()
-#        lst_add = []
-#        for obj in qs:
-#            # Check if there are any associated Dateranges
-#            if obj.manuscript_dateranges.all().count() == 0:
-#                # There are no date ranges yet: create just ONE
-#                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
-#                # Show that we added it
-#                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
-#                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
-#                lst_add.append(sAdd)
-
-#        # Wrapping it up
-#        result_list.append(dict(part="Added", result= lst_add))
-#        context['result_list'] = result_list
-
-#        # Render and return the page
-#        return render(request, template_name, context)
-#    except:
-#        msg = oErr.get_error_message()
-#        oErr.DoError("do_daterange")
-#        return reverse('home')
-
 def do_mext(request):
     """Copy all 'url' fields from Manuscript instances to separate ManuscriptExt instances and link them to the Manuscript"""
 
@@ -5009,15 +4956,19 @@ class SermonListView(BasicList):
     template_help = "seeker/filter_help.html"
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
-                  'manu__yearstart', 'sectiontitle', 'title', '','', 'stype']
+                  'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
+                  'sectiontitle', 'title', '','', 'stype']
     order_default = order_cols
     order_heads = [
-        {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
-        {'name': 'Signature',   'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111'}, 
+        {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
+         'title': 'Attributed author'}, 
+        {'name': 'Gryson/Clavis', 'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111',
+         'title': 'Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon'}, 
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate'},
+        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate',
+         'title': 'Date of the manuscript'},
         {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
         {'name': 'Title',       'order': 'o=7', 'type': 'str', 'custom': 'title', 
@@ -5026,8 +4977,8 @@ class SermonListView(BasicList):
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
         {'name': 'Status',      'order': 'o=10', 'type': 'str', 'custom': 'status'}]
 
-    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
-                {"name": "Author",           "id": "filter_author",         "enabled": False},
+    filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
+                {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
@@ -12719,7 +12670,7 @@ class EqualGoldDetails(EqualGoldEdit):
                         '<span title="Collection name">coll.</span>', 
                         '<span title="Item">item</span>', 
                         '<span title="Folio number">ff.</span>', 
-                        '<span title="Attributed author">auth.</span>', 
+                        '<span title="Attributed author">attr. auth.</span>', 
                         '<span title="Incipit">inc.</span>', 
                         '<span title="Explicit">expl.</span>', 
                         '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
