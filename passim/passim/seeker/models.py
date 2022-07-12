@@ -7673,8 +7673,7 @@ class EqualGoldExternal(models.Model):
     def __str__(self):
         sBack = "SSG_{} to id_{} ({})".format(self.equal.id, self.externalid, self.externaltype)
         return sBack
-
-    
+        
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""

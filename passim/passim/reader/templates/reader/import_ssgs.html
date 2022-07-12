@@ -20,15 +20,19 @@
 
   <div class="col-md-12 collapse" id="man-list">
     <table>
-      <thead><tr><th>#</th><th>Json File</th><th>Authority File</th><th>Gryson</th><th>Clavis</th></tr></thead>
+      <thead><tr><th>#</th><th>Json File</th><th>Opera</th><th>Gold</th><th>Authority File</th><th>Gryson / Clavis</th><th>SSG match</th><th>Manu type</th><th>Sig Status</th></tr></thead>
       <tbody>
         {% for item in results %}
           <tr>
             <td>{{forloop.counter}}</td>
             <td>{{item.filename}}</td>
-            <td>{{item.name}}</td>
-            <td>{{item.gryson}}</td>
-            <td>{{item.clavis}}</td>
+            <td>{{item.opera}}</td>
+            <td>{{item.gold}}</td>
+            <td>{{item.ssg}}</td>
+            <td>{{item.siglist}}</td>
+            <td>{{item.ssgmatch}}</td>
+            <td>{{item.manutype}}</td>
+            <td>{{item.sigstatus}}</td>
           </tr>
         {% endfor %}
       </tbody>
