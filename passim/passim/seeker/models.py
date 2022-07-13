@@ -6723,12 +6723,18 @@ class EqualGold(models.Model):
     def sermon_number(author):
         """Determine what the sermon number *would be* for the indicated author"""
 
-        # Check the highest sermon number for this author
-        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
-        if qs_ssg.count() == 0:
-            iNumber = 1
-        else:
-            iNumber = qs_ssg.first().number + 1
+        iNumber = 1
+        oErr = ErrHandle()
+        try:
+            # Check the highest sermon number for this author
+            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+            if qs_ssg.count() == 0:
+                iNumber = 1
+            else:
+                iNumber = qs_ssg.first().number + 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("sermon_number")
         return iNumber
 
     def set_firstsig(self):
@@ -6737,6 +6743,7 @@ class EqualGold(models.Model):
         if first != None:
             firstsig = first.code
             if self.firstsig != firstsig:
+                self.firstsig = firstsig
                 # Save changes
                 self.save()
         return True

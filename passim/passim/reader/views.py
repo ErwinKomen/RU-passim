@@ -52,8 +52,9 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, \
+    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
+    Collection, CollectionSuper, CollectionGold, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -3979,7 +3980,29 @@ class ReaderHuwaImport(ReaderEqualGold):
         try:
             # This is a JSON file: Load the file into a variable
             sData = data_file.read()
-            oOperaData = json.loads( sData.decode(encoding="utf8"))
+            oOperaData = json.loads( sData.decode(encoding="utf-8"))
+
+            # Think of a dataset name to connect all the input with
+            sNowTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+            # SSG collection
+            sDatasetSsg = "Huwa SSG/AF import {}".format(sNowTime)
+            coll_super = Collection.objects.filter(name=sDatasetSsg).first()
+            if coll_super is None:
+                profile = Profile.get_user_profile(self.request.user.username)
+                coll_super = Collection.objects.create(
+                    name=sDatasetSsg, readonly=True, owner=profile,
+                    scope="team", type="super", settype="pd",
+                    descrip="Automatically uploaded SSG/AF from HUWA JSON at {}".format(sNowTime))
+            # Gold collection
+            sDatasetGold = "Huwa SG import {}".format(sNowTime)
+            coll_gold = Collection.objects.filter(name=sDatasetGold).first()
+            if coll_gold is None:
+                profile = Profile.get_user_profile(self.request.user.username)
+                coll_gold = Collection.objects.create(
+                    name=sDatasetGold, readonly=True, owner=profile,
+                    scope="team", type="gold", settype="pd",
+                    descrip="Automatically uploaded SG from HUWA JSON at {}".format(sNowTime))
 
             # Load the relations separately
             opera_relations = oOperaData.get("opera_relations")
@@ -4014,16 +4037,17 @@ class ReaderHuwaImport(ReaderEqualGold):
                     # DOUBLE CHECK - at first we don't do anything with them
                     pass
 
-                    # ============= PLEASE LEAVE THIS UNTIL issue #534 is SORTED OUT ======================
+                    # ============= PLEASE LEAVE THIS UNTIL issue #533 is SORTED OUT ======================
+                    # (asked: 13/jul/2022)
                     ## Second criterion: check Gryson/Clavis code (via sig_status)
                     #if sig_status == "opera_ssg_1_0":
                     #    # Yes: import this one
-                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim])
+                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim], coll_super=coll_super, coll_gold=coll_gold)
                     #elif sig_status == "opera_ssg_1_1":
                     #    # Only create SSG if there is a match in inc/exp
                     #    if ssg_type in ["ssgmF", "ssgmE"]:
                     #        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                    #        oImported = self.import_one_json(oOpera,[project_huwa])
+                    #        oImported = self.import_one_json(oOpera,[project_huwa], coll_super=coll_super, coll_gold=coll_gold)
                     # =====================================================================================
 
                 # First criterion: skip all manu_type 'zero_links']
@@ -4041,16 +4065,16 @@ class ReaderHuwaImport(ReaderEqualGold):
                         # Depending on ssg_type (though this appears to be irrelevant)
                         if ssg_type == "ssgmF":
                             # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG)
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                         else:
                             # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG)
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                     elif sig_status == "opera_ssg_1_1":
                         # Indicate that a new SG must be made for these
                         bMakeSG = True
                         if ssg_type in ["ssgmF", "ssgmE"]:
                             # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG)
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                         else:
                             # Skip these: a subset is made of/for them
                             pass
@@ -4095,18 +4119,22 @@ class ReaderHuwaImport(ReaderEqualGold):
         oErr = ErrHandle()
         count_new = 0
         count_existing = 0
+        count = 0
         
         try:
             # Take note of how many relations there are
             count_rel = len(opera_relations)
 
             # Walk the list of relations
+            rel_num = 0
             for oRelation in opera_relations:
                 src_id = oRelation.get("src")
                 dst_id = oRelation.get("dst")
                 linktype = oRelation.get("linktype")
                 spectype = oRelation.get("spectype")
                 keyword = oRelation.get("keyword")
+                rel_num += 1
+                oErr.Status("Add_relations number: {}".format(rel_num))
                 
                 # Retrieve the src and dst SSGs
                 src = get_opera_ssg(src_id)
@@ -4133,12 +4161,13 @@ class ReaderHuwaImport(ReaderEqualGold):
                             count_existing += 1
             # Report the counts
             oErr.Status("add_relations: new={}, existing={}, missing={}".format(count_new, count_existing, count_rel - count_new - count_existing))
+            count = count_new + count_existing
         except:
             msg = oErr.get_error_message()
             oErr.DoError("add_relations")
         return count
 
-    def import_one_json(self, oOpera, projects, bMakeSG=False):
+    def import_one_json(self, oOpera, projects, bMakeSG=False, coll_super=None, coll_gold=None):
         """Import one OPERA definition of a SSG/AF"""
 
         def add_signatures_to_sg(signatures, gold):
@@ -4158,6 +4187,17 @@ class ReaderHuwaImport(ReaderEqualGold):
                 oErr.DoError("add_signatures_to_sg")
             return sBack
 
+        def get_firstsig(signatures):
+            oErr = ErrHandle()
+            sBack = ""
+            try:
+                if len(signatures) > 0:
+                    oSig = signatures[0]
+                    sBack = oSig.get("code")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_firstsig")
+            return sBack
 
         oErr = ErrHandle()
         oImported = dict(status="ok")
@@ -4191,6 +4231,9 @@ class ReaderHuwaImport(ReaderEqualGold):
             oImported['ssgmatch'] = existing_type
             oImported['manutype'] = manu_type
             oImported['sigstatus'] = sig_status
+
+            ssg = None
+            gold = None
 
             # If there is an existing SSG with the same Signature(s)...
             if len(same_sig_ssgs) == 0:
@@ -4228,12 +4271,15 @@ class ReaderHuwaImport(ReaderEqualGold):
                     kw_huwa = Keyword.objects.create(name="HUWA created", visibility="edi")
                 gold.keywords.add(kw_huwa)
 
-                # (5) Save SSG to process changes
-                ssg.save()
-                oImported['ssg'] = ssg.get_code()
-
                 # Add all the signatures
                 oImported['siglist'] = add_signatures_to_sg(signatures, gold)
+
+                # (5) Save SSG to process changes
+                ssg.stype = "imp"   # This has been imported
+                ssg.atype = "acc"   # Acceptance type must be 'acc'
+                ssg.firstsig = get_firstsig(signatures)
+                ssg.save()
+                oImported['ssg'] = ssg.get_code()
 
                 # Create a link between the SSG and the opera identifier
                 EqualGoldExternal.objects.create(
@@ -4286,6 +4332,20 @@ class ReaderHuwaImport(ReaderEqualGold):
                         subset = subset)
 
                     oImported['msg'] = "read"
+
+            # Has something been added?
+            if not ssg is None and not coll_super is None:
+                # Check if this combination already exists
+                obj_ssg_coll = CollectionSuper.objects.filter(collection=coll_super, super=ssg).first()
+                if obj_ssg_coll is None:
+                    # Add to collection
+                    obj_ssg_coll = CollectionSuper.objects.create(collection=coll_super, super=ssg)
+            if not gold is None and not coll_gold is None:
+                # Check if this combination already exists
+                obj_gold_coll = CollectionGold.objects.filter(collection=coll_gold, gold=gold).first()
+                if obj_gold_coll is None:
+                    # Add to collection
+                    obj_gold_coll = CollectionGold.objects.create(collection=coll_gold, gold=gold)
 
         except:
             msg = oErr.get_error_message()
