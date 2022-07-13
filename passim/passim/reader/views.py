@@ -2914,6 +2914,26 @@ class EqualGoldHuwaToJson(BasicPart):
                         break
             return sBack
 
+        def get_table_item(lTable, id, sIdField="id"):
+            oBack = None
+            if isinstance(id, str): id = int(id)
+            if id != 0:
+                for oItem in lTable:
+                    if oItem[sIdField] == id:
+                        oBack = oItem
+                        break
+            return oBack
+
+        def get_table_items(lTable, id, sIdField="id"):
+            lBack = []
+            if isinstance(id, str): id = int(id)
+            if id != 0:
+                for oItem in lTable:
+                    if oItem[sIdField] == id:
+                        lBack.append(copy.copy(oItem))
+                        break
+            return lBack
+
         def get_table_fk_count(lTable, id, sIdField):
             iCount = 0
             if id != 0:
@@ -2923,6 +2943,42 @@ class EqualGoldHuwaToJson(BasicPart):
             if iCount < 0:
                 iStop = 1
             return iCount
+
+        def get_library_info(id):
+            """Get the country/city/library name information for bibliothek.id"""
+
+            lst_bibliothek = huwa_tables['bibliothek']
+            lst_ort = huwa_tables['ort']
+            lst_land = huwa_tables['land']
+            oLibrary = None
+
+            oBiblio = get_table_item(lst_bibliothek, id)
+            if not oBiblio is None:
+                # Found the library
+                bFoundLib = True
+                oLibrary = dict(
+                    name=oBiblio.get('bibl_name'),
+                    short = oBiblio.get('bibl_kurz'),
+                    url = oBiblio.get('url'),
+                    note = oBiblio.get("bemerkungen"))
+                # Look for city and country
+                ort_id = oBiblio.get("ort")
+                oOrt = get_table_item(lst_ort, ort_id)
+                if not oOrt is None:
+                    # Found the location
+                    oLibrary['city'] = oOrt.get("ortsname")
+                    oLibrary['citynote'] = oOrt.get("bemerkungen")
+                    # Look for country
+                    land_id = oBiblio.get("land")
+                    oLand = get_table_item(lst_land, land_id)
+                    if not oLand is None:
+                        # Found the country
+                        name = oLand.get("landname")
+                        if not name is None and name != "":
+                            oLibrary['country'] = name
+
+            # Return the info we have
+            return oLibrary
 
         def add_existing(sKey):
             if not sKey in existing_dict:
@@ -3017,7 +3073,7 @@ class EqualGoldHuwaToJson(BasicPart):
         sData = ""
         bAcceptNewOtherSignatures = False
         huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
-            'autor', 'autor_opera', 'datum_opera', 'inhalt']
+            'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land']
 
         oErr = ErrHandle()
         table_info = {}
@@ -3056,7 +3112,66 @@ class EqualGoldHuwaToJson(BasicPart):
             # (5c) Load the 'huwa_conv_sig' object: calculate Clavis/Frede/Cppm based on [abk]
             huwa_conv_sig = self.read_huwa_conv_sig()
 
-            # (6) Walk through the table with AF information
+            # (6) Read the Huwa library information
+            oLibraryInfo = self.read_libraries()
+            oLibHuwaPassim = oLibraryInfo['huwapassim']
+
+            # (7) Walk through the Manuscript tables: handschrift + inhalt
+            count_manuscript = len(tables['handschrift'])
+            lst_manuscript = []
+            for idx, oHandschrift in enumerate(tables['handschrift']):
+                # Show where we are
+                if idx % 100 == 0:
+                    oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
+
+                # Take over any information that should be
+                idno = oHandschrift.get("signatur")
+                handschrift_id = oHandschrift.get("id")
+                oManuscript = dict(id=idx+1, idno=idno, stype="imp")
+
+                # Figure out library and location
+                bibliothek_id = oHandschrift.get("bibliothek")
+                if not bibliothek_id is None:
+                    if bibliothek_id in oLibHuwaPassim:
+                        library_id = oLibHuwaPassim[str(bibliothek_id)]
+                        library = Library.objects.filter(id=library_id).first()
+                        lib_name = ""
+                        lib_city = ""
+                        lib_country = ""
+                        if not library is None:
+                            lib_name = library.name
+                            if not library.lcity is None:
+                                lib_city = library.lcity.name
+                            if not library.lcountry is None:
+                                lib_country = library.lcountry.name
+                    else:
+                        # Get the details of this library
+                        oLibrary = get_library_info(bibliothek_id)
+                        lib_name = oLibrary.get("name", "")
+                        lib_city = oLibrary.get("city", "")
+                        lib_country = oLibrary.get("country", "")
+
+                    # Add this information in the Passim Manuscript object
+                    oManuscript['library'] = lib_name
+                    oManuscript['lcity'] = lib_city
+                    oManuscript['lcountry'] = lib_country
+
+                # Get and walk through the contents of this Handschrift
+                lst_inhalt = get_table_items(tables['inhalt'], handschrift_id, "handschrift")
+                order = 1
+                for oInhalt in lst_inhalt:
+                    # Get all the necessary information of this Sermon Manifestation
+                    oSermon = dict(
+                        order = order,
+                        opera_id=oInhalt.get("opera")
+                        )
+                    order += 1
+
+
+                # Add this to the list of Manuscripts
+                lst_manuscript.append(oManuscript)
+
+            # (8) Walk through the table with AF+Sermon information
             signature_dict = {}     # Each entry contains a list of OPERA ids that have this signature
             lst_opera = []
             count_opera = len(tables['opera'])
@@ -3235,7 +3350,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Add this to the list of SSGs
                 lst_opera.append(oSsg)
 
-            # (6) Process the inter-opera relations 
+            # (9) Process the inter-opera relations 
             lst_opera_rel = []
             oRelationship = {x['rel_id']:x  for x in EqualGoldHuwaToJson.relationships }
             count_rel = len(lst_relations)
@@ -3289,7 +3404,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
                     oErr.Status(msg)
 
-            # (7) Calculate the signature status (see issue #533)
+            # (10) Calculate the signature status (see issue #533)
             for idx, oOperaSsg in enumerate(lst_opera):
                 sig_status = "unknown"
                 # Get the opera signatures
@@ -3335,10 +3450,11 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Save the sig_status                
                 oOperaSsg['existing_ssg']['sig_status'] = sig_status
 
-            # (8) combine the sections into one object
+            # (11) combine the sections into one object
             oData['operas'] = lst_opera
             oData['opera_relations'] = lst_opera_rel
             oData['sig_dict'] = signature_dict
+            oData['manuscripts'] = lst_manuscript
             
             # Convert oData to stringified JSON
             if dtype == "json":
@@ -3466,6 +3582,21 @@ class EqualGoldHuwaToJson(BasicPart):
         # Return the table that we found
         return lst_authors
 
+    def read_libraries(self):
+        """Load the JSON that specifies the relationship between HUWA and Passim libraries"""
+
+        oErr = ErrHandle()
+        oLibraryInfo = {}
+        try:
+            libraries_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_passim_library.json"))
+            with open(libraries_json, "r", encoding="utf-8") as f:
+                oLibraryInfo = json.load(f)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_libraries")
+        # Return the table that we found
+        return oLibraryInfo
+
     def read_opera_passim(self):
         """Load the JSON that specifies the inter-SSG relations according to Opera id's """
 
@@ -3577,6 +3708,18 @@ class EqualGoldHuwaToJson(BasicPart):
             oErr.DoError("HuwaEqualGoldToJson/get_table")
 
         return oTables
+
+
+class EqualGoldHuwaOperaToJson(EqualGoldHuwaToJson):
+    """Read HUWA operas (SSG and Sermon) from database into JSON"""
+
+    pass
+
+
+class EqualGoldHuwaManuToJson(EqualGoldHuwaToJson):
+    """Read HUWA manuscripts from database into JSON"""
+
+    pass
 
 
 class ReaderEqualGold(View):
