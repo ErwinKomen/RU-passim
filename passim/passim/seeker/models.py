@@ -8716,7 +8716,8 @@ class SermonDescr(models.Model):
                 signatureM_names = value_lst #  get_json_list(value)
                 for code in signatureM_names:
                     # Find the SIgnature
-                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Issue #533: changed to exact matching
+                    signature = Signature.objects.filter(code=code).first()
                     # Find the editype
                     if signature == None:
                         editype = "gr"
@@ -8732,7 +8733,8 @@ class SermonDescr(models.Model):
                 # Walk all signatures
                 for code in signatureA_names:
                     # Find the appropriate SG with this signature
-                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Issue #533: changed to exact matching
+                    signature = Signature.objects.filter(code=code).first()
                     if signature is None:
                         # Show what is happening
                         if bDebug: oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))

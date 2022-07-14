@@ -4029,6 +4029,7 @@ class ReaderHuwaImport(ReaderEqualGold):
                 sig_status = existing_ssg.get("sig_status")
                 ssg_type = existing_ssg.get("type").split(":")[0]
                 manu_type = oOpera.get("manu_type")
+                action = oOpera.get("action", "")
                 bMakeSG = False
 
                 # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
@@ -4057,8 +4058,15 @@ class ReaderHuwaImport(ReaderEqualGold):
                         # Skip for now
                         pass
                     elif sig_status == "opera_ssg_0_n":
-                        # Skip for now
-                        pass
+                        # Check what the ACTION is for this one
+                        if action == "new AF":
+                            # Indicate that a new SG must be made for these
+                            bMakeSG = True
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                        elif action == "link_to AF":
+                            # ONLY (!!!) create a link between the SSG and the OPERA number
+                            oImported = self.link_ssg_to_opera(oOpera)
                     elif sig_status == "opera_ssg_1_0":
                         # Indicate that a new SG must be made for these
                         bMakeSG = True
@@ -4085,7 +4093,7 @@ class ReaderHuwaImport(ReaderEqualGold):
                         # Skip for now
                         pass
                 # Process the [oImported]
-                if not oImported is None and oImported.get("msg") == "read":
+                if not oImported is None and oImported.get("msg") in ["read", "linked"]:
                     lst_imported.append(oImported)
 
             # Check if any relations from the list [opera_relations] can be added
@@ -4120,6 +4128,7 @@ class ReaderHuwaImport(ReaderEqualGold):
         count_new = 0
         count_existing = 0
         count = 0
+        bDebug = False
         
         try:
             # Take note of how many relations there are
@@ -4134,7 +4143,9 @@ class ReaderHuwaImport(ReaderEqualGold):
                 spectype = oRelation.get("spectype")
                 keyword = oRelation.get("keyword")
                 rel_num += 1
-                oErr.Status("Add_relations number: {}".format(rel_num))
+
+                # -------- DEBUGGING ----------------
+                if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
                 
                 # Retrieve the src and dst SSGs
                 src = get_opera_ssg(src_id)
@@ -4156,6 +4167,8 @@ class ReaderHuwaImport(ReaderEqualGold):
                                 obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
                                 if obj is None:
                                     obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
+                            
+                            oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
                         else:
                             # Keep track of existing links
                             count_existing += 1
@@ -4166,6 +4179,47 @@ class ReaderHuwaImport(ReaderEqualGold):
             msg = oErr.get_error_message()
             oErr.DoError("add_relations")
         return count
+
+    def link_ssg_to_opera(self, oOpera):
+        """Make a link between one OPERA definition and an existing SSG/AF"""
+
+        oErr = ErrHandle()
+        oImported = dict(status="ok")
+        try:
+            # extract all parameters that *could* be relevant
+            opera_id = oOpera.get("opera")
+            same_sig_ssgs = oOpera.get("same_sig_ssgs")
+            sig_status = oOpera['existing_ssg']['sig_status']
+            existing_type = oOpera['existing_ssg']['type']
+            manu_type = oOpera['manu_type']
+
+            # Make a subset identifier
+            existing_type = existing_type.split(":")[0]
+            manu_type= manu_type.split("_")[0]
+            subset = json.dumps(dict(sig=sig_status, manu=manu_type, existing=existing_type ))
+
+            # See if we can make a link
+            if len(same_sig_ssgs) > 0:
+                ssg_id = same_sig_ssgs[0]
+                # Get this SSG
+                ssg = EqualGold.objects.filter(id=ssg_id).first()
+                if not ssg is None:
+                    # Create a link between the SSG and the opera identifier
+                    EqualGoldExternal.objects.create(
+                        equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                        subset = subset)
+                    oImported['msg'] = "linked"
+                    oImported['ssg'] = ssg.get_code()
+                    oImported['gold'] = 'n/a'
+                    oImported['siglist'] = 'n/a'
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("link_ssg_to_opera")
+            oImported['status'] = "error"
+            oImported['msg'] = msg
+
+        return oImported
 
     def import_one_json(self, oOpera, projects, bMakeSG=False, coll_super=None, coll_gold=None):
         """Import one OPERA definition of a SSG/AF"""
