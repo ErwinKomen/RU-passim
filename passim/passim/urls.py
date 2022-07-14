@@ -81,6 +81,7 @@ urlpatterns = [
     url(r'^tools/sermons/$', passim.seeker.views.do_sermons, name='do_sermons'),
     url(r'^tools/ssg/$', passim.seeker.views.do_ssgmigrate, name='do_ssgmigrate'),
     url(r'^tools/huwa/$', passim.seeker.views.do_huwa, name='do_huwa'),
+    url(r'^tools/sermones/reset$', passim.dct.views.sermones_reset, name='sermones_reset'),
 
     url(r'^search/sermon', SermonListView.as_view(), name='search_sermon'),
     url(r'^search/manuscript', ManuscriptListView.as_view(), name='search_manuscript'),
@@ -165,6 +166,10 @@ urlpatterns = [
     url(r'^ssg/ufield/approval/list', EqualApprovalUlist.as_view(), name='equalapprovaluser_list'),
     url(r'^ssg/ufield/approval/details(?:/(?P<pk>\d+))?/$', EqualApprovalUserDetails.as_view(), name='equalapprovaluser_details'),
     url(r'^ssg/ufield/approval/edit(?:/(?P<pk>\d+))?/$', EqualApprovalUserEdit.as_view(), name='equalapprovaluser_edit'),
+
+    url(r'^ssglink/list', EqualGoldLinkListView.as_view(), name='equalgoldlink_list'),
+    url(r'^ssglink/details(?:/(?P<pk>\d+))?/$', EqualGoldLinkDetails.as_view(), name='equalgoldlink_details'),
+    url(r'^ssglink/edit(?:/(?P<pk>\d+))?/$', EqualGoldLinkEdit.as_view(), name='equalgoldlink_edit'),
     
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
@@ -258,6 +263,8 @@ urlpatterns = [
     url(r'^profile/edit(?:/(?P<pk>\d+))?/$', ProfileEdit.as_view(), name='profile_edit'),
     url(r'^default/details(?:/(?P<pk>\d+))?/$', DefaultDetails.as_view(), name='default_details'), 
     url(r'^default/edit(?:/(?P<pk>\d+))?/$', DefaultEdit.as_view(), name='default_edit'), 
+    url(r'^user/details(?:/(?P<pk>\d+))?/$', UserDetails.as_view(), name='user_details'),
+    url(r'^user/edit(?:/(?P<pk>\d+))?/$', UserEdit.as_view(), name='user_edit'),
 
     url(r'^project/list', ProjectListView.as_view(), name='project2_list'), 
     url(r'^project/details(?:/(?P<pk>\d+))?/$', ProjectDetails.as_view(), name='project2_details'), 
@@ -339,6 +346,7 @@ urlpatterns = [
     # ========== NEW method =======================================================================
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
+    url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================

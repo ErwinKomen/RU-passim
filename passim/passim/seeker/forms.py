@@ -40,6 +40,55 @@ SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less t
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 
 
+# =================== HELPER FUNCTIONS ==========================
+
+def order_search(qs, term):
+    """Given a query and a search term, provide better ordered results"""
+
+    oErr = ErrHandle()
+    try:
+        # Divide terms into list of words
+        term_list = term.split()
+
+        # New attempt
+        if len(term_list) > 1:
+            # There are multiple words in the search request - count the presence of each of them
+            term_keys = []
+            hitdict = {}
+            for idx, term in enumerate(term_list):
+                key = "hits{}".format(idx+1)
+                term_keys.append(key)
+                condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                    Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                    Q(equal_goldsermons__siglist__icontains=term)
+                hitdict[key] = Case( When(condition, then=Value(1)), default=Value(0), output_field=IntegerField())
+            # Annotate with the hitdict
+            qs = qs.annotate(**hitdict)
+            # Now annotate with the Sum of these hit-fields
+            sumdict = {}
+            sumdict['hitcount'] = F(term_keys[0])
+            for key in term_keys[1:]:
+                sumdict['hitcount'] += F(key)
+            qs = qs.annotate(**sumdict).order_by("-hitcount", "code", "id")
+        else:
+
+            # Adapt: behaviour from issue #292
+            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                        Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                        Q(equal_goldsermons__siglist__icontains=term)
+            qs = qs.annotate(
+                full_string_order=Case(
+                    When(condition, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                ),
+            )
+            qs = qs.order_by("-full_string_order", "code", "id")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("order_search")
+    return qs
+
 # ================= WIDGETS =====================================
 
 
@@ -393,9 +442,14 @@ class EqualGoldWidget(ModelSelect2Widget):
 
     def label_from_instance(self, obj):
         # Determine the full text
-        full = obj.get_text()
+        # OLD (EK) - changed with issue #43
+        # full = obj.get_text()
+        
+        # Provide a label as in SuperOneWidget
+        sLabel = obj.get_label(do_incexpl = True)
+
         # Determine here what to return...
-        return full
+        return sLabel
 
     def get_queryset(self):
         if self.addonly:
@@ -406,6 +460,93 @@ class EqualGoldWidget(ModelSelect2Widget):
                 qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by(*self.order).distinct()
             else:
                 qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(id=self.exclude).order_by(*self.order).distinct()
+        return qs
+
+    def filter_queryset(self, term, queryset = None, **dependent_fields):
+        term_for_now = ""
+        qs = super(EqualGoldWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        
+        # Check if this contains a string literal
+        bAdapted = False
+        if term.count('"') >= 2:
+            # Need to look for a literal string
+            arTerm = term.split('"')
+            if len(arTerm) >= 3:
+                # Behaviour from issue #432
+
+                term_ordered = []
+
+                # Take the literal term
+                term_literal = arTerm[1]
+                term_ordered.append(term_literal)
+
+                # Also add the terms from [literal], but chunked (if they contain spaces)
+                if term_literal.count(" ") > 1:
+                    term_parts = term_literal.split()
+
+                    # Take the last two and the before part together
+                    term_ordered.append(" ".join(term_parts[-2:]))
+                    if len(term_parts) > 3:
+                        term_ordered.append(" ".join(term_parts[0:-2]))
+
+                    # Take the first two and the remainder together
+                    term_ordered.append(" ".join(term_parts[0:2]))
+                    if len(term_parts) > 3:
+                        term_ordered.append(" ".join(term_parts[2:]))
+
+                # Take the part before
+                term_before = arTerm[0].strip()
+                term_ordered.append(term_before)
+
+                # Take all the following terms together, joined by "
+                term_after = '"'.join(arTerm[2:])
+                term_ordered.append(term_after)
+
+                # Build the combined condition
+                if not term_ordered is None:
+                    # Build up the cases last-to-first
+                    case_list = []
+                    counter = len(term_ordered)
+                    for term in  term_ordered:
+                        if term != "":
+                            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                                Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                                Q(equal_goldsermons__siglist__icontains=term)
+                            case_list.append(When(condition, then=Value(counter)))
+                            counter -= 1
+
+                    qs = qs.annotate(
+                        term_string_order=Case(
+                            # When(condition_literal, then=Value(1)),
+                            *case_list,
+                            default=Value(0),
+                            output_field=IntegerField()
+                        ),
+                    )
+
+                    # Filter intelligently
+                    qs = qs.filter(term_string_order__gte=1)
+ 
+                    qs = qs.order_by("-term_string_order", "code", "id")
+                    bAdapted = True
+
+        if not bAdapted:
+            qs = order_search(qs, term)
+
+            ## Adapt: behaviour from issue #292
+            #condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+            #            Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+            #            Q(equal_goldsermons__siglist__icontains=term)
+            #qs = qs.annotate(
+            #    full_string_order=Case(
+            #        When(condition, then=Value(1)),
+            #        default=Value(0),
+            #        output_field=IntegerField()
+            #    ),
+            #)
+            #qs = qs.order_by("-full_string_order", "code", "id")
+
+        # Return result
         return qs
 
 
@@ -735,27 +876,6 @@ class OriginCodWidget(ModelSelect2MultipleWidget):
         return qs        
 
 
-#class ProjectOneWidget(ModelSelect2Widget):
-#    model = Project
-#    search_fields = [ 'name__icontains' ]
-
-#    def label_from_instance(self, obj):
-#        return obj.name
-
-#    def get_queryset(self):
-#        return Project.objects.all().order_by('name').distinct()
-    
-
-#class ProjectWidget(ModelSelect2MultipleWidget):
-#    model = Project
-#    search_fields = [ 'name__icontains' ]
-
-#    def label_from_instance(self, obj):
-#        return obj.name
-
-#    def get_queryset(self):
-#        return Project.objects.all().order_by('name').distinct()
-
 class OnlineSourcesWidget(ModelSelect2MultipleWidget):
     model = OnlineSources
     search_fields = [ 'name__icontains' ]
@@ -979,6 +1099,7 @@ class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
 
 
 class SermonDescrGoldAddOnlyWidget(SermonDescrGoldWidget):
+    """Realization of SermonDescrGoldWidget"""
     add_only = True
 
 
@@ -1004,6 +1125,7 @@ class SermonDescrSuperWidget(ModelSelect2MultipleWidget):
 
 
 class SermonDescrSuperAddOnlyWidget(SermonDescrSuperWidget):
+    """Realization of SermonDescrSuperWidget"""
     add_only = True
 
 
@@ -1076,14 +1198,17 @@ class SignatureOneWidget(ModelSelect2Widget):
 
 
 class SignatureGrysonWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "gr"
 
 
 class SignatureClavisWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "cl"
 
 
 class SignatureOtherWidget(SignatureOneWidget):
+    """Realization of SignatureOne"""
     editype = "ot"
 
 
@@ -1097,6 +1222,7 @@ class ManutypeWidget(ModelSelect2Widget):
     def get_queryset(self):
         return FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
 
+
 class ScopeTypeWidget(ModelSelect2Widget):
     model = FieldChoice
     search_fields = ['english_name__icontains']
@@ -1106,6 +1232,7 @@ class ScopeTypeWidget(ModelSelect2Widget):
 
     def get_queryset(self):
         return FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
+
 
 class StypeWidget(ModelSelect2MultipleWidget):
     model = FieldChoice
@@ -1158,20 +1285,82 @@ class SuperOneWidget(ModelSelect2Widget):
         return EqualGold.objects.filter(moved__isnull=True, atype = 'acc').order_by('code', 'id').distinct()
 
     def filter_queryset(self, term, queryset = None, **dependent_fields):
-        qs = super(SuperOneWidget, self).filter_queryset(term, queryset, **dependent_fields)
-        # Adapt
-        condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
-                    Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
-                    Q(equal_goldsermons__siglist__icontains=term)
-        qs = qs.annotate(
-            full_string_order=Case(
-                When(condition, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField()
-            ),
-        )
+        term_for_now = ""
+        qs = super(SuperOneWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        
+        bAdapted = False
+        bIssue432 = True
+
+        # Check if this contains a string literal
+        if term.count('"') >= 2:
+            # Need to look for a literal string
+            arTerm = term.split('"')
+            if len(arTerm) >= 3:
+                # Behaviour from issue #432
+
+                term_ordered = []
+
+                # Take the literal term
+                term_literal = arTerm[1]
+                term_ordered.append(term_literal)
+
+                # Also add the terms from [literal], but chunked (if they contain spaces)
+                if term_literal.count(" ") > 1:
+                    term_parts = term_literal.split()
+
+                    # Take the last two and the before part together
+                    term_ordered.append(" ".join(term_parts[-2:]))
+                    if len(term_parts) > 3:
+                        term_ordered.append(" ".join(term_parts[0:-2]))
+
+                    # Take the first two and the remainder together
+                    term_ordered.append(" ".join(term_parts[0:2]))
+                    if len(term_parts) > 3:
+                        term_ordered.append(" ".join(term_parts[2:]))
+
+                # Take the part before
+                term_before = arTerm[0].strip()
+                term_ordered.append(term_before)
+
+                # Take all the following terms together, joined by "
+                term_after = '"'.join(arTerm[2:])
+                term_ordered.append(term_after)
+
+                # Build the combined condition
+                if not term_ordered is None:
+                    # Build up the cases last-to-first
+                    case_list = []
+                    counter = len(term_ordered)
+                    for term in  term_ordered:
+                        term = term.strip()
+                        if term != "":
+                            condition = Q(code__icontains=term) | Q(author__name__icontains=term) | \
+                                Q(srchincipit__icontains=term) | Q(srchexplicit__icontains=term) | \
+                                Q(equal_goldsermons__siglist__icontains=term)
+                            case_list.append(When(condition, then=Value(counter)))
+                            counter -= 1
+
+                    qs = qs.annotate(
+                        term_string_order=Case(
+                            # When(condition_literal, then=Value(1)),
+                            *case_list,
+                            default=Value(0),
+                            output_field=IntegerField()
+                        ),
+                    )
+
+                    # Filter intelligently
+                    qs = qs.filter(term_string_order__gte=1)
+ 
+                    qs = qs.order_by("-term_string_order", "code", "id")
+                    bAdapted = True
+
+        if not bAdapted:
+
+            qs = order_search(qs, term)
+
         # Return result
-        return qs.order_by("-full_string_order", "code", "id")
+        return qs
 
 
 class TemplateOneWidget(ModelSelect2Widget):
@@ -1197,10 +1386,6 @@ class UserWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return User.objects.all().order_by('username').distinct()
-
-
-
-
 
 
 
@@ -1470,15 +1655,15 @@ class SearchManuForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'pd',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple manuscript datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple manifestation datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple sermongold datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple authority file datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneManuWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
@@ -1582,7 +1767,7 @@ class SermonForm(PassimModelForm):
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 30%;', 
-                                             'class': 'searching', 'placeholder': 'Term to look for (use * or #)'}))
+                                             'class': 'searching', 'placeholder': 'Term to look for (use * or # or @)'}))
                 #widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Term to look for (use * or #)'}))
     free_include = forms.ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=FreeWidget(attrs={'data-placeholder': 'May occur in any of...', 'style': 'width: 35%;', 'class': 'searching'}))
@@ -1800,6 +1985,7 @@ class SermonForm(PassimModelForm):
             oErr.DoError("SermonForm-init")
         return None
 
+
 class OnlineSourceForm(forms.ModelForm):
     """Online Sources list"""
 
@@ -1831,7 +2017,6 @@ class OnlineSourceForm(forms.ModelForm):
         if 'instance' in kwargs:
             instance = kwargs['instance']    
     
-
 
 class KeywordForm(forms.ModelForm):
     """Keyword list"""
@@ -1993,6 +2178,32 @@ class ProvenanceManForm(forms.ModelForm):
         # Get the instance
         if 'instance' in kwargs:
             instance = kwargs['instance']
+
+
+class UserForm(forms.ModelForm):
+    """Allow changing some user attributes"""
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name']
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(UserForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Adapt the widgets to have width 100%
+            sStyle = 'width: 100%;'
+            self.fields['username'].widget.attrs['style'] = sStyle
+            self.fields['email'].widget.attrs['style'] = sStyle
+            self.fields['first_name'].widget.attrs['style'] = sStyle
+            self.fields['last_name'].widget.attrs['style'] = sStyle
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileForm-init")
+        # We are okay
+        return None
             
 
 class ProfileForm(forms.ModelForm):
@@ -2002,6 +2213,16 @@ class ProfileForm(forms.ModelForm):
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
+    # Issue #435: facilitate changing [email, (user)name]
+    newusername = forms.CharField(label=_("User name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'User name...', 'style': 'width: 100%;'}))
+    newemail = forms.CharField(label=_("Email"), required=False,
+                widget=forms.EmailInput(attrs={'class': 'searching input-sm', 'placeholder': 'Email...', 'style': 'width: 100%;'}))
+    newfirst_name = forms.CharField(label=_("First name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'First name...', 'style': 'width: 100%;'}))
+    newlast_name = forms.CharField(label=_("Last name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Last name...', 'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2044,6 +2265,13 @@ class ProfileForm(forms.ModelForm):
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
                 self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
+
+                # Fill in the user informatino
+                self.fields['newusername'].initial = instance.user.username
+                self.fields['newemail'].initial = instance.user.email
+                self.fields['newfirst_name'].initial = instance.user.first_name
+                self.fields['newlast_name'].initial = instance.user.last_name
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileForm-init")
@@ -3015,7 +3243,7 @@ class EqualGoldLinkForm(forms.ModelForm):
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
                 widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
-                widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 100%;', 
+                widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 20px;', 
                     'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
     note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
                 widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
@@ -3025,8 +3253,9 @@ class EqualGoldLinkForm(forms.ModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGoldLink
-        fields = ['src', 'linktype', 'dst' ]
-        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'})
+        fields = ['src', 'linktype', 'dst', 'spectype', 'alternatives', 'note' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
+                 # 'dst':         SuperOneWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -3036,19 +3265,25 @@ class EqualGoldLinkForm(forms.ModelForm):
             super_id = kwargs.pop("super_id", "")
             # Start by executing the standard handling
             super(EqualGoldLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['spectype'].required = False
+            self.fields['alternatives'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newspectype'].required = False
+            self.fields['newalt'].required = False
+            self.fields['newsuper'].required = False
+
             # Initialize choices for linktype
             init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'])
             init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, exclude=['eqs'], use_helptext=False)
             init_choices(self, 'newspectype', SPEC_TYPE, bUseAbbr=True, maybe_empty=True, use_helptext=False)
             init_choices(self, 'alternatives', YESNO_TYPE, bUseAbbr=True,maybe_empty=True, use_helptext=False)
-            # Make sure to set required and optional fields
-            self.fields['linktype'].required = False
-            self.fields['newlinktype'].required = False
-            self.fields['newspectype'].required = False
-            self.fields['newalt'].required = False
-            self.fields['note'].required = False
-            self.fields['dst'].required = False
-            self.fields['newsuper'].required = False
 
             # For searching/listing
             self.fields['newlinktype'].initial = "prt"

@@ -54,6 +54,7 @@ SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
 LINK_TYPE = "seeker.linktype"
+EXTERNAL_TYPE = "seeker.extype"
 SPEC_TYPE = "seeker.spectype"
 REPORT_TYPE = "seeker.reptype"
 STATUS_TYPE = "seeker.stype"
@@ -92,6 +93,9 @@ CERTAIN_LOW = 'unc'     # uncertain
 CERTAIN_AVE = 'ave'     # average
 CERTAIN_HIGH = 'rea'    # reasonably certain
 CERTAIN_HIGHEST = 'vce' # very certain
+
+# EXTERNAL TYPES
+EXTERNAL_HUWA_OPERA = "huwop"
 
 STYPE_IMPORTED = 'imp'
 STYPE_MANUAL = 'man'
@@ -3092,8 +3096,6 @@ class Litref(models.Model):
             sBack = self.short
         else:
             return adapt_markdown(self.short, lowercase=False)
-            #print(self.short)
-            #return self.short
 
 
 class Project2(models.Model):
@@ -3922,25 +3924,51 @@ class Manuscript(models.Model):
             oErr.DoError("get_country")
         return country
 
-    def get_dates(self):
+    def get_dates(self, bOverall=False):
         lhtml = []
-        # Get all the date ranges in the correct order
-        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
-        # Walk the date range objects
-        for obj in qs:
-            # Determine the output for this one daterange
-            ref = ""
-            if obj.reference: 
-                if obj.pages: 
-                    ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+        oErr = ErrHandle()
+        try:
+            # Get all the date ranges in the correct order
+            qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
+            min_date = 3000
+            max_date = 0
+            # Walk the date range objects
+            for obj in qs:
+                if bOverall:
+                    if not obj.yearstart is None:
+                        if obj.yearstart < min_date: min_date = obj.yearstart
+                    if not obj.yearfinish is None:
+                        if obj.yearfinish > max_date: max_date = obj.yearfinish
                 else:
-                    ref = " (see {})".format(obj.reference.get_full_markdown())
-            if obj.yearstart == obj.yearfinish:
-                years = "{}".format(obj.yearstart)
-            else:
-                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
-            item = "{} {}".format(years, ref)
-            lhtml.append(item)
+                    # Determine the output for this one daterange
+                    ref = ""
+                    if obj.reference: 
+                        if obj.pages: 
+                            ref = " (see {}, {})".format(obj.reference.get_full_markdown(), obj.pages)
+                        else:
+                            ref = " (see {})".format(obj.reference.get_full_markdown())
+                    if obj.yearstart == obj.yearfinish:
+                        years = "{}".format(obj.yearstart)
+                    else:
+                        years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+                    item = "{} {}".format(years, ref)
+                    lhtml.append(item)
+            if bOverall:
+                if min_date < 3000:
+                    if max_date > 0:
+                        if min_date == max_date:
+                            lhtml.append("{}".format(min_date))
+                        else:
+                            lhtml.append("{}-{}".format(min_date, max_date))
+                    else:
+                        lhtml.append("{}".format(min_date))
+                elif max_date > 0:
+                    lhtml.append("{}".format(max_date))
+                else:
+                    lhtml.append("-")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_dates")
 
         return ", ".join(lhtml)
 
@@ -4134,10 +4162,6 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
-    #def get_project(self):
-    #    sBack = "-" if self.project == None else self.project.name
-    #    return sBack
-
     def get_projects(self):
         sBack = "-" 
         if self.projects.count() > 0:
@@ -4146,12 +4170,6 @@ class Manuscript(models.Model):
                 html.append(obj.name)
             sBack = ", ".join(html)
         return sBack
-
-    #def get_project_markdown(self):
-    #    sBack = "-"
-    #    if self.project:
-    #        sBack = '<span class="project">{}</span>'.format(self.project.name)
-    #    return sBack
 
     def get_project_markdown2(self): 
         lHtml = []
@@ -6348,7 +6366,15 @@ class EqualGold(models.Model):
         # Visit all collections that I have access to
         mycoll__id = Collection.get_scoped_queryset('super', username, team_group, settype = settype).values('id')
         for col in self.collections.filter(id__in=mycoll__id).order_by('name'):
-            url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            # Previous code: this provides a section of the SSG *list* view
+            # url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
+            # EK: what the user expects is a link to the Collection *details* view
+            details_name = 'collany_details'
+            if settype == "hc":
+                details_name = 'collhist_details'
+            elif settype == "pd":
+                details_name = 'collsuper_details'
+            url = reverse(details_name, kwargs={'pk': col.id})
             lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
         sBack = ", ".join(lHtml)
         return sBack
@@ -6610,19 +6636,23 @@ class EqualGold(models.Model):
         oErr = ErrHandle()
         try:
             for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-                lHtml.append("<tr class='view-row'>")
+                # Initializations
                 sSpectype = ""
                 sAlternatives = ""
+                sTitle = ""
+                sNoteShow = ""
+                sNoteDiv = ""
+
+                # Get the URL for this particular link
+                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
+                lHtml.append("<tr class='view-row'>")
                 if superlink.spectype != None and len(superlink.spectype) > 1:
                     # Show the specification type
                     sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
                 if superlink.alternatives != None and superlink.alternatives == "true":
                     sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
-                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'>{}</span>{}</td>".format(
-                    superlink.get_linktype_display(), sSpectype))
-                sTitle = ""
-                sNoteShow = ""
-                sNoteDiv = ""
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span>{}</td>".format(
+                    link_url, superlink.get_linktype_display(), sSpectype))
                 if superlink.note != None and len(superlink.note) > 1:
                     sTitle = "title='{}'".format(superlink.note)
                     sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
@@ -6666,20 +6696,27 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_view(self):
+    def get_view(self, bShort = False):
         """Get a HTML valid view of myself"""
 
         lHtml = []
         # Add the PASSIM code
-        code = self.code if self.code else "(no Passim code)"
-        lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+        if bShort:
+            lHtml.append(self.get_passimcode_markdown())
+        else:
+            code = self.code if self.code else "(no Passim code)"
+            lHtml.append("<span class='passimcode'>{}</span> ".format(code))
+
         # Treat signatures
         equal_set = self.equal_goldsermons.all()
         qs = Signature.objects.filter(gold__in=equal_set).order_by('-editype', 'code').distinct()
         if qs.count() > 0:
             lSign = []
-            for item in qs:
-                lSign.append(item.short())
+            if bShort:
+                lSign.append(qs.first().short())
+            else:
+                for item in qs:
+                    lSign.append(item.short())
             lHtml.append("<span class='signature'>{}</span>".format(" | ".join(lSign)))
         else:
             lHtml.append("[-]")
@@ -6688,12 +6725,15 @@ class EqualGold(models.Model):
             lHtml.append("(by <span class='sermon-author'>{}</span>) ".format(self.author.name))
         else:
             lHtml.append("(by <i>Unknown Author</i>) ")
-        # Treat incipit
-        if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
-        # Treat intermediate dots
-        if self.incipit and self.explicit: lHtml.append("...-...")
-        # Treat explicit
-        if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+
+        if not bShort:
+            # Treat incipit
+            if self.incipit: lHtml.append("{}".format(self.get_incipit_markdown()))
+            # Treat intermediate dots
+            if self.incipit and self.explicit: lHtml.append("...-...")
+            # Treat explicit
+            if self.explicit: lHtml.append("{}".format(self.get_explicit_markdown()))
+
         # Return the results
         return "".join(lHtml)
 
@@ -6708,12 +6748,18 @@ class EqualGold(models.Model):
     def sermon_number(author):
         """Determine what the sermon number *would be* for the indicated author"""
 
-        # Check the highest sermon number for this author
-        qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
-        if qs_ssg.count() == 0:
-            iNumber = 1
-        else:
-            iNumber = qs_ssg.first().number + 1
+        iNumber = 1
+        oErr = ErrHandle()
+        try:
+            # Check the highest sermon number for this author
+            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+            if qs_ssg.count() == 0:
+                iNumber = 1
+            else:
+                iNumber = qs_ssg.first().number + 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("sermon_number")
         return iNumber
 
     def set_firstsig(self):
@@ -6722,6 +6768,7 @@ class EqualGold(models.Model):
         if first != None:
             firstsig = first.code
             if self.firstsig != firstsig:
+                self.firstsig = firstsig
                 # Save changes
                 self.save()
         return True
@@ -7601,8 +7648,22 @@ class EqualGoldLink(models.Model):
             obj.set_ssgcount()
         return response
 
+    def get_alternatives(self):
+        sBack = ""
+        if self.alternatives == "yes":
+            sBack = "yes"
+        else:
+            sBack = "no"
+        return sBack
+
     def get_label(self, do_incexpl=False):
         sBack = "{}: {}".format(self.get_linktype_display(), self.dst.get_label(do_incexpl))
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 
@@ -7635,7 +7696,28 @@ class EqualGoldProject(models.Model):
         else:
             response = None
         return response
-    
+
+
+class EqualGoldExternal(models.Model):
+    """Link between an SSG/AF and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a EqualGold instance ...
+    equal = models.ForeignKey(EqualGold, related_name="equalexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+    # [0-1] Possible subset
+    subset = models.CharField("Subset", max_length=MAX_TEXT_LEN, blank=True, null=True)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "SSG_{} to id_{} ({})".format(self.equal.id, self.externalid, self.externaltype)
+        return sBack
+        
 
 class SermonGoldSame(models.Model):
     """Link to identical sermons that have a different signature"""
@@ -8682,7 +8764,8 @@ class SermonDescr(models.Model):
                 signatureM_names = value_lst #  get_json_list(value)
                 for code in signatureM_names:
                     # Find the SIgnature
-                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Issue #533: changed to exact matching
+                    signature = Signature.objects.filter(code=code).first()
                     # Find the editype
                     if signature == None:
                         editype = "gr"
@@ -8698,7 +8781,8 @@ class SermonDescr(models.Model):
                 # Walk all signatures
                 for code in signatureA_names:
                     # Find the appropriate SG with this signature
-                    signature = Signature.objects.filter(code__iexact=code).first()
+                    # Issue #533: changed to exact matching
+                    signature = Signature.objects.filter(code=code).first()
                     if signature is None:
                         # Show what is happening
                         if bDebug: oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
@@ -11009,6 +11093,7 @@ class CollOverlap(models.Model):
         response = super(CollOverlap, self).save(force_insert, force_update, using, update_fields)
         return response
 
+
 class OnlineSources(models.Model):
     """The table where the online sources used in PASSIM are stored"""
     # [1] Name of the online source
@@ -11030,3 +11115,5 @@ class OnlineSources(models.Model):
             # Give the URL the same look as is done in other places
             sBack = "<span class='collection'><a href='{}'>{}</a></span>".format(self.url, self.url)
         return sBack
+
+

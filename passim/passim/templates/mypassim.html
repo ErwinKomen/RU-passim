@@ -37,6 +37,63 @@
         <p>Current statistics: {{rset_count}} research set(s) and {{dct_count}} DCT(s).
         </p>
       </section>
+
+      <section>
+        <h3>Profile</h3>
+        <p>This is the information that you have provided</p>
+        <table style="width: 100%;">
+          <!-- Profile information -->
+          <tr><td valign="top">Username:</td><td valign="top" colspan="2">{{user.username}}</td></tr>
+          <tr><td valign="top">Email:</td><td valign="top" colspan="2">{{user.email}}</td></tr>
+          <tr><td valign="top">First name:</td><td valign="top" colspan="2">{{user.first_name}}</td></tr>
+          <tr><td valign="top">Last name:</td><td valign="top">{{user.last_name}}</td>
+            <td>
+              <a href="{% url 'user_details' profile.user.id  %}" role="button" title="Edit user information" class="btn btn-xs jumbo-1">
+                <span class="glyphicon glyphicon-pencil" title="Edit user information"></span>
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p>
+        </p>
+      </section>
+
+      {% if user.is_superuser %}
+        <section>
+          <h3>
+            <span>Table counts</span>
+            <span class="pull-right"><code>admin</code></span>
+          </h3>
+          <p>Size of a number of tables for administrative purposes.
+            <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', true);">
+              Reset Sermones
+            </a>
+          </p>
+          <div id="sermones_confirmation" class="row hidden" >
+            <div class="col-md-6">Do you really want to reset SERMONES?</div>
+            <div class="col-md-6">
+              <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', false);">Cancel</a>
+              <a class="btn btn-xs jumbo-4" href="{% url 'sermones_reset' %}">Yes</a>
+            </div>
+          </div>
+          <table class="func-view table-hover" style="width: 100%;">
+            <thead>
+              <tr><th>No.</th><th>App</th><th>Table</th><th>Count</th></tr>
+            </thead>
+            <tbody>
+              {% for info in table_infos %}
+              <tr>
+                <td align="right">{{forloop.counter}} &nbsp;</td>
+                <td>{{info.app_name}}</td>
+                <td>{{info.model_name}}</td>
+                <td align="right">{{info.count}}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+
     </div>
 
     <div class="col-md-6">

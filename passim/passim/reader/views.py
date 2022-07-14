@@ -29,7 +29,7 @@ import operator
 from operator import itemgetter
 from functools import reduce
 from time import sleep 
-import fnmatch
+import fnmatch, copy
 import sys, os
 import base64
 import json
@@ -52,9 +52,10 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
-    EqualGold, \
+    EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime
+    Collection, CollectionSuper, CollectionGold, \
+    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -2505,6 +2506,7 @@ class ReaderImport(View):
         self.custom_init()
 
     def custom_init(self):
+        """Allow user to add code"""
         pass    
 
     def checkAuthentication(self,request):
@@ -2913,6 +2915,26 @@ class EqualGoldHuwaToJson(BasicPart):
                         break
             return sBack
 
+        def get_table_item(lTable, id, sIdField="id"):
+            oBack = None
+            if isinstance(id, str): id = int(id)
+            if id != 0:
+                for oItem in lTable:
+                    if oItem[sIdField] == id:
+                        oBack = oItem
+                        break
+            return oBack
+
+        def get_table_items(lTable, id, sIdField="id"):
+            lBack = []
+            if isinstance(id, str): id = int(id)
+            if id != 0:
+                for oItem in lTable:
+                    if oItem[sIdField] == id:
+                        lBack.append(copy.copy(oItem))
+                        break
+            return lBack
+
         def get_table_fk_count(lTable, id, sIdField):
             iCount = 0
             if id != 0:
@@ -2922,6 +2944,42 @@ class EqualGoldHuwaToJson(BasicPart):
             if iCount < 0:
                 iStop = 1
             return iCount
+
+        def get_library_info(id):
+            """Get the country/city/library name information for bibliothek.id"""
+
+            lst_bibliothek = huwa_tables['bibliothek']
+            lst_ort = huwa_tables['ort']
+            lst_land = huwa_tables['land']
+            oLibrary = None
+
+            oBiblio = get_table_item(lst_bibliothek, id)
+            if not oBiblio is None:
+                # Found the library
+                bFoundLib = True
+                oLibrary = dict(
+                    name=oBiblio.get('bibl_name'),
+                    short = oBiblio.get('bibl_kurz'),
+                    url = oBiblio.get('url'),
+                    note = oBiblio.get("bemerkungen"))
+                # Look for city and country
+                ort_id = oBiblio.get("ort")
+                oOrt = get_table_item(lst_ort, ort_id)
+                if not oOrt is None:
+                    # Found the location
+                    oLibrary['city'] = oOrt.get("ortsname")
+                    oLibrary['citynote'] = oOrt.get("bemerkungen")
+                    # Look for country
+                    land_id = oBiblio.get("land")
+                    oLand = get_table_item(lst_land, land_id)
+                    if not oLand is None:
+                        # Found the country
+                        name = oLand.get("landname")
+                        if not name is None and name != "":
+                            oLibrary['country'] = name
+
+            # Return the info we have
+            return oLibrary
 
         def add_existing(sKey):
             if not sKey in existing_dict:
@@ -2956,18 +3014,77 @@ class EqualGoldHuwaToJson(BasicPart):
                 sBack = "'{}".format(sBack)
             return sBack
 
+        def add_sig_to_list(signatures, lst_sig, editype, code_format):
+            oErr = ErrHandle()
+            try:
+                if not lst_sig is None:
+                    if isinstance(lst_sig, int):
+                        if lst_sig == 0:
+                            return;
+                        lst_sig = [ str(lst_sig) ]
+                    elif isinstance(lst_sig, str):
+                        lst_sig = lst_sig.split(";")
+                    for sig in lst_sig:
+                        oAdd = dict(editype=editype, code=code_format.format(sig))
+                        signatures.append(oAdd)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_sig_to_list")
+
+        def add_sig_to_dict(signatures, sig_dict, opera_id):
+            oErr = ErrHandle()
+            try:
+                # walk all the signatures
+                for sig in signatures:
+                    # Turn this signature into one string
+                    full_sig = "{}: {}".format(sig['editype'], sig['code'])
+                    # Do we have an entry?
+                    if full_sig in sig_dict:
+                        lst_id = sig_dict[full_sig]
+                    else:
+                        lst_id = []
+                    # Add this entry
+                    lst_id.append(opera_id)
+                    # Put it back in the dictionary
+                    sig_dict[full_sig] = lst_id
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_sig_to_dict")
+
+        def add_sig_replacing(signatures, item, key, number, editype):
+            oErr = ErrHandle()
+            try:
+                element = item.get(key)
+                if not element is None:
+                    # Convert Clavis
+                    # transformed = re.sub(r'\#.*', number, element)
+                    transformed = rHashTag.sub(number, element).strip()
+                    # Remove final ',' if needed
+                    if transformed[-1] == ",":
+                        transformed = transformed.strip(",")
+                    oAdd = dict(editype=editype, code=transformed)
+                    signatures.append(oAdd)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_sig_replacing")
+
         # Initialize
         oData = {}
         sData = ""
+        bAcceptNewOtherSignatures = False
         huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
-            'autor', 'autor_opera', 'datum_opera', 'inhalt']
+            'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land']
 
         oErr = ErrHandle()
         table_info = {}
         author_info = {}
         existing_dict = {}
+        sig_matching = {}
         bDoCounting = True
+        bUseOperaPassim = True
         rHasNumber = re.compile(r'.*[0-9].*')
+        rHashTag = re.compile(r'\#.*')
 
         count_manu_zero = 0     # Number of items linked to ZERO manuscripts
         count_manu_one = 0      # Number of items linked to just one manuscript
@@ -2990,9 +3107,75 @@ class EqualGoldHuwaToJson(BasicPart):
             # (5) Load the tables that we need
             tables = self.get_tables(table_info, huwa_tables)
 
-            # (6) Walk through the table with AF information
-            count_opera = len(tables['opera'])
+            # (5b) Load the 'opera_passim' object, which is needed for correct Clavis / Frede / Cppm
+            opera_passim = self.read_opera_passim()
+
+            # (5c) Load the 'huwa_conv_sig' object: calculate Clavis/Frede/Cppm based on [abk]
+            huwa_conv_sig = self.read_huwa_conv_sig()
+
+            # (6) Read the Huwa library information
+            oLibraryInfo = self.read_libraries()
+            oLibHuwaPassim = oLibraryInfo['huwapassim']
+
+            # (7) Walk through the Manuscript tables: handschrift + inhalt
+            count_manuscript = len(tables['handschrift'])
+            lst_manuscript = []
+            for idx, oHandschrift in enumerate(tables['handschrift']):
+                # Show where we are
+                if idx % 100 == 0:
+                    oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
+
+                # Take over any information that should be
+                idno = oHandschrift.get("signatur")
+                handschrift_id = oHandschrift.get("id")
+                oManuscript = dict(id=idx+1, idno=idno, stype="imp")
+
+                # Figure out library and location
+                bibliothek_id = oHandschrift.get("bibliothek")
+                if not bibliothek_id is None:
+                    if bibliothek_id in oLibHuwaPassim:
+                        library_id = oLibHuwaPassim[str(bibliothek_id)]
+                        library = Library.objects.filter(id=library_id).first()
+                        lib_name = ""
+                        lib_city = ""
+                        lib_country = ""
+                        if not library is None:
+                            lib_name = library.name
+                            if not library.lcity is None:
+                                lib_city = library.lcity.name
+                            if not library.lcountry is None:
+                                lib_country = library.lcountry.name
+                    else:
+                        # Get the details of this library
+                        oLibrary = get_library_info(bibliothek_id)
+                        lib_name = oLibrary.get("name", "")
+                        lib_city = oLibrary.get("city", "")
+                        lib_country = oLibrary.get("country", "")
+
+                    # Add this information in the Passim Manuscript object
+                    oManuscript['library'] = lib_name
+                    oManuscript['lcity'] = lib_city
+                    oManuscript['lcountry'] = lib_country
+
+                # Get and walk through the contents of this Handschrift
+                lst_inhalt = get_table_items(tables['inhalt'], handschrift_id, "handschrift")
+                order = 1
+                for oInhalt in lst_inhalt:
+                    # Get all the necessary information of this Sermon Manifestation
+                    oSermon = dict(
+                        order = order,
+                        opera_id=oInhalt.get("opera")
+                        )
+                    order += 1
+
+
+                # Add this to the list of Manuscripts
+                lst_manuscript.append(oManuscript)
+
+            # (8) Walk through the table with AF+Sermon information
+            signature_dict = {}     # Each entry contains a list of OPERA ids that have this signature
             lst_opera = []
+            count_opera = len(tables['opera'])
             for idx, oOpera in enumerate(tables['opera']):
                 opera_id = oOpera['id']
                 # Take over any information that should
@@ -3004,19 +3187,74 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Get the signature(s)
                 signaturesA = []
-                other = oOpera.get("abk", "")
-                if not other is None and other != "":
-                    signaturesA.append(dict(editype="ot", code=other))
-                clavis = get_table_list(tables['clavis'], opera_id, "name")
-                for sig in clavis:
-                    signaturesA.append(dict(editype="cl", code="CPL {}".format(sig)))
-                frede = get_table_list(tables['frede'], opera_id, "name")
-                for sig in frede:
-                    signaturesA.append(dict(editype="gr", code=sig))
-                cppm = get_table_list(tables['cppm'], opera_id, "name")
-                for sig in cppm:
-                    signaturesA.append(dict(editype="cl", code="CPPM {}".format(sig)))
+                lst_notes = []
+                if bUseOperaPassim and opera_id in opera_passim:
+                    # Get the relevant record
+                    oOperaNew = opera_passim[opera_id]
+                    # Look for clavis/frede/cppm
+                    add_sig_to_list(signaturesA, oOperaNew.get("clavis"), "cl", "CPL {}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("frede"), "gr", "{}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("cppm"), "cl", "CPPM {}")
+
+                    other = oOperaNew.get("abk", "")
+                    if not other is None and other != "" and len(signaturesA) == 0:
+                        # Check if we can convert this
+                        bFound = False
+                        number = ""
+                        for item in huwa_conv_sig:
+                            mask = item['mask']
+                            huwa = item['huwa']
+                            m = re.match(mask, other)
+                            if m:
+                                bFound = True
+                                # Now get the number
+                                if len(m.groups(0)) > 0:
+                                    number = m.groups(0)[0]
+                                    if huwa.count('#') > 1:
+                                        iStop = 1
+                                    
+                                # Show what we are doing
+                                oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
+                                # Now we can break from the loop
+                                break
+                        if bFound:
+                            # Look for clavis/frede/cppm
+                            add_sig_replacing(signaturesA, item, "clavis", number, "cl")
+                            add_sig_replacing(signaturesA, item, "gryson", number, "gr")
+                            add_sig_replacing(signaturesA, item, "other", number, "ot")
+
+                        elif bAcceptNewOtherSignatures:
+                            # Check how long this [other] is
+                            if len(other) > 10:
+                                # Just add it to notes
+                                lst_notes.append("abk: {}".format(other))
+                            else:
+                                # THis is 10 characters or below, so it could actually be a real code
+                                signaturesA.append(dict(editype="ot", code=other))
+                        else:
+                            # Just add it to notes
+                            lst_notes.append("abk: {}".format(other))
+                    # Look for possible field [correction of abk]
+                    for k, v in oOperaNew.items():
+                        if "correction" in k and "abk" in k:
+                            # There is a correction: put it into notes
+                            lst_notes.append("{}: {}".format(k, v))
+                else:
+                    other = oOpera.get("abk", "")
+                    if not other is None and other != "":
+                        signaturesA.append(dict(editype="ot", code=other))
+                    clavis = get_table_list(tables['clavis'], opera_id, "name")
+                    add_sig_to_list(signaturesA, clavis, "cl", "CPL {}")
+
+                    frede = get_table_list(tables['frede'], opera_id, "name")
+                    add_sig_to_list(signaturesA, frede, "gr", "{}")
+
+                    cppm = get_table_list(tables['cppm'], opera_id, "name")
+                    add_sig_to_list(signaturesA, cppm, "cl", "CPPM {}")
+
                 oSsg['signaturesA'] = signaturesA
+                # Process the signatures in the [signature_dict]
+                add_sig_to_dict(signaturesA, signature_dict, opera_id)
 
                 # Get the Incipit and the Explicit
                 oSsg['incipit'] = get_table_field(tables['incipit'], int(oOpera.get('incipit')), "incipit_text")
@@ -3024,7 +3262,9 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Make good notes for further processing
                 oSsg['note_langname'] = oOpera.get("opera_langname","")
-                oSsg['notes'] = oOpera.get("bemerkungen", "")
+                remarks = oOpera.get("bemerkungen", "")
+                if remarks != "": lst_notes.append("Remarks: {}".format(remarks))
+                oSsg['notes'] = "\n".join(lst_notes)
 
                 # Get to the [datum_opera]
                 oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
@@ -3049,17 +3289,17 @@ class EqualGoldHuwaToJson(BasicPart):
                     manu_type = "-"
                     if oSsg['manuscripts'] == 0:
                         count_manu_zero += 1
-                        manu_type = "zero links"
+                        manu_type = "zero_links" # "zero links"
                     elif oSsg['manuscripts'] == 1:
                         count_manu_one += 1
-                        manu_type = "one link"
+                        manu_type = "one_link" # "one link"
                     elif oSsg['manuscripts'] > 1:
                         if bAbqHasNumber:
                             count_manu_many_num += 1
-                            manu_type = "many links ABK has number"
+                            manu_type = "many_links_ABK_num" # "many links ABK has number"
                         else:
                             count_manu_many_oth += 1
-                            manu_type = "many links ABK text only"
+                            manu_type = "many_links_ABK_txt" # "many links ABK text only"
                     oSsg['manu_type'] = manu_type
 
                     # Check if there already is a SSG with the inc/expl
@@ -3088,10 +3328,30 @@ class EqualGoldHuwaToJson(BasicPart):
                             add_existing("ssgmFA")
                     oSsg['existing_ssg'] = existing_ssg
 
+                    same_sig_ssgs = []
+                    if len(signaturesA) > 0:
+                        # Build a Q-expression
+                        expr = ( Q(code__iexact=signaturesA[0]['code']) & Q(editype=signaturesA[0]['editype']) )
+                        for oSig in signaturesA[1:]:
+                            expr |= ( Q(code__iexact=oSig['code']) & Q(editype=oSig['editype']) )
+                        
+                        # Get a list of signature id's
+                        sig_ids = [x['id'] for x in Signature.objects.filter(expr).values('id')]
+
+                        if len(sig_ids) > 0:
+                            # Check if there already is a SSG with one of the signatures in the list
+                            qs = EqualGold.objects.filter(equal_goldsermons__goldsignatures__id__in=sig_ids).distinct().values('id')
+                            # same_sig_ssgs = qs.count()
+                            # Better: give a list of SSG ids with the same sigs
+                            same_sig_ssgs = [x['id'] for x in qs]
+
+                    # Add the results of the SSG match
+                    oSsg['same_sig_ssgs'] = same_sig_ssgs
+
                 # Add this to the list of SSGs
                 lst_opera.append(oSsg)
 
-            # (6) Process the inter-opera relations 
+            # (9) Process the inter-opera relations 
             lst_opera_rel = []
             oRelationship = {x['rel_id']:x  for x in EqualGoldHuwaToJson.relationships }
             count_rel = len(lst_relations)
@@ -3145,10 +3405,57 @@ class EqualGoldHuwaToJson(BasicPart):
                     msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
                     oErr.Status(msg)
 
+            # (10) Calculate the signature status (see issue #533)
+            for idx, oOperaSsg in enumerate(lst_opera):
+                sig_status = "unknown"
+                # Get the opera signatures
+                signaturesA = ["{}: {}".format(x['editype'], x['code']) for x in oOperaSsg['signaturesA'] ]
 
-            # (7) combine the sections into one object
+                # Get matching existing Passim SSG/AFs via these signature(s)
+                same_sig_ssgs = oOperaSsg['same_sig_ssgs']
+
+                if len(same_sig_ssgs) == 0:
+                    # There are no matching existing Passim SSGs
+                    if len(signaturesA) == 0:
+                        sig_status = "opera_ssg_0_0"
+                    else:
+                        sig_status = "opera_ssg_1_0"
+                elif len(signaturesA) == 0:
+                    # There are no Opera signatures, but there are 
+                    sig_status = "opera_ssg_0_1"
+                else:
+                    # Get the signatures of the Passim SSG
+                    signaturesP = [ "{}: {}".format(x.editype, x.code) for x in Signature.objects.filter(gold__equal__id__in=same_sig_ssgs) ]
+                    count = 0
+                    for sigA in signaturesA:
+                        if sigA in signaturesP:
+                            count += 1
+                    if len(signaturesA) == len(signaturesP) and count == len(signaturesA):
+                        # There is a full 1-1 match between Opara and Passim signatures
+                        sig_status = "opera_ssg_1_1"
+                    else:
+                        if count == 0:
+                            sig_status = "opera_ssg_0_n"
+                        elif count == len(signaturesA):
+                            # everything of Opera is in Passim, but Passim has more
+                            sig_status = "opera_ssg_1_n"
+                        else:
+                            # There is an overlap between opera/passim signatures > 1
+                            # but the number of Opera and Passim signatures is not entirely equal
+                            sig_status = "opera_ssg_n_1"
+                if bDoCounting:
+                    if not sig_status in sig_matching:
+                        sig_matching[sig_status] = 0
+                    sig_matching[sig_status] += 1
+
+                # Save the sig_status                
+                oOperaSsg['existing_ssg']['sig_status'] = sig_status
+
+            # (11) combine the sections into one object
             oData['operas'] = lst_opera
             oData['opera_relations'] = lst_opera_rel
+            oData['sig_dict'] = signature_dict
+            oData['manuscripts'] = lst_manuscript
             
             # Convert oData to stringified JSON
             if dtype == "json":
@@ -3165,7 +3472,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Determine the headers
                 headers = ['opera', 'sig_Clavis', 'sig_Gryson', 'sig_Other', 'inc', 'exp', 'note_langname', 'notes', 
-                           'date_estimate', 'author_name', 'count_manu', 'manu_type', 'existing_ssg']
+                           'date_estimate', 'author_name', 'count_manu', 'manu_type', 'existing_ssg', 'sig_status']
                 # Output this header row
                 csvwriter.writerow(headers)
 
@@ -3189,6 +3496,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     row.append(get_good_string(oSsg,'manuscripts'))
                     row.append(get_good_string(oSsg,'manu_type'))
                     row.append(get_good_string(oSsg,'existing_ssg','type'))
+                    row.append(get_good_string(oSsg,'existing_ssg','sig_status'))
 
                     # Output this row
                     csvwriter.writerow(row)
@@ -3204,6 +3512,9 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Show the existing stuff
                 for k,v in existing_dict.items():
                     oErr.Status("Existing {}: {}".format(k,v))
+                # Show the signature matching
+                for k,v in sig_matching.items():
+                    oErr.Status("Signature status {}: {}".format(k,v))
 
         except:
             msg = oErr.get_error_message()
@@ -3271,6 +3582,59 @@ class EqualGoldHuwaToJson(BasicPart):
             oErr.DoError("HuwaEqualGoldToJson/read_authors")
         # Return the table that we found
         return lst_authors
+
+    def read_libraries(self):
+        """Load the JSON that specifies the relationship between HUWA and Passim libraries"""
+
+        oErr = ErrHandle()
+        oLibraryInfo = {}
+        try:
+            libraries_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_passim_library.json"))
+            with open(libraries_json, "r", encoding="utf-8") as f:
+                oLibraryInfo = json.load(f)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_libraries")
+        # Return the table that we found
+        return oLibraryInfo
+
+    def read_opera_passim(self):
+        """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+
+        oErr = ErrHandle()
+        dict_operapassim = {}
+        try:
+            lst_operapassim = None
+            operapassim_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "Opera_passim_MR.json"))
+            with open(operapassim_json, "r", encoding="utf-8") as f:
+                oOperaPassim = json.load(f)
+            # Process the list into a dictionary
+            if not oOperaPassim is None:
+                dict_operapassim = {x['id']: x for x in oOperaPassim['opera_passim']}
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_opera_passim")
+        # Return the table that we found
+        return dict_operapassim
+
+    def read_huwa_conv_sig(self):
+        """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""
+
+        oErr = ErrHandle()
+        lst_huwa_conv_sig = []
+        try:
+            huwa_conv_sig_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_conv_sig.json"))
+            with open(huwa_conv_sig_json, "r", encoding="utf-8") as f:
+                lst_huwa_conv_sig = json.load(f)
+            # Add the 'mask' to each item
+            for item in lst_huwa_conv_sig:
+                mask = item['huwa'].replace("#", r"(\d[\d\s\,\-]*)(.*)")
+                item['mask'] = mask
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("HuwaEqualGoldToJson/read_huwa_conv_sig")
+        # Return the table that we found
+        return lst_huwa_conv_sig
 
     def read_relations(self):
         """Load the JSON that specifies the inter-SSG relations according to Opera id's """
@@ -3346,4 +3710,702 @@ class EqualGoldHuwaToJson(BasicPart):
 
         return oTables
 
+
+class EqualGoldHuwaOperaToJson(EqualGoldHuwaToJson):
+    """Read HUWA operas (SSG and Sermon) from database into JSON"""
+
+    pass
+
+
+class EqualGoldHuwaManuToJson(EqualGoldHuwaToJson):
+    """Read HUWA manuscripts from database into JSON"""
+
+    pass
+
+
+class ReaderEqualGold(View):
+    arErr = []
+    error_list = []
+    transactions = []
+    data = {'status': 'ok', 'html': ''}
+    template_name = 'reader/import_ssgs.html'
+    obj = None
+    oStatus = None
+    data_file = ""
+    bClean = False
+    import_type = "undefined"
+    sourceinfo_url = "undefined"
+    username = ""
+    mForm = UploadFilesForm
+
+    def custom_init(self):
+        """Allow user to add code"""
+        pass    
+
+    def initializations(self, request, object_id):
+        # Clear errors
+        self.arErr = []
+        # COpy the request
+        self.request = request
+
+        # Get the parameters
+        if request.POST:
+            self.qd = request.POST
+        else:
+            self.qd = request.GET
+        # ALWAYS: perform some custom initialisations
+        self.custom_init()
+
+    def post(self, request, pk=None):
+        # A POST request means we are trying to SAVE something
+        self.initializations(request, pk)
+
+        # Explicitly set the status to OK
+        self.data['status'] = "ok"
+
+        username = request.user.username
+        self.username = username
+
+        if self.checkAuthentication(request):
+            # Remove previous status object for this user
+            Status.objects.filter(user=username).delete()
+            # Create a status object
+            oStatus = Status(user=username, type=self.import_type, status="preparing")
+            oStatus.save()
+            # Make sure the status is available
+            self.oStatus = oStatus
+
+            lResults = []
+
+            # Get profile 
+            profile = Profile.get_user_profile(username) 
+                    
+            # Create a SourceInfo object for this extraction
+            source = SourceInfo.objects.create(url=self.sourceinfo_url, collector=username, profile = profile)
+
+            # The list of headers to be shown
+            lHeader = ['status', 'msg', 'filename', 'ssg', 'siglist']
+
+            if self.mForm is None:
+                # Process the request
+                bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                if bOkay:
+                    # Adapt the 'source' to tell what we did 
+                    source.code = code
+                    oErr.Status(code)
+                    source.save()
+                    # Indicate we are ready
+                    oStatus.set("readyclose")
+                    # Get a list of errors
+                    error_list = [str(item) for item in self.arErr]
+
+                    statuscode = "error" if len(error_list) > 0 else "completed"
+
+                    # Create the context
+                    context = dict(
+                        statuscode=statuscode,
+                        results=lResults,
+                        error_list=error_list
+                        )
+                else:
+                    self.arErr.append(code)
+
+                if len(self.arErr) == 0:
+                    # Get the HTML response
+                    self.data['html'] = render_to_string(self.template_name, context, request)
+                else:
+                    lHtml = []
+                    for item in self.arErr:
+                        lHtml.append(item)
+                    self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+            else:
+                form = self.mForm(request.POST, request.FILES)
+                if form.is_valid():
+                    # NOTE: from here a breakpoint may be inserted!
+                    print('import_{}: valid form'.format(self.import_type))
+                    oErr = ErrHandle()
+                    try:
+
+                        # Process the request
+                        bOkay, code = self.process_files(request, source, lResults, lHeader)
+
+                        if bOkay:
+                            # Adapt the 'source' to tell what we did 
+                            source.code = code
+                            oErr.Status(code)
+                            source.save()
+                            # Indicate we are ready
+                            oStatus.set("readyclose")
+                            # Get a list of errors
+                            error_list = [str(item) for item in self.arErr]
+
+                            statuscode = "error" if len(error_list) > 0 else "completed"
+
+                            # Create the context
+                            context = dict(
+                                statuscode=statuscode,
+                                results=lResults,
+                                error_list=error_list
+                                )
+                        else:
+                            self.arErr.append(code)
+
+                        if len(self.arErr) == 0:
+                            # Get the HTML response
+                            self.data['html'] = render_to_string(self.template_name, context, request)
+                        else:
+                            lHtml = []
+                            for item in self.arErr:
+                                lHtml.append(item)
+                            self.data['html'] = "There are errors: {}".format("\n".join(lHtml))
+                    except:
+                        msg = oErr.get_error_message()
+                        oErr.DoError("import_{}".format(self.import_type))
+                        self.data['html'] = msg
+                        self.data['status'] = "error"
+
+                else:
+                    self.data['html'] = 'invalid form: {}'.format(form.errors)
+                    self.data['status'] = "error"
+        
+            # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
+        else:
+            self.data['html'] = "Please log in before continuing"
+
+        # Return the information
+        return JsonResponse(self.data)
+
+    def checkAuthentication(self,request):
+        # first check for authentication
+        if not request.user.is_authenticated:
+            # Provide error message
+            self.data['html'] = "Please log in to work on this project"
+            return False
+        elif not user_is_ingroup(request, 'passim_uploader'):
+            # Provide error message
+            self.data['html'] = "Sorry, you do not have the rights to upload anything"
+            return False
+        else:
+            return True
+
+    def process_files(self, request, source, lResults, lHeader):
+        """This is a wrapper, that needs to be specified for each individual import function"""
+
+        bOkay = True
+        code = ""
+        return bOkay, code
+
+
+class ReaderHuwaImport(ReaderEqualGold):
+    """HUWA import via a JSON file"""
+
+    import_type = "huwajson"
+    sourceinfo_url = "http://www.ru.nl"
+
+    def process_files(self, request, source, lResults, lHeader):
+        """Process a JSON file for HUWA import"""
+
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        file_list = []
+        oErr = ErrHandle()
+        try:
+            # Make sure we have the username
+            username = self.username
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "json":
+                            # This is a JSON file
+                            oResult = self.read_json(username, data_file, filename, self.arErr, source=source)
+
+                            if oResult['count'] > 0:
+                                for item in oResult['imported']:
+                                    lst_read.append(copy.copy(item))
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "ijson", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No AFs (SSGs) have been added")
+                        else:
+                            # Create a list of results
+                            if oResult['count'] > 0:
+                                for item in oResult['imported']:
+                                    lResults.append(copy.copy(item))
+
+            code = "Imported using the import_type [huwajson] on these JSON file(s): {}".format(", ".join(file_list))
+
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+            oErr.DoError("ReaderHuwaImport/process_files")
+
+        return bOkay, code
+
+    def read_json(self, username, data_file, filename, arErr, jsondoc=None, sName = None, source=None):
+        """Read one HUWA JSON file"""
+
+        oErr = ErrHandle()
+        oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username}
+        lst_imported = []
+        lst_results = []
+        msg = ""
+        try:
+            # This is a JSON file: Load the file into a variable
+            sData = data_file.read()
+            oOperaData = json.loads( sData.decode(encoding="utf-8"))
+
+            # Think of a dataset name to connect all the input with
+            sNowTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+            # SSG collection
+            sDatasetSsg = "Huwa SSG/AF import {}".format(sNowTime)
+            coll_super = Collection.objects.filter(name=sDatasetSsg).first()
+            if coll_super is None:
+                profile = Profile.get_user_profile(self.request.user.username)
+                coll_super = Collection.objects.create(
+                    name=sDatasetSsg, readonly=True, owner=profile,
+                    scope="team", type="super", settype="pd",
+                    descrip="Automatically uploaded SSG/AF from HUWA JSON at {}".format(sNowTime))
+            # Gold collection
+            sDatasetGold = "Huwa SG import {}".format(sNowTime)
+            coll_gold = Collection.objects.filter(name=sDatasetGold).first()
+            if coll_gold is None:
+                profile = Profile.get_user_profile(self.request.user.username)
+                coll_gold = Collection.objects.create(
+                    name=sDatasetGold, readonly=True, owner=profile,
+                    scope="team", type="gold", settype="pd",
+                    descrip="Automatically uploaded SG from HUWA JSON at {}".format(sNowTime))
+
+            # Load the relations separately
+            opera_relations = oOperaData.get("opera_relations")
+            # Load the opera definitions
+            operas = oOperaData.get("operas")
+
+            # Figure out what the HUWA and the PASSIM project is
+            project_huwa = Project2.objects.filter(name__icontains="huwa").first()
+            if project_huwa is None:
+                project_huwa = Project2.objects.create(name="HUWA/CSEL")
+            project_passim = Project2.objects.filter(name__icontains="passim").first()
+
+            # Now read and process the input according to issue #534
+            num_operas = len(operas)
+            for idx, oOpera in enumerate(operas):
+                oImported = {}
+
+                # Show where we are
+                opera_id = oOpera.get('opera')
+                oErr.Status("Huwa Import reading opera id={} {}/{}".format(opera_id, idx+1, num_operas))
+
+                # Get the parameters that are needed
+                existing_ssg = oOpera.get("existing_ssg")
+                sig_status = existing_ssg.get("sig_status")
+                ssg_type = existing_ssg.get("type").split(":")[0]
+                manu_type = oOpera.get("manu_type")
+                action = oOpera.get("action", "")
+                bMakeSG = False
+
+                # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
+                if manu_type == "zero_links":
+                    # This Opera has no links to inhalt
+                    # DOUBLE CHECK - at first we don't do anything with them
+                    pass
+
+                    # ============= PLEASE LEAVE THIS UNTIL issue #533 is SORTED OUT ======================
+                    # (asked: 13/jul/2022)
+                    ## Second criterion: check Gryson/Clavis code (via sig_status)
+                    #if sig_status == "opera_ssg_1_0":
+                    #    # Yes: import this one
+                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim], coll_super=coll_super, coll_gold=coll_gold)
+                    #elif sig_status == "opera_ssg_1_1":
+                    #    # Only create SSG if there is a match in inc/exp
+                    #    if ssg_type in ["ssgmF", "ssgmE"]:
+                    #        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                    #        oImported = self.import_one_json(oOpera,[project_huwa], coll_super=coll_super, coll_gold=coll_gold)
+                    # =====================================================================================
+
+                # First criterion: skip all manu_type 'zero_links']
+                elif manu_type != 'zero_links':
+                    # Second criterion: look at possible sig_status
+                    if sig_status == "opera_ssg_0_0":
+                        # Skip for now
+                        pass
+                    elif sig_status == "opera_ssg_0_n":
+                        # Check what the ACTION is for this one
+                        if action == "new AF":
+                            # Indicate that a new SG must be made for these
+                            bMakeSG = True
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                        elif action == "link_to AF":
+                            # ONLY (!!!) create a link between the SSG and the OPERA number
+                            oImported = self.link_ssg_to_opera(oOpera)
+                    elif sig_status == "opera_ssg_1_0":
+                        # Indicate that a new SG must be made for these
+                        bMakeSG = True
+                        # Depending on ssg_type (though this appears to be irrelevant)
+                        if ssg_type == "ssgmF":
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                        else:
+                            # Yes: import this one
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    elif sig_status == "opera_ssg_1_1":
+                        # Indicate that a new SG must be made for these
+                        bMakeSG = True
+                        if ssg_type in ["ssgmF", "ssgmE"]:
+                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                        else:
+                            # Skip these: a subset is made of/for them
+                            pass
+                    elif sig_status == "opera_ssg_1_n":
+                        # Skip for now
+                        pass
+                    elif sig_status == "opera_ssg_n_1":
+                        # Skip for now
+                        pass
+                # Process the [oImported]
+                if not oImported is None and oImported.get("msg") in ["read", "linked"]:
+                    lst_imported.append(oImported)
+
+            # Check if any relations from the list [opera_relations] can be added
+            count_relations = self.add_relations(opera_relations)
+
+            # Add the list to the stuff we return
+            oBack['imported'] = lst_imported
+            oBack['name'] = filename
+            oBack['filename'] = filename
+            oBack['count'] = len(lst_imported)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("read_json")
+            oResult['status'] = 'error'
+            oResult['msg'] = msg
+
+        return oBack
+
+    def add_relations(self, opera_relations):
+        """Given the list of relations, see if anything can be added"""
+
+        def get_opera_ssg(opera_id):
+            """Get the Passim SSG, given the opera ID"""
+
+            ssg = None
+            obj = EqualGoldExternal.objects.filter(externalid=opera_id, externaltype = EXTERNAL_HUWA_OPERA).first()
+            if not obj is None:
+                ssg = obj.equal
+            return ssg
+
+        oErr = ErrHandle()
+        count_new = 0
+        count_existing = 0
+        count = 0
+        bDebug = False
+        
+        try:
+            # Take note of how many relations there are
+            count_rel = len(opera_relations)
+
+            # Walk the list of relations
+            rel_num = 0
+            for oRelation in opera_relations:
+                src_id = oRelation.get("src")
+                dst_id = oRelation.get("dst")
+                linktype = oRelation.get("linktype")
+                spectype = oRelation.get("spectype")
+                keyword = oRelation.get("keyword")
+                rel_num += 1
+
+                # -------- DEBUGGING ----------------
+                if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
+                
+                # Retrieve the src and dst SSGs
+                src = get_opera_ssg(src_id)
+                if not src is None:
+                    dst = get_opera_ssg(dst_id)
+                    if not dst is None and not linktype is None and not spectype is None:
+                        # All essential ingredients are there: check if this relation already exists
+                        link = EqualGoldLink.objects.filter(src=src, dst=dst, linktype=linktype, spectype=spectype).first()
+                        if link is None:
+                            # Create a link
+                            link = EqualGoldLink.objects.create(src=src, dst=dst, linktype=linktype, spectype=spectype, alternatives="no")
+                            count_new += 1
+                            # Need to add a keyword, possibly?
+                            if not keyword is None and keyword != "":
+                                kw_obj = Keyword.objects.filter(name__iexact=keyword).first()
+                                if kw_obj is None:
+                                    kw_obj = Keyword.objects.create(name__iexact=keyword)
+                                # Check if there already is a kw link between [src] and [kw_obj]
+                                obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
+                                if obj is None:
+                                    obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
+                            
+                            oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
+                        else:
+                            # Keep track of existing links
+                            count_existing += 1
+            # Report the counts
+            oErr.Status("add_relations: new={}, existing={}, missing={}".format(count_new, count_existing, count_rel - count_new - count_existing))
+            count = count_new + count_existing
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_relations")
+        return count
+
+    def link_ssg_to_opera(self, oOpera):
+        """Make a link between one OPERA definition and an existing SSG/AF"""
+
+        oErr = ErrHandle()
+        oImported = dict(status="ok")
+        try:
+            # extract all parameters that *could* be relevant
+            opera_id = oOpera.get("opera")
+            same_sig_ssgs = oOpera.get("same_sig_ssgs")
+            sig_status = oOpera['existing_ssg']['sig_status']
+            existing_type = oOpera['existing_ssg']['type']
+            manu_type = oOpera['manu_type']
+
+            # Make a subset identifier
+            existing_type = existing_type.split(":")[0]
+            manu_type= manu_type.split("_")[0]
+            subset = json.dumps(dict(sig=sig_status, manu=manu_type, existing=existing_type ))
+
+            # See if we can make a link
+            if len(same_sig_ssgs) > 0:
+                ssg_id = same_sig_ssgs[0]
+                # Get this SSG
+                ssg = EqualGold.objects.filter(id=ssg_id).first()
+                if not ssg is None:
+                    # Create a link between the SSG and the opera identifier
+                    EqualGoldExternal.objects.create(
+                        equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                        subset = subset)
+                    oImported['msg'] = "linked"
+                    oImported['ssg'] = ssg.get_code()
+                    oImported['gold'] = 'n/a'
+                    oImported['siglist'] = 'n/a'
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("link_ssg_to_opera")
+            oImported['status'] = "error"
+            oImported['msg'] = msg
+
+        return oImported
+
+    def import_one_json(self, oOpera, projects, bMakeSG=False, coll_super=None, coll_gold=None):
+        """Import one OPERA definition of a SSG/AF"""
+
+        def add_signatures_to_sg(signatures, gold):
+            oErr = ErrHandle()
+            siglist = []
+            sBack = ""
+            try:
+                for oSig in signatures:
+                    # Create a signature that is linked to the correct SG
+                    editype = oSig.get("editype")
+                    code = oSig.get("code")
+                    sig = Signature.objects.create(code=code, editype=editype, gold=gold)
+                    siglist.append("{}: {}".format(editype,code))
+                sBack = ", ".join(siglist)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("add_signatures_to_sg")
+            return sBack
+
+        def get_firstsig(signatures):
+            oErr = ErrHandle()
+            sBack = ""
+            try:
+                if len(signatures) > 0:
+                    oSig = signatures[0]
+                    sBack = oSig.get("code")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_firstsig")
+            return sBack
+
+        oErr = ErrHandle()
+        oImported = dict(status="ok")
+
+        try:
+            # extract all parameters that *could* be relevant
+            opera_id = oOpera.get("opera")
+            signatures = oOpera.get("signaturesA")
+            incipit = oOpera.get("incipit", "")
+            explicit = oOpera.get("explicit", "")
+            note_langname = oOpera.get("note_langname")
+            notes = oOpera.get("notes")
+            date_estimate = oOpera.get("date_estimate")
+            author_id = oOpera.get("author").get("id")
+            same_sig_ssgs = oOpera.get("same_sig_ssgs")
+            sig_status = oOpera['existing_ssg']['sig_status']
+            existing_type = oOpera['existing_ssg']['type']
+            existing_id = oOpera['existing_ssg'].get("id")
+            manu_type = oOpera['manu_type']
+
+            # Make a subset identifier
+            existing_type = existing_type.split(":")[0]
+            manu_type= manu_type.split("_")[0]
+            subset = json.dumps(dict(sig=sig_status, manu=manu_type, existing=existing_type ))
+
+            oImported['opera'] = opera_id
+            oImported['gold'] = "-"
+            oImported['incipit'] = incipit
+            oImported['explicit'] = explicit
+            oImported['notes'] = notes
+            oImported['ssgmatch'] = existing_type
+            oImported['manutype'] = manu_type
+            oImported['sigstatus'] = sig_status
+
+            ssg = None
+            gold = None
+
+            # If there is an existing SSG with the same Signature(s)...
+            if len(same_sig_ssgs) == 0:
+                # Check if there is an existing SSG
+                if existing_id is None:
+                    # No, there are no SSGs with the same sig yet: this means we are CREATING a new SSG and a new SG for it
+
+                    ssg = EqualGold.create_empty()
+
+                    # (1) Set inc, exp, author
+                    bNeedSaving = False
+                    if incipit != "": ssg.incipit = incipit ; bNeedSaving = True
+                    if explicit != "": ssg.explicit = explicit ; bNeedSaving = True
+                    if not author_id is None: ssg.author_id = author_id
+                else:
+                    # There already is an SSG
+                    ssg = EqualGold.objects.filter(id=existing_id).first()
+
+                # (2) Add the existing SSG to the project HUWA
+                for project in projects:
+                    # Check if it is already connected to the indicated project
+                    if EqualGoldProject.objects.filter(equal=ssg, project=project).count() == 0:
+                        # If it isn't yet: add it
+                        EqualGoldProject.objects.create(equal=ssg, project=project)
+
+                # (3) Create an SG with the correct signature(s)                
+                gold = SermonGold.objects.create(
+                    author_id=author_id, incipit=incipit, explicit=explicit, equal=ssg)
+                oImported['gold'] = gold.id
+
+                # (4) Add a keyword to the SG to indicate this is from HUWA
+                kw_huwa = Keyword.objects.filter(name__contains="HUWA created", visibility="edi").first()
+                if kw_huwa is None:
+                    # Create a keyword
+                    kw_huwa = Keyword.objects.create(name="HUWA created", visibility="edi")
+                gold.keywords.add(kw_huwa)
+
+                # Add all the signatures
+                oImported['siglist'] = add_signatures_to_sg(signatures, gold)
+
+                # (5) Save SSG to process changes
+                ssg.stype = "imp"   # This has been imported
+                ssg.atype = "acc"   # Acceptance type must be 'acc'
+                ssg.firstsig = get_firstsig(signatures)
+                ssg.save()
+                oImported['ssg'] = ssg.get_code()
+
+                # Create a link between the SSG and the opera identifier
+                EqualGoldExternal.objects.create(
+                    equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                    subset = subset)
+
+                # Indicate that this one has been read
+                oImported['msg'] = "read"
+
+            else:
+                # There already is at least one SSG with the same Signature(s)
+                ssg_id = same_sig_ssgs[0]
+                ssg = EqualGold.objects.filter(id=ssg_id).first()
+
+                oImported['ssg'] = ssg.get_code()
+
+                # Double check if this has already been done...
+                obj = EqualGoldExternal.objects.filter(
+                    equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA).first()
+
+                if obj is None:
+                    # This one has not been imported yet...
+
+                    # Note: see issue #534 - add existing SSG to list of projects + add SG and link it to SSG
+                    # (1) Add the existing SSG to the project HUWA
+                    for project in projects:
+                        if EqualGoldProject.objects.filter(equal=ssg, project=project).count() == 0:
+                            EqualGoldProject.objects.create(equal=ssg, project=project)
+
+                    if bMakeSG:
+                        # (2) Add an SG, linking it to the existing [ssg]
+                        gold = SermonGold.objects.create(
+                            author_id=author_id, incipit=incipit, explicit=explicit, equal=ssg)
+
+                        oImported['gold'] = gold.id
+
+                        # (3) Add all the signatures, linking them to the correct SG
+                        oImported['siglist'] = add_signatures_to_sg(signatures, gold)
+
+                        # (4) Add a keyword to the SG to indicate this is from HUWA
+                        kw_huwa = Keyword.objects.filter(name__contains="HUWA import", visibility="edi").first()
+                        if kw_huwa is None:
+                            # Create a keyword
+                            kw_huwa = Keyword.objects.create(name="HUWA import", visibility="edi")
+                        gold.keywords.add(kw_huwa)
+
+                    # Create a link between the SSG and the opera identifier
+                    EqualGoldExternal.objects.create(
+                        equal=ssg, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                        subset = subset)
+
+                    oImported['msg'] = "read"
+
+            # Has something been added?
+            if not ssg is None and not coll_super is None:
+                # Check if this combination already exists
+                obj_ssg_coll = CollectionSuper.objects.filter(collection=coll_super, super=ssg).first()
+                if obj_ssg_coll is None:
+                    # Add to collection
+                    obj_ssg_coll = CollectionSuper.objects.create(collection=coll_super, super=ssg)
+            if not gold is None and not coll_gold is None:
+                # Check if this combination already exists
+                obj_gold_coll = CollectionGold.objects.filter(collection=coll_gold, gold=gold).first()
+                if obj_gold_coll is None:
+                    # Add to collection
+                    obj_gold_coll = CollectionGold.objects.create(collection=coll_gold, gold=gold)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("import_one_json")
+            oImported['status'] = "error"
+            oImported['msg'] = msg
+
+        return oImported
 

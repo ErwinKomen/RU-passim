@@ -1327,13 +1327,22 @@ class BasicList(ListView):
                 self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
                 # qs = self.model.objects.filter(manuitems__itemsermons__goldsermons__goldsignatures__code__in = "AN Mt h 42")
 
+                # Combine exclude filters with logical or
+                exclude = None
+                if not lstExclude is None and len(lstExclude) > 0:
+                    exclude = lstExclude[0]
+                    for expr in lstExclude[1:]:
+                        exclude |= expr
+
                 # Calculate the final qs
                 if len(lstQ) == 0 and not self.none_on_empty:
                     if lstExclude:
                         if qAlternative:
-                            qs = self.model.objects.filter(qAlternative).exclude(*lstExclude).distinct()
+                            # qs = self.model.objects.filter(qAlternative).exclude(*lstExclude).distinct()
+                            qs = self.model.objects.filter(qAlternative).exclude(exclude).distinct()
                         else:
-                            qs = self.model.objects.exclude(*lstExclude)
+                            # qs = self.model.objects.exclude(*lstExclude)
+                            qs = self.model.objects.exclude(exclude)
                     else:
                         if qAlternative:
                             qs = self.model.objects.filter(qAlternative).distinct()
@@ -1350,7 +1359,8 @@ class BasicList(ListView):
 
                     # Check if excluding is needed
                     if lstExclude:
-                        qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
+                        # qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
+                        qs = self.model.objects.filter(filter).exclude(exclude).distinct()
                     else:
                         qs = self.model.objects.filter(filter).distinct()
 

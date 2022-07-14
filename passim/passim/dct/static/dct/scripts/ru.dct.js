@@ -1967,7 +1967,7 @@ var ru = (function ($, ru) {
         }
       },
 
-        /**
+      /**
        * dct_source
        *    Show or hide a source list
        *
@@ -1994,7 +1994,7 @@ var ru = (function ($, ru) {
           private_methods.errMsg("dct_source", ex);
         }
       },
-      
+
       /**
        * load_dct
        *    Ask for the DCT definition using AJAX

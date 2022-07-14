@@ -1,0 +1,53 @@
+﻿{% if statuscode == "completed" %}
+  <div class='col-md-12'>
+    <p>
+    The list of AFs (SSGs) has been processed, and {{results|length}} new AFs have been added.
+    </p>
+    <p>
+      Possible actions:
+      <ul>
+        <li><b>Show</b> show the list of AFs that have been added
+          <button class="btn btn-default btn-sm dropdown-toggle"
+                  type="button" data-toggle="collapse" data-target="#man-list">List</button>
+        </li>
+        <li><b>List</b> all AFs
+            <!-- When ready press this button -->
+            <span><a class="btn btn-xs jumbo-1" role="button" href="{% url 'equalgold_list' %}">List</a></span>
+        </li>
+      </ul>
+    </p>
+  </div>
+
+  <div class="col-md-12 collapse" id="man-list">
+    <table>
+      <thead><tr><th>#</th><th>Json File</th><th>Opera</th><th>Gold</th><th>Authority File</th><th>Gryson / Clavis</th><th>SSG match</th><th>Manu type</th><th>Sig Status</th></tr></thead>
+      <tbody>
+        {% for item in results %}
+          <tr>
+            <td>{{forloop.counter}}</td>
+            <td>{{item.filename}}</td>
+            <td>{{item.opera}}</td>
+            <td>{{item.gold}}</td>
+            <td>{{item.ssg}}</td>
+            <td>{{item.siglist}}</td>
+            <td>{{item.ssgmatch}}</td>
+            <td>{{item.manutype}}</td>
+            <td>{{item.sigstatus}}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endif %}
+
+<!-- Any errors are shown here too-->
+<div class="errors">
+  {% if error_list and statuscode != "error" %} 
+    <h4>Errors:</h4>
+    <div>statuscode = {{statuscode}}</div>
+    {% for item in error_list %}
+      <div class="error-item">{{item}}</div>
+    {% endfor %}
+  {% endif %}
+</div>

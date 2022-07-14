@@ -30,7 +30,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources'],
+                        'codico_origin', 'import_onlinesources', 'dateranges'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -65,6 +65,40 @@ def adapt_sermonhierarchy():
     # Perform adaptations
     bResult, msg = Manuscript.adapt_hierarchy()
     return bResult, msg
+
+def adapt_dateranges():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+
+    try:
+        with transaction.atomic():
+            # Walk all manuscripts
+            for manu in Manuscript.objects.all():
+                yearstart = 0
+                yearfinish = 3000
+                # Find the best fit for the yearstart
+                lst_dateranges = Daterange.objects.filter(codico__manuscript=manu).order_by('yearstart').values('yearstart')
+                if len(lst_dateranges) > 0:
+                    yearstart = lst_dateranges[0]['yearstart']
+                # Find the best fit for the yearfinish
+                lst_dateranges = Daterange.objects.filter(codico__manuscript=manu).order_by('-yearfinish').values('yearfinish')
+                if len(lst_dateranges) > 0:
+                    yearfinish = lst_dateranges[0]['yearfinish']
+                bNeedSaving = False
+                if yearstart != manu.yearstart:
+                    manu.yearstart = yearstart
+                    bNeedSaving = True
+                if yearfinish != manu.yearfinish:
+                    manu.yearfinish = yearfinish
+                    bNeedSaving = True
+                if bNeedSaving:
+                    manu.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 def adapt_msitemcleanup():
     method = "UseAdaptations"

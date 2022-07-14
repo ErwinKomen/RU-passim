@@ -72,9 +72,10 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
-    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm
+    CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
+    UserForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
-    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
@@ -83,9 +84,9 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
-    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
-    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
+    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList
@@ -1521,59 +1522,6 @@ def do_provenance(request):
         msg = oErr.get_error_message()
         oErr.DoError("do_provenance")
         return reverse('home')
-
-# Issue #426: should be removed in due course
-#def do_daterange(request):
-#    """Copy data ranges from manuscripts to separate tables - if not already there"""
-
-#    oErr = ErrHandle()
-#    try:
-#        assert isinstance(request, HttpRequest)
-#        # Specify the template
-#        template_name = 'tools.html'
-#        # Define the initial context
-#        context =  {'title':'RU-passim-tools',
-#                    'year':get_current_datetime().year,
-#                    'pfx': APP_PREFIX,
-#                    'site_url': admin.site.site_url}
-#        context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-#        context['is_app_editor'] = user_is_ingroup(request, app_editor)
-
-#        # Only passim uploaders can do this
-#        if not context['is_app_uploader']: return reverse('home')
-
-#        # Indicate the necessary tools sub-part
-#        context['tools_part'] = "Update from Manuscript to Daterange table"
-
-#        # Process this visit
-#        context['breadcrumbs'] = get_breadcrumbs(request, "Dateranges", True)
-
-#        # Create list to be returned
-#        result_list = []
-
-#        # Visit all Manuscripts
-#        qs = Manuscript.objects.all()
-#        lst_add = []
-#        for obj in qs:
-#            # Check if there are any associated Dateranges
-#            if obj.manuscript_dateranges.all().count() == 0:
-#                # There are no date ranges yet: create just ONE
-#                obj_dr = Daterange.objects.create(yearstart=obj.yearstart, yearfinish=obj.yearfinish, manuscript=obj)
-#                # Show that we added it
-#                # oAdded = dict(manuscript=obj.idno, yearstart=obj.yearstart, yearfinish=obj.yearfinish)
-#                sAdd = "{}: {}-{}".format(obj.idno, obj.yearstart, obj.yearfinish)
-#                lst_add.append(sAdd)
-
-#        # Wrapping it up
-#        result_list.append(dict(part="Added", result= lst_add))
-#        context['result_list'] = result_list
-
-#        # Render and return the page
-#        return render(request, template_name, context)
-#    except:
-#        msg = oErr.get_error_message()
-#        oErr.DoError("do_daterange")
-#        return reverse('home')
 
 def do_mext(request):
     """Copy all 'url' fields from Manuscript instances to separate ManuscriptExt instances and link them to the Manuscript"""
@@ -4048,14 +3996,31 @@ def get_pie_data():
     combidata = {}
     ptypes = ['sermo', 'super', 'manu']
     try:
+        # Get the values for app, edi, imp, man
+        stype_list = FieldChoice.objects.filter(field="seeker.stype").values('id', 'abbr')
+        oStype = {}
+        for oItem in stype_list:
+            oStype[oItem['abbr']] = oItem['id']
         for ptype in ptypes:
             qs = None
+            url_red = ""
+            url_ora = ""
+            url_gre = ""
             if ptype == "sermo":
-                qs = SermonDescr.objects.filter(msitem__isnull=False).order_by('stype').values('stype')
+                qs = SermonDescr.objects.exclude(Q(mtype='tem') & Q(msitem__isnull=True)).order_by('stype').values('stype')
+                url_red = "{}?sermo-stypelist={}&sermo-stypelist={}".format(reverse('sermon_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['edi'])
+                url_gre = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['app'])
             elif ptype == "super":
-                qs = EqualGold.objects.filter(moved__isnull=True).order_by('stype').values('stype')
+                qs = EqualGold.objects.filter(moved__isnull=True,atype='acc').order_by('stype').values('stype')
+                url_red = "{}?ssg-stypelist={}&ssg-stypelist={}".format(reverse('equalgold_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['edi'])
+                url_gre = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['app'])
             elif ptype == "manu":
-                qs = Manuscript.objects.filter(mtype='man').order_by('stype').values('stype')
+                qs = Manuscript.objects.exclude(Q(mtype='tem')).order_by('stype').values('stype')
+                url_red = "{}?manu-stypelist={}&manu-stypelist={}".format(reverse('manuscript_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['edi'])
+                url_gre = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['app'])
             # Calculate the different stype values
             if qs != None:
                 app = sum(x['stype'] == "app" for x in qs)  # Approved
@@ -4069,9 +4034,9 @@ def get_pie_data():
             total = red + green + orange
             # Create a list of data
             data = []
-            data.append({'name': 'Initial', 'value': red, 'total': total})
-            data.append({'name': 'Edited', 'value': orange, 'total': total})
-            data.append({'name': 'Approved', 'value': green, 'total': total})
+            data.append({'name': 'Initial', 'value': red, 'total': total, 'url': url_red})
+            data.append({'name': 'Edited', 'value': orange, 'total': total, 'url': url_ora})
+            data.append({'name': 'Approved', 'value': green, 'total': total, 'url': url_gre})
             combidata[ptype] = data
     except:
         msg = oErr.get_error_message()
@@ -4995,24 +4960,30 @@ class SermonListView(BasicList):
     basic_name = "sermon"
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 'sectiontitle', 'title', '','', 'stype']
+    order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
+                  'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
+                  'sectiontitle', 'title', '','', 'stype']
     order_default = order_cols
     order_heads = [
-        {'name': 'Author',      'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True}, 
-        {'name': 'Signature',   'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111'}, 
+        {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
+         'title': 'Attributed author'}, 
+        {'name': 'Gryson/Clavis', 'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111',
+         'title': 'Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon'}, 
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Section',     'order': 'o=5', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate',
+         'title': 'Date of the manuscript'},
+        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
-        {'name': 'Title',       'order': 'o=6', 'type': 'str', 'custom': 'title', 
-         'allowwrap': True,    'autohide': "on", 'filter': 'filter_title'},        
+        {'name': 'Title',       'order': 'o=7', 'type': 'str', 'custom': 'title', 
+         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Status',      'order': 'o=10', 'type': 'str', 'custom': 'status'}]
 
-    filters = [ {"name": "Gryson or Clavis", "id": "filter_signature",      "enabled": False},
-                {"name": "Author",           "id": "filter_author",         "enabled": False},
+    filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
+                {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_atype",          "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
@@ -5020,7 +4991,7 @@ class SermonListView(BasicList):
                 {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
-                {"name": "Bible",            "id": "filter_bibref",         "enabled": False},
+                {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
                 {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
@@ -5036,12 +5007,12 @@ class SermonListView(BasicList):
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "City",             "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "City/location",    "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Library",          "id": "filter_library",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Origin",           "id": "filter_origin",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Provenance",       "id": "filter_provenance",     "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "Date from",        "id": "filter_datestart",      "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Date range",       "id": "filter_daterange",      "enabled": False, "head_id": "filter_manuscript"},
+                # {"name": "Date until",       "id": "filter_datefinish",     "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Manuscript type",  "id": "filter_manutype",       "enabled": False, "head_id": "filter_manuscript"},
                 ]
     
@@ -5087,8 +5058,8 @@ class SermonListView(BasicList):
             {'filter': 'origin',        'fkfield': 'msitem__codico__origin',          'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'msitem__codico__provenances|msitem__codico__provenances__location',     
              'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
+            {'filter': 'daterange',     'dbfield': 'msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
+            {'filter': 'daterange',     'dbfield': 'msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
             {'filter': 'manutype',      'dbfield': 'msitem__manu__mtype',     'keyS': 'manutype',     'keyType': 'fieldchoice', 'infield': 'abbr'},
             ]},
         {'section': 'other', 'filterlist': [
@@ -5168,6 +5139,10 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "msdate":
+            manu = instance.get_manuscript()
+            # Get the yearstart-yearfinish
+            html.append(manu.get_dates(True))
         elif custom == "title":
             sTitle = ""
             if instance.title != None and instance.title != "":
@@ -5202,7 +5177,8 @@ class SermonListView(BasicList):
 
         try:
             # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
-            lstExclude.append(Q(mtype='tem') )
+            lstExclude.append(Q(mtype='tem'))
+            lstExclude.append(Q(msitem__isnull=True))
             ## Make sure to only show mtype manifestations
             #fields['mtype'] = "man"
 
@@ -5263,36 +5239,88 @@ class SermonListView(BasicList):
             # Adapt according to the 'free' fields
             free_term = fields.get("free_term", "")
             if free_term != None and free_term != "":
+                all_fields = "all_fields"
+
                 free_include = fields.get("free_include", [])
                 free_exclude = fields.get("free_exclude", [])
 
-                # Look for include fields
-                s_q_i_lst = ""
-                for obj in free_include:
-                    val = free_term
-                    if "*" in val or "#" in val:
-                        val = adapt_search(val)
-                        s_q = Q(**{"{}__iregex".format(obj.field): val})
-                    else:
-                        s_q = Q(**{"{}__iexact".format(obj.field): val})
-                    if s_q_i_lst == "":
-                        s_q_i_lst = s_q
-                    else:
-                        s_q_i_lst |= s_q
+                # Look for include field(s)
+                if len(free_include) == 1 and free_include[0].field == all_fields:
+                    # Include all fields from Free
+                    s_q_i_lst = ""
+                    for obj in Free.objects.exclude(field=all_fields):
+                        val = free_term
+                        if "*" in val or "#" in val:
+                            val = adapt_search(val)
+                            s_q = Q(**{"{}__iregex".format(obj.field): val})
+                        elif "@" in val:
+                            val = val.replace("@", "").strip()
+                            s_q = Q(**{"{}__icontains".format(obj.field): val})
+                        else:
+                            s_q = Q(**{"{}__iexact".format(obj.field): val})
+                        if s_q_i_lst == "":
+                            s_q_i_lst = s_q
+                        else:
+                            s_q_i_lst |= s_q
+                else:
+                    s_q_i_lst = ""
+                    for obj in free_include:
+                        if obj.field == all_fields:
+                            # skip it
+                            pass
+                        else:
+                            val = free_term
+                            if "*" in val or "#" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(obj.field): val})
+                            elif "@" in val:
+                                val = val.replace("@", "").strip()
+                                s_q = Q(**{"{}__icontains".format(obj.field): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(obj.field): val})
+                            if s_q_i_lst == "":
+                                s_q_i_lst = s_q
+                            else:
+                                s_q_i_lst |= s_q
 
                 # Look for exclude fields
-                s_q_e_lst = ""
-                for obj in free_exclude:
-                    val = free_term
-                    if "*" in val or "#" in val:
-                        val = adapt_search(val)
-                        s_q = Q(**{"{}__iregex".format(obj.field): val})
-                    else:
-                        s_q = Q(**{"{}__iexact".format(obj.field): val})
-                    if s_q_e_lst == "":
-                        s_q_e_lst = s_q
-                    else:
-                        s_q_e_lst |= s_q
+                if len(free_exclude) == 1 and free_exclude[0].field == all_fields:
+                    # Include all fields from Free
+                    s_q_e_lst = ""
+                    for obj in Free.objects.exclude(field=all_fields):
+                        val = free_term
+                        if "*" in val or "#" in val:
+                            val = adapt_search(val)
+                            s_q = Q(**{"{}__iregex".format(obj.field): val})
+                        elif "@" in val:
+                            val = val.replace("@", "").strip()
+                            s_q = Q(**{"{}__icontains".format(obj.field): val})
+                        else:
+                            s_q = Q(**{"{}__iexact".format(obj.field): val})
+                        if s_q_e_lst == "":
+                            s_q_e_lst = s_q
+                        else:
+                            s_q_e_lst |= s_q
+                else:
+                    s_q_e_lst = ""
+                    for obj in free_exclude:
+                        if obj.field == all_fields:
+                            # skip it
+                            pass
+                        else:
+                            val = free_term
+                            if "*" in val or "#" in val:
+                                val = adapt_search(val)
+                                s_q = Q(**{"{}__iregex".format(obj.field): val})
+                            elif "@" in val:
+                                val = val.replace("@", "").strip()
+                                s_q = Q(**{"{}__icontains".format(obj.field): val})
+                            else:
+                                s_q = Q(**{"{}__iexact".format(obj.field): val})
+                            if s_q_e_lst == "":
+                                s_q_e_lst = s_q
+                            else:
+                                s_q_e_lst |= s_q
 
                 if s_q_i_lst != "":
                     qAlternative = s_q_i_lst
@@ -6459,6 +6487,8 @@ class FeastListView(BasicList):
         return sBack, sTitle
 
 
+# ================= TEMPLATE =============================
+
 class TemplateEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
 
@@ -6625,6 +6655,60 @@ class TemplateListView(BasicList):
         return context
 
 
+# ================= PROFILE and USER =============================
+
+class UserEdit(BasicDetails):
+    """Changing a user's changeable attributes"""
+
+    model = User
+    mForm = UserForm
+    prefix = "usr"
+    title = "UserEdit"
+    no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+
+        # Set the LISTVIEW to the MyPassim page
+        self.listview = reverse('mypassim')
+        self.listviewtitle = "My Passim"
+
+        # Return nothing
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            # Issue #435: user must be able to change: email, pw, name
+            {'type': 'plain', 'label': "Username:",     'value': instance.username,    'field_key': "username"},
+            {'type': 'plain', 'label': "Email:",        'value': instance.email,       'field_key': "email"},
+            {'type': 'plain', 'label': "First name:",   'value': instance.first_name,  'field_key': "first_name"},
+            {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},
+            ]
+
+        # Adapt the permission, if this is the actual user that is logged in
+        if context['authenticated'] and not context['is_app_moderator']:
+            # Check who this is
+            user = self.request.user
+            # Compare with instance
+            if user.id == instance.id:
+                self.permission = "write"
+            else:
+                # This is not the current user
+                self.permission = "readonly"
+            context['permission'] = self.permission
+
+        # Return the context we have made
+        return context
+
+
+class UserDetails(UserEdit):
+    """Like User Edit, but then with HTML output"""
+    rtype = "html"
+
+
 class ProfileEdit(BasicDetails):
     """Details view of profile"""
 
@@ -6643,11 +6727,13 @@ class ProfileEdit(BasicDetails):
 
         # Define the main items to show and edit
         context['mainitems'] = [
+            # The user.id must be passed on, but non-visibly
             {'type': 'plain', 'label': "User",          'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
-            {'type': 'plain', 'label': "Username:",     'value': instance.user.username, },
-            {'type': 'plain', 'label': "Email:",        'value': instance.user.email, },
-            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name, },
-            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name, },
+            # Issue #435: user must be able to change: email, pw, name
+            {'type': 'plain', 'label': "Username:",     'value': instance.user.username,    'field_key': "newusername"},
+            {'type': 'plain', 'label': "Email:",        'value': instance.user.email,       'field_key': "newemail"},
+            {'type': 'plain', 'label': "First name:",   'value': instance.user.first_name,  'field_key': "newfirst_name"},
+            {'type': 'plain', 'label': "Last name:",    'value': instance.user.last_name,   'field_key': "newlast_name"},
             {'type': 'plain', 'label': "Is staff:",     'value': instance.user.is_staff, },
             {'type': 'plain', 'label': "Is superuser:", 'value': instance.user.is_superuser, },
             {'type': 'plain', 'label': "Date joined:",  'value': instance.user.date_joined.strftime("%d/%b/%Y %H:%M"), },
@@ -6657,6 +6743,19 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
             ]
+
+        # Adapt the permission, if this is the actual user that is logged in
+        if context['authenticated'] and not context['is_app_moderator']:
+            # Check who this is
+            user = self.request.user
+            # Compare with instance
+            if user.id == instance.user.id:
+                self.permission = "write"
+            else:
+                # This is not the current user
+                self.permission = "readonly"
+            context['permission'] = self.permission
+
         # Return the context we have made
         return context
 
@@ -6666,6 +6765,36 @@ class ProfileEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            bSaveUser = False
+
+            # (1) Process newusername
+            newusername = form.cleaned_data['newusername']
+            if instance.user.username != newusername:
+                instance.user.username = newusername
+                bSaveUser = True
+
+            # (2) Process newemail
+            newemail = form.cleaned_data['newemail']
+            if instance.user.email != newemail:
+                instance.user.email = newemail
+                bSaveUser = True
+
+            # (3) Process newfirst_name
+            newfirst_name = form.cleaned_data['newfirst_name']
+            if instance.user.first_name != newfirst_name:
+                instance.user.first_name = newfirst_name
+                bSaveUser = True
+
+            # (4) Process newlast_name
+            newlast_name = form.cleaned_data['newlast_name']
+            if instance.user.last_name != newlast_name:
+                instance.user.last_name = newlast_name
+                bSaveUser = True
+
+            # Possibly save the user
+            if bSaveUser:
+                instance.user.save()
+
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
             adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
@@ -6780,6 +6909,8 @@ class DefaultDetails(DefaultEdit):
 
     rtype = "html"
 
+
+# ================= PROJECT =============================
 
 class ProjectEdit(BasicDetails):
     """Details and editing of a project (nov 2021 version)"""
@@ -6935,6 +7066,8 @@ class ProjectListView(BasicList):
         sBack = "\n".join(html)
         return sBack, sTitle
 
+
+# ================= COLLECTION =============================
 
 class CollAnyEdit(BasicDetails):
     """Manu: Manuscript collections"""
@@ -8584,8 +8717,9 @@ class CollectionListView(BasicList):
                 {'section': 'other', 'filterlist': [
                     {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type'},
-                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'}
-                    #{'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'scope'}
+                    {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
+                    # {'filter': 'scope',  'dbfield': 'scope',  'keyS': 'scope'}
+                    {'filter': 'defscope',  'dbfield': '$dummy', 'keyS': 'defscope'}
                     ]}
                 ]
         elif self.prefix == "publ":
@@ -8810,8 +8944,10 @@ class CollectionListView(BasicList):
                 # When navigating to My Datasets, scope is empty and colscope is None:
                 if fields['scope'] == "":
                     # For the complete overview (private datasets of the user, team and public):
-                    if fields['colscope'] == None:                        
-                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                    if fields['colscope'] == None:
+                        # issue #446: use [defscope] for default setting
+                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
                     # Filtering on scope Public:
                     elif fields['colscope'].abbr == 'publ':           
                         fields['colscope'] = (Q(scope="publ") )
@@ -8835,8 +8971,10 @@ class CollectionListView(BasicList):
                         elif fields['colscope'].abbr == 'team':
                             fields['colscope'] = (Q(scope="team") )
                     # For the complete overview (private datasets of the user, team and public):
-                    elif fields['colscope'] == None:                        
-                        fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                    elif fields['colscope'] == None:
+                        # issue #446: use [defscope] for default setting
+                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
              
         
         elif self.prefix == "publ":
@@ -11732,6 +11870,8 @@ class SermonGoldDetails(SermonGoldEdit):
         return True, ""
 
 
+# ================= EQUALGOLD =============================
+
 class EqualGoldEdit(BasicDetails):
     model = EqualGold
     mForm = SuperSermonGoldForm
@@ -12560,7 +12700,7 @@ class EqualGoldDetails(EqualGoldEdit):
                         '<span title="Collection name">coll.</span>', 
                         '<span title="Item">item</span>', 
                         '<span title="Folio number">ff.</span>', 
-                        '<span title="Attributed author">auth.</span>', 
+                        '<span title="Attributed author">attr. auth.</span>', 
                         '<span title="Incipit">inc.</span>', 
                         '<span title="Explicit">expl.</span>', 
                         '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
@@ -12673,15 +12813,15 @@ class EqualGoldListView(BasicList):
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Authority file"},        
-        {'name': 'Manifestations',                 'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
+        {'name': 'Manifestations',          'order': 'o=5'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
-        {'name': 'Contains',                    'order': 'o=7'   , 'type': 'int', 'custom': 'size',
+        {'name': 'Contains',                'order': 'o=6'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Links',                   'order': 'o=7'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
-        {'name': 'Hist. Coll.',                     'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'Hist. Coll.',             'order': 'o=8'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
-        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}        
+        {'name': 'Status',                  'order': 'o=9',   'type': 'str', 'custom': 'status'}        
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -12757,6 +12897,24 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
                 ]
+            # Possibly add to 'uploads'
+            bHasJson = False
+            for item in self.uploads:
+                if item['title'] == "huwajson":
+                    bHasJson = True
+
+            # Should json be added?
+            if not bHasJson:
+                # Add a reference to the Json upload method
+                html = []
+                html.append("Upload SSGs/AFs from a HUWA json specification.")
+                html.append("<b>Note 1:</b> this may OVERWRITE existing information!")
+                html.append("<b>Note 2:</b> PROJECT assignment is according to issue #534")
+                msg = "<br />".join(html)
+                oJson = dict(title="huwajson", label="HUWA json",
+                              url=reverse('import_huwa'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
 
         return None
     
@@ -12898,7 +13056,7 @@ class EqualGoldListView(BasicList):
         
         # Make sure we only show the SSG/AF's that have accepted modifications
         # (fields['atype'] = 'acc'), so exclude the others:
-        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) ]      
+        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]      
        
         return fields, lstExclude, qAlternative        
 
@@ -13006,30 +13164,124 @@ class EqualGoldVisDownload(BasicPart):
         # Initialize
         lData = []
         sData = ""
+        oErr = ErrHandle()
 
-        if dtype == "json":
-            # Retrieve the actual data from self.data
-            oData = dict(legend=self.data['legend'],
-                         link_list=self.data['link_list'],
-                         node_list=self.data['node_list'])
-            sData = json.dumps(oData, indent=2)
-        elif dtype == "hist-svg":
-            pass
-        elif dtype == "hist-png":
-            pass
-        elif dtype == "csv" or dtype == "xlsx":
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
-            csvwriter.writerow(headers)
-            pass
+        try:
+            if dtype == "json":
+                # Retrieve the actual data from self.data
+                oData = dict(legend=self.data['legend'],
+                             link_list=self.data['link_list'],
+                             node_list=self.data['node_list'])
+                sData = json.dumps(oData, indent=2)
+            elif dtype == "hist-svg":
+                pass
+            elif dtype == "hist-png":
+                pass
+            elif dtype == "csv":
+                # THIS IS NOT YET IMPLEMENTED
 
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Headers
+                headers = ['round', 'testset', 'speaker', 'gender', 'filename', 'sentence', 'ntype']
+                csvwriter.writerow(headers)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+            elif dtype == "excel":
+
+                if self.vistype in ['trans', 'overlap']:
+                    # Start workbook
+                    wb = openpyxl.Workbook()
+
+                    # First worksheet: Name of the legend
+                    ws = wb.get_active_sheet()
+                    ws.title="Data"
+                    c = ws.cell(row=1, column=1)
+                    c.value = "Legend"
+                    c = ws.cell(row=1, column=2)
+                    c.value = self.data['legend']
+
+                    # Second sheet: node data
+                    ws = wb.create_sheet("Nodes")
+                    node_list=self.data['node_list']
+
+                    # (2): headers
+                    if self.vistype == "overlap":
+                        headers = ["group", "HCs", "id", "label", "passim", "scount"]
+                    elif self.vistype == "trans":
+                        headers = ["id", "scount", "label", "category", "rating", "sig"]
+                    for col_num in range(len(headers)):
+                        c = ws.cell(row=1, column=col_num+1)
+                        c.value = headers[col_num]
+                        c.font = openpyxl.styles.Font(bold=True)
+                        # Set width to a fixed size
+                        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0    
+                    
+                    # (2): items   
+                    row_num = 2 
+                    for item in node_list:
+                        if self.vistype == "overlap":
+                            ws.cell(row=row_num, column=1).value = item.get("group")
+                            ws.cell(row=row_num, column=2).value = json.dumps(item.get("hcs"))
+                            ws.cell(row=row_num, column=3).value = item.get("id")
+                            ws.cell(row=row_num, column=4).value = item.get("label")
+                            ws.cell(row=row_num, column=5).value = item.get("passim")
+                            ws.cell(row=row_num, column=6).value = item.get("scount")
+                        elif self.vistype == "trans":
+                            ws.cell(row=row_num, column=1).value = item.get("id")
+                            ws.cell(row=row_num, column=2).value = item.get("scount")
+                            ws.cell(row=row_num, column=3).value = item.get("label")
+                            ws.cell(row=row_num, column=4).value = item.get("category")
+                            ws.cell(row=row_num, column=5).value = item.get("rating")
+                            ws.cell(row=row_num, column=6).value = item.get("sig")
+
+                        row_num += 1
+
+                    # Third sheet: link data
+                    ws = wb.create_sheet("Links")
+                    link_list=self.data['link_list']
+                
+                    # (3): headers
+                    if self.vistype == "overlap":
+                        headers = ["value", "spectype", "spec", "linktype", "source", "target", "alternatives", "link", "note"]
+                    elif self.vistype == "trans":
+                        headers = ["source", "target", "value"]
+                    for col_num in range(len(headers)):
+                        c = ws.cell(row=1, column=col_num+1)
+                        c.value = headers[col_num]
+                        c.font = openpyxl.styles.Font(bold=True)
+                        # Set width to a fixed size
+                        ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+                    # (3): items   
+                    row_num = 2 
+                    for item in link_list:
+                        if self.vistype == "overlap":
+                            ws.cell(row=row_num, column=1).value = item.get("value")
+                            ws.cell(row=row_num, column=2).value = item.get("spectype")
+                            ws.cell(row=row_num, column=3).value = item.get("spec")
+                            ws.cell(row=row_num, column=4).value = item.get("linktype")
+                            ws.cell(row=row_num, column=5).value = item.get("source")
+                            ws.cell(row=row_num, column=6).value = item.get("target")
+                            ws.cell(row=row_num, column=7).value = item.get("alternatives")
+                            ws.cell(row=row_num, column=8).value = item.get("link")
+                            ws.cell(row=row_num, column=9).value = item.get("note")
+                        elif self.vistype == "trans":
+                            ws.cell(row=row_num, column=1).value = item.get("source")
+                            ws.cell(row=row_num, column=2).value = item.get("target")
+                            ws.cell(row=row_num, column=3).value = item.get("value")
+                        row_num += 1
+
+                # Save it
+                wb.save(response)
+                sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldVisDownload/get_data")
 
         return sData
 
@@ -13048,6 +13300,107 @@ class EqualGoldOverlapDownload(EqualGoldVisDownload):
     """Overlap graph"""
     vistype = "overlap"
 
+
+# ================= EQUALGOLDLINK ======================
+
+class EqualGoldLinkEdit(BasicDetails):
+    model = EqualGoldLink
+    mForm = EqualGoldLinkForm
+    prefix = 'ssglink'
+    title = "Authority file link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this SSG is
+            self.listview = reverse('equalgold_details', kwargs={'pk': src.id})
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'safe',  'label': "Source AF:",    'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target AF:",    'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",    'value': instance.get_linktype_display(),       'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Spec type:",    'value': instance.get_spectype_display(),       'field_key': 'spectype'},
+            {'type': 'plain', 'label': "Alternatives:", "value": instance.get_alternatives(),           'field_key': 'alternatives'},
+            {'type': 'plain', 'label': "Note:",         "value": instance.get_note(),                   'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class EqualGoldLinkDetails(EqualGoldLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class EqualGoldLinkListView(BasicList):
+    """List super sermon gold instances"""
+
+    model = EqualGoldLink
+    listform = EqualGoldLinkForm
+    has_select2 = True  # Check
+    template_help = "seeker/filter_help.html"
+    prefix = "ssglink"
+    bUseFilter = True  
+    plural_name = "Authority File links"
+    sg_name = "Authority File Link"
+    order_cols = ['src__code', 'dst__code', 'linktype', 'spectype', 'alternatives'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        {'name': 'Spec type',       'order': 'o=4', 'type': 'str', 'custom': 'spectype',    'linkdetails': True, 'main': True},        
+        {'name': 'Alternatives',    'order': 'o=5', 'type': 'str', 'custom': 'alternatives','linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+        {"name": "Spec type",   "id": "filter_spectype",    "enabled": False}
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'code', 'keyList': 'srclist', 'infield': 'code'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'code', 'keyList': 'dstlist', 'infield': 'code'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            {'filter': 'spectype',    'dbfield': 'spectype',    'keyList': 'spectypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+        elif custom == "spectype":
+            sBack = instance.get_spectype_display()
+        elif custom == "alternatives":
+            sBack = instance.get_alternatives_display()
+
+        return sBack, sTitle
+
+
+# ================= AUTHOR =============================
 
 class AuthorEdit(BasicDetails):
     """The details of one author"""
@@ -13133,6 +13486,73 @@ class AuthorListView(BasicList):
             sBack = "\n".join(html)
         return sBack, sTitle
 
+
+class AuthorListDownload(BasicPart):
+    MainModel = Author
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
+        #context['search_name'] = self.basket.research.name
+        return context
+
+    def get_queryset(self, prefix):
+
+        # Get parameters
+        name = self.qd.get("name", "")
+
+        # Construct the QS
+        lstQ = []
+        if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+        qs = Author.objects.filter(*lstQ).order_by('name')
+
+        return qs
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+
+        if dtype == "json":
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = {"id": author.id, "name": author.name}
+                lData.append(row)
+            # convert to string
+            sData = json.dumps(lData)
+        else:
+            # Create CSV string writer
+            output = StringIO()
+            delimiter = "\t" if dtype == "csv" else ","
+            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+            # Headers
+            headers = ['id', 'name']
+            csvwriter.writerow(headers)
+            # Loop
+            for author in self.get_queryset(prefix):
+                row = [author.id, author.name]
+                csvwriter.writerow(row)
+
+            # Convert to string
+            sData = output.getvalue()
+            output.close()
+
+        return sData
+
+
+# ================= LIBRARY =============================
 
 class LibraryListView(BasicList):
     """Listview of libraries in countries/cities"""
@@ -13434,70 +13854,7 @@ class LibraryDetails(LibraryEdit):
         return context
 
 
-class AuthorListDownload(BasicPart):
-    MainModel = Author
-    template_name = "seeker/download_status.html"
-    action = "download"
-    dtype = "csv"       # downloadtype
-
-    def custom_init(self):
-        """Calculate stuff"""
-        
-        dt = self.qd.get('downloadtype', "")
-        if dt != None and dt != '':
-            self.dtype = dt
-
-    def add_to_context(self, context):
-        # Provide search URL and search name
-        #context['search_edit_url'] = reverse("seeker_edit", kwargs={"object_id": self.basket.research.id})
-        #context['search_name'] = self.basket.research.name
-        return context
-
-    def get_queryset(self, prefix):
-
-        # Get parameters
-        name = self.qd.get("name", "")
-
-        # Construct the QS
-        lstQ = []
-        if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
-        qs = Author.objects.filter(*lstQ).order_by('name')
-
-        return qs
-
-    def get_data(self, prefix, dtype, response=None):
-        """Gather the data as CSV, including a header line and comma-separated"""
-
-        # Initialize
-        lData = []
-        sData = ""
-
-        if dtype == "json":
-            # Loop
-            for author in self.get_queryset(prefix):
-                row = {"id": author.id, "name": author.name}
-                lData.append(row)
-            # convert to string
-            sData = json.dumps(lData)
-        else:
-            # Create CSV string writer
-            output = StringIO()
-            delimiter = "\t" if dtype == "csv" else ","
-            csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
-            # Headers
-            headers = ['id', 'name']
-            csvwriter.writerow(headers)
-            # Loop
-            for author in self.get_queryset(prefix):
-                row = [author.id, author.name]
-                csvwriter.writerow(row)
-
-            # Convert to string
-            sData = output.getvalue()
-            output.close()
-
-        return sData
-
+# ================= REPORT =============================
 
 class ReportListView(BasicList):
     """Listview of reports"""
@@ -13675,6 +14032,8 @@ class ReportDownload(BasicPart):
         return sData
 
 
+# ================= SOURCE =============================
+
 class SourceListView(BasicList):
     """Listview of sources"""
 
@@ -13757,9 +14116,10 @@ class SourceListView(BasicList):
                     manu = qs_t.first()
                     # Get the ID of the template with this manuscript
                     obj_t = Template.objects.filter(manu=manu).first()
-                    url = reverse("template_details", kwargs={'pk': obj_t.id})
-                    sBack = "<a href='{}' title='One template manuscript'><span class='badge jumbo-2 clickable'>{}</span></a>".format(
-                        url, count_t)
+                    if not obj_t is None:
+                        url = reverse("template_details", kwargs={'pk': obj_t.id})
+                        sBack = "<a href='{}' title='One template manuscript'><span class='badge jumbo-2 clickable'>{}</span></a>".format(
+                            url, count_t)
                 else:
                     url = reverse('template_list')
                     sBack = "<a href='{}?tmp-srclist={}' title='Template manuscripts'><span class='badge jumbo-1 clickable'>{}</span></a>".format(
@@ -13824,6 +14184,8 @@ class SourceDetails(SourceEdit):
 
     rtype = "html"
 
+
+# =======================================================
 
 class LitRefListView(ListView):
     """Listview of edition and literature references"""
