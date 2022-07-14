@@ -4022,7 +4022,14 @@ class ReaderHuwaImport(ReaderEqualGold):
 
                 # Show where we are
                 opera_id = oOpera.get('opera')
-                oErr.Status("Huwa Import reading opera id={} {}/{}".format(opera_id, idx+1, num_operas))
+
+                #if idx % 100 == 0:
+                #    oErr.Status("Huwa Import reading opera id={} {}/{}".format(opera_id, idx+1, num_operas))
+
+                ## -------------- DEBUGGING ------
+                #if opera_id == 6301:
+                #    iStop = 1
+
 
                 # Get the parameters that are needed
                 existing_ssg = oOpera.get("existing_ssg")
@@ -4094,6 +4101,8 @@ class ReaderHuwaImport(ReaderEqualGold):
                         pass
                 # Process the [oImported]
                 if not oImported is None and oImported.get("msg") in ["read", "linked"]:
+                    oErr.Status("Huwa Import processing opera id={} as [{}] ({}/{})".format(
+                        opera_id, oImported.get("msg"), idx+1, num_operas))
                     lst_imported.append(oImported)
 
             # Check if any relations from the list [opera_relations] can be added
@@ -4144,9 +4153,13 @@ class ReaderHuwaImport(ReaderEqualGold):
                 keyword = oRelation.get("keyword")
                 rel_num += 1
 
-                # -------- DEBUGGING ----------------
-                if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
+                ## -------- DEBUGGING ----------------
+                #if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
                 
+                ## -------- DEBUGGING ----------------
+                #if src_id == 6301:
+                #    iStop = 1
+
                 # Retrieve the src and dst SSGs
                 src = get_opera_ssg(src_id)
                 if not src is None:
@@ -4290,7 +4303,7 @@ class ReaderHuwaImport(ReaderEqualGold):
             gold = None
 
             # If there is an existing SSG with the same Signature(s)...
-            if len(same_sig_ssgs) == 0:
+            if len(same_sig_ssgs) == 0 or oOpera.get("action") == "new AF":
                 # Check if there is an existing SSG
                 if existing_id is None:
                     # No, there are no SSGs with the same sig yet: this means we are CREATING a new SSG and a new SG for it
