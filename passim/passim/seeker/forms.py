@@ -1335,6 +1335,8 @@ class SearchManuForm(PassimModelForm):
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    #manu_namelist  = ModelMultipleChoiceField(queryset=None, required=False, 
+    #                        widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
@@ -1381,6 +1383,13 @@ class SearchManuForm(PassimModelForm):
     projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
+    
+    srch_title = forms.CharField(required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching names input -sm', 'placeholder': 'Title (use wildcards)...', 'style': 'width: 100%;'}))
+
+    #srch_title = forms.CharField(label=_("Title"), required=False,
+    #            widget=forms.TextInput(attrs={'class': 'typeahead searching names input-sm', 'placeholder': 'Titles(s)...', 'style': 'width: 100%;'}))
+    
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
@@ -1413,7 +1422,7 @@ class SearchManuForm(PassimModelForm):
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
-                  "manuidnos", "gldsiggrysons", "gldsigclavises"]
+                  "manuidnos", "gldsiggrysons", "gldsigclavises", "names"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -1522,7 +1531,7 @@ class SermonForm(PassimModelForm):
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname  = forms.CharField(label=_("Author"), required=False, 
-                    widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Authors using wildcards...', 'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author (wildcards can be used)...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     authortype  = forms.ChoiceField(label=_("Author type"), required=False, 

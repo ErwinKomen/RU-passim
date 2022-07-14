@@ -228,12 +228,17 @@ def adapt_search(val, regex_function=None):
 def make_search_list(filters, oFields, search_list, qd, lstExclude):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
-    def enable_filter(filter_id, head_id=None):
-        for item in filters:
-            if filter_id in item['id']:
-                item['enabled'] = True
-                # Break from my loop
-                break
+    def enable_filter(filter_id, head_id=None): # filter_id = of title of sectiontitle
+        for item in filters:        
+            # first create two strings in order to compare the selected filters and the hidden columns (title and sectiontitle) with each other 
+            temp_filter_id = str("filter_" + filter_id)
+            temp_item_id = str(item['id'])                  
+            # If the selected filter(s) match(es) one or two of the hidden columns 
+            # enabled should be given a True
+            if temp_filter_id == temp_item_id:    
+                item['enabled'] = True            
+                # Break from my loop (deleted)
+                # break 
         # Check if this one has a head
         if head_id != None and head_id != "":
             for item in filters:
@@ -241,7 +246,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                     item['enabled'] = True
                     # Break from this sub-loop
                     break
-        return True
+        return True 
 
     def get_value(obj, field, default=None):
         if field in obj:
@@ -1369,16 +1374,16 @@ class BasicList(ListView):
             # Adapt order_heads 'autohide' if a column has a filter set
             for oOrderHead in self.order_heads:
                 if 'filter' in oOrderHead:
-                    sFilterId = oOrderHead['filter']
+                    sFilterId = oOrderHead['filter'] 
                     # Initial: on
                     oOrderHead['autohide'] = "on"
                     # Look for the correct filter
-                    for oFilter in self.filters:
+                    for oFilter in self.filters:                        
                         if oFilter['id'] == sFilterId:
-                            # We found the filter - is it being used?
-                            if oFilter['enabled']:
+                            # We found the filter - is it being used? 
+                            if oFilter['enabled']:                      
                                 # It is used, so make sure to switch OFF the autohide
-                                oOrderHead['autohide'] = "off"
+                                oOrderHead['autohide'] = "off"                                 
 
         else:
             # No filter and no basket: show all
@@ -1486,6 +1491,8 @@ class BasicDetails(DetailView):
     add = False             # Are we adding a new record or editing an existing one?
     is_basic = True         # Is this a basic details/edit view?
     history_button = False  # Show history button for this view
+    comment_button = False  # Show user comment button for this view
+    comment_count = None
     lst_typeahead = []
 
     def get(self, request, pk=None, *args, **kwargs):
@@ -1678,6 +1685,8 @@ class BasicDetails(DetailView):
 
         context['topleftbuttons'] = ""
         context['history_button'] = self.history_button
+        context['comment_button'] = self.comment_button
+        context['comment_count'] = self.comment_count
         context['no_delete'] = self.no_delete
 
         if context['authenticated'] and self.permission != "readonly":
@@ -1920,6 +1929,9 @@ class BasicDetails(DetailView):
                 if self.history_button:
                     # Retrieve history
                     context['history_contents'] = self.get_history(instance)
+                #elif self.comment_button:
+                    # Retrieve number of counts
+                #    context['comment_count'] = self.get_comment(instance)
 
             # fill in the form values
             if frm and 'mainitems' in context:

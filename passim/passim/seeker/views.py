@@ -4333,6 +4333,7 @@ class SermonEdit(BasicDetails):
     basic_name = "sermon"
     use_team_group = True
     history_button = True
+    comment_button = True
     prefix_type = "simple"
 
     StossgFormSet = inlineformset_factory(SermonDescr, SermonDescrEqual,
@@ -4418,7 +4419,7 @@ class SermonEdit(BasicDetails):
                 )
         # Get the main items
         mainitems_main = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True),'field_key': 'stype'},
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
             # -------- HIDDEN field values ---------------
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
             # --------------------------------------------
@@ -4530,6 +4531,8 @@ class SermonEdit(BasicDetails):
         title_right.append("&nbsp;<span class='codico-title-manifes' title='Codicologial unit'>{}</span>".format(codi_title))
         context['title_right'] = "".join(title_right)
 
+        #context['count_comments'] = instance.get_comments(True)
+
         # Signal that we have select2
         context['has_select2'] = True
 
@@ -4539,6 +4542,8 @@ class SermonEdit(BasicDetails):
         context['comment_list'] = get_usercomments('sermo', instance, profile)
         lhtml = []
         lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+        context['comment_count'] = instance.comments.count()
+        # Store the after_details in the context
         context['after_details'] = "\n".join(lhtml)
 
         # Return the context we have made
@@ -5001,7 +5006,7 @@ class SermonListView(BasicList):
         {'name': 'Section',     'order': 'o=5', 'type': 'str', 'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
         {'name': 'Title',       'order': 'o=6', 'type': 'str', 'custom': 'title', 
-         'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
+         'allowwrap': True,    'autohide': "on", 'filter': 'filter_title'},        
         {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
         {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
         {'name': 'Status',      'order': 'o=9', 'type': 'str', 'custom': 'status'}]
@@ -6942,6 +6947,7 @@ class CollAnyEdit(BasicDetails):
     settype = "pd"
     title = "Any collection"
     history_button = True
+    comment_button = True
     manu = None
     codico = None
     datasettype = ""
@@ -7123,7 +7129,17 @@ class CollAnyEdit(BasicDetails):
             if may_edit_project(self.request, profile, instance):
                 oProject['field_list'] = 'projlist'
             context['mainitems'].append(oProject)        
-                        
+
+        # Add comment modal stuff
+        if instance.settype == "hc":
+            initial = dict(otype="hc", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
+            context['comment_list'] = get_usercomments('hc', instance, profile)            
+            lhtml = []
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+            context['comment_count'] = instance.comments.count()
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)                        
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
@@ -7147,6 +7163,9 @@ class CollAnyEdit(BasicDetails):
 
         # Signal that we have select2
         context['has_select2'] = True
+
+        
+
 
         # Determine what the permission level is of this collection for the current user
         # (1) Is this user a different one than the one who created the collection?
@@ -8916,10 +8935,10 @@ class CommentSend(BasicPart):
 
         url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
                      "gold": "sermongold_details", "super": "equalgold_details",
-                     "codi": "codico_details"}
+                     "codi": "codico_details", "hc": "collhist_details"}
         obj_names = {"manu": "Manuscript", "sermo": "Sermon",
                      "gold": "Sermon Gold", "super": "Authority file",
-                     "codi": "Codicological unit"}
+                     "codi": "Codicological unit", "hc": "Historical collection"}
         def get_object(otype, objid):
             obj = None
             if otype == "manu":
@@ -8932,6 +8951,8 @@ class CommentSend(BasicPart):
                 obj = EqualGold.objects.filter(id=objid).first()
             elif otype == "codi":
                 obj = Codico.objects.filter(id=objid).first()
+            elif otype == "hc":
+                obj = Collection.objects.filter(id=objid).first()
             return obj
 
         if self.add:
@@ -8948,11 +8969,11 @@ class CommentSend(BasicPart):
                     # Yes, there is a remark
                     comment = Comment.objects.create(profile=profile, content=content, otype=otype)
                     obj = get_object(otype, objid)
-                    # Add a new object for this user
-                    obj.comments.add(comment)
+                    # Add a new object for this user 
+                    obj.comments.add(comment) 
 
                     # Send this comment by email
-                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id})
+                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id}) # HIER GAAT HET MIS
                     context['objurl'] = self.request.build_absolute_uri(objurl)
                     context['objname'] = obj_names[otype]
                     context['comdate'] = comment.get_created()
@@ -9162,6 +9183,7 @@ class ManuscriptEdit(BasicDetails):
     mainitems = []
     use_team_group = True
     history_button = True
+    comment_button = True
     
     #MdrFormSet = inlineformset_factory(Manuscript, Daterange,
     #                                     form=DaterangeForm, min_num=0,
@@ -9396,10 +9418,10 @@ class ManuscriptEdit(BasicDetails):
             # Add comment modal stuff
             initial = dict(otype="manu", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
-
-            context['comment_list'] = get_usercomments('manu', instance, profile)
+            context['comment_list'] = get_usercomments('manu', instance, profile)            
+            lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
-
+            context['comment_count'] = instance.comments.count()
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
 
@@ -10115,6 +10137,8 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "manu"
+    sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
+    plural_name = "Manuscripts"
     basketview = False
     template_help = "seeker/filter_help.html"
 
@@ -10135,11 +10159,12 @@ class ManuscriptListView(BasicList):
         {"name": "City/Location",   "id": "filter_city",             "enabled": False},
         {"name": "Library",         "id": "filter_library",          "enabled": False},
         {"name": "Origin",          "id": "filter_origin",           "enabled": False},
+        {"name": "Title",           "id": "filter_title",            "enabled": False},
         {"name": "Provenance",      "id": "filter_provenance",       "enabled": False},
         {"name": "Date range",      "id": "filter_daterange",        "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",          "enabled": False},
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
-        {"name": "Manuscript",      "id": "filter_manutype",         "enabled": False},
+        {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},
         {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
         {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
@@ -10166,6 +10191,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'title',         'dbfield': 'name',                  'keyS': 'srch_title'},
             {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origins__location|manuscriptcodicounits__origins', 
              # Issue #427. This was: 'manuscriptcodicounits__origin',                 
              'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
@@ -11716,6 +11742,8 @@ class EqualGoldEdit(BasicDetails):
     mainitems = []
     use_team_group = True
     history_button = True
+    comment_button = True
+
     
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
@@ -11851,9 +11879,11 @@ class EqualGoldEdit(BasicDetails):
                 # Add comment modal stuff
                 initial = dict(otype="super", objid=instance.id, profile=profile)
                 context['commentForm'] = CommentForm(initial=initial, prefix="com")
-                context['comment_list'] = get_usercomments('super', instance, profile)
+                context['comment_list'] = get_usercomments('super', instance, profile)                
                 lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+                context['comment_count'] = instance.comments.count()
+                # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)
 
             # Signal that we have select2
@@ -12658,7 +12688,7 @@ class EqualGoldListView(BasicList):
         {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
         {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
         {"name": "Passim code",     "id": "filter_code",              "enabled": False},
-        {"name": "Number",          "id": "filter_number",            "enabled": False},
+        #{"name": "Number",          "id": "filter_number",            "enabled": False},
         {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
@@ -12678,8 +12708,8 @@ class EqualGoldListView(BasicList):
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code',     'help': 'passimcode',
              'keyList': 'passimlist', 'infield': 'id'},
-            {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
-             'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
+           # {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
+           #  'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
             {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
             {'filter': 'scount',    'dbfield': 'scount',            'keyS': 'scount',
              'title': 'The number of sermons (manifestations) belonging to this Authority file'},
@@ -12807,8 +12837,10 @@ class EqualGoldListView(BasicList):
             sCount = instance.ssgcount
             if sCount == None: sCount = 0
             html.append("{}".format(sCount))
-        elif custom == "hccount":
-            html.append("{}".format(instance.hccount))
+        elif custom == "hccount": 
+            hCount = instance.hccount
+            if hCount == None: hCount = 0            
+            html.append("{}".format(hCount)) 
         elif custom == "hclist":
             html.append(instance.get_hclist_markdown())
         elif custom == "code":

@@ -38,7 +38,7 @@
           </div>
 
           <!-- Actual contents -->
-          <div class="col-md-10">
+          <div class="col-md-9">
 
             <div class="row">
               <div class="col-md-12">
@@ -317,9 +317,24 @@
             {% endif %}
 
           </div>
+          <!-- Button for User comments-->
+          <div class="col-md-2" align ="right">
+            {% if comment_button %}
+              <!-- Comment button -->
+            
+            <a class="view-mode btn jumbo-1"
+               data-toggle="modal" 
+               data-target="#modal-comment">
+              <span class="glyphicon glyphicon-envelope" title="Add a user comment"></span>
+              {% if comment_count and comment_count > 0 %}
+                <span style='color:red;'> {{comment_count}}</span>
+              {% endif %}
+            </a>
+            {% endif %}
+          
 
           <!-- Button for History and for Editing (if user has permission) -->
-          <div class="col-md-1">
+          
             {% if history_button %}
               <!-- History button -->
             <a class="view-mode btn jumbo-1"

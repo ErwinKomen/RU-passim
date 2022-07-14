@@ -395,8 +395,32 @@ def get_searchable(sText):
         sText = sText.strip()
     return sText
 
+def get_comments(stype, usercomment=False, count=-1):
+    """Get the comments for each manuscripts, sermon or equalgold"""
+    # TH: hij komt hier helemaal niet
+
+    sBack = ""
+    
+    if usercomment:
+        # Add modal button to comment
+        html = []
+        count_code = ""
+        if count > 0:
+            # Add an indication of the number of comments
+            count_code = "<span style='color: red;'> {}</span>".format(count)
+            print(count_code)
+        html.append(sBack)
+        html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
+        html.append("   data-target='#modal-comment'>")
+        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
+        sBack = "\n".join(html)
+
+
+
+
 def get_stype_light(stype, usercomment=False, count=-1):
     """HTML visualization of the different STYPE statuses"""
+    # Get rid of the comments section
 
     sBack = ""
     if stype == "": stype = "-"
@@ -419,18 +443,19 @@ def get_stype_light(stype, usercomment=False, count=-1):
     # sBack = "<span class=\"glyphicon glyphicon-record\" title=\"{}\" style=\"color: {};\"></span>".format(htext, light)
     sBack = traffic_light.format(htext, red, orange, green)
 
-    if usercomment:
-        # Add modal button to comment
-        html = []
-        count_code = ""
-        if count > 0:
-            # Add an indication of the number of comments
-            count_code = "<span style='color: red;'> {}</span>".format(count)
-        html.append(sBack)
-        html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
-        html.append("   data-target='#modal-comment'>")
-        html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
-        sBack = "\n".join(html)
+    #if usercomment:
+    #    # Add modal button to comment 
+    #    html = []
+    #    count_code = ""
+    #    if count > 0:
+    #        # Add an indication of the number of comments
+    #        count_code = "<span style='color: red;'> {}</span>".format(count)
+    #    html.append(sBack)
+    #    html.append("<span style='margin-left: 100px;'><a class='view-mode btn btn-xs jumbo-1' data-toggle='modal'")
+    #    html.append("   data-target='#modal-comment'>")
+    #    html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
+    #    sBack = "\n".join(html)
+        
 
     # Return what we made
     return sBack
@@ -3231,7 +3256,7 @@ class Comment(models.Model):
 
     def get_otype(self):
         otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
-                      super="Authority file", codi="Codicological Unit")
+                      super="Authority file", codi="Codicological Unit", hc="Historical Collection")
         return otypes[self.otype]
 
 
@@ -6962,6 +6987,18 @@ class SermonGold(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+    def get_goldsig_preferential(self):
+        """Get all signatures according to preference gr > cl > ot"""
+
+        editype_preferences = ['gr', 'cl', 'ot']
+        siglist = []
+        for editype in editype_preferences:
+            sublist = Signature.objects.filter(gold__equal=self, editype=editype).order_by('code').values('code')
+            for item in sublist:
+                siglist.append(item)
+        return siglist
+
+
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
         return self.srchincipit
@@ -7705,6 +7742,9 @@ class Collection(models.Model):
     # [m] Many-to-many: one (historical) collection can belong to one or more projects
     projects = models.ManyToManyField(Project2, through="CollectionProject", related_name="project2_collection")
 
+    # [m] Many-to-many: one historical collection can have a series of user-supplied comments
+    comments = models.ManyToManyField(Comment, related_name="comments_collection")
+
     
     def __str__(self):
         return self.name
@@ -7827,6 +7867,14 @@ class Collection(models.Model):
         """Return an appropriate name or label"""
 
         return self.name
+    
+    # Probably not necessary
+    def get_stype_light(self, usercomment=False):
+        count = 0
+        if usercomment:
+            count = self.comments.count()
+        sBack = get_stype_light(self.stype, usercomment, count)
+        return sBack
 
     def get_litrefs_markdown(self):
         lHtml = []
@@ -9364,11 +9412,19 @@ class SermonDescr(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, usercomment, count) # dit gaat dus naar models.py en komt weer terug
+        return sBack
+
+    def get_comments(self, usercomment=False): # Ok, hij komt hier, niet met Sermons
+        count = 0
+        if usercomment: # ok, hier gaat het nu goed
+            count = self.comments.count()
+        sBack = get_comments(self. usercomment, count) # user comment moet true worden dit lukt
         return sBack
 
     def get_template_link(self, profile):
