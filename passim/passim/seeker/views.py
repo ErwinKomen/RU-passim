@@ -4984,7 +4984,7 @@ class SermonListView(BasicList):
 
     filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
                 {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
-                {"name": "Author type",      "id": "filter_atype",          "enabled": False},
+                {"name": "Author type",      "id": "filter_autype",         "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
                 {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
@@ -5032,7 +5032,7 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'atype',                                         'keyS': 'authortype',  'help': 'authorhelp'},
+            {'filter': 'autype',                                        'keyS': 'authortype',  'help': 'authorhelp'},
             {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature_a', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist_a', 'infield': 'code' },
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
