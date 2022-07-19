@@ -13088,9 +13088,11 @@ class EqualGoldScountDownload(BasicPart):
     def get_queryset(self, prefix):
 
         # Construct the QS
-        qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
-            'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
-            'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+        #qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
+        #    'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
+        #    'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+        qs = EqualGold.objects.none()
+        #TODO: this should be corrected
 
         return qs
 

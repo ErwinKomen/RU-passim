@@ -9967,6 +9967,7 @@ class Range(models.Model):
                 if bStatus and not is_end(pos):
                     # Is there more stuff?
                     additional = sRange[pos:].strip()
+                    sRemark = additional
                     if obj != None:
                         obj.added = sRemark
                         bNeedSaving = True
@@ -10713,7 +10714,7 @@ class OriginCod(models.Model):
         ori = self.origin
         sName = ""
         sLoc = ""
-        url = reverse("origin_details", kwargs={'pk': origin.id})
+        url = reverse("origin_details", kwargs={'pk': ori.id})
         if ori.name != None and ori.name != "": sName = "{}: ".format(ori.name)
         if ori.location != None: sLoc = ori.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)
