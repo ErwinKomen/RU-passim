@@ -102,6 +102,7 @@ urlpatterns = [
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
     url(r'^manuscript/import/galway/$', ManuscriptUploadGalway.as_view(), name='manuscript_upload_galway'),
     url(r'^manuscript/codico/$', ManuscriptCodico.as_view(), name='manuscript_codico'),
+    url(r'^manuscript/huwa/download/$', ManuscriptHuwaToJson.as_view(), name='manuscript_huwajson'),
 
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
     url(r'^codico/details(?:/(?P<pk>\d+))?/$', CodicoDetails.as_view(), name='codico_details'),
