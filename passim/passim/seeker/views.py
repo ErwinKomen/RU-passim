@@ -9557,7 +9557,7 @@ class ManuscriptEdit(BasicDetails):
             initial = dict(otype="manu", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('manu', instance, profile)            
-            lhtml = []
+            
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
             # Store the after_details in the context
@@ -9988,6 +9988,20 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 # Debugging:
                 str_hlist = json.dumps(hlist, indent=2)
 
+                # Step 0: make sure that the very *FIRST* element contains a 'codi' item
+                if not 'codi' in hlist[0]:
+                    codi_id = None
+                    for item in hlist:
+                        if 'codi' in item:
+                            codi_id = item['codi']
+                            break
+                    if codi_id is None:
+                        # We are in *DEEP* trouble. Not one single CODI
+                        errHandle.Status("ManuscriptHierarchy: Cannot find first CODI. Manu={}".format(instance.id))
+                    else:
+                        hlist[0]['codi'] = codi_id
+
+
                 # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                 head_to_id = {}
                 deletables = []
@@ -10022,100 +10036,109 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         bNeedSaving = False
                         # Get the msitem of this item
                         msitem = MsItem.objects.filter(id=getid(item, "id", head_to_id)).first()
-                        # Get the next if any
-                        next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
-                        # Get the first child
-                        firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
-                        # Get the parent
-                        parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
+                        # if this doesn't exist (anymore), just skip it
+                        if not msitem is None:
+                            # Get the next if any
+                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
+                            # Get the first child
+                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
+                            # Get the parent
+                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
 
-                        # Get a possible codi id
-                        codi_id = item.get("codi")
-                        if codi_id != None:
-                            if codi == None or codi.id != codi_id:
-                                codi = Codico.objects.filter(id=codi_id).first()
-                                # Possibly reset the codi order
-                                if codi_order != codi.order:
-                                    codi.order = codi_order
-                                    codi.save()
-                                codi_order += 1
+                            # Get a possible codi id
+                            codi_id = item.get("codi")
+                            if codi_id != None:
+                                if codi == None or codi.id != codi_id:
+                                    codi = Codico.objects.filter(id=codi_id).first()
+                                    # Possibly reset the codi order
+                                    if codi_order != codi.order:
+                                        codi.order = codi_order
+                                        codi.save()
+                                    codi_order += 1
 
-                        # Safe guarding
-                        if codi is None:
-                            errHandle.Status("ManuscriptHierarchy: codi is none")
-                            x = msitem.itemsermons.first()
-                        # Possibly set the msitem codi
-                        if msitem.codico != codi:
-                            msitem.codico = codi
-                            bNeedSaving = True
-                        elif codi == None and msitem.codico == None:
-                            # This MsItem is inserted before something that may already have a codico
-                            codi = instance.manuscriptcodicounits.order_by('order').first()
-                            if codi != None:
+                            # Safe guarding
+                            if codi is None:
+                                errHandle.Status("ManuscriptHierarchy: codi is none. Manu={}, msitem={}".format(instance.id, msitem.id))
+                                x = msitem.itemsermons.first()
+
+                            # Possibly set the msitem codi
+                            if msitem.codico != codi:
                                 msitem.codico = codi
                                 bNeedSaving = True
+                            elif codi == None and msitem.codico == None:
+                                # This MsItem is inserted before something that may already have a codico
+                                codi = instance.manuscriptcodicounits.order_by('order').first()
+                                if codi != None:
+                                    msitem.codico = codi
+                                    bNeedSaving = True
 
-                        # Possibly adapt the [shead] title and locus
-                        itemhead = msitem.itemheads.first()
-                        if itemhead and 'title' in item and 'locus' in item:
-                            title= item['title'].strip()
-                            locus = item['locus']
-                            if itemhead.title != title or itemhead.locus != locus:
-                                itemhead.title = title.strip()
-                                itemhead.locus = locus
-                                # Save the itemhead
-                                itemhead.save()
+                            # Possibly adapt the [shead] title and locus
+                            itemhead = msitem.itemheads.first()
+                            if itemhead and 'title' in item and 'locus' in item:
+                                title= item['title'].strip()
+                                locus = item['locus']
+                                if itemhead.title != title or itemhead.locus != locus:
+                                    itemhead.title = title.strip()
+                                    itemhead.locus = locus
+                                    # Save the itemhead
+                                    itemhead.save()
                             
-                        order = idx + 1
+                            order = idx + 1
 
-                        sermon_id = "none"
-                        if msitem.itemsermons.count() > 0:
-                            sermon_id = msitem.itemsermons.first().id
-                        sermonlog = dict(sermon=sermon_id)
-                        bAddSermonLog = False
+                            sermon_id = "none"
+                            sermonlog = dict(msitem=msitem.id)
+                            if msitem.itemsermons.count() > 0:
+                                sermon_id = msitem.itemsermons.first().id
+                                sermonlog['sermon'] =sermon_id
+                            elif not itemhead is None:
+                                srmhead_id = itemhead.id
+                                sermonlog['srmhead']=srmhead_id
+                            else:
+                                sermonlog['srmwarn']="no SD or SH".format(msitem.id)
+                            bAddSermonLog = False
 
-                        # Check if anytyhing changed
-                        if msitem.order != order:
-                            # Implement the change
-                            msitem.order = order
-                            bNeedSaving =True
-                        if msitem.parent is not parent:
-                            # Track the change
-                            old_parent_id = "none" if msitem.parent == None else msitem.parent.id
-                            new_parent_id = "none" if parent == None else parent.id
-                            if old_parent_id != new_parent_id:
+                            # Check if anytyhing changed
+                            if msitem.order != order:
+                                # Implement the change
+                                msitem.order = order
+                                bNeedSaving =True
+                            if msitem.parent is not parent:
                                 # Track the change
-                                sermonlog['parent_new'] = new_parent_id
-                                sermonlog['parent_old'] = old_parent_id
+                                old_parent_id = "none" if msitem.parent == None else msitem.parent.id
+                                new_parent_id = "none" if parent == None else parent.id
+                                if old_parent_id != new_parent_id:
+                                    # Track the change
+                                    sermonlog['parent_new'] = new_parent_id
+                                    sermonlog['parent_old'] = old_parent_id
+                                    bAddSermonLog = True
+
+                                    # Implement the change
+                                    msitem.parent = parent
+                                    bNeedSaving = True
+                                else:
+                                    no_change = 1
+
+                            if msitem.firstchild != firstchild:
+                                # Implement the change
+                                msitem.firstchild = firstchild
+                                bNeedSaving =True
+                            if msitem.next != next:
+                                # Track the change
+                                old_next_id = "none" if msitem.next == None else msitem.next.id
+                                new_next_id = "none" if next == None else next.id
+                                sermonlog['next_new'] = new_next_id
+                                sermonlog['next_old'] = old_next_id
                                 bAddSermonLog = True
 
                                 # Implement the change
-                                msitem.parent = parent
-                                bNeedSaving = True
-                            else:
-                                no_change = 1
-
-                        if msitem.firstchild != firstchild:
-                            # Implement the change
-                            msitem.firstchild = firstchild
-                            bNeedSaving =True
-                        if msitem.next != next:
-                            # Track the change
-                            old_next_id = "none" if msitem.next == None else msitem.next.id
-                            new_next_id = "none" if next == None else next.id
-                            sermonlog['next_new'] = new_next_id
-                            sermonlog['next_old'] = old_next_id
-                            bAddSermonLog = True
-
-                            # Implement the change
-                            msitem.next = next
-                            bNeedSaving =True
-                        # Do we need to save this one?
-                        if bNeedSaving:
-                            msitem.save()
-                            if bAddSermonLog:
-                                # Store the changes
-                                hierarchy.append(sermonlog)
+                                msitem.next = next
+                                bNeedSaving =True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                msitem.save()
+                                if bAddSermonLog:
+                                    # Store the changes
+                                    hierarchy.append(sermonlog)
 
                 details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
                 passim_action_add(self, instance, details, "save")

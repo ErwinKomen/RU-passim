@@ -4258,7 +4258,18 @@ class Manuscript(models.Model):
         try:
             # Create a well sorted list of sermons
             if method == "msitem":
-                qs = self.manuitems.filter(order__gte=0).order_by('order')
+                # OLD (erwin): qs = self.manuitems.filter(order__gte=0).order_by('codico__order', 'order')
+                # More transparent:
+                qs = MsItem.objects.filter(codico__manuscript=self, order__gte=0).order_by('codico__order', 'order')
+                # New: just make sure that badly ordered elements get sorted out
+                with transaction.atomic():
+                    order = 1
+                    for obj in qs:
+                        if obj.order != order:
+                            obj.order = order
+                            obj.save()
+                        order += 1
+                # By this time all order elements are in-order
             elif method == "codicos":
                 # Look for the Reconstruction codico's
                 codico_lst = [x['codico__id'] for x in self.manuscriptreconstructions.order_by('order').values('codico__id')]
