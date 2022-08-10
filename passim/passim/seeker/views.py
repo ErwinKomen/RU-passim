@@ -13351,7 +13351,13 @@ class EqualGoldLinkEdit(BasicDetails):
         """Add to the existing context"""
 
         # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
         context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,                       'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,                       'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
             {'type': 'safe',  'label': "Source AF:",    'value': instance.src.get_view(True) },
             {'type': 'safe',  'label': "Target AF:",    'value': instance.dst.get_view(True) },
             {'type': 'plain', 'label': "Link type:",    'value': instance.get_linktype_display(),       'field_key': 'linktype'},
