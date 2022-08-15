@@ -89,7 +89,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
-from passim.dct.models import ResearchSet, SetList
+from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
     approval_parse_adding, approval_parse_removing, approval_parse_deleting, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
@@ -9323,10 +9323,6 @@ class ManuscriptEdit(BasicDetails):
     history_button = True
     comment_button = True
     
-    #MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-    #                                     form=DaterangeForm, min_num=0,
-    #                                     fk_name = "manuscript",
-    #                                     extra=0, can_delete=True, can_order=False)
     McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
                                        form=ManuscriptCollectionForm, min_num=0,
                                        fk_name="manuscript", extra=0)
@@ -9409,11 +9405,12 @@ class ManuscriptEdit(BasicDetails):
             # Get the main items
             mainitems_main = [
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),  'field_key': 'stype'},
-                {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
-                {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
+                {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),          'field_key': 'lcountry'},
+                {'type': 'plain', 'label': "City:",         'value': instance.get_city(),             'field_key': 'lcity',
                  'title': 'City, village or abbey (monastery) of the library'},
-                {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
-                {'type': 'plain', 'label': "Shelfmark:",   'value': instance.idno,                 'field_key': 'idno'},
+                {'type': 'safe',  'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
+                {'type': 'plain', 'label': "Shelfmark:",    'value': instance.idno,                   'field_key': 'idno'},
+                {'type': 'safe',  'label': "Saved item:",   'value': self.get_saveditem_html(instance, profile)          },
                 # Project assignment: see below
                 # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
                 # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
@@ -9560,6 +9557,10 @@ class ManuscriptEdit(BasicDetails):
             
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
+
+            # Also add the saved item form
+            lhtml.append(self.get_saveditem_html(instance, profile, "form"))
+
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
 
@@ -9643,6 +9644,30 @@ class ManuscriptEdit(BasicDetails):
 
         context = dict(manu=instance)
         sBack = render_to_string("seeker/manu_provs.html", context, self.request)
+        return sBack
+
+    def get_saveditem_html(self, instance, profile, htmltype="button"):
+        """Get an indication whether this is a saved item, or allow to add it"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            obj = SavedItem.get_saveditem(instance, profile, "manu")
+            context = {}
+            context['profile'] = profile
+            context['saveditem'] = obj
+            context['item'] = instance
+            context['sitemtype'] = "manu"
+            context['sitemaction'] = "add" if obj is None else "remove"
+
+            template_name = "dct/sitem_button.html"
+            if htmltype == "form":
+                template_name = "dct/sitem_form.html"
+
+            sBack = render_to_string(template_name, context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptEdit/get_saveditem_html")
         return sBack
 
     def process_formset(self, prefix, request, formset):

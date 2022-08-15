@@ -827,7 +827,7 @@ class SavedItem(models.Model):
     #     Possibilities: manu, serm, ssg, hist, pd
     sitemtype = models.CharField("Saved item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
 
-    # Depending on the type of setlist, there is a pointer to the actual list of SSGs
+    # Depending on the type of SavedItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
     manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_saveditems")
     # [0-1] Sermon pointer
@@ -840,6 +840,63 @@ class SavedItem(models.Model):
     def __str__(self):
         sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
         return sBack
+
+    def get_saveditem(item, profile, sitemtype):
+        """If this is a saved item for the indicated user, get that item"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                if sitemtype == "manu":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, manuscript=item).first()
+                elif sitemtype == "serm":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, sermon=item).first()
+                elif sitemtype == "ssg":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, equal=item).first()
+                elif sitemtype == "hc" or sitemtype == "pd":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, collection=item).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/get_saveditem")
+        return obj
+
+    def get_saveditem_button(item, profile, sitemtype):
+        """Provide a button to either turn this into a saved item or remove it as saved item"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            obj = SavedItem.get_saveditem(item, profile, sitemtype)
+            html = []
+            if obj is None:
+                # make it possible to turn this into a saved item
+                html.append("<a class='btn btn-xs jumbo-3' onclick='ru.dct.add_saveditem();'>")
+                html.append('<span class="glyphicon glyphicon-plus"></span>')
+                html.append('<span>Add to your saved items</span>')
+                html.append('</a>')
+            else:
+                # make it possible to remove this as saved item
+                html.append("<a class='btn btn-xs jumbo-4' onclick=''>")
+                html.append('<span class="glyphicon glyphicon-minus"></span>')
+                html.append('<span>Remove from your saved items</span>')
+                html.append('</a>')
+            # Combine into string
+            sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/get_saveditem_button")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if the order is specified
+        if self.order is None or self.order == 0:
+            # Specify the order
+            self.order = SavedItem.objects.filter(profile=self.profile).count() + 1
+        response = super(SavedItem, self).save(force_insert, force_update, using, update_fields)
+        # Return the regular save response
+        return response
 
 
 class SavedSearch(models.Model):

@@ -16,7 +16,7 @@
   <div class="row">
     <div class="col-md-6">
       <!-- This is where the related sets appear, as their own sections -->
-      {% influde 'related_objects' %}
+      {% include 'dct/rel_view.html' with related=related_objects %}
 
       <section>
         <h3>
@@ -269,4 +269,8 @@
 
 
 </div>
+{% endblock %}
+
+{% block script %}
+    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
 {% endblock %}

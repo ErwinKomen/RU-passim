@@ -28,7 +28,8 @@ from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
-from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
+from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
+    SavedItem, SavedSearch
 from passim.dct.forms import ResearchSetForm, SetDefForm
 from passim.approve.models import EqualChange, EqualApproval
 
@@ -328,7 +329,7 @@ class MyPassimEdit(BasicDetails):
     prefix = "pre"  # Personal Research Environment
     prefix_type = "simple"
     title = "MY PASSIM"
-    template_name = "mypassim.html"
+    template_name = "dct/mypassim.html"
     mainitems = []
 
     def custom_init(self, instance):
@@ -415,7 +416,7 @@ class MyPassimEdit(BasicDetails):
             context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
 
             # Add any related objects
-            context['related_objects'] = self.get_related_objects()
+            context['related_objects'] = self.get_related_objects(profile)
 
         except:
             msg = oErr.get_error_message()
@@ -423,7 +424,7 @@ class MyPassimEdit(BasicDetails):
 
         return context
 
-    def get_related_objects(self, profile):
+    def get_related_objects(self, instance):
         """Calculate and add related objects:
 
         Currently:
@@ -485,38 +486,36 @@ class MyPassimEdit(BasicDetails):
             # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_sitemlist)
 
-            # Walk these sitemset
+            # Walk these sitemlist
             for obj in qs_sitemlist:
-                # The [obj] is of type `SetList`
+                # The [obj] is of type `SavedItem`
 
                 rel_item = []
 
-                # The [item] depends on the setlisttype
+                # The [item] depends on the sitemtype
                 item = None
-                if obj.setlisttype == "manu":
-                    item = obj.manuscript
-                else:
-                    item = obj.collection
+                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+                if obj.sitemtype in itemset:
+                    item = getattr(obj, itemset[obj.sitemtype])
 
-                # SetList: Order within the ResearchSet
+                # SavedItem: Order within the set of SavedItems
                 add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
-                # SetList: Type
-                add_one_item(rel_item, obj.get_setlisttype_display(), False)
+                # SavedItem: Type
+                add_one_item(rel_item, obj.get_sitemtype_display(), False)
 
-                # SetList: title of the manu/coll
+                # SavedItem: title of the manu/serm/ssg/coll
                 kwargs = None
-                if obj.name != None and obj.name != "":
-                    kwargs = dict(name=obj.name)
-                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "title", kwargs=kwargs), False, main=True)
+                #if obj.name != None and obj.name != "":
+                #    kwargs = dict(name=obj.name)
+                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
 
-                # SetList: Size (number of SSG in this manu/coll)
-                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False, align="right")
+                # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
+                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
 
                 if bMayEdit:
                     # Actions that can be performed on this item
-                    # Was (see issue #393): add_one_item(rel_item, self.get_actions())
-                    add_one_item(rel_item, self.get_field_value("setlist", obj, "buttons"), False)
+                    add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
 
                 # Add this line to the list
                 rel_list.append(dict(id=obj.id, cols=rel_item))
@@ -524,9 +523,9 @@ class MyPassimEdit(BasicDetails):
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
                 '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Type of setlist">Type of this setlist</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="The title of the manuscript/dataset/collection">Title</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Number of SSGs part of this setlist">Size</span>{}'.format(sort_start_int, sort_end)
+                '{}<span title="Type of saved item">Item</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="The title of the manuscript/sermon/authority-file/dataset/collection">Title</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of SSGs part of this item">Size</span>{}'.format(sort_start_int, sort_end)
                 ]
             if bMayEdit:
                 sitemset['columns'].append("")
@@ -539,6 +538,76 @@ class MyPassimEdit(BasicDetails):
         # Return the adapted context
         return related_objects
 
+    def get_field_value(self, type, instance, custom, kwargs=None):
+        sBack = ""
+        collection_types = ['hc', 'pd' ]
+
+        if type == "manu":
+            # This is a Manuscript
+            if custom == "title":
+                url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                    url, instance.get_city(), instance.get_library(), instance.idno)
+            elif custom == "size":
+                # Get the number of SSGs related to items in this manuscript
+                count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico__manuscript=instance).order_by('id').distinct().count()
+                sBack = "{}".format(count)
+
+        elif type == "serm":
+            # This is a sermon description
+            if custom == "title":
+                url = reverse("sermon_details", kwargs = {'pk': instance.id})
+                sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+            elif custom == "size":
+                # Get the number of SSGs to which this Sermon points
+                count = instance.equalgolds.count()
+                sBack = "{}".format(count)
+
+        elif type == "ssg":
+            # This is an Authority File (=SSG)
+            if custom == "title":
+                url = reverse("equalgold_details", kwargs = {'pk': instance.id})
+                sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+            elif custom == "size":
+                count = 1   # There is just 1 authority file
+                sBack = "{}".format(count)
+
+
+        elif type in collection_types:
+            if custom == "title":
+                sTitle = "none"
+                if instance is None:
+                    sBack = sTitle
+                else:
+                    if type == "hc":
+                        # Historical collection
+                        url = reverse("collhist_details", kwargs={'pk': instance.id})
+                    else:
+                        # Private or Public dataset
+                        if instance.scope == "publ":
+                            url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                        else:
+                            url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                    if kwargs != None and 'name' in kwargs:
+                        title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                    else:
+                        title = instance.name
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
+            elif custom == "size":
+                # Get the number of SSGs related to items in this collection
+                count = "-1" if instance is None else instance.super_col.count()
+                sBack = "{}".format(count)
+
+        elif type == "saveditem":
+            # A saved item should get the button 'Delete'
+            if custom == "buttons":
+                # Create the remove button
+                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+        return sBack
+
 
 class MyPassimDetails(MyPassimEdit):
     """The HTML variant of [ResearchSetEdit]"""
@@ -546,6 +615,49 @@ class MyPassimDetails(MyPassimEdit):
     rtype = "html"
 
 
+# ================= View for SavedData ================
+
+
+class SavedItemApply(BasicPart):
+    """Either add or remove an item as saved data"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+            # Retrieve necessary parameters
+            sitemtype = self.qd.get("sitemtype")
+            sitemaction = self.qd.get("sitemaction")
+            saveditemid = self.qd.get("saveditemid")
+            itemid = self.qd.get("itemid")
+
+            if sitemaction == "add":
+                # We are going to add an item as a saveditem
+                profile = self.obj
+                obj = SavedItem.objects.create(
+                    profile=profile, sitemtype=sitemtype)
+                # The particular attribute to set depends on the sitemtype
+                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+                setattr(obj, "{}_id".format(itemset[obj.sitemtype]), itemid)
+                obj.save()
+                data['action'] = "added"
+            elif sitemaction == "remove" and not saveditemid is None:
+                # We need to remove a saved item
+                obj = SavedItem.objects.filter(id=saveditemid).first()
+                if not obj is None:
+                    obj.delete()
+                data['action'] = "removed"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItemApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 # =================== Model views for the DCT ========

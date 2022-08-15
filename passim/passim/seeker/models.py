@@ -15,10 +15,6 @@ import pytz
 from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
-from passim.utils import *
-from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
-from passim.seeker.excel import excel_to_list
-from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 import sys, os, io, re
 import copy
 import json
@@ -37,6 +33,12 @@ from pyzotero import zotero
 # from lxml import etree as ET
 # import xmltodict
 from xml.dom import minidom
+
+# From this own application
+from passim.utils import *
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
+from passim.seeker.excel import excel_to_list
+from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 
 re_number = r'\d+'
 
@@ -403,6 +405,7 @@ def get_comments(stype, usercomment=False, count=-1):
     """Get the comments for each manuscripts, sermon or equalgold"""
     # TH: hij komt hier helemaal niet
 
+    # Initialize what is returned
     sBack = ""
     
     if usercomment:
@@ -418,9 +421,8 @@ def get_comments(stype, usercomment=False, count=-1):
         html.append("   data-target='#modal-comment'>")
         html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
         sBack = "\n".join(html)
-
-
-
+    # Actually return
+    return sBack
 
 def get_stype_light(stype, usercomment=False, count=-1):
     """HTML visualization of the different STYPE statuses"""
@@ -3381,6 +3383,7 @@ class Manuscript(models.Model):
         ]
 
     def __str__(self):
+        """Get this manuscript's name"""
         return self.name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
@@ -7056,7 +7059,6 @@ class SermonGold(models.Model):
                 siglist.append(item)
         return siglist
 
-
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
         return self.srchincipit
@@ -9414,8 +9416,8 @@ class SermonDescr(models.Model):
         """Get the manuscript that links to this sermondescr"""
 
         manu = None
-        if self.msitem and self.msitem.manu:
-            manu = self.msitem.manu
+        if self.msitem and self.msitem.codico and self.msitem.codico.manuscript:
+            manu = self.msitem.codico.manuscript
         return manu
 
     def get_note_markdown(self):
