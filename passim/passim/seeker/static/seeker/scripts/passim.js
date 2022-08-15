@@ -159,6 +159,16 @@ var ru = (function ($, ru) {
                            "manuidnos", "editions", "keywords", "collections"],
             item = "";
 
+        // Initialize collapse signing
+        $(".collapse-indicator").on('shown.bs.collapse', function () {
+          var el = $(this);
+          $(el).closest("section").find(".glyphicon-plus").removeClass("glyphicon-plus").addClass("glyphicon-minus");
+        });
+        $(".collapse-indicator").on('hidden.bs.collapse', function () {
+          var el = $(this);
+          $(el).closest("section").find(".glyphicon-minus").removeClass("glyphicon-minus").addClass("glyphicon-plus");
+        });
+
         // Get the base URL
         base_url = $("#__baseurl__").text();
         if (lst_typeahead === undefined || lst_typeahead.length === 0) {

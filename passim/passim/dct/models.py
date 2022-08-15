@@ -17,13 +17,16 @@ import json, copy
 # Take from my own app
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
+from passim.basic.models import UserSearch
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
-    Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword
+    Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
+    SermonDescr, EqualGold
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
 
 SETLIST_TYPE = "dct.setlisttype"
+SAVEDITEM_TYPE = "dct.saveditemtype"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -811,6 +814,46 @@ class SetDef(models.Model):
         return oBack
 
 
+# ====================== Personal Research Environment models ========================================
+
+class SavedItem(models.Model):
+    """A saved item can be a M/S/SSG or HC or PD"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_saveditems")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each saved item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    sitemtype = models.CharField("Saved item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # Depending on the type of setlist, there is a pointer to the actual list of SSGs
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_saveditems")
+    # [0-1] Sermon pointer
+    sermon = models.ForeignKey(SermonDescr, blank=True, null=True, on_delete=models.SET_NULL, related_name="sermon_saveditems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_saveditems")
+    # [0-1] Collection pointer (that can be HC, public or personal collection
+    collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_saveditems")
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        return sBack
 
 
+class SavedSearch(models.Model):
+    """A saved search links to the basic UserSearch"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savedsearches")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+
+    # [1] The usersearch that this saved search points to 
+    usersearch = models.ForeignKey(UserSearch, on_delete=models.CASCADE, related_name="usersearch_savedsearches")
+
+    def __str__(self):
+        sBack = "{}: {}".format(self.profile.user.username, self.usersearch.id)
+        return sBack
 

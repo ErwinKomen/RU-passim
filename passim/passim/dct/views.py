@@ -219,7 +219,7 @@ def dct_manulist(lst_manu, bDebug=False):
 
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
-    """Renders the MyPassim page (=PRE)."""
+    """Renders the MyPassim page (=PRE, Personal Research Environment)."""
     
     oErr = ErrHandle()
     try:
@@ -319,6 +319,232 @@ def mypassim(request):
         oErr.DoError("mypassim")
 
     return render(request,template_name, context)
+
+
+# =================== MyPassim as model view attempt ======
+class MyPassimEdit(BasicDetails):
+    model = Profile
+    mform = None
+    prefix = "pre"  # Personal Research Environment
+    prefix_type = "simple"
+    title = "MY PASSIM"
+    template_name = "mypassim.html"
+    mainitems = []
+
+    def custom_init(self, instance):
+        if user_is_authenticated(self.request):
+            # Get the profile id of this user
+            profile = Profile.get_user_profile(self.request.user.username)
+            self.object = profile
+        else:
+            pass
+        return None
+
+    def add_to_context(self, context, instance):
+        oErr = ErrHandle()
+        try:
+            profile = self.object
+            context['profile'] = profile
+            context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
+            context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
+            context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+
+            # COunting table sizes for the super user
+            if user_is_superuser(self.request):
+                table_infos = []
+                tables = [
+                    {'app': 'seeker',
+                     'models': ['Collection', 'Profile', 'Manuscript', 'SermonDescr', 'SermonHead', 'SermonGold', 
+                          'Codico', 'MsItem', 'Author', 'Keyword', 'Library', 'Origin', 'Provenance', 'SourceInfo', 'Signature',
+                          'SermonDescrEqual']},
+                    {'app': 'dct', 
+                     'models': ['ResearchSet', 'SetList', 'SetDef'] }
+                          ]
+                for oApp in tables:
+                    app_name = oApp['app']
+                    models = oApp['models']
+                    models.sort()
+                    for model in models:
+                        cls = apps.app_configs[app_name].get_model(model)
+                        count = cls.objects.count()
+                        oInfo = dict(app_name=app_name, model_name=model, count=count)
+                        table_infos.append(oInfo)
+                context['table_infos'] = table_infos
+
+            # Figure out any editing rights
+            qs = profile.projects.all()
+            context['edit_projects'] = "(none)"
+            if context['is_app_editor'] and qs.count() > 0:
+                html = []
+                for obj in qs:
+                    url = reverse('project2_details', kwargs={'pk': obj.id})
+                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
+                context['edit_projects'] = ",".join(html)
+
+            # Figure out which projects this editor may handle
+            if context['is_app_editor']:
+                qs = profile.project_editor.filter(status="incl")
+                if qs.count() == 0:
+                    sDefault = "(none)"
+                else:
+                    html = []
+                    for obj in qs:
+                        project = obj.project
+                        url = reverse('project2_details', kwargs={'pk': project.id})
+                        html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                    sDefault = ", ".join(html)
+                context['default_projects'] = sDefault
+
+            # Make sure to check (and possibly create) EqualApprove items for this user
+            iCount = EqualChange.check_projects(profile)
+
+            # What about the field changes that I have suggested?
+            context['count_fchange_all'] = profile.profileproposals.count()
+            context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
+
+            # How many do I need to approve?    
+            context['count_approve_all'] = profile.profileapprovals.count()
+            context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+
+            # What about the SSG/AFs that I have suggested?
+            context['count_afadd_all'] = profile.profileaddings.count()
+            context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
+
+            # How many SSG/AFs do I need to approve?    
+            context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
+            context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
+
+            # Add any related objects
+            context['related_objects'] = self.get_related_objects()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("mypassimedit/add_to_context")
+
+        return context
+
+    def get_related_objects(self, profile):
+        """Calculate and add related objects:
+
+        Currently:
+            - Saved items
+        To be extended (see issue #408):
+            - Saved searches
+        """
+
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+            oAdd = dict(value=value)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
+            rel_item.append(oAdd)
+            return True
+
+        def check_order(qs):
+            with transaction.atomic():
+                for idx, obj in enumerate(qs):
+                    if obj.order < 0:
+                        obj.order = idx + 1
+                        obj.save()
+
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Authorization: only app-editors may edit!
+        bMayEdit = user_is_ingroup(self.request, team_group)
+            
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = ""
+        sort_start_int = ""
+        sort_end = ""
+        if bMayEdit:
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Make sure to work with the current user's profile
+            profile = self.object
+
+            # [1] =============================================================
+            # Get all 'SavedItem' objects that belong to the current user (=profile)
+            sitemset = dict(title="Saved items", prefix="svitem")  
+            if resizable: sitemset['gridclass'] = "resizable dragdrop"
+            sitemset['savebuttons'] = bMayEdit
+            sitemset['saveasbutton'] = False
+
+            qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_sitemlist)
+
+            # Walk these sitemset
+            for obj in qs_sitemlist:
+                # The [obj] is of type `SetList`
+
+                rel_item = []
+
+                # The [item] depends on the setlisttype
+                item = None
+                if obj.setlisttype == "manu":
+                    item = obj.manuscript
+                else:
+                    item = obj.collection
+
+                # SetList: Order within the ResearchSet
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SetList: Type
+                add_one_item(rel_item, obj.get_setlisttype_display(), False)
+
+                # SetList: title of the manu/coll
+                kwargs = None
+                if obj.name != None and obj.name != "":
+                    kwargs = dict(name=obj.name)
+                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "title", kwargs=kwargs), False, main=True)
+
+                # SetList: Size (number of SSG in this manu/coll)
+                add_one_item(rel_item, self.get_field_value(obj.setlisttype, item, "size"), False, align="right")
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    # Was (see issue #393): add_one_item(rel_item, self.get_actions())
+                    add_one_item(rel_item, self.get_field_value("setlist", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            sitemset['rel_list'] = rel_list
+            sitemset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Type of setlist">Type of this setlist</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="The title of the manuscript/dataset/collection">Title</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of SSGs part of this setlist">Size</span>{}'.format(sort_start_int, sort_end)
+                ]
+            if bMayEdit:
+                sitemset['columns'].append("")
+            related_objects.append(sitemset)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("mypassimedit/get_related_objects")
+
+        # Return the adapted context
+        return related_objects
+
+
+class MyPassimDetails(MyPassimEdit):
+    """The HTML variant of [ResearchSetEdit]"""
+
+    rtype = "html"
+
 
 
 
