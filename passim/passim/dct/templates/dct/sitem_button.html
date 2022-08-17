@@ -1,15 +1,15 @@
 
-<div targetid="#sitem_form">
+<span targetid="#sitem_form" class="sitem">
   {% if saveditem.id %}
-    <a class="btn btn-xs jumbo-4" onclick="ru.dct.do_saveditem(this, 'add');">
-      <span class="glyphicon glyphicon-minus"></span>
-      <span>Remove from your saved items</span>
+    <a class="sitem-button-selected" onclick="ru.dct.do_saveditem(this, 'add');"
+       title="Remove from your saved items">
+      <span class="glyphicon glyphicon-star"></span>
     </a>
   {% else %}
-    <a class="btn btn-xs jumbo-3" onclick="ru.dct.do_saveditem(this, 'remove');">
-      <span class="glyphicon glyphicon-plus"></span>
-      <span>Add to your saved items</span>
+    <a class="sitem-button" onclick="ru.dct.do_saveditem(this, 'remove');"
+       title="Add to your saved items">
+      <span class="glyphicon glyphicon-star-empty"></span>
     </a>
   {% endif %}
-</div>
+</span>
 

@@ -641,6 +641,32 @@ def adapt_regex_incexp(value):
 
     return value
 
+def get_saveditem_html(request, instance, profile, htmltype="button", sitemtype=None):
+    """Get an indication whether this is a saved item, or allow to add it"""
+
+    oErr = ErrHandle()
+    sBack = ""
+    try:
+        if not sitemtype is None:
+            obj = SavedItem.get_saveditem(instance, profile, sitemtype)
+            context = {}
+            context['profile'] = profile
+            context['saveditem'] = obj
+            context['item'] = instance
+            context['sitemtype'] = sitemtype
+            context['sitemaction'] = "add" if obj is None else "remove"
+
+            template_name = "dct/sitem_button.html"
+            if htmltype == "form":
+                template_name = "dct/sitem_form.html"
+
+            sBack = render_to_string(template_name, context, request)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_saveditem_html")
+    return sBack
+
+
 
 # ================= STANDARD views =====================================
 
@@ -4382,12 +4408,18 @@ class SermonEdit(BasicDetails):
             context['mainitems'].append(
                 {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
                 )
+
+        # Prepare saveditem handling
+        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
+        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
+
         # Get the main items
         mainitems_main = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
             # -------- HIDDEN field values ---------------
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
             # --------------------------------------------
+            {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
             {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
@@ -4508,6 +4540,10 @@ class SermonEdit(BasicDetails):
         lhtml = []
         lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
         context['comment_count'] = instance.comments.count()
+
+        # Also add the saved item form
+        lhtml.append(saveditem_form)
+
         # Store the after_details in the context
         context['after_details'] = "\n".join(lhtml)
 
@@ -7194,9 +7230,14 @@ class CollAnyEdit(BasicDetails):
         # Need to know who this is
         profile = Profile.get_user_profile(self.request.user.username)
 
+        # Prepare saveditem handling
+        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
+        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+            {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
             ]
@@ -7271,8 +7312,19 @@ class CollAnyEdit(BasicDetails):
             lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
+
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
             # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)                        
+            context['after_details'] = "\n".join(lhtml)    
+        else:
+            lhtml = []                    
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)    
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
@@ -9402,15 +9454,20 @@ class ManuscriptEdit(BasicDetails):
                 context['mainitems'].append(
                     {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
                     )
+
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
+
             # Get the main items
             mainitems_main = [
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),  'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),      'field_key': 'stype'},
+                {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
                 {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),          'field_key': 'lcountry'},
                 {'type': 'plain', 'label': "City:",         'value': instance.get_city(),             'field_key': 'lcity',
                  'title': 'City, village or abbey (monastery) of the library'},
                 {'type': 'safe',  'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
                 {'type': 'plain', 'label': "Shelfmark:",    'value': instance.idno,                   'field_key': 'idno'},
-                {'type': 'safe',  'label': "Saved item:",   'value': self.get_saveditem_html(instance, profile)          },
                 # Project assignment: see below
                 # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
                 # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
@@ -9559,7 +9616,7 @@ class ManuscriptEdit(BasicDetails):
             context['comment_count'] = instance.comments.count()
 
             # Also add the saved item form
-            lhtml.append(self.get_saveditem_html(instance, profile, "form"))
+            lhtml.append(saveditem_form)
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
@@ -9644,30 +9701,6 @@ class ManuscriptEdit(BasicDetails):
 
         context = dict(manu=instance)
         sBack = render_to_string("seeker/manu_provs.html", context, self.request)
-        return sBack
-
-    def get_saveditem_html(self, instance, profile, htmltype="button"):
-        """Get an indication whether this is a saved item, or allow to add it"""
-
-        oErr = ErrHandle()
-        sBack = ""
-        try:
-            obj = SavedItem.get_saveditem(instance, profile, "manu")
-            context = {}
-            context['profile'] = profile
-            context['saveditem'] = obj
-            context['item'] = instance
-            context['sitemtype'] = "manu"
-            context['sitemaction'] = "add" if obj is None else "remove"
-
-            template_name = "dct/sitem_button.html"
-            if htmltype == "form":
-                template_name = "dct/sitem_form.html"
-
-            sBack = render_to_string(template_name, context, self.request)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("ManuscriptEdit/get_saveditem_html")
         return sBack
 
     def process_formset(self, prefix, request, formset):
@@ -11050,7 +11083,7 @@ class CodicoEdit(BasicDetails):
 
             # Get the main items
             mainitems_main = [
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),    'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),    'field_key': 'stype'},
                 # -------- HIDDEN field values ---------------
                 {'type': 'plain', 'label': "Manuscript id", 'value': manu_id,   'field_key': "manuscript",  'empty': 'hide'},
                 # --------------------------------------------
@@ -11654,7 +11687,7 @@ class SermonGoldEdit(BasicDetails):
                  'title': 'Belongs to the equality set of Authority file...', 'field_key': "equal"}, 
                 {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
                  'title': 'Other Sermons Gold members of the same equality set'},
-                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True), 'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(), 'field_key': 'stype', 'hidenew': True},
                 {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
                 {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
                  'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
@@ -11975,10 +12008,15 @@ class EqualGoldEdit(BasicDetails):
             username = profile.user.username
             team_group = app_editor
 
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="ssg")
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="ssg")
+
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
+                {'type': 'safe',  'label': "Saved item:",    'value': saveditem_button          },
                 {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
 
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
@@ -12071,6 +12109,10 @@ class EqualGoldEdit(BasicDetails):
                 lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
+
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)
 

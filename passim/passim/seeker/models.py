@@ -424,7 +424,7 @@ def get_comments(stype, usercomment=False, count=-1):
     # Actually return
     return sBack
 
-def get_stype_light(stype, usercomment=False, count=-1):
+def get_stype_light(stype, usercomment=False, count=-1, add=""):
     """HTML visualization of the different STYPE statuses"""
     # Get rid of the comments section
 
@@ -461,6 +461,14 @@ def get_stype_light(stype, usercomment=False, count=-1):
     #    html.append("   data-target='#modal-comment'>")
     #    html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
     #    sBack = "\n".join(html)
+
+    # Any additions?
+    if add != "":
+        html = []
+        html.append(sBack)
+        html.append("&nbsp;&nbsp;")
+        html.append(add)
+        sBack = "".join(html)
         
 
     # Return what we made
@@ -4344,11 +4352,12 @@ class Manuscript(models.Model):
             # Return the result
         return sermon_list
 
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -5756,7 +5765,7 @@ class Codico(models.Model):
             # This is from Manuscript, but we don't have Comments...
             count = self.comments.count()
             pass
-        sBack = get_stype_light(self.stype, usercomment, count)
+        sBack = get_stype_light(self.stype, usercomment=usercomment, count=count)
         return sBack
 
 
@@ -6635,11 +6644,12 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_superlinks_markdown(self):
@@ -7254,7 +7264,7 @@ class SermonGold(models.Model):
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+        sBack = get_stype_light(self.stype, usercomment=usercomment, count=count)
         return sBack
 
     def get_view(self):
@@ -7905,7 +7915,6 @@ class Collection(models.Model):
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
 
-
     def get_copy(self, owner=None):
         """Create a copy of myself and return it"""
 
@@ -7964,11 +7973,12 @@ class Collection(models.Model):
         return self.name
     
     # Probably not necessary
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_litrefs_markdown(self):
@@ -9509,12 +9519,12 @@ class SermonDescr(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_stype_light(self, usercomment=False): 
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
             print(count)
-        sBack = get_stype_light(self.stype, usercomment, count) # dit gaat dus naar models.py en komt weer terug
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_comments(self, usercomment=False): # Ok, hij komt hier, niet met Sermons

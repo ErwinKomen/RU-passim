@@ -567,9 +567,10 @@ class MyPassimEdit(BasicDetails):
         elif type == "ssg":
             # This is an Authority File (=SSG)
             if custom == "title":
-                url = reverse("equalgold_details", kwargs = {'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
-                    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+                sBack = instance.get_passimcode_markdown()
+                #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
+                #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
             elif custom == "size":
                 count = 1   # There is just 1 authority file
                 sBack = "{}".format(count)
@@ -597,8 +598,9 @@ class MyPassimEdit(BasicDetails):
                     sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
             elif custom == "size":
                 # Get the number of SSGs related to items in this collection
-                count = "-1" if instance is None else instance.super_col.count()
-                sBack = "{}".format(count)
+                #count = "-1" if instance is None else instance.super_col.count()
+                #sBack = "{}".format(count)
+                sBack = instance.get_size_markdown()
 
         elif type == "saveditem":
             # A saved item should get the button 'Delete'
@@ -629,28 +631,48 @@ class SavedItemApply(BasicPart):
         data = dict(status="ok")
        
         try:
+            # We already know who we are
+            profile = self.obj
+
             # Retrieve necessary parameters
             sitemtype = self.qd.get("sitemtype")
             sitemaction = self.qd.get("sitemaction")
             saveditemid = self.qd.get("saveditemid")
             itemid = self.qd.get("itemid")
 
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemidfield = itemset[sitemtype]
+
             if sitemaction == "add":
                 # We are going to add an item as a saveditem
-                profile = self.obj
                 obj = SavedItem.objects.create(
                     profile=profile, sitemtype=sitemtype)
                 # The particular attribute to set depends on the sitemtype
-                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
-                setattr(obj, "{}_id".format(itemset[obj.sitemtype]), itemid)
+                setattr(obj, "{}_id".format(itemidfield), itemid)
                 obj.save()
                 data['action'] = "added"
             elif sitemaction == "remove" and not saveditemid is None:
-                # We need to remove a saved item
-                obj = SavedItem.objects.filter(id=saveditemid).first()
-                if not obj is None:
-                    obj.delete()
+                # We need to remove *ALL* relevant items
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(sitemtype=sitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                delete_id = SavedItem.objects.filter(*lstQ).values("id")
+                if len(delete_id) > 0:
+                    SavedItem.objects.filter(id__in=delete_id).delete()
                 data['action'] = "removed"
+
+            # Possibly adapt the ordering of the saved items for this user
+            if 'action' in data:
+                # Something has happened
+                qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
+                with transaction.atomic():
+                    order = 1
+                    for obj in qs:
+                        if obj.order != order:
+                            obj.order = order
+                            obj.save()
+                        order += 1
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedItemApply")

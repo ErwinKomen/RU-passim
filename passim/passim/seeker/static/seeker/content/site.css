@@ -1950,4 +1950,12 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
 }*/
 
 
+.sitem-button-selected > .glyphicon {
+    color: blue; /* #355e3b;  */
+    cursor: pointer;
+}
 
+.sitem-button {
+    color: gray; 
+    cursor: pointer;
+}

@@ -2008,7 +2008,7 @@ var ru = (function ($, ru) {
 
         try {
           // Get to the form
-          frm = $(elStart).closest("div").attr("targetid");
+          frm = $(elStart).closest(".sitem").attr("targetid");
           // Get the data
           data = $(frm).serializeArray();
 
@@ -2033,14 +2033,23 @@ var ru = (function ($, ru) {
                   } else if (action !== undefined && action !== "") {
                     switch (action) {
                       case "deleted":
-                        $(elStart).removeClass("jumbo-4");
-                        $(elStart).addClass("jumbo-3");
-                        $(elStart).html('<span class="glyphicon glyphicon-plus"></span><span>Add to your saved items</span>');
+                      case "removed":
+                        // $(elStart).css("color", "gray");
+                        $(elStart).removeClass("sitem-button-selected");
+                        $(elStart).addClass("sitem-button");
+                        $(elStart).html('<span class="glyphicon glyphicon-star-empty"></span>');
+                        $(elStart).attr("title", "Add to your saved items");
+                        // Change the sitem action to be taken
+                        $("#id_sitemaction").val("add");
                         break;
                       case "added":
-                        $(elStart).removeClass("jumbo-3");
-                        $(elStart).addClass("jumbo-4");
-                        $(elStart).html('<span class="glyphicon glyphicon-minus"></span><span>Remove from your saved items</span>');
+                        // $(elStart).css("color", "red");
+                        $(elStart).removeClass("sitem-button");
+                        $(elStart).addClass("sitem-button-selected");
+                        $(elStart).html('<span class="glyphicon glyphicon-star"></span>');
+                        $(elStart).attr("title", "Remove from your saved items");
+                        // Change the sitem action to be taken
+                        $("#id_sitemaction").val("remove");
                         break;
                     }
                   }
@@ -2105,6 +2114,11 @@ var ru = (function ($, ru) {
           // Get to the form
           frm = $(elDctId).closest("form");
           data = frm.serializeArray();
+
+          // Sanity check
+          if ($(elDctId).length === 0) {
+            return;
+          }
 
           // Get the data right now
           // Try to delete: send a POST
