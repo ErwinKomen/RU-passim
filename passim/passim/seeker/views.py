@@ -4998,7 +4998,7 @@ class SermonListView(BasicList):
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
-                  'sectiontitle', 'title', '','', 'stype']
+                  'sectiontitle', 'title', '','','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
@@ -5006,17 +5006,18 @@ class SermonListView(BasicList):
         {'name': 'Gryson/Clavis', 'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111',
          'title': 'Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon'}, 
         {'name': 'Incipit ... Explicit', 
-                                'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
-        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate',
+                                'order': 'o=3', 'type': 'str',  'custom': 'incexpl', 'main': True, 'linkdetails': True},
+        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str',  'custom': 'manuscript'},
+        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str',  'custom': 'msdate',
          'title': 'Date of the manuscript'},
-        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Section',     'order': 'o=6', 'type': 'str',  'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
-        {'name': 'Title',       'order': 'o=7', 'type': 'str', 'custom': 'title', 
+        {'name': 'Title',       'order': 'o=7', 'type': 'str',  'custom': 'title', 
          'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
-        {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
-        {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=10', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Locus',       'order': '',    'type': 'str',  'field':  'locus' },
+        {'name': '',            'order': '',    'type': 'str',  'custom':  'saved' },
+        {'name': 'Links',       'order': '',    'type': 'str',  'custom': 'links'},
+        {'name': 'Status',      'order': 'o=11', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
                 {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
@@ -5121,6 +5122,10 @@ class SermonListView(BasicList):
 
             # Make sure to set a basic filter
             self.basic_filter = Q(mtype="man")
+
+            # Make the profile available
+            self.profile = Profile.get_user_profile(self.request.user.username)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListiew/initializations")
@@ -5175,6 +5180,12 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="serm")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="serm")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "msdate":
             manu = instance.get_manuscript()
             # Get the yearstart-yearfinish
@@ -8748,14 +8759,15 @@ class CollectionListView(BasicList):
             self.titlesg = "Personal Dataset"
             self.plural_name = "Datasets"
             self.sg_name = "Dataset"  
-            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', 'created', '']
+            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', '', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Scope',       'order': 'o=3', 'type': 'str', 'custom': 'scope'},
                 {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
-                {'name': 'Created',     'order': 'o=5', 'type': 'str', 'custom': 'created'},
+                {'name': '',            'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+                {'name': 'Created',     'order': 'o=6', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
             self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False},
@@ -8778,13 +8790,14 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "Public Datasets"
             self.sg_name = "Public Dataset"  
-            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '']
+            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Created',     'order': 'o=3', 'type': 'str', 'custom': 'created'},
                 {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
+                {'name': '',            'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
             self.filters = [ {"name": "Public dataset", "id": "filter_collection", "enabled": False}]
@@ -8802,13 +8815,14 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', 'ssgauthornum', 'created']
+            self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
                 {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
-                {'name': 'Author count',            'order': 'o=3', 'type': 'int', 'custom': 'authcount'},
-                {'name': 'Added',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
+                {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+                {'name': 'Author count',            'order': 'o=4', 'type': 'int', 'custom': 'authcount'},
+                {'name': 'Added',                   'order': 'o=5', 'type': 'str', 'custom': 'created'}
             ]  
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
@@ -8922,6 +8936,9 @@ class CollectionListView(BasicList):
         
         listview_adaptations("collhist_list")
         
+        # Make the profile available
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
 
     def add_to_context(self, context, initial):
@@ -9112,6 +9129,14 @@ class CollectionListView(BasicList):
             url = reverse('collhist_temp', kwargs={'pk': instance.id})
             html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
             sBack = "\n".join(html)
+        elif custom == "saved":
+            # Prepare saveditem handling
+            html = []
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype=self.settype)
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype=self.settype)
+            html.append(saveditem_button)
+            html.append(saveditem_form)
+            sBack = "".join(html)
         return sBack, sTitle
     
 
@@ -10355,23 +10380,26 @@ class ManuscriptListView(BasicList):
     use_team_group = True
     paginate_by = 20
     bUseFilter = True
+    profile = None
     prefix = "manu"
     sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Manuscripts"
     basketview = False
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
-    order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
+    order_heads = [
+        {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
                     'title': 'City or other location, such as monastery'},
-                   {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
-                   {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
-                   {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-                   {'name': 'From',     'order': 'o=5', 'type': 'int', 'custom': 'from',    'align': 'right'},
-                   {'name': 'Until',    'order': 'o=6', 'type': 'int', 'custom': 'until',   'align': 'right'},
-                   {'name': 'Status',   'order': 'o=7', 'type': 'str', 'custom': 'status'},
-                   {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
+        {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
+        {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+        {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+        {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
+        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
+        {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
         {"name": "Country",         "id": "filter_country",          "enabled": False},
@@ -10532,6 +10560,8 @@ class ManuscriptListView(BasicList):
         # ======== One-time adaptations ==============
         listview_adaptations("manuscript_list")
 
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
 
     def add_to_context(self, context, initial):
@@ -10588,6 +10618,12 @@ class ManuscriptListView(BasicList):
             if codico != None and codico.name != None:
                 html.append("<span class='manuscript-title'>| {}</span>".format(codico.name[:100]))
                 sTitle = codico.name
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="manu")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="manu")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
@@ -12890,7 +12926,7 @@ class EqualGoldListView(BasicList):
     bUseFilter = True  
     plural_name = "Authority Files"
     sg_name = "Authority File"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -12903,6 +12939,7 @@ class EqualGoldListView(BasicList):
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Authority file"},        
+        {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
         {'name': 'Manifestations',          'order': 'o=5'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
         {'name': 'Contains',                'order': 'o=6'   , 'type': 'int', 'custom': 'size',
@@ -13006,6 +13043,9 @@ class EqualGoldListView(BasicList):
                               type="multiple", msg=msg)
                 self.uploads.append(oJson)
 
+        # Make the profile available
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
     
     def add_to_context(self, context, initial):
@@ -13107,6 +13147,12 @@ class EqualGoldListView(BasicList):
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="ssg")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="ssg")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "status":
             # Provide the status traffic light
             html.append(instance.get_stype_light())

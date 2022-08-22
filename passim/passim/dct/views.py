@@ -483,6 +483,8 @@ class MyPassimEdit(BasicDetails):
             sitemset['saveasbutton'] = False
 
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+            # Also store the count
+            sitemset['count'] = qs_sitemlist.count()
             # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_sitemlist)
 
@@ -530,6 +532,10 @@ class MyPassimEdit(BasicDetails):
             if bMayEdit:
                 sitemset['columns'].append("")
             related_objects.append(sitemset)
+
+            # [2] ===============================================================
+            # Deal with Saved Searches!!!!
+            # TODO: implement
 
         except:
             msg = oErr.get_error_message()

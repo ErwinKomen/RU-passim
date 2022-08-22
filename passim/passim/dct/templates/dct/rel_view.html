@@ -6,6 +6,9 @@
     <h3>
       <span class="glyphicon glyphicon-plus"></span>
       <span data-toggle="collapse" data-target="#basic_{{related.prefix}}_set">{{related.title}}</span>
+      {% if related.count %}
+        <span style="font-size:small;">&nbsp;({{related.count}})</span>
+      {% endif %}
     </h3>
 
     <div class="row collapse-indicator collapse related-root {{related.classes}}" id="basic_{{related.prefix}}_set" >

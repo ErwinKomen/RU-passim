@@ -1,5 +1,5 @@
 
-<form id="sitem_form" targeturl="{% url 'saveditem_apply' profile.id %}">
+<form id="sitem_form_{{item.id}}" targeturl="{% url 'saveditem_apply' profile.id %}">
   {% csrf_token %}
   <div class="hidden">
     <input type="text" id="id_saveditemid" name="saveditemid" value="{% if saveditem %}{{saveditem.id}}{% else %}{% endif %}" />
