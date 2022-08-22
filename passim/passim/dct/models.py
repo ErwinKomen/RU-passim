@@ -898,6 +898,26 @@ class SavedItem(models.Model):
         # Return the regular save response
         return response
 
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/update_saveditems")
+            bOkay = Falses
+        return bOkay
+
+
 
 class SavedSearch(models.Model):
     """A saved search links to the basic UserSearch"""

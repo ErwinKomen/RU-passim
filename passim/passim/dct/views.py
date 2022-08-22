@@ -485,6 +485,8 @@ class MyPassimEdit(BasicDetails):
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
             # Also store the count
             sitemset['count'] = qs_sitemlist.count()
+            sitemset['instance'] = instance
+            sitemset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
             # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_sitemlist)
 
@@ -616,15 +618,86 @@ class MyPassimEdit(BasicDetails):
 
         return sBack
 
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
+
+        try:
+            arg_hlist = "svitem-hlist"
+            arg_savenew = "svitem-savenew"
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                # Interpret the savenew parameter
+                savenew = self.qd[arg_savenew]
+
+                # Make sure we are not saving
+                self.do_not_save = True
+                # But that we do a new redirect
+                self.newRedirect = True
+
+                # Change the redirect URL
+                if self.redirectpage == "":
+                    self.redirectpage = reverse('mypassim_details')
+
+                # What we have is the ordered list of Manuscript id's that are part of this collection
+                with transaction.atomic():
+                    # Make sure the orders are correct
+                    for idx, item_id in enumerate(hlist):
+                        order = idx + 1
+                        lstQ = [Q(profile=instance)]
+                        lstQ.append(Q(**{"id": item_id}))
+                        obj = SavedItem.objects.filter(*lstQ).first()
+                        if obj != None:
+                            if obj.order != order:
+                                obj.order = order
+                                obj.save()
+                                bChanges = True
+                # See if any need to be removed
+                existing_item_id = [str(x.id) for x in SavedItem.objects.filter(profile=instance)]
+                delete_id = []
+                for item_id in existing_item_id:
+                    if not item_id in hlist:
+                        delete_id.append(item_id)
+                if len(delete_id)>0:
+                    lstQ = [Q(profile=instance)]
+                    lstQ.append(Q(**{"id__in": delete_id}))
+                    SavedItem.objects.filter(*lstQ).delete()
+                    bChanges = True
+
+                if bChanges:
+                    # (6) Re-calculate the order
+                    SavedItem.update_order(instance)
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MyPassimEdit/check_hlist")
+            return False
+
 
 class MyPassimDetails(MyPassimEdit):
     """The HTML variant of [ResearchSetEdit]"""
 
     rtype = "html"
 
+    def custom_init(self, instance):
+        # First process what needs to be done anyway
+        custom_result = super(MyPassimDetails, self).custom_init(instance)
+
+        # Now continue
+        profile = instance if not instance is None else self.object
+        if not profile is None:
+            # Check for hlist saving
+            self.check_hlist(profile)
+        return None
+
+
 
 # ================= View for SavedData ================
-
 
 class SavedItemApply(BasicPart):
     """Either add or remove an item as saved data"""
@@ -671,14 +744,15 @@ class SavedItemApply(BasicPart):
             # Possibly adapt the ordering of the saved items for this user
             if 'action' in data:
                 # Something has happened
-                qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
-                with transaction.atomic():
-                    order = 1
-                    for obj in qs:
-                        if obj.order != order:
-                            obj.order = order
-                            obj.save()
-                        order += 1
+                SavedItem.update_order(profile)
+                #qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
+                #with transaction.atomic():
+                #    order = 1
+                #    for obj in qs:
+                #        if obj.order != order:
+                #            obj.order = order
+                #            obj.save()
+                #        order += 1
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedItemApply")

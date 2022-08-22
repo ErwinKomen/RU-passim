@@ -16,7 +16,7 @@
       <!-- Hidden related hierarchy submit form -->
       <div class="hidden">
         <form id="save_related_{{related.prefix}}" method="post" 
-              action="{% if basic_form.instance.id %}{{detailsview}}{% endif %}">
+              action="{% if related.instance.id %}{{related.detailsview}}{% endif %}">
           {% csrf_token %}
           <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
           <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />

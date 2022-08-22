@@ -1,6 +1,12 @@
 {% extends "layout.html" %}
 {% load staticfiles %}
 
+{% block scripts %}
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
+    <script src="{% static 'basic/scripts/basic.js' %}"></script>
+    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+{% endblock %}
+
 
 {% block content %}
 
@@ -271,6 +277,3 @@
 </div>
 {% endblock %}
 
-{% block script %}
-    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
-{% endblock %}
