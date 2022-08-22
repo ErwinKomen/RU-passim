@@ -302,6 +302,7 @@ urlpatterns = [
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
     url(r'^saveditem/apply(?:/(?P<pk>\d+))?/$', SavedItemApply.as_view(), name='saveditem_apply'),
+    url(r'^selitem/apply(?:/(?P<pk>\d+))?/$', SelectItemApply.as_view(), name='selitem_apply'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

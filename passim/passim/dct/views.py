@@ -29,7 +29,7 @@ from passim.seeker.views import get_application_context, get_breadcrumbs, user_i
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
-    SavedItem, SavedSearch
+    SavedItem, SavedSearch, SelectItem
 from passim.dct.forms import ResearchSetForm, SetDefForm
 from passim.approve.models import EqualChange, EqualApproval
 
@@ -697,7 +697,7 @@ class MyPassimDetails(MyPassimEdit):
 
 
 
-# ================= View for SavedData ================
+# ================= Views for SavedItem, SelectItem ================
 
 class SavedItemApply(BasicPart):
     """Either add or remove an item as saved data"""
@@ -756,6 +756,57 @@ class SavedItemApply(BasicPart):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedItemApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
+
+
+class SelectItemApply(BasicPart):
+    """Either add or remove an item as saved data"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+            # We already know who we are
+            profile = self.obj
+
+            # Retrieve necessary parameters
+            selitemtype = self.qd.get("selitemtype")
+            selitemaction = self.qd.get("selitemaction")
+            selitemid = self.qd.get("selitemid")
+            itemid = self.qd.get("itemid")
+
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemidfield = itemset[selitemtype]
+
+            if selitemaction == "add":
+                # We are going to add an item as a saveditem
+                obj = SelectItem.objects.create(
+                    profile=profile, selitemtype=selitemtype)
+                # The particular attribute to set depends on the selitemtype
+                setattr(obj, "{}_id".format(itemidfield), itemid)
+                obj.save()
+                data['action'] = "added"
+            elif selitemaction == "remove" and not saveditemid is None:
+                # We need to remove *ALL* relevant items
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(selitemtype=selitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                delete_id = SelectItem.objects.filter(*lstQ).values("id")
+                if len(delete_id) > 0:
+                    SelectItem.objects.filter(id__in=delete_id).delete()
+                data['action'] = "removed"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItemApply")
             data['status'] = "error"
 
         context['data'] = data

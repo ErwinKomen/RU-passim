@@ -916,8 +916,7 @@ class SavedItem(models.Model):
             oErr.DoError("SavedItem/update_saveditems")
             bOkay = Falses
         return bOkay
-
-
+    
 
 class SavedSearch(models.Model):
     """A saved search links to the basic UserSearch"""
@@ -933,4 +932,55 @@ class SavedSearch(models.Model):
     def __str__(self):
         sBack = "{}: {}".format(self.profile.user.username, self.usersearch.id)
         return sBack
+
+
+class SelectItem(models.Model):
+    """A selected item can be a M/S/SSG or HC or PD"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_selectitems")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each saved item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # Depending on the type of SelectItem, there is a pointer to the actual item
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_selectitems")
+    # [0-1] Sermon pointer
+    sermon = models.ForeignKey(SermonDescr, blank=True, null=True, on_delete=models.SET_NULL, related_name="sermon_selectitems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_selectitems")
+    # [0-1] Collection pointer (that can be HC, public or personal collection
+    collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_selectitems")
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        return sBack
+
+    def get_selectitem(item, profile, selitemtype):
+        """If this is a saved item for the indicated user, get that item"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                if selitemtype == "manu":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, manuscript=item).first()
+                elif selitemtype == "serm":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, sermon=item).first()
+                elif selitemtype == "ssg":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, equal=item).first()
+                elif selitemtype == "hc" or selitemtype == "pd":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, collection=item).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItem/get_selectitem")
+        return obj
+
+
+
+
 

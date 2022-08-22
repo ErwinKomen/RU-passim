@@ -1959,3 +1959,15 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     color: gray; 
     cursor: pointer;
 }
+
+
+.selitem-button-selected > .glyphicon {
+    color: darkgreen; /* #355e3b;  */
+    cursor: pointer;
+}
+
+.selitem-button {
+    color: gray; 
+    cursor: pointer;
+}
+

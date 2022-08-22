@@ -89,7 +89,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
-from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch
+from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
     approval_parse_adding, approval_parse_removing, approval_parse_deleting, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
@@ -664,6 +664,31 @@ def get_saveditem_html(request, instance, profile, htmltype="button", sitemtype=
     except:
         msg = oErr.get_error_message()
         oErr.DoError("get_saveditem_html")
+    return sBack
+
+def get_selectitem_html(request, instance, profile, htmltype="button", selitemtype=None):
+    """Get an indication whether this is a select item, or allow to add it"""
+
+    oErr = ErrHandle()
+    sBack = ""
+    try:
+        if not selitemtype is None:
+            obj = SelectItem.get_selectitem(instance, profile, selitemtype)
+            context = {}
+            context['profile'] = profile
+            context['selitem'] = obj
+            context['item'] = instance
+            context['selitemtype'] = selitemtype
+            context['selitemaction'] = "add" if obj is None else "remove"
+
+            template_name = "dct/selitem_button.html"
+            if htmltype == "form":
+                template_name = "dct/selitem_form.html"
+
+            sBack = render_to_string(template_name, context, request)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_selectitem_html")
     return sBack
 
 
@@ -10387,18 +10412,19 @@ class ManuscriptListView(BasicList):
     basketview = False
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['', 'library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
-        {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
+        {'name': "Select",  'order': '',    'type':  'str', 'custom': 'select', 'autohide': "on"},
+        {'name': 'City/Location',    'order': 'o=2', 'type': 'str', 'custom': 'city',
                     'title': 'City or other location, such as monastery'},
-        {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
-        {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Library',  'order': 'o=3', 'type': 'str', 'custom': 'library'},
+        {'name': 'Name',     'order': 'o=4', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
         {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
-        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
-        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
+        {'name': 'From',     'order': 'o=7', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=8', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=9', 'type': 'str', 'custom': 'status'},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
@@ -10624,6 +10650,12 @@ class ManuscriptListView(BasicList):
             saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="manu")
             html.append(saveditem_button)
             html.append(saveditem_form)
+        elif custom == "select":
+            # Prepare selected item handling
+            selectitem_button = get_selectitem_html(self.request, instance, self.profile, selitemtype="manu")
+            selectitem_form = get_selectitem_html(self.request, instance, self.profile, "form", selitemtype="manu")
+            html.append(selectitem_button)
+            html.append(selectitem_form)
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))

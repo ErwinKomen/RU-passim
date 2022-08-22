@@ -2094,6 +2094,103 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_selitem
+       *    Check or uncheck items for selection
+       *
+       */
+      do_selitem: function (elStart, sAction) {
+        var frm = null,
+            targeturl = "",
+            action = "",
+            data = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest(".selitem").attr("targetid");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the URL
+          targeturl = $(frm).attr("targeturl");
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "deleted":
+                      case "removed":
+                        $(elStart).removeClass("selitem-button-selected");
+                        $(elStart).addClass("selitem-button");
+                        $(elStart).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                        $(elStart).attr("title", "Select this item");
+                        // Change the sitem action to be taken
+                        $("#id_selitemaction").val("add");
+                        break;
+                      case "added":
+                        // $(elStart).css("color", "red");
+                        $(elStart).removeClass("selitem-button");
+                        $(elStart).addClass("selitem-button-selected");
+                        $(elStart).html('<span class="glyphicon glyphicon-check"></span>');
+                        $(elStart).attr("title", "Uncheck this item");
+                        // Change the sitem action to be taken
+                        $("#id_selitemaction").val("remove");
+                        break;
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+
+        } catch (ex) {
+          private_methods.errMsg("do_selitem", ex);
+        }
+      },
+
+      /**
        * load_dct
        *    Ask for the DCT definition using AJAX
        *
