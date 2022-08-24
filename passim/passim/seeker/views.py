@@ -666,7 +666,7 @@ def get_saveditem_html(request, instance, profile, htmltype="button", sitemtype=
         oErr.DoError("get_saveditem_html")
     return sBack
 
-def get_selectitem_html(request, instance, profile, htmltype="button", selitemtype=None):
+def get_selectitem_info(request, instance, profile, selitemtype=None):
     """Get an indication whether this is a select item, or allow to add it"""
 
     oErr = ErrHandle()
@@ -681,15 +681,20 @@ def get_selectitem_html(request, instance, profile, htmltype="button", selitemty
             context['selitemtype'] = selitemtype
             context['selitemaction'] = "add" if obj is None else "remove"
 
+            html = []
             template_name = "dct/selitem_button.html"
-            if htmltype == "form":
-                template_name = "dct/selitem_form.html"
+            html.append( render_to_string(template_name, context, request))
 
-            sBack = render_to_string(template_name, context, request)
+            template_name = "dct/selitem_form.html"
+            html.append( render_to_string(template_name, context, request))
+
+            sBack = "\n".join(html)
     except:
         msg = oErr.get_error_message()
-        oErr.DoError("get_selectitem_html")
+        oErr.DoError("get_selectitem_info")
     return sBack
+
+
 
 
 
@@ -5015,6 +5020,7 @@ class SermonListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "sermo"
+    sel_button = "serm"
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Manifestations"
@@ -5428,6 +5434,10 @@ class SermonListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
 
 
 class OnlineSourceEdit(BasicDetails):
@@ -9163,6 +9173,10 @@ class CollectionListView(BasicList):
             html.append(saveditem_form)
             sBack = "".join(html)
         return sBack, sTitle
+
+    def get_selectitem_info(self, instance):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.settype)
     
 
 class CommentSend(BasicPart):
@@ -10406,25 +10420,25 @@ class ManuscriptListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     profile = None
+    sel_button = "manu"
     prefix = "manu"
     sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Manuscripts"
     basketview = False
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['', 'library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
-        {'name': "Select",  'order': '',    'type':  'str', 'custom': 'select', 'autohide': "on"},
-        {'name': 'City/Location',    'order': 'o=2', 'type': 'str', 'custom': 'city',
+        {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
                     'title': 'City or other location, such as monastery'},
-        {'name': 'Library',  'order': 'o=3', 'type': 'str', 'custom': 'library'},
-        {'name': 'Name',     'order': 'o=4', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
+        {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
         {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-        {'name': 'From',     'order': 'o=7', 'type': 'int', 'custom': 'from',    'align': 'right'},
-        {'name': 'Until',    'order': 'o=8', 'type': 'int', 'custom': 'until',   'align': 'right'},
-        {'name': 'Status',   'order': 'o=9', 'type': 'str', 'custom': 'status'},
+        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
@@ -10650,12 +10664,6 @@ class ManuscriptListView(BasicList):
             saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="manu")
             html.append(saveditem_button)
             html.append(saveditem_form)
-        elif custom == "select":
-            # Prepare selected item handling
-            selectitem_button = get_selectitem_html(self.request, instance, self.profile, selitemtype="manu")
-            selectitem_form = get_selectitem_html(self.request, instance, self.profile, "form", selitemtype="manu")
-            html.append(selectitem_button)
-            html.append(selectitem_form)
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
@@ -10842,6 +10850,10 @@ class ManuscriptListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
   
 
 class ManuscriptDownload(BasicPart):
@@ -12955,6 +12967,7 @@ class EqualGoldListView(BasicList):
     use_team_group = True
     template_help = "seeker/filter_help.html"
     prefix = "ssg"
+    sel_button = "ssg"
     bUseFilter = True  
     plural_name = "Authority Files"
     sg_name = "Authority File"
@@ -13238,6 +13251,10 @@ class EqualGoldListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
         
 
 class EqualGoldScountDownload(BasicPart):

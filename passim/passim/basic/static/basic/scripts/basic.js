@@ -2994,6 +2994,78 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sel_button
+       *    Show or hide the select column
+       *
+       */
+      sel_button: function (elStart) {
+        var elTable = null,
+            elS = null,
+            elH = null,
+            mode = "";
+
+        try {
+          // Find out which mode I am in
+          mode = ($(elStart).hasClass("jumbo-1")) ? "hide" : "show";
+
+          // Find the table
+          elTable = $("table.table").first();
+          // Find the <h3> element
+          elH = $(elStart).closest("h3");
+          // Either hide or show the .select-column
+          switch (mode) {
+            case "hide":
+              // Turn into showing
+              $(elTable).find(".select-column").removeClass("hidden");
+              // Change the button into 'showing'
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-3");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").removeClass("hidden");
+              $(elH).find(".select-execute button").attr("disabled", true);
+              // Set the correct 'w' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("show");
+              break;
+            case "show":
+              // Turn into hiding
+              $(elTable).find(".select-column").addClass("hidden");
+              // Change the button into 'hiding'
+              $(elStart).removeClass("jumbo-3");
+              $(elStart).addClass("jumbo-1");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").addClass("hidden");
+              $(elH).find(".select-execute button").attr("disabled", true);
+              // Set the correct 'w' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("hide");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sel_button", ex);
+        }
+      },
+
+      /**
+       * sel_execute
+       *    Show or hide the select column
+       *
+       */
+      sel_execute: function (elStart, action) {
+        var elTable = null,
+            elS = null,
+            elH = null,
+            mode = "";
+
+        try {
+          alert("Action not yet implemented: " + action);
+        } catch (ex) {
+          private_methods.errMsg("sel_execute", ex);
+        }
+      },
+
+      /**
        * tabular_addrow
        *   Add one row into a tabular inline
        *

@@ -873,6 +873,7 @@ class BasicList(ListView):
     bHasParameters = False
     bUseFilter = False
     new_button = True
+    sel_button = False
     initial = None
     listform = None
     has_select2 = False
@@ -905,6 +906,7 @@ class BasicList(ListView):
     lst_typeaheads = []
     sort_order = ""
     col_wrap = ""
+    sel_mode = ""
     param_list = []
     qs = None
     page_function = "ru.basic.search_paged_start"
@@ -994,13 +996,20 @@ class BasicList(ListView):
         context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
         context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
 
+        # Make sure we get selection mode right early enough...
+        selmode = self.qd.get("s", None)
+        if selmode != None:
+            self.sel_mode = selmode.strip()
+
         # Make sure to transform the 'object_list'  into a 'result_list'
         context['result_list'] = self.get_result_list(context['object_list'])
 
         context['sortOrder'] = self.sort_order
         context['colWrap'] = self.col_wrap
+        context['selMode'] = self.sel_mode
 
         context['new_button'] = self.new_button
+        context['sel_button'] = self.sel_button
         context['add_text'] = self.add_text
 
         context['admin_editable'] = self.admin_editable
@@ -1207,6 +1216,14 @@ class BasicList(ListView):
                 result['admindetails'] = reverse(admindetails, args=[obj.id])
             except:
                 pass
+
+            # Fill in the selection information
+            selectitem_info = ""
+            if not self.sel_button is None and self.sel_button != "":
+                # Prepare selected item handling
+                selectitem_info = self.get_selectitem_info(obj)
+
+            result['sel_info'] = selectitem_info
 
             # Add to the list of results
             result_list.append(result)
@@ -1430,6 +1447,9 @@ class BasicList(ListView):
         # Return the resulting filtered and sorted queryset
         self.qs = qs
         return qs
+
+    def get_selectitem_info(self, instance):
+        return ""
 
     def view_queryset(self, qs):
         return None

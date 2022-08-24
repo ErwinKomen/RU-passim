@@ -80,7 +80,6 @@ def sermones_reset(request):
         oErr.DoError("sermones_reset")
         return redirect('home')
 
-
 def manuscript_ssgs(manu, bDebug = False):
     """Get the ordered list of SSGs related to a manuscript"""
 
@@ -163,7 +162,6 @@ def collection_ssgs(coll, bDebug = False):
         oErr.DoError("collection_ssgs")
     return lBack
 
-
 def dct_manulist(lst_manu, bDebug=False):
     """Create a DCT based on the manuscripts in the list"""
 
@@ -217,6 +215,9 @@ def dct_manulist(lst_manu, bDebug=False):
         msg = oErr.get_error_message()
         oErr.DoError("dct_manulist")
     return lBack
+
+
+
 
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
