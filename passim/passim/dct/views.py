@@ -725,11 +725,13 @@ class SavedItemApply(BasicPart):
 
             if sitemaction == "add":
                 # We are going to add an item as a saveditem
-                obj = SavedItem.objects.create(
-                    profile=profile, sitemtype=sitemtype)
-                # The particular attribute to set depends on the sitemtype
-                setattr(obj, "{}_id".format(itemidfield), itemid)
-                obj.save()
+                obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
+                if obj is None:
+                    obj = SavedItem.objects.create(
+                        profile=profile, sitemtype=sitemtype)
+                    # The particular attribute to set depends on the sitemtype
+                    setattr(obj, "{}_id".format(itemidfield), itemid)
+                    obj.save()
                 data['action'] = "added"
             elif sitemaction == "remove" and not saveditemid is None:
                 # We need to remove *ALL* relevant items
@@ -746,14 +748,6 @@ class SavedItemApply(BasicPart):
             if 'action' in data:
                 # Something has happened
                 SavedItem.update_order(profile)
-                #qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
-                #with transaction.atomic():
-                #    order = 1
-                #    for obj in qs:
-                #        if obj.order != order:
-                #            obj.order = order
-                #            obj.save()
-                #        order += 1
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedItemApply")
@@ -780,21 +774,30 @@ class SelectItemApply(BasicPart):
             # Retrieve necessary parameters
             selitemtype = self.qd.get("selitemtype")
             selitemaction = self.qd.get("selitemaction")
+            mode = self.qd.get("mode")
             selitemid = self.qd.get("selitemid")
             itemid = self.qd.get("itemid")
 
             itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
             itemidfield = itemset[selitemtype]
 
+            if selitemaction == "-" and not mode is None:
+                selitemaction = mode
+
             if selitemaction == "add":
-                # We are going to add an item as a saveditem
-                obj = SelectItem.objects.create(
-                    profile=profile, selitemtype=selitemtype)
-                # The particular attribute to set depends on the selitemtype
-                setattr(obj, "{}_id".format(itemidfield), itemid)
-                obj.save()
+                # We are going to add an item as a selitem
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(selitemtype=selitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                obj = SelectItem.objects.filter(*lstQ).first()
+                if obj is None:
+                    obj = SelectItem.objects.create(profile=profile, selitemtype=selitemtype)
+                    # The particular attribute to set depends on the selitemtype
+                    setattr(obj, "{}_id".format(itemidfield), itemid)
+                    obj.save()
                 data['action'] = "added"
-            elif selitemaction == "remove" and not saveditemid is None:
+            elif selitemaction == "remove" and not selitemid is None:
                 # We need to remove *ALL* relevant items
                 lstQ = []
                 lstQ.append(Q(profile=profile))
@@ -804,6 +807,19 @@ class SelectItemApply(BasicPart):
                 if len(delete_id) > 0:
                     SelectItem.objects.filter(id__in=delete_id).delete()
                 data['action'] = "removed"
+
+            elif selitemaction == "clear_sel":
+                # Remove all selections for this item type
+                delete_id = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).values("id")
+                if len(delete_id) > 0:
+                    SelectItem.objects.filter(id__in=delete_id).delete()
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "clear_sel"
+
+            # Has something happened?
+            if 'action' in data:
+                # Okay, then re-calculate the amount of selected items
+                data['selitemcount'] = SelectItem.get_selectcount(profile, selitemtype)
 
         except:
             msg = oErr.get_error_message()

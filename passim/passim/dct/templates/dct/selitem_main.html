@@ -1,0 +1,7 @@
+﻿<form class="selitem-main" targeturl="{% url 'selitem_apply' profile.id %}">
+  {% csrf_token %}
+  <div class="hidden">
+    <input type="text" id="id_selitemtype"   name="selitemtype"   value="{{selitemtype}}" />
+    <input type="text" id="id_selitemaction" name="selitemaction" value="-" />
+  </div>
+</form>

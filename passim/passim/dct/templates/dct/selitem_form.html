@@ -2,7 +2,7 @@
 <form id="selitem_form_{{item.id}}" targeturl="{% url 'selitem_apply' profile.id %}">
   {% csrf_token %}
   <div class="hidden">
-    <input type="text" id="id_selitemid" name="saveditemid" value="{% if selitem %}{{selitem.id}}{% else %}{% endif %}" />
+    <input type="text" id="id_selitemid" name="selitemid" value="{% if selitem %}{{selitem.id}}{% else %}{% endif %}" />
     <input type="text" id="id_itemid"      name="itemid"      value="{% if item %}{{item.id}}{% else %}{% endif %}" />
     <input type="text" id="id_selitemtype"   name="selitemtype"   value="{{selitemtype}}" />
     <input type="text" id="id_selitemaction" name="selitemaction" value="{{selitemaction}}" />

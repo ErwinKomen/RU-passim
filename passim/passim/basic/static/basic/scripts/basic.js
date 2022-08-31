@@ -3002,11 +3002,15 @@ var ru = (function ($, ru) {
         var elTable = null,
             elS = null,
             elH = null,
+            selcount = "",
             mode = "";
 
         try {
           // Find out which mode I am in
           mode = ($(elStart).hasClass("jumbo-1")) ? "hide" : "show";
+
+          // Figure out what the selection count is
+          selcount = $(".selcount").first().html().trim();
 
           // Find the table
           elTable = $("table.table").first();
@@ -3022,8 +3026,17 @@ var ru = (function ($, ru) {
               $(elStart).addClass("jumbo-3");
               // Set proper execution button visibility
               $(elH).find(".select-execute").removeClass("hidden");
-              $(elH).find(".select-execute button").attr("disabled", true);
-              // Set the correct 'w' parameter
+
+              // make sure .selcount changes correctly
+              $(".selcount").addClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              } else {
+                $(elH).find(".select-execute button").attr("disabled", false);
+              }
+              // Set the correct 's' parameter
               elS = document.getElementsByName("s");
               $(elS).val("show");
               break;
@@ -3035,8 +3048,15 @@ var ru = (function ($, ru) {
               $(elStart).addClass("jumbo-1");
               // Set proper execution button visibility
               $(elH).find(".select-execute").addClass("hidden");
-              $(elH).find(".select-execute button").attr("disabled", true);
-              // Set the correct 'w' parameter
+
+              // make sure .selcount changes correctly
+              $(".selcount").removeClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              }
+              // Set the correct 's' parameter
               elS = document.getElementsByName("s");
               $(elS).val("hide");
               break;
@@ -3047,24 +3067,7 @@ var ru = (function ($, ru) {
         }
       },
 
-      /**
-       * sel_execute
-       *    Show or hide the select column
-       *
-       */
-      sel_execute: function (elStart, action) {
-        var elTable = null,
-            elS = null,
-            elH = null,
-            mode = "";
-
-        try {
-          alert("Action not yet implemented: " + action);
-        } catch (ex) {
-          private_methods.errMsg("sel_execute", ex);
-        }
-      },
-
+  
       /**
        * tabular_addrow
        *   Add one row into a tabular inline

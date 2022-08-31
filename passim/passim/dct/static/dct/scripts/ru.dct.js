@@ -11,6 +11,7 @@ var $ = jQuery;
       // ru.basic.init_events();
       // ru.basic.init_typeahead();
       ru.dct.load_dct();
+      ru.dct.init_selection();
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
       $('[data-toggle="popover"]').popover();
@@ -1895,6 +1896,7 @@ var ru = (function ($, ru) {
       dct_save: function (el, elDctId, save_mode) {
         var frm = null,
             data = null,
+            err = "#little_err_msg",
             targeturl = null,
             contents = null,
             ssglists = null,
@@ -2102,13 +2104,25 @@ var ru = (function ($, ru) {
         var frm = null,
             targeturl = "",
             action = "",
+            elTd = null,
+            err = "#little_err_msg",
+            selitemcount = "",
             data = null;
 
         try {
           // Get to the form
-          frm = $(elStart).closest(".selitem").attr("targetid");
+          if ($(elStart)[0].localName.toLowerCase() === "form") {
+            frm = $(elStart);
+          } else {
+            frm = $(elStart).closest(".selitem").attr("targetid");
+          }
           // Get the data
           data = $(frm).serializeArray();
+          // Append the action to it
+          data.push({name: "mode", value: sAction});
+
+          // Find nearest <td>
+          elTd = $(elStart).closest("td");
 
           // Get the URL
           targeturl = $(frm).attr("targeturl");
@@ -2125,11 +2139,27 @@ var ru = (function ($, ru) {
                   // Should have a new target URL
                   targeturl = response['targeturl'];
                   action = response['action'];
+                  // Get selitemcount
+                  selitemcount = response['selitemcount'];
                   if (targeturl !== undefined && targeturl !== "") {
                     // Go open that targeturl
                     window.location = targeturl;
                   } else if (action !== undefined && action !== "") {
                     switch (action) {
+                      case "clear_sel":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+                        });
+                        break;
                       case "deleted":
                       case "removed":
                         $(elStart).removeClass("selitem-button-selected");
@@ -2137,7 +2167,7 @@ var ru = (function ($, ru) {
                         $(elStart).html('<span class="glyphicon glyphicon-unchecked"></span>');
                         $(elStart).attr("title", "Select this item");
                         // Change the sitem action to be taken
-                        $("#id_selitemaction").val("add");
+                        $(elTd).find("#id_selitemaction").val("add");
                         break;
                       case "added":
                         // $(elStart).css("color", "red");
@@ -2146,8 +2176,18 @@ var ru = (function ($, ru) {
                         $(elStart).html('<span class="glyphicon glyphicon-check"></span>');
                         $(elStart).attr("title", "Uncheck this item");
                         // Change the sitem action to be taken
-                        $("#id_selitemaction").val("remove");
+                        $(elTd).find("#id_selitemaction").val("remove");
                         break;
+                    }
+                    // Adapt the amount of selected items
+                    if (selitemcount !== undefined) {
+                      if (selitemcount <= 0) {
+                        $(".selcount").html("");
+                        $("h3 .select-execute button").attr("disabled", true);
+                      } else {
+                        $(".selcount").html(selitemcount);
+                        $("h3 .select-execute button").attr("disabled", false);
+                      }
                     }
                   }
                   break;
@@ -2187,6 +2227,29 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("do_selitem", ex);
+        }
+      },
+
+      /**
+       * init_selection
+       *    Initialize selecting stuff
+       *
+       */
+      init_selection: function () {
+        try {
+          // Visit every button under class 'select-execute'
+
+          $(".select-execute button").each(function (idx, el) {
+            var mode = $(el).attr("mode"),
+                elStart = $(".selitem-main").first();
+
+            $(el).unbind("click").on("click", function (evt) {
+              ru.dct.do_selitem(elStart, mode);
+            });
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("init_selection", ex);
         }
       },
 

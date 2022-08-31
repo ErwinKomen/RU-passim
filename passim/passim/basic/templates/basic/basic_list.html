@@ -367,26 +367,31 @@
               <span class="pull-right">
                 {% if is_app_editor and sel_button %}
                   <!-- Button to switch selection on/off -->
-                    <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
-                      <!-- Show the possibility icons -->
-                      <button class="btn btn-xs jumbo-1" role="button" onclick="ru.basic.sel_execute(this, 'add_saveitem');"
-                         title="Add to saved items" >
-                        <span class="glyphicon glyphicon-star-empty" ></span>
-                      </button>
-                      <button class="btn btn-xs jumbo-1" role="button" onclick="ru.basic.sel_execute(this, 'add_basket');"
-                         title="Add to basket" >
-                        <span class="glyphicon glyphicon-shopping-cart" ></span>
-                      </button>
-                      <button class="btn btn-xs jumbo-1" role="button" onclick="ru.basic.sel_execute(this, 'add_dct');"
-                         title="Add to DCT" >
-                        <span class="glyphicon glyphicon-wrench" ></span>
-                      </button>
-                    </span>
+                  <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
+                    <!-- Show the possibility icons -->
+                    <button class="btn btn-xs jumbo-4" role="button" mode="clear_sel"
+                        title="Unselect everything" >
+                      <span class="glyphicon glyphicon-refresh" ></span>
+                    </button>
+                    <button class="btn btn-xs jumbo-1" role="button" mode="add_saveitem"
+                        title="Add to saved items" >
+                      <span class="glyphicon glyphicon-star-empty" ></span>
+                    </button>
+                    <button class="btn btn-xs jumbo-1" role="button" mode="add_basket"
+                        title="Add to basket" >
+                      <span class="glyphicon glyphicon-shopping-cart" ></span>
+                    </button>
+                    <button class="btn btn-xs jumbo-1" role="button" mode="add_dct"
+                        title="Add to DCT" >
+                      <span class="glyphicon glyphicon-wrench" ></span>
+                    </button>
+                  </span>
                   <span>
                     <a class="btn btn-xs {% if selMode and selMode == 'show' %}jumbo-3{% else %}jumbo-1{% endif %}" role="button"
                        onclick="ru.basic.sel_button(this);"
                        title="Enter or leave multiple-row selection mode">
                       <span class="glyphicon glyphicon-list"></span>
+                      <span class="selcount {% if selMode and selMode == 'show' %}showing{% endif %}">{{sel_count}}</span>
                     </a>
                   </span>
                 {% endif %}
@@ -403,6 +408,11 @@
                 {% endif %}
               </span>
             </h3>
+            <!-- Room for a little error message -->
+            <div id="little_err_msg" class="err-msg"></div>
+            <!-- Room for select item handling -->
+            <div class="hidden">{{sel_info|safe}}</div>
+
 
             <!-- Room to have the form-link to create a new list-item -->
             <div class="hidden" >

@@ -673,20 +673,29 @@ def get_selectitem_info(request, instance, profile, selitemtype=None):
     sBack = ""
     try:
         if not selitemtype is None:
-            obj = SelectItem.get_selectitem(instance, profile, selitemtype)
+            html = []
             context = {}
             context['profile'] = profile
-            context['selitem'] = obj
-            context['item'] = instance
             context['selitemtype'] = selitemtype
-            context['selitemaction'] = "add" if obj is None else "remove"
 
-            html = []
-            template_name = "dct/selitem_button.html"
-            html.append( render_to_string(template_name, context, request))
+            # Is this the main form or not?
+            if instance is None:
+                # This is the main form
+                template_name = "dct/selitem_main.html"
+                html.append( render_to_string(template_name, context, request))
 
-            template_name = "dct/selitem_form.html"
-            html.append( render_to_string(template_name, context, request))
+            else:
+
+                obj = SelectItem.get_selectitem(instance, profile, selitemtype)
+                context['selitem'] = obj
+                context['item'] = instance
+                context['selitemaction'] = "add" if obj is None else "remove"
+
+                template_name = "dct/selitem_button.html"
+                html.append( render_to_string(template_name, context, request))
+
+                template_name = "dct/selitem_form.html"
+                html.append( render_to_string(template_name, context, request))
 
             sBack = "\n".join(html)
     except:
@@ -5168,6 +5177,12 @@ class SermonListView(BasicList):
         context['basketsize'] = 0 if profile == None else profile.basketsize
         context['basket_show'] = reverse('basket_show')
         context['basket_update'] = reverse('basket_update')
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "serm")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_basketqueryset(self):
@@ -8981,6 +8996,12 @@ class CollectionListView(BasicList):
         if self.prefix == "priv":
             context['prefix'] = self.prefix
             context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, self.settype)
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_own_list(self):
@@ -10619,6 +10640,11 @@ class ManuscriptListView(BasicList):
         context['basket_update'] = reverse('basket_update_manu')
 
         context['colltype'] = "manu"
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "manu")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
 
         return context
 
@@ -13101,6 +13127,12 @@ class EqualGoldListView(BasicList):
         context['basket_show'] = reverse('basket_show_super')
         context['basket_update'] = reverse('basket_update_super')
         context['histogram_data'] = self.get_histogram_data('d3')
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "ssg")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_histogram_data(self, method='d3'):

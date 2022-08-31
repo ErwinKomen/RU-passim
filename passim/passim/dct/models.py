@@ -980,6 +980,19 @@ class SelectItem(models.Model):
             oErr.DoError("SelectItem/get_selectitem")
         return obj
 
+    def get_selectcount(profile, selitemtype):
+        """Get the amount of selected items for this particular user / selitemtype"""
+
+        iCount = 0
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                iCount = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).count()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItem/get_selectcount")
+        return iCount
 
 
 

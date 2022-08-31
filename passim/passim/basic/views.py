@@ -874,6 +874,7 @@ class BasicList(ListView):
     bUseFilter = False
     new_button = True
     sel_button = False
+    sel_count = ""
     initial = None
     listform = None
     has_select2 = False
@@ -1010,6 +1011,7 @@ class BasicList(ListView):
 
         context['new_button'] = self.new_button
         context['sel_button'] = self.sel_button
+        context['sel_count'] = self.sel_count
         context['add_text'] = self.add_text
 
         context['admin_editable'] = self.admin_editable
@@ -1136,6 +1138,14 @@ class BasicList(ListView):
         context['usebasket'] = self.basketview
 
         context['permission'] = self.permission
+
+        # Fill in the selection information
+        selectitem_info = ""
+        if not self.sel_button is None and self.sel_button != "":
+            # Prepare selected item handling
+            selectitem_info = self.get_selectitem_info(None)
+
+        context['sel_info'] = selectitem_info
 
         # Add the search url
         if self.usersearch_id == "":
