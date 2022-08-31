@@ -7032,7 +7032,8 @@ class ProjectEdit(BasicDetails):
             # Define the main items to show and edit
             context['mainitems'] = [
                 {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
-                {'type': 'line',  'label': "Editors:",  'value': instance.get_editor_markdown()}
+                {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
+                 'title': 'All the current users that have approval rights for this project'}
                 ]       
 
             # Also add a delete Warning Statistics message (see issue #485)
