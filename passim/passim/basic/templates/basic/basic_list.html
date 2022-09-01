@@ -373,18 +373,12 @@
                         title="Unselect everything" >
                       <span class="glyphicon glyphicon-refresh" ></span>
                     </button>
-                    <button class="btn btn-xs jumbo-1" role="button" mode="add_saveitem"
-                        title="Add to saved items" >
-                      <span class="glyphicon glyphicon-star-empty" ></span>
-                    </button>
-                    <button class="btn btn-xs jumbo-1" role="button" mode="add_basket"
-                        title="Add to basket" >
-                      <span class="glyphicon glyphicon-shopping-cart" ></span>
-                    </button>
-                    <button class="btn btn-xs jumbo-1" role="button" mode="add_dct"
-                        title="Add to DCT" >
-                      <span class="glyphicon glyphicon-wrench" ></span>
-                    </button>
+                    {% for selbut in selectbuttons %}
+                      <button class="btn btn-xs {{selbut.button}}" role="button" mode="{{selbut.mode}}"
+                          title="{{selbut.title}}" >
+                        <span class="glyphicon {{selbut.glyphicon}}" ></span>
+                      </button>
+                    {% endfor %}
                   </span>
                   <span>
                     <a class="btn btn-xs {% if selMode and selMode == 'show' %}jumbo-3{% else %}jumbo-1{% endif %}" role="button"

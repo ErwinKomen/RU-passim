@@ -891,7 +891,7 @@ class SavedItem(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Check if the order is specified
-        if self.order is None or self.order == 0:
+        if self.order is None or self.order <= 0:
             # Specify the order
             self.order = SavedItem.objects.filter(profile=self.profile).count() + 1
         response = super(SavedItem, self).save(force_insert, force_update, using, update_fields)
@@ -960,7 +960,7 @@ class SelectItem(models.Model):
         return sBack
 
     def get_selectitem(item, profile, selitemtype):
-        """If this is a saved item for the indicated user, get that item"""
+        """If this is a selected item for the indicated user, get that item"""
 
         obj = None
         oErr = ErrHandle()

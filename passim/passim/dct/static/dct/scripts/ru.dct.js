@@ -2146,6 +2146,40 @@ var ru = (function ($, ru) {
                     window.location = targeturl;
                   } else if (action !== undefined && action !== "") {
                     switch (action) {
+                      case "update_sav":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                          // Make sure the SavedItem is showing
+                          el = $(elTr).find(".sitem-button").first();
+                          if (el.length > 0) {
+                            $(el).find("span").removeClass("glyphicon-star-empty");
+                            $(el).find("span").addClass("glyphicon-star");
+                            $(el).removeClass("sitem-button");
+                            $(el).addClass("sitem-button-selected");
+                            // $(el).attr("onclick", 'ru.dct.do_saveditem(this, "add");');
+                            $(el).attr("title", "Remove from your saved items");
+
+                            $(el).unbind("click").on("click", function (evt) {
+                              ru.dct.do_saveditem(elStart, "remove");
+                            });
+                            $(el).closest("td").find("#id_sitemaction").val("remove");
+                          }
+                        });
+
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        break;
                       case "clear_sel":
                         // Adapt all relevant material
                         $(".selitem-button-selected").each(function (idx, el) {

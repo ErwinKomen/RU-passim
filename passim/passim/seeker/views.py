@@ -5148,6 +5148,12 @@ class SermonListView(BasicList):
             ]}
          ]
 
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
+
     def initializations(self):
         oErr = ErrHandle()
         try:
@@ -8774,6 +8780,11 @@ class CollectionListView(BasicList):
             ]} # {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'} eruit
         ]
 
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
+
     def initializations(self):
         if self.prefix == "sermo":
             self.plural_name = "Sermon collections"
@@ -8984,6 +8995,7 @@ class CollectionListView(BasicList):
                     {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
                 ]
                 # ======== One-time adaptations ==============
+        self.sel_button = self.settype
         
         listview_adaptations("collhist_list")
         
@@ -8998,7 +9010,7 @@ class CollectionListView(BasicList):
             context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
 
         # Count the number of selected items
-        iCount = SelectItem.get_selectcount(profile, self.settype)
+        iCount = SelectItem.get_selectcount(self.profile, self.settype)
         if iCount > 0:
             context['sel_count'] = str(iCount)
 
@@ -10559,6 +10571,12 @@ class ManuscriptListView(BasicList):
                  {"label": "Ead:json", "dtype": "json", "url": 'ead_results'}]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
 
     def initializations(self):
         # Possibly add to 'uploads'
@@ -13083,6 +13101,12 @@ class EqualGoldListView(BasicList):
         ]
     custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
+
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
 
     def initializations(self):
 

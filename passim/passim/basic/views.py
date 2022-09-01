@@ -895,6 +895,7 @@ class BasicList(ListView):
     searches = []
     downloads = []
     custombuttons = []
+    selectbuttons = []
     list_fields = []
     uploads = []
     delete_line = False
@@ -1037,6 +1038,10 @@ class BasicList(ListView):
                     # get the code of the template
                     pass
             context['custombuttons'] = self.custombuttons
+
+        # Selection buttons
+        if len(self.selectbuttons) > 0:
+            context['selectbuttons'] = self.selectbuttons
 
         # Delete button per line?
         if self.delete_line:

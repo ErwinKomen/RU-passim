@@ -816,6 +816,48 @@ class SelectItemApply(BasicPart):
                 # Indicate that the JS also needs to do some clearing
                 data['action'] = "clear_sel"
 
+            elif selitemaction == "add_saveitem":
+                # Add all selected items to the Saved Items
+                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+                for obj_sel in qs:
+                    # Check if we have this already as SavedItem
+                    obj_sav = SavedItem.objects.filter(profile=profile, sitemtype=selitemtype,
+                            manuscript=obj_sel.manuscript, sermon=obj_sel.sermon,
+                            equal=obj_sel.equal, collection=obj_sel.collection).first()
+                    if obj_sav is None:
+                        # Create it
+                        obj_sav = SavedItem.objects.create(profile=profile, sitemtype=selitemtype,
+                                manuscript=obj_sel.manuscript, sermon=obj_sel.sermon,
+                                equal=obj_sel.equal, collection=obj_sel.collection)
+
+                # Remove the selection
+                qs.delete()
+
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "update_sav"
+
+            elif selitemaction == "add_basket":
+                # Add all selected items to the Basket of the currently selected listview
+                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                # Remove the selection
+                # qs.delete()
+
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "clear_sel"
+
+            elif selitemaction == "add_dct":
+                # Add all selected items to the DCT
+                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                # Remove the selection
+                # qs.delete()
+
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "clear_sel"
+
+            
+
             # Has something happened?
             if 'action' in data:
                 # Okay, then re-calculate the amount of selected items
