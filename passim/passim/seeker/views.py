@@ -666,7 +666,7 @@ def get_saveditem_html(request, instance, profile, htmltype="button", sitemtype=
         oErr.DoError("get_saveditem_html")
     return sBack
 
-def get_selectitem_info(request, instance, profile, selitemtype=None):
+def get_selectitem_info(request, instance, profile, selitemtype=None, context={}):
     """Get an indication whether this is a select item, or allow to add it"""
 
     oErr = ErrHandle()
@@ -674,7 +674,7 @@ def get_selectitem_info(request, instance, profile, selitemtype=None):
     try:
         if not selitemtype is None:
             html = []
-            context = {}
+            # context = {}
             context['profile'] = profile
             context['selitemtype'] = selitemtype
 
@@ -5151,7 +5151,7 @@ class SermonListView(BasicList):
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
         {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
-        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        # {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
         ]
 
     def initializations(self):
@@ -5456,9 +5456,9 @@ class SermonListView(BasicList):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
 
-    def get_selectitem_info(self, instance):
+    def get_selectitem_info(self, instance, context):
         """Use the get_selectitem_info() defined earlier in this views.py"""
-        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
 
 
 class OnlineSourceEdit(BasicDetails):
@@ -8782,7 +8782,7 @@ class CollectionListView(BasicList):
 
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
-        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
         ]
 
     def initializations(self):
@@ -9208,9 +9208,9 @@ class CollectionListView(BasicList):
             sBack = "".join(html)
         return sBack, sTitle
 
-    def get_selectitem_info(self, instance):
+    def get_selectitem_info(self, instance, context):
         """Use the get_selectitem_info() defined earlier in this views.py"""
-        return get_selectitem_info(self.request, instance, self.profile, self.settype)
+        return get_selectitem_info(self.request, instance, self.profile, self.settype, context)
     
 
 class CommentSend(BasicPart):
@@ -10575,7 +10575,7 @@ class ManuscriptListView(BasicList):
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
         {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
-        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
         ]
 
     def initializations(self):
@@ -10896,9 +10896,9 @@ class ManuscriptListView(BasicList):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
 
-    def get_selectitem_info(self, instance):
+    def get_selectitem_info(self, instance, context):
         """Use the get_selectitem_info() defined earlier in this views.py"""
-        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
   
 
 class ManuscriptDownload(BasicPart):
@@ -13105,7 +13105,7 @@ class EqualGoldListView(BasicList):
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
         {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
-        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        # {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
         ]
 
     def initializations(self):
@@ -13309,9 +13309,9 @@ class EqualGoldListView(BasicList):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
 
-    def get_selectitem_info(self, instance):
+    def get_selectitem_info(self, instance, context):
         """Use the get_selectitem_info() defined earlier in this views.py"""
-        return get_selectitem_info(self.request, instance, self.profile, self.sel_button)
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
         
 
 class EqualGoldScountDownload(BasicPart):

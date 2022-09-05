@@ -1004,7 +1004,7 @@ class BasicList(ListView):
             self.sel_mode = selmode.strip()
 
         # Make sure to transform the 'object_list'  into a 'result_list'
-        context['result_list'] = self.get_result_list(context['object_list'])
+        context['result_list'] = self.get_result_list(context['object_list'], context)
 
         context['sortOrder'] = self.sort_order
         context['colWrap'] = self.col_wrap
@@ -1148,7 +1148,7 @@ class BasicList(ListView):
         selectitem_info = ""
         if not self.sel_button is None and self.sel_button != "":
             # Prepare selected item handling
-            selectitem_info = self.get_selectitem_info(None)
+            selectitem_info = self.get_selectitem_info(None, context)
 
         context['sel_info'] = selectitem_info
 
@@ -1168,7 +1168,7 @@ class BasicList(ListView):
     def add_to_context(self, context, initial):
         return context
 
-    def get_result_list(self, obj_list):
+    def get_result_list(self, obj_list, context):
         result_list = []
         # Walk all items in the object list
         for obj in obj_list:
@@ -1236,7 +1236,7 @@ class BasicList(ListView):
             selectitem_info = ""
             if not self.sel_button is None and self.sel_button != "":
                 # Prepare selected item handling
-                selectitem_info = self.get_selectitem_info(obj)
+                selectitem_info = self.get_selectitem_info(obj, context)
 
             result['sel_info'] = selectitem_info
 
@@ -1463,7 +1463,7 @@ class BasicList(ListView):
         self.qs = qs
         return qs
 
-    def get_selectitem_info(self, instance):
+    def get_selectitem_info(self, instance, context):
         return ""
 
     def view_queryset(self, qs):

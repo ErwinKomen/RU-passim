@@ -2106,11 +2106,29 @@ var ru = (function ($, ru) {
             action = "",
             elTd = null,
             i = 0,
+            elSelItemDct = "#selitem-dct",
+            elSelItemRset = "#selitem-rset",
             err = "#little_err_msg",
             selitemcount = "",
             data = null;
 
         try {
+          // In general: hide the -rset
+          $(elSelItemRset).addClass("hidden");
+
+          // Is this just canceling?
+          switch (sAction) {
+            case "cancel_dct":
+              // This is just canceling the current idea of selecting a Research Set
+              $(elSelItemDct).addClass("hidden");
+              return;
+            case "show_dct":
+              // Make sure the researcher can select a Research Set
+              $(elSelItemDct).removeClass("hidden");
+              $(elSelItemRset).addClass("hidden");
+              return;
+          }
+
           // Get to the form
           if ($(elStart)[0].localName.toLowerCase() === "form") {
             frm = $(elStart);
@@ -2202,6 +2220,28 @@ var ru = (function ($, ru) {
 
                         // Adapt selitemcount
                         selitemcount = 0;
+                        break;
+                      case "update_dct":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                        });
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        // Also make sure to close the selitem-dct
+                        $(elSelItemDct).addClass("hidden");
+                        $(elSelItemRset).find("a").first().attr("href", response.researchset);
+                        $(elSelItemRset).removeClass("hidden");
                         break;
                       case "clear_sel":
                         // Adapt all relevant material

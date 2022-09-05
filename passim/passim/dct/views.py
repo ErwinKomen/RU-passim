@@ -773,6 +773,11 @@ class SelectItemApply(BasicPart):
             ssg=dict(model=BasketSuper, field_b="super", field_s="equal", field_p="basketsize_super"),
             gold=dict(model=BasketGold, field_b="gold", field_s="gold", field_p="basketsize_gold")
             )
+        oSelDct = dict(
+            manu=dict(setlisttype="manu", field_s="manuscript"),
+            hc=dict(setlisttype="ssgd", field_s="collection"),
+            pd=dict(setlisttype="ssgd", field_s="collection")
+            )
        
         try:
             # We already know who we are
@@ -784,6 +789,11 @@ class SelectItemApply(BasicPart):
             mode = self.qd.get("mode")
             selitemid = self.qd.get("selitemid")
             itemid = self.qd.get("itemid")
+            rsetoneid = None
+            for k,v in self.qd.items():
+                if "rsetone" in k:
+                    rsetoneid = v
+                    break
 
             itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
             itemidfield = itemset[selitemtype]
@@ -887,14 +897,32 @@ class SelectItemApply(BasicPart):
                     data['action'] = "update_basket"
 
             elif selitemaction == "add_dct":
-                # Add all selected items to the DCT
-                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+                # Double check: this functionality only exists for M, HC, PD
+                if selitemtype in oSelDct and not rsetoneid is None:
+                    # Add all selected items to the DCT
+                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
 
-                # Remove the selection
-                # qs.delete()
+                    # Figure out which selection object to use
+                    selParams = oSelDct[selitemtype]
+                    setlisttype = selParams['setlisttype']
+                    field_s = selParams['field_s']
 
-                # Indicate that the JS also needs to do some clearing
-                data['action'] = "clear_sel"
+                    # Add all selected items to the DCT
+                    rset = ResearchSet.objects.filter(id=rsetoneid).first()
+                    if not rset is None:
+                        # Walk all the selected items
+                        for obj in qs:
+                            # Add this item to the chosen research set
+                            item = getattr(obj,field_s)
+                            rset.add_list(item, setlisttype)
+                        # make sure to add a link to the research set here
+                        data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                    # Remove the selection
+                    qs.delete()
+
+                    # Indicate that the JS also needs to do some clearing
+                    data['action'] = "update_dct"
 
             
 

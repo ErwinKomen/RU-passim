@@ -374,8 +374,8 @@
                       <span class="glyphicon glyphicon-refresh" ></span>
                     </button>
                     {% for selbut in selectbuttons %}
-                      <button class="btn btn-xs {{selbut.button}}" role="button" mode="{{selbut.mode}}"
-                          title="{{selbut.title}}" >
+                      <button class="btn btn-xs {{selbut.button}}" role="button" title="{{selbut.title}}"
+                              {% if selbut.mode %}mode="{{selbut.mode}}"{% else %}data-toggle="collapse" data-target="{{selbut.datatarget}}" {% endif %} >
                         <span class="glyphicon {{selbut.glyphicon}}" ></span>
                       </button>
                     {% endfor %}
@@ -405,7 +405,7 @@
             <!-- Room for a little error message -->
             <div id="little_err_msg" class="err-msg"></div>
             <!-- Room for select item handling -->
-            <div class="hidden">{{sel_info|safe}}</div>
+            <div class="">{{sel_info|safe}}</div>
 
 
             <!-- Room to have the form-link to create a new list-item -->

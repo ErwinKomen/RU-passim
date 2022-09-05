@@ -11,6 +11,7 @@ from django.db.models import F, Case, Value, When, IntegerField
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
 from passim.seeker.models import *
 from passim.basic.widgets import RangeSlider
+from passim.dct.models import ResearchSet
 
 def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bUseAbbr=False, exclude=None):
     if (obj.fields != None and sFieldName in obj.fields):
@@ -1077,6 +1078,20 @@ class ProvenanceCodWidget(ModelSelect2MultipleWidget):
         return qs        
 
 
+class ResearchSetOneWidget(ModelSelect2Widget):
+    model = ResearchSet
+    search_fields = [ 'name__icontains' ]
+    type = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        profile = self.attrs.pop('profile', '')
+        qs = ResearchSet.objects.filter(profile=profile)
+        return qs
+
+
 class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
     model = SermonDescrGold
     add_only = False
@@ -1520,8 +1535,6 @@ class SearchManuForm(PassimModelForm):
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
-    #manu_namelist  = ModelMultipleChoiceField(queryset=None, required=False, 
-    #                        widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
@@ -1563,8 +1576,6 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
@@ -1572,9 +1583,6 @@ class SearchManuForm(PassimModelForm):
     srch_title = forms.CharField(required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching names input -sm', 'placeholder': 'Title (use wildcards)...', 'style': 'width: 100%;'}))
 
-    #srch_title = forms.CharField(label=_("Title"), required=False,
-    #            widget=forms.TextInput(attrs={'class': 'typeahead searching names input-sm', 'placeholder': 'Titles(s)...', 'style': 'width: 100%;'}))
-    
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
@@ -1599,11 +1607,8 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
-    collone     = ModelChoiceField(queryset=None, required=False) #, 
-                # widget=CollOneManuWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #overlap_org     = forms.IntegerField(label=_("percentage overlap"), required=False,
-    #            widget=NumberInput(attrs={'placeholder': 'Overlap at least...', 'type': 'range', 'min': '1', 'max': '100', # 'value': '10', 
-    #                                      'step': '1', 'style': 'width: 30%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False) 
+    rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
@@ -1613,19 +1618,11 @@ class SearchManuForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Manuscript
-        # OLD (issue #372) 
-        # fields = ['name', 'library', 'idno', 'origin', 'url', 'support', 'extent', 'format', 'stype'] # , 'yearstart', 'yearfinish'
         fields = ['name', 'library', 'idno', 'url', 'stype'] 
         widgets={'library':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...',  'style': 'width: 100%;'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
-                 #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;', 'class': 'searching'}),
-                 # (#372) 'origin':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 # (#372) 'format':      forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 # (#372) 'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 # (#372) 'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -1636,6 +1633,8 @@ class SearchManuForm(PassimModelForm):
         try:
             username = self.username
             team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+
             # NONE of the fields are required in the SEARCH form!
             self.fields['stype'].required = False
             self.fields['name'].required = False
@@ -1645,7 +1644,6 @@ class SearchManuForm(PassimModelForm):
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
@@ -1666,6 +1664,8 @@ class SearchManuForm(PassimModelForm):
                         'data-placeholder': 'Select multiple authority file datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneManuWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
+                        'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
@@ -1674,9 +1674,11 @@ class SearchManuForm(PassimModelForm):
             self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
             self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
 
+            # The rsetone information is needed for "selection-to-DCT" processing
+            self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
+
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "manu"
-            # self.fields['collone'].queryset = Collection.objects.filter(type=prefix).order_by('name')
             self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
 
             # Get the instance
@@ -2329,8 +2331,8 @@ class CollectionForm(PassimModelForm):
                 widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
-    collone     = ModelChoiceField(queryset=None, required=False)   #, 
-                #widget=CollOneWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    collone     = ModelChoiceField(queryset=None, required=False)  
+    rsetone     = ModelChoiceField(queryset=None, required=False)
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -2340,9 +2342,6 @@ class CollectionForm(PassimModelForm):
     colscope    = ModelChoiceField(queryset=None, required=False, 
                 widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
 
-    #manutype    = forms.ModelChoiceField(queryset=None, required=False, 
-    #            widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
-    
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2434,10 +2433,6 @@ class CollectionForm(PassimModelForm):
                  }
 
     def __init__(self, *args, **kwargs):
-        ## Obligatory for this type of form!!!
-        #self.username = kwargs.pop('username', "")
-        #self.team_group = kwargs.pop('team_group', "")
-        #self.userplus = kwargs.pop('userplus', "")
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
         username = self.username
@@ -2470,6 +2465,11 @@ class CollectionForm(PassimModelForm):
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
         self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                     'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+        self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
+                    'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+
+        # The rsetone information is needed for "selection-to-DCT" processing
+        self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
 
         # Project2:
         # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()

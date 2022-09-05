@@ -133,6 +133,43 @@ class ResearchSet(models.Model):
                 order += 1
         return None
 
+    def add_list(self, obj, setlisttype):
+        """Add a list of SSGs (either Manuscript or Collection) to the research set"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            # Get the current size of the research set
+            iCount = self.researchset_setlists.count()
+            order = iCount + 1
+            setlist = None
+
+            # Action depends on the type of addition
+            if setlisttype == "manu":   # Add a manuscript
+                setlist = SetList.objects.filter(researchset=self, setlisttype=setlisttype, manuscript=obj).first()
+                if setlist is None:
+                    setlist = SetList.objects.create(
+                        researchset=self, order=order, setlisttype=setlisttype,
+                        manuscript=obj, name="Added via add_list")
+                pass
+            elif setlisttype == "ssgd":   # Add a hc or pd
+                setlist = SetList.objects.filter(researchset=self, setlisttype=setlisttype, collection=obj).first()
+                if setlist is None:
+                    setlist = SetList.objects.create(
+                        researchset=self, order=order, setlisttype=setlisttype,
+                        collection=obj, name="Added via add_list")
+
+            # If need be, calculate the contents
+            if not setlist is None:
+                self.update_ssglists()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/add_list")
+            bBack = False
+        # Return the status
+        return bBack
+
     def calculate_matches(self, ssglists):
         """Calculate the number of pm-matches for each list from ssglists"""
 
@@ -422,20 +459,19 @@ class SetList(models.Model):
         """
 
         oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 3000, "matches": 0}
-        if self.setlisttype == "manu":
+        if self.setlisttype == "manu":          # SSGs via Manuscript > sermons > SSG links
             # This is a manuscript
             oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
             oBack['size'] = self.manuscript.get_sermon_count()
             oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
             oBack['yearstart'] = self.manuscript.yearstart
             oBack['yearfinish'] = self.manuscript.yearfinish
-        elif self.setlisttype == "hist":
-            # Historical collection
+        elif self.setlisttype == "hist":        # Historical collection (of SSGs)
             oBack['top'] = "hc"
             oBack['main'] = self.collection.name
             oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})
-        elif self.setlisttype == "ssgd":
+            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
+        elif self.setlisttype == "ssgd":        # Personal/public dataset (of SSGs!!!)
             # Personal collection
             oBack['top'] = "pd"
             if self.name == None or self.name == "":
