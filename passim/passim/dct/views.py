@@ -26,7 +26,8 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
-from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2
+from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
+    Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
     SavedItem, SavedSearch, SelectItem
@@ -766,6 +767,12 @@ class SelectItemApply(BasicPart):
 
         oErr = ErrHandle()
         data = dict(status="ok")
+        oSelBasket = dict(
+            serm=dict(model=Basket, field_b="sermon", field_s="sermon", field_p="basketsize"),
+            manu=dict(model=BasketMan, field_b="manu", field_s="manuscript", field_p="basketsize_manu"),
+            ssg=dict(model=BasketSuper, field_b="super", field_s="equal", field_p="basketsize_super"),
+            gold=dict(model=BasketGold, field_b="gold", field_s="gold", field_p="basketsize_gold")
+            )
        
         try:
             # We already know who we are
@@ -837,14 +844,47 @@ class SelectItemApply(BasicPart):
                 data['action'] = "update_sav"
 
             elif selitemaction == "add_basket":
-                # Add all selected items to the Basket of the currently selected listview
-                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+                # Double check: this functionality only exists for S, SG, SSG, M
+                if selitemtype in oSelBasket:
+                    # Add all selected items to the Basket of the currently selected listview
+                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
 
-                # Remove the selection
-                # qs.delete()
+                    # Figure out which selection object to use
+                    selParams = oSelBasket[selitemtype]
+                    cls = selParams['model']
+                    field_b = selParams['field_b']
+                    field_s = selParams['field_s']
+                    field_p = selParams['field_p']
 
-                # Indicate that the JS also needs to do some clearing
-                data['action'] = "clear_sel"
+                    # Walk all selected items
+                    for obj_sel in qs:  
+                        # which object is this?
+                        obj = getattr(obj_sel, field_s)
+                                              
+                        # Check if this item already exists in the basket
+                        lstQ = [Q(profile=profile)]
+                        lstQ.append(Q(**{"{}".format(field_b): obj.id}))
+                        obj_basket = cls.objects.filter(*lstQ).first()
+                        if obj_basket is None:
+                            # Create a dictionry with the required stuff
+                            data_dict = dict(profile=profile)
+                            data_dict[field_b] = obj
+                            # Add it to the basket
+                            cls.objects.create(**data_dict)
+                    # Re-calculate the size of the basket
+                    basketsize = cls.objects.filter(profile=profile).count()
+
+                    # Adapt the profile's basketsize
+                    setattr(profile, field_p, basketsize)
+                    profile.save()
+
+                    data['basketsize'] = basketsize
+
+                    # Remove the selection
+                    qs.delete()
+
+                    # Indicate that the JS also needs to do some clearing
+                    data['action'] = "update_basket"
 
             elif selitemaction == "add_dct":
                 # Add all selected items to the DCT

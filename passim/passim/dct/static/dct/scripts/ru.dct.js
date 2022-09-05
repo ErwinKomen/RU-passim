@@ -2105,6 +2105,7 @@ var ru = (function ($, ru) {
             targeturl = "",
             action = "",
             elTd = null,
+            i = 0,
             err = "#little_err_msg",
             selitemcount = "",
             data = null;
@@ -2176,6 +2177,28 @@ var ru = (function ($, ru) {
                             $(el).closest("td").find("#id_sitemaction").val("remove");
                           }
                         });
+
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        break;
+                      case "update_basket":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                        });
+
+                        // Make sure the Basket number is showing correctly
+                        $("#basketsize").html("(" + response.basketsize + ")");
 
                         // Adapt selitemcount
                         selitemcount = 0;
