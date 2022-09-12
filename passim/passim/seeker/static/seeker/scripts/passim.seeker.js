@@ -1828,6 +1828,8 @@ var ru = (function ($, ru) {
             linktypes = ["prt", "neq", "ech", "uns"],
             sLinktype = "",
             maxcount = 0,
+            distance_factor = 5,    // Previously this was 10
+            count_factor = 50,      // Previously this was maxcount
             gravityvalue = 100,
             gravityid = "#gravity_overlap_value",
             degree = 1,
@@ -1913,12 +1915,14 @@ var ru = (function ($, ru) {
             'legend': options['legend']
           });
 
+          count_factor = 4;  // Previously this was 'maxcount'
+
           // This is based on D3 version *6* !!! (not version 3)
           loc_simulation = d3.forceSimulation(options['nodes'])
               .force("link", d3.forceLink(options['links']).id(function (d) {
                 var result = d.id;
                 return result;
-              }).distance(function (d) { return 10 * maxcount / degree; })
+              }).distance(function (d) { return distance_factor * count_factor * Math.sqrt(maxcount) / degree; }).strength(1)
               )
               .force("charge", d3.forceManyBody().strength(-1 * gravityvalue))
               .force("center", d3.forceCenter(width / 2, height / 2))
@@ -2437,21 +2441,27 @@ var ru = (function ($, ru) {
           }
 
           function network_drag(simulation) {
-            function dragstarted(event) {
-              if (!event.active) simulation.alphaTarget(0.4).restart();
-              event.subject.fx = event.subject.x;
-              event.subject.fy = event.subject.y;
+            function dragstarted(event, d) {
+              if (!event.active) simulation.alphaTarget(0.2).restart();
+              //event.subject.fx = event.subject.x;
+              //event.subject.fy = event.subject.y;
+              d.fx = d.x;
+              d.fy = d.y;
             }
 
-            function dragged(event) {
-              event.subject.fx = event.x;
-              event.subject.fy = event.y;
+            function dragged(event, d) {
+              //event.subject.fx = event.x;
+              //event.subject.fy = event.y;
+              d.fx = event.x;
+              d.fy = event.y;
             }
 
-            function dragended(event) {
+            function dragended(event, d) {
               if (!event.active) simulation.alphaTarget(0);
-              event.subject.fx = null;
-              event.subject.fy = null;
+              //event.subject.fx = null;
+              //event.subject.fy = null;
+              d.fx = null;
+              d.fy = null;
             }
 
             return d3.drag()
