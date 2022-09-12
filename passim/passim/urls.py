@@ -272,7 +272,6 @@ urlpatterns = [
     url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project2_edit'), 
 
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
-    # url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetails.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
 
@@ -334,8 +333,6 @@ urlpatterns = [
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    #url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
-    #url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 

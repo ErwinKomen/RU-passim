@@ -1884,7 +1884,7 @@ var ru = (function ($, ru) {
           // Calculate the maxcount within the nodes 'scount' feature
           for (i = 0; i < options['nodes'].length; i++) {
             count = options['nodes'][i]['scount'];
-            if (count > maxcount) {
+            if (count !== undefined && count > maxcount) {
               maxcount = count;
             }
           }
@@ -2021,6 +2021,7 @@ var ru = (function ($, ru) {
                   .attr("data-toggle", "modal")
                   .attr("data-target", "#modal-nodecolor")
                   .attr("class", "overlap-node")
+                  .attr("scale", "-")
                   .call(network_drag(loc_simulation));
 
           // Add the circle below the <g>
@@ -2035,8 +2036,8 @@ var ru = (function ($, ru) {
                 return x.toString();
               })
               .attr("y", function (d) {
-                var x = 3 * get_radius(d);
-                return x.toString();
+                var y = 3 * get_radius(d);
+                return y.toString();
               })
               .text(function (d) {
                 return d.label;
@@ -2089,13 +2090,21 @@ var ru = (function ($, ru) {
           // ====================== HELP FUNCTIONS =============================
           function get_radius(d) {
             var scount = 0,
+                max_size = 30,
+                min_size = 4,
+                fixed_size = true,
                 iSize = 4;
+
             if (d !== undefined) {
               scount = d.scount;
             }
             if ("overlap_scount" in loc_network_options && loc_network_options["overlap_scount"] === true) {
               // Need to pay more attention to the scount
-              iSize = Math.max(4, scount+1);
+              iSize = Math.max(4, scount + 1);
+              iSize = min_size + max_size * iSize / maxcount;
+            } else if (fixed_size) {
+              // Issue #578: fix this to one size
+              iSize = 4;
             } else {
               // This is usually [5]
               iSize = Math.max(5, scount / 4);
@@ -2104,7 +2113,7 @@ var ru = (function ($, ru) {
           }
 
           function get_width(d) {
-            return 10 * d.label.length;
+            return 8 * d.label.length;
           }
 
           function get_height(d) {
@@ -2121,6 +2130,7 @@ var ru = (function ($, ru) {
             // THis is geometric re-scale:
             // (but note: CSS prevents lines from scaling)
             g.attr("transform", event.transform);
+            g.attr("scale", scale.toString());
 
             // EK While looking at issue #510, #511, I saw that the code below
             //             causes the 'hover' effect to disappear, which is a pity
@@ -2151,15 +2161,15 @@ var ru = (function ($, ru) {
               });
             node.selectAll("text")
               .attr("x", function (d) {
-                var x = (-1 * get_width(d) / 2) / scale;
+                var x = (-1 * (get_width(d) / Math.sqrt( scale)) / 2); // * scale;
                 return x.toString();
               })
               .attr("y", function (d) {
-                var x = (3 * get_radius(d)) / scale;
-                return x.toString();
+                var y = 2 + (4 * get_radius(d) / Math.sqrt(scale)); // * scale;
+                return y.toString();
               })
               .style("font-size", function (d) {
-                var iSize = Math.round( 14 / scale);
+                var iSize = 2 + Math.round( 14 / scale);
                 return (scale < 1) ? "14px" : iSize.toString() + "px";
               });
 
