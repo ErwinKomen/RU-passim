@@ -346,9 +346,6 @@ urlpatterns = [
     url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
 
     # ================ Any READER APP URLs should come here =======================================
-    #url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
-    #url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
-    # ========== NEW method =======================================================================
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
