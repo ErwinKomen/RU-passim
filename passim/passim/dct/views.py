@@ -552,71 +552,78 @@ class MyPassimEdit(BasicDetails):
         sBack = ""
         collection_types = ['hc', 'pd' ]
 
-        if type == "manu":
-            # This is a Manuscript
-            if custom == "title":
-                url = reverse("manuscript_details", kwargs={'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
-                    url, instance.get_city(), instance.get_library(), instance.idno)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this manuscript
-                count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico__manuscript=instance).order_by('id').distinct().count()
-                sBack = "{}".format(count)
+        oErr = ErrHandle()
+        try:
 
-        elif type == "serm":
-            # This is a sermon description
-            if custom == "title":
-                url = reverse("sermon_details", kwargs = {'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
-                    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
-            elif custom == "size":
-                # Get the number of SSGs to which this Sermon points
-                count = instance.equalgolds.count()
-                sBack = "{}".format(count)
+            if type == "manu":
+                # This is a Manuscript
+                if custom == "title":
+                    url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                        url, instance.get_city(), instance.get_library(), instance.idno)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this manuscript
+                    count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico__manuscript=instance).order_by('id').distinct().count()
+                    sBack = "{}".format(count)
 
-        elif type == "ssg":
-            # This is an Authority File (=SSG)
-            if custom == "title":
-                sBack = instance.get_passimcode_markdown()
-                #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
-                #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
-                #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
-            elif custom == "size":
-                count = 1   # There is just 1 authority file
-                sBack = "{}".format(count)
+            elif type == "serm":
+                # This is a sermon description
+                if custom == "title":
+                    url = reverse("sermon_details", kwargs = {'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                        url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+                elif custom == "size":
+                    # Get the number of SSGs to which this Sermon points
+                    count = instance.equalgolds.count()
+                    sBack = "{}".format(count)
+
+            elif type == "ssg":
+                # This is an Authority File (=SSG)
+                if custom == "title":
+                    sBack = instance.get_passimcode_markdown()
+                    #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
+                    #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                    #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+                elif custom == "size":
+                    count = 1   # There is just 1 authority file
+                    sBack = "{}".format(count)
 
 
-        elif type in collection_types:
-            if custom == "title":
-                sTitle = "none"
-                if instance is None:
-                    sBack = sTitle
-                else:
-                    if type == "hc":
-                        # Historical collection
-                        url = reverse("collhist_details", kwargs={'pk': instance.id})
+            elif type in collection_types:
+                if custom == "title":
+                    sTitle = "none"
+                    if instance is None:
+                        sBack = sTitle
                     else:
-                        # Private or Public dataset
-                        if instance.scope == "publ":
-                            url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                        if type == "hc":
+                            # Historical collection
+                            url = reverse("collhist_details", kwargs={'pk': instance.id})
                         else:
-                            url = reverse("collpriv_details", kwargs={'pk': instance.id})
-                    if kwargs != None and 'name' in kwargs:
-                        title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
-                    else:
-                        title = instance.name
-                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this collection
-                #count = "-1" if instance is None else instance.super_col.count()
-                #sBack = "{}".format(count)
-                sBack = instance.get_size_markdown()
+                            # Private or Public dataset
+                            if instance.scope == "publ":
+                                url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                            else:
+                                url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                        if kwargs != None and 'name' in kwargs:
+                            title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                        else:
+                            title = instance.name
+                        sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this collection
+                    #count = "-1" if instance is None else instance.super_col.count()
+                    #sBack = "{}".format(count)
+                    sBack = instance.get_size_markdown()
 
-        elif type == "saveditem":
-            # A saved item should get the button 'Delete'
-            if custom == "buttons":
-                # Create the remove button
-                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+            elif type == "saveditem":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MyPassimEdit/get_field_value")
 
         return sBack
 
