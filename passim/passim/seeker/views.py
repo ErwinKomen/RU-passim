@@ -12244,13 +12244,20 @@ class EqualGoldEdit(BasicDetails):
             # Signal that we have select2
             context['has_select2'] = True
 
-            # SPecification of the new button
-            context['new_button_title'] = "Sermon Gold"
-            context['new_button_name'] = "gold"
-            context['new_button_url'] = reverse("gold_details")
-            context['new_button_params'] = [
-                {'name': 'gold-n-equal', 'value': instance.id}
-                ]
+            # Test if the code to "add a new sermon gold" may be safely added or not
+            if instance.moved is None:
+                self.new_button = True
+                context['new_button'] = True
+                # SPecification of the new button
+                context['new_button_title'] = "Sermon Gold"
+                context['new_button_name'] = "gold"
+                context['new_button_url'] = reverse("gold_details")
+                context['new_button_params'] = [
+                    {'name': 'gold-n-equal', 'value': instance.id}
+                    ]
+            else:
+                self.new_button = False
+                context['new_button'] = False
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldEdit/add_to_context")
@@ -12802,7 +12809,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # And in all cases: make sure we redirect to the 'clean' GET page
                 self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
-            elif instance != None and instance.id != None:
+            elif instance != None and instance.id != None and instance.moved is None:
                 context['sections'] = []
 
                 # Lists of related objects
