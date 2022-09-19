@@ -54,7 +54,7 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -2596,7 +2596,11 @@ class EqualGoldHuwaToJson(BasicPart):
         
         dt = self.qd.get('downloadtype', "")
         if dt != None and dt != '':
-            self.dtype = dt
+            if dt == "json_manu":
+                self.dtype = "json"
+                self.import_type = "manu"
+            else:
+                self.dtype = dt
 
     def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
@@ -2647,41 +2651,80 @@ class EqualGoldHuwaToJson(BasicPart):
                 iStop = 1
             return iCount
 
-        def get_library_info(id):
+        def get_library_info(id, tables):
             """Get the country/city/library name information for bibliothek.id"""
 
-            lst_bibliothek = huwa_tables['bibliothek']
-            lst_ort = huwa_tables['ort']
-            lst_land = huwa_tables['land']
             oLibrary = None
+            oErr = ErrHandle()
+            try:
+                lst_bibliothek = tables['bibliothek']
+                lst_ort = tables['ort']
+                lst_land = tables['land']
 
-            oBiblio = get_table_item(lst_bibliothek, id)
-            if not oBiblio is None:
-                # Found the library
-                bFoundLib = True
-                oLibrary = dict(
-                    name=oBiblio.get('bibl_name'),
-                    short = oBiblio.get('bibl_kurz'),
-                    url = oBiblio.get('url'),
-                    note = oBiblio.get("bemerkungen"))
-                # Look for city and country
-                ort_id = oBiblio.get("ort")
-                oOrt = get_table_item(lst_ort, ort_id)
-                if not oOrt is None:
-                    # Found the location
-                    oLibrary['city'] = oOrt.get("ortsname")
-                    oLibrary['citynote'] = oOrt.get("bemerkungen")
-                    # Look for country
-                    land_id = oBiblio.get("land")
-                    oLand = get_table_item(lst_land, land_id)
-                    if not oLand is None:
-                        # Found the country
-                        name = oLand.get("landname")
-                        if not name is None and name != "":
-                            oLibrary['country'] = name
+                oBiblio = get_table_item(lst_bibliothek, id)
+                if not oBiblio is None:
+                    # Found the library
+                    bFoundLib = True
+                    oLibrary = dict(
+                        name=oBiblio.get('bibl_name'),
+                        short = oBiblio.get('bibl_kurz'),
+                        url = oBiblio.get('url'),
+                        note = oBiblio.get("bemerkungen"))
+                    # Look for city and country
+                    ort_id = oBiblio.get("ort")
+                    oOrt = get_table_item(lst_ort, ort_id)
+                    if not oOrt is None:
+                        # Found the location
+                        oLibrary['city'] = oOrt.get("ortsname")
+                        oLibrary['citynote'] = oOrt.get("bemerkungen")
+                        # Look for country
+                        land_id = oOrt.get("land")
+                        oLand = get_table_item(lst_land, land_id)
+                        if not oLand is None:
+                            # Found the country
+                            name = oLand.get("landname")
+                            if not name is None and name != "":
+                                oLibrary['country'] = name
 
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_library_info")
             # Return the info we have
             return oLibrary
+
+        def get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country):
+            oErr = ErrHandle()
+            lib_id = None
+            try:
+                # (1) Get the Passim lib_country
+                obj_country = Location.get_location(country=lib_country)
+                country_set = [ obj_country ]
+                # (2) Get the Passim lib_city
+                obj_city = obj = Location.objects.filter(
+                    name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
+                if obj_city is None:
+                    # Add the city and the country it is in
+                    obj_city = Location.objects.create(name=lib_city, loctype__name="city")
+                    # Create a relation that the city is in the specified country
+                    obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                            
+                # Try to get it
+                obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
+                if obj_lib is None:
+                    # Add the library in the country/city
+                    obj_lib = Library.objects.create(
+                        name=lib_name, snote="Added from HUWA bibliothek ID {}".format(bibliothek_id),
+                        lcity=obj_city, lcountry=obj_country, location=obj_city
+                        )
+                # Make sure we have the exact information for this library available
+                lib_city = obj_lib.lcity.name
+                lib_country = obj_lib.lcountry.name
+                lib_id = obj_lib.id
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_or_create_library")
+            # Return the appropriate information
+            return lib_id, lib_city, lib_country
 
         def add_existing(sKey):
             if not sKey in existing_dict:
@@ -2714,6 +2757,28 @@ class EqualGoldHuwaToJson(BasicPart):
                 sBack = "'-"
             elif sBack[0] == "=":
                 sBack = "'{}".format(sBack)
+            return sBack
+
+        def get_locus(oInhalt):
+            """Get a complete LOCUS string combining von_bis, von_rv and bis_f, bis_rv"""
+
+            sBack = ""
+            lst_von_bis = oInhalt.get("von_bis", "").split(".")
+            von_rv = oInhalt.get("von_rv", "")
+            lst_bis_f = oInhalt.get("bis_f", "").split(".")
+            bis_rv = oInhalt.get("bis_rv", "")
+
+            von_bis = None if int(lst_von_bis[0]) == 0 else lst_von_bis[0]
+            bis_f = None if int(lst_bis_f[0]) == 0 else lst_bis_f[0]
+
+            html = []
+            if von_rv != "": html.append(von_rv)
+            if not von_bis is None: html.append(von_bis)
+            if len(html) > 0: html.append("-")
+            if bis_rv != "": html.append(bis_rv)
+            if not bis_f is None: html.append(bis_f)
+            sBack = "".join(html)
+
             return sBack
 
         def add_sig_to_list(signatures, lst_sig, editype, code_format):
@@ -2772,13 +2837,21 @@ class EqualGoldHuwaToJson(BasicPart):
                 oErr.DoError("add_sig_replacing")
 
         # Initialize
+        oHuwaLand = { "Algerien": "Algeria", "Australien": "Australia", "Belgien": "Belgium",
+            "Deutschland": "Germany", "Dänemark": "Denmark", "Finnland": "Finland", "Frankreich": "France",
+            "Irland": "Ireland", "Italien": "Italy", "Kanada": "Canada", "Luxembourg": "Luxembourg",
+            "Niederlande": "Netherlands","Polen": "Poland", "Portugal": "Portugal", "Rumänien": "Romania",
+            "Russland": "Russia","Schweden": "Sweden", "Schweiz": "Switzerland", "Slowakei": "Slovakia",
+            "Spanien": "Spain", "Tschechien": "Czechia", "Tunesien": "Tunisia", "USA": "United States",
+            "Ungarn": "Hungary", "United Kingdom": "United Kingdom", "Vaticano": "Vatican", "Österreich": "Austria" }
         oData = {}
         sData = ""
         bAcceptNewOtherSignatures = False
 
         # the huwa_tables depend on the import type
         if self.import_type == "manu":
-            huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
+            # Note that sermons use the tables 'inc' and 'des' for the incipit and explicit
+            huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'des', 'inc',
                 'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land']
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
@@ -2826,6 +2899,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 # (6) Read the Huwa library information
                 oLibraryInfo = self.read_libraries()
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
+                oLibHuwaOnly = oLibraryInfo.get("huwaonly")
 
                 # (7) Walk through the Manuscript tables: handschrift + inhalt
                 count_manuscript = len(tables['handschrift'])
@@ -2833,7 +2907,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 for idx, oHandschrift in enumerate(tables['handschrift']):
                     # Show where we are
                     if idx % 100 == 0:
-                        oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
+                        oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_manuscript))
 
                     # Take over any information that should be
                     idno = oHandschrift.get("signatur")
@@ -2843,6 +2917,9 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Figure out library and location
                     bibliothek_id = oHandschrift.get("bibliothek")
                     if not bibliothek_id is None:
+                        lib_id = None
+
+                        # A library has been specified for this manuscript
                         if bibliothek_id in oLibHuwaPassim:
                             library_id = oLibHuwaPassim[str(bibliothek_id)]
                             library = Library.objects.filter(id=library_id).first()
@@ -2855,14 +2932,32 @@ class EqualGoldHuwaToJson(BasicPart):
                                     lib_city = library.lcity.name
                                 if not library.lcountry is None:
                                     lib_country = library.lcountry.name
-                        else:
-                            # Get the details of this library
-                            oLibrary = get_library_info(bibliothek_id)
+                                lib_id = library.id
+                        elif bibliothek_id in oLibHuwaOnly:
+                            # This library is known in HUWA, but not in Passim: try to add it
+                            oLibrary = oLibHuwaOnly[bibliothek_id]
+                            # Always get the pre-defined details
                             lib_name = oLibrary.get("name", "")
                             lib_city = oLibrary.get("city", "")
                             lib_country = oLibrary.get("country", "")
 
+                            if lib_name != "" and lib_city != "" and lib_country != "":
+                                lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
+                        else:
+                            # Get the details of this library
+                            oLibrary = get_library_info(bibliothek_id, tables)
+                            # Always get the pre-defined details
+                            lib_name = oLibrary.get("name", "")
+                            lib_city = oLibrary.get("city", "")
+                            lib_country = oLibrary.get("country", "")
+                            if lib_country != "" and lib_country in oHuwaLand:
+                                lib_country = oHuwaLand[lib_country]
+
+                            # NOTE: do *NOT* attempt to add this library.
+                            #       it requires manual correction
+
                         # Add this information in the Passim Manuscript object
+                        oManuscript['library_id'] = lib_id
                         oManuscript['library'] = lib_name
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
@@ -2870,14 +2965,50 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Get and walk through the contents of this Handschrift
                     lst_inhalt = get_table_items(tables['inhalt'], handschrift_id, "handschrift")
                     order = 1
-                    for oInhalt in lst_inhalt:
-                        # Get all the necessary information of this Sermon Manifestation
-                        oSermon = dict(
-                            order = order,
-                            opera_id=oInhalt.get("opera")
+                    lst_sermons = []
+                    for idx, oInhalt in enumerate(lst_inhalt):
+                        # Get the opera id
+                        opera_id=oInhalt.get("opera")
+                        # Get the Opera table
+                        if opera_id in opera_passim:
+                            oOpera = opera_passim[opera_id]
+                            # Get all the necessary information of this Sermon Manifestation
+                            title = oOpera.get("opera_langname")
+                            locus = get_locus(oInhalt)
+                            note = oInhalt.get("bemerkungen", "")
+                            autor_id = oOpera.get("autor", None)
+                            if not autor_id is None:
+                                # Try to get the matching Passim author
+                                autor_id = autor_id
+                            oSermon = dict(
+                                type = "Plain", stype = "", locus = locus,
+                                author = autor_id, sectiontitle = None,
+                                quote = "", title = opera,
+                                incipit = incipit, explicit = explicit,
+                                postscriptum = None, feast = "",
+                                brefs = None, additional = "", note = note,
+                                keywords = [], keywordsU = [], signaturesM = [],
+                                signaturesA = signaturesA, datasets = [],
+                                literature = "", ssglinks = "",
+                                opera_id=opera_id
+                                )
+                            order += 1
+                    # Walk through the sermons and create correct msitems
+                    lst_msitems = []
+                    order = 1
+                    for idx, oSermon in enumerate(lst_sermons):
+                        if idx + 1 == len(lst_sermons):
+                            sNext = ""
+                        else:
+                            sNext = order + 1
+                        oMsItem = dict(
+                            order = order, parent = "", firstchild = "", next = sNext, sermon = oSermon
                             )
-                        order += 1
+                        lst_msitems.append(oMsItem)
 
+                        order += 1
+                    # Add the msitem list to the manuscript
+                    oManuscript['msitems'] = lst_msitems
 
                     # Add this to the list of Manuscripts
                     lst_manuscript.append(oManuscript)

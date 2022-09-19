@@ -10565,10 +10565,15 @@ class ManuscriptListView(BasicList):
             ]}
          ]
     uploads = reader_uploads
-    downloads = [{"label": "Ead:Excel", "dtype": "xlsx", "url": 'ead_results'},
-                 {"label": "Ead:csv (tab-separated)", "dtype": "csv", "url": 'ead_results'},
-                 {"label": None},
-                 {"label": "Ead:json", "dtype": "json", "url": 'ead_results'}]
+    downloads = [
+        {"label": "Ead:Excel", "dtype": "xlsx", "url": 'ead_results'},
+        {"label": "Ead:csv (tab-separated)", "dtype": "csv", "url": 'ead_results'},
+        {"label": None},
+        {"label": "Ead:json", "dtype": "json", "url": 'ead_results'},
+        {"label": None},
+        {"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},
+                 
+                 ]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
 
