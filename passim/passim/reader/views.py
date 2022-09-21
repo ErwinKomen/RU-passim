@@ -2565,7 +2565,7 @@ class EqualGoldHuwaToJson(BasicPart):
     dtype = "json"          # downloadtype
     prefix_type = "simple"
     import_type = "ssg"     # Options: 'ssg', 'manu'
-
+    downloadname = "huwa_ssg"
 
     # Specify the relationships (see issue #526)
     relationships = [
@@ -2638,7 +2638,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 for oItem in lTable:
                     if oItem[sIdField] == id:
                         lBack.append(copy.copy(oItem))
-                        break
+                        #break
             return lBack
 
         def get_table_fk_count(lTable, id, sIdField):
@@ -2828,6 +2828,82 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return author_id, msg
 
+        def get_extent(oHandschrift):
+            """Derive an Extent description of the manuscript"""
+
+            sBack = ""
+            oErr = ErrHandle()
+            html = []
+            try:
+                # use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
+                fol_pag = oHandschrift.get("fol_pag", "")
+                folbl = oHandschrift.get("folbl", "")
+                vors_vorne = oHandschrift.get("vors_vorne", "")
+                vors_hinten = oHandschrift.get("vors_hinten", "")
+                col = oHandschrift.get("col", "")
+                col_breite = oHandschrift.get("col_breite", "")
+                zeilen = oHandschrift.get("zeilen", "")
+
+                if folbl != "":
+                    if fol_pag != "":
+                        html.append("{} {}".format(folbl, fol_pag))
+                    else:
+                        html.append("{} pp.".format(folbl))
+                if vors_vorne != "":
+                    if len(html) == 0:
+                        html.append(vors_vorne)
+                    else:
+                        html.append(", {}".format(vors_vorne))
+                    if vors_hinten != "":
+                        html.append("-{}".format(vors_hinten))
+                elif vors_hinten != "":
+                    if len(html) == 0:
+                        html.append(vors_hinten)
+                    else:
+                        html.append(", {}".format(vors_hinten))
+                if col != "":
+                    if len(html) != 0: html.append(" ")
+                    html.append("{} cols".format(col))
+                    if col_breite != "":
+                        html.append(" ({} mm wide)".format(col_breite))
+                if zeilen != "":
+                    if len(html) != 0: html.append(" ")
+                    html.append("{} lines per page/column".format(zeilen))
+
+                # Combine into string
+                sBack = "".join(html)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_extent")
+            return sBack
+
+        def get_format(oHandschrift):
+            """Derive a Format description of the manuscript"""
+
+            sBack = ""
+            html = []
+            oErr = ErrHandle()
+            try:
+                # use fields format, hs_breite, schrift_hoehe, schrift_breite
+                format = oHandschrift.get("format", "")
+                hs_breite = oHandschrift.get("hs_breite", "")
+                schrift_hoehe = oHandschrift.get("schrift_hoehe", "")
+                schrift_breite = oHandschrift.get("schrift_breite", "")
+                
+                if hs_breite != "" and format != "":
+                    html.append("Ms: {} x {} mm".format(format, hs_breite))
+                if schrift_breite != "" and schrift_hoehe != "":
+                    if "var" in schrift_breite or "var" in schrift_hoehe:
+                        html.append("Text: variable")
+                    else:
+                        html.append("Text: {} x {} mm".format(schrift_hoehe, schrift_breite))
+                # Combine into string
+                sBack = " ".join(html)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_format")
+            return sBack
+
         def get_good_string(oSsg, field, second=None):
             """Get a good string from [oSsg]"""
 
@@ -2858,14 +2934,23 @@ class EqualGoldHuwaToJson(BasicPart):
                 bis_f = None if int(lst_bis_f[0]) == 0 else lst_bis_f[0]
 
                 html = []
-                if von_rv != "": html.append(von_rv)
-                if not von_bis is None: html.append(von_bis)
-                if len(html) > 0: html.append("-")
-                if bis_rv != "": html.append(bis_rv)
-                if not bis_f is None: html.append(bis_f)
+                # Calculate from
+                lst_from = []
+                if von_rv != "": lst_from.append(von_rv)
+                if not von_bis is None: lst_from.append(von_bis)
+                sFrom = "".join(lst_from)
 
-                # Combine what I have
-                sBack = "".join(html)
+                # Calculate until
+                lst_until = []
+                if bis_rv != "": lst_until.append(bis_rv)
+                if not bis_f is None: lst_until.append(bis_f)
+                sUntil = "".join(lst_until)
+
+                # Combine the two
+                if sFrom == sUntil:
+                    sBack = sFrom
+                else:
+                    sBack = "{}-{}".format(sFrom, sUntil)
 
             except:
                 msg = oErr.get_error_message()
@@ -2885,6 +2970,17 @@ class EqualGoldHuwaToJson(BasicPart):
             sBack = json.dumps(lSig)
             return sBack
 
+        def get_support(oHandschrift, oSupport):
+            sBack = ""
+            oErr = ErrHandle()
+            try:
+                material = oHandschrift.get("material")
+                if not material is None and material != "":
+                    sBack = oSupport[str(material)]
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_support")
+            return sBack
 
         # Initialize
         oHuwaLand = { "Algerien": "Algeria", "Australien": "Australia", "Belgien": "Belgium",
@@ -2902,7 +2998,8 @@ class EqualGoldHuwaToJson(BasicPart):
         if self.import_type == "manu":
             # Note that sermons use the tables 'inc' and 'des' for the incipit and explicit
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'des', 'inc', 'inms', 'autor_inms',
-                'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land']
+                'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land',
+                'material']
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -2913,6 +3010,7 @@ class EqualGoldHuwaToJson(BasicPart):
         existing_dict = {}
         sig_matching = {}
         bDoCounting = True
+        bAddUnusedSermonFields = False
         bUseOperaPassim = True
         rHasNumber = re.compile(r'.*[0-9].*')
         rHashTag = re.compile(r'\#.*')
@@ -2946,23 +3044,65 @@ class EqualGoldHuwaToJson(BasicPart):
 
             # What if we are reading Manuscript information?
             if self.import_type == "manu":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_manu"
+
                 # (6) Read the Huwa library information
                 oLibraryInfo = self.read_libraries()
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
 
+                # Transform the Inhalt table into a dictionary around [handschrift]
+                oInhaltHandschrift = {}
+                for oInhalt in tables['inhalt']:
+                    handschrift_id = str(oInhalt.get("handschrift"))
+                    if not handschrift_id in oInhaltHandschrift:
+                        oInhaltHandschrift[handschrift_id] = []
+                    # Add it
+                    oInhaltHandschrift[handschrift_id].append(oInhalt)
+
+                # Transform the DES table into a dictionary around [inhalt]
+                oInhaltDes = {}
+                for oDes in tables['des']:
+                    inhalt_id = str(oDes['inhalt'])
+                    oInhaltDes[inhalt_id] = oDes['des_text']
+
+                # Transform the INC table into a dictionary around [inhalt]
+                oInhaltInc = {}
+                for oInc in tables['inc']:
+                    inhalt_id = str(oInc['inhalt'])
+                    oInhaltInc[inhalt_id] = oInc['inc_text']
+
+                # Change the materials into a dictionary
+                oSupport = {}
+                for oMat in tables['material']:
+                    mat_name = oMat['material_name']
+                    if not oMat is None and oMat != "":
+                        oSupport[str(oMat['id'])] = mat_name
+
                 # (7) Walk through the Manuscript tables: handschrift + inhalt
                 count_manuscript = len(tables['handschrift'])
-                lst_manuscript = []
+                # lst_manuscript = []
+                lst_manu_string = []
+                lst_manu_string.append('{ "manuscripts": [')
                 for idx, oHandschrift in enumerate(tables['handschrift']):
                     # Show where we are
                     if idx % 100 == 0:
-                        oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_manuscript))
+                        oErr.Status("EqualGoldHuwaToJson manuscripts: {}/{}".format(idx+1, count_manuscript))
 
                     # Take over any information that should be
                     idno = oHandschrift.get("signatur")
                     handschrift_id = oHandschrift.get("id")
-                    oManuscript = dict(id=idx+1, idno=idno, stype="imp")
+                    # NOTE: no need to supply [stype], since that must be set when reading the JSON
+                    oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id)
+
+                    # Physical features of the manuscript:
+                    # (1) Support = material
+                    oManuscript['support'] = get_support(oInhaltHandschrift, oSupport)
+                    # (2) Extent: use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
+                    oManuscript['extent'] = get_extent(oHandschrift)
+                    # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
+                    oManuscript['format'] = get_format(oHandschrift)
 
                     # Figure out library and location
                     bibliothek_id = oHandschrift.get("bibliothek")
@@ -3013,7 +3153,11 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['lcountry'] = lib_country
 
                     # Get and walk through the contents of this Handschrift
-                    lst_inhalt = get_table_items(tables['inhalt'], handschrift_id, "handschrift")
+                    lst_inhalt = oInhaltHandschrift.get(str(handschrift_id), [])
+                    # ------------ DEBUG ------------
+                    if len(lst_inhalt) > 1 or handschrift_id == 460:
+                        iStop = 1
+                    # -------------------------------
                     order = 1
                     lst_sermons = []
                     for idx, oInhalt in enumerate(lst_inhalt):
@@ -3031,24 +3175,41 @@ class EqualGoldHuwaToJson(BasicPart):
                             # Getting the author also works differently
                             author_id, author_name = get_author(oInhalt, tables, lst_authors)
                             # Get the incipit
-                            incipit = get_table_field(tables['inc'], inhalt_id, "inc_text", sIdField="inhalt")
+                            # incipit = get_table_field(tables['inc'], inhalt_id, "inc_text", sIdField="inhalt")
+                            incipit = oInhaltInc.get(str(inhalt_id), "")
                             # Get the explicit
-                            explicit = get_table_field(tables['des'], inhalt_id, "des_text", sIdField="inhalt")
+                            #explicit = get_table_field(tables['des'], inhalt_id, "des_text", sIdField="inhalt")
+                            explicit = oInhaltDes.get(str(inhalt_id), "")
                             # Get signatures (or should that go via the SSG link, since they are automatic ones?)
 
                             # Combine into a Sermon record
+                            # NOTE: no need to set [stype], since that must be set when reading the JSON
                             oSermon = dict(
-                                type = "Plain", stype = "", locus = locus,
-                                author = author_name, author_id = author_id, sectiontitle = None,
-                                quote = "", title = title,
-                                incipit = incipit, explicit = explicit,
-                                postscriptum = None, feast = "",
-                                brefs = None, additional = "", note = note,
-                                keywords = [], keywordsU = [], signaturesM = [],
-                                signaturesA = [], datasets = ['HUWA_manuscripts'],
-                                literature = "", ssglinks = "",
+                                type = "Plain", locus = locus,
+                                author = author_name, author_id = author_id, 
+                                title = title, incipit = incipit, explicit = explicit,
+                                note = note, keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],
                                 opera_id=opera_id
                                 )
+                            if bAddUnusedSermonFields:
+                                # Add sermon fields that this routine does not fill in
+                                oSermon['sectiontitle'] = None
+                                oSermon['postscriptum'] = None
+                                oSermon['brefs'] = None
+                                oSermon['quote'] = ""
+                                oSermon['feast'] = ""
+                                oSermon['additional'] = ""
+                                oSermon['literature'] = ""
+                                oSermon['ssglinks'] = ""
+                                oSermon['keywordsU'] = []
+                                oSermon['signaturesM'] = []
+                                oSermon['signaturesA'] = []
+
+                            # Check if we can see what [ssglinks] are needed by looking at the opera_id
+                            ssglinks = [x['equal_id'] for x in EqualGoldExternal.objects.filter(externaltype="huwop", externalid=opera_id).values("equal_id")]
+                            if len(ssglinks) > 0:
+                                oSermon['ssglinks'] = ssglinks
+
                             # Add the sermon to the list
                             lst_sermons.append(oSermon)
                             # Make sure we retain the correct order
@@ -3072,10 +3233,16 @@ class EqualGoldHuwaToJson(BasicPart):
                     oManuscript['msitems'] = lst_msitems
 
                     # Add this to the list of Manuscripts
-                    lst_manuscript.append(oManuscript)
+                    # lst_manuscript.append(oManuscript)
+
+                    # Serialize the Manuscript into JSON
+                    sComma = "" if idx + 1 >= count_manuscript else ","
+                    lst_manu_string.append("{}{}".format(json.dumps(oManuscript, indent=2), sComma))
 
                 # (11) combine the sections into one object
-                oData['manuscripts'] = lst_manuscript
+                # oData['manuscripts'] = lst_manuscript
+                lst_manu_string.append("]")
+                lst_manu_string.append("}")
 
             elif self.import_type == "ssg":
                 # (8) Walk through the table with AF+Sermon information
@@ -3364,8 +3531,12 @@ class EqualGoldHuwaToJson(BasicPart):
             
             # Convert oData to stringified JSON
             if dtype == "json":
-                # convert to string
-                sData = json.dumps(oData, indent=2)
+                if self.import_type == "manu":
+                    # Combine the lst_manu_string
+                    sData = "\n".join(lst_manu_string)
+                else:
+                    # convert to string
+                    sData = json.dumps(oData, indent=2)
 
             elif dtype == "csv" or dtype == "xlsx":
                 # 
@@ -3481,7 +3652,20 @@ class EqualGoldHuwaToJson(BasicPart):
         try:
             authors_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_passim_author.json"))
             with open(authors_json, "r", encoding="utf-8") as f:
-                lst_authors = json.load(f)
+                lst_interim = json.load(f)
+
+            # Make sure that all the 'huwa_id' fields are integers and not string
+            for oAuthor in lst_interim:
+                if isinstance(oAuthor['huwa_id'], str):
+                    sHuwaIds = oAuthor['huwa_id'].replace(" ", "")
+                    arHuwaIds = re.split(r"[\;\/]", sHuwaIds)
+                    for sHuwaId in arHuwaIds:
+                        iHuwaId = int(sHuwaId.strip())
+                        oOneAuthor = copy.copy(oAuthor)
+                        oOneAuthor['huwa_id'] = iHuwaId
+                        lst_authors.append(oOneAuthor)
+                else:
+                    lst_authors.append(copy.copy(oAuthor))
         except:
             msg = oErr.get_error_message()
             oErr.DoError("HuwaEqualGoldToJson/read_authors")
