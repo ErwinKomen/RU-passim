@@ -37,7 +37,7 @@ adaptation_list = {
                        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
                        'atype_def_equal', 'atype_acc_equal'],
     'provenance_list': ['manuprov_m2m'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless']    
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
 
 
@@ -1014,6 +1014,42 @@ def adapt_coll_ownerless():
     try:
         qs = Collection.objects.filter(owner__isnull=True)
         qs.delete()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_litref_check():
+    """Remove identical literature references per collection"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    try:
+        qs = Collection.objects.all()
+        for obj_coll in qs:
+            # Look for literatur references
+            lst_unique = []
+            lst_delete = []
+            for obj_litrefcol in obj_coll.collection_litrefcols.all():
+                # Get the litref ID and the pages
+                litref_id = obj_litrefcol.reference.id
+                pages = obj_litrefcol.pages
+                # Check if this is already in there
+                bFound = False
+                for oUnique in lst_unique:
+                    if oUnique['litref'] == litref_id and oUnique['pages'] == pages:
+                        bFound = True
+                        lst_delete.append(obj_litrefcol.id)
+                        break
+                # If it is not found
+                if not bFound:
+                    lst_unique.append(dict(litref=litref_id, pages=pages))
+            # Anything deletable?
+            if len(lst_delete) > 0:
+                print("adapt_litref_check: removing LitrefCol ids: {}".format(lst_delete))
+                LitrefCol.objects.filter(id__in=lst_delete).delete()
     except:
         bResult = False
         msg = oErr.get_error_message()
