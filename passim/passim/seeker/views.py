@@ -7209,7 +7209,15 @@ class CollAnyEdit(BasicDetails):
 
     def custom_init(self, instance):
         if instance != None and instance.settype == "hc":
-            self.formset_objects.append({'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
+            # First check if the 'clit' is already in the formset_objects or not
+            bFound = False
+            for oItem in self.formset_objects:
+                if oItem['prefix'] == "clit":
+                    bFound = True
+                    break
+            if not bFound:
+                self.formset_objects.append(
+                    {'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
         if instance != None:
             self.datasettype = instance.type
         return None
@@ -7529,11 +7537,12 @@ class CollAnyEdit(BasicDetails):
                     newpages = cleaned.get("newpages")
                     # Also get the litref
                     oneref = cleaned.get("oneref")
-                    if oneref:
-                        litref = cleaned['oneref']
-                        # Check if all is in order
-                        if litref:
-                            form.instance.reference = litref
+                    if not oneref is None:
+                        # Double check if this combination [oneref/newpages] is already connected to [instance] or not
+                        obj = LitrefCol.objects.filter(reference=oneref, pages=newpages, collection=instance).first()
+                        if obj is None:
+                            # It is not there yet: add it
+                            form.instance.reference = oneref
                             if newpages:
                                 form.instance.pages = newpages
                     # Note: it will get saved with form.save()
