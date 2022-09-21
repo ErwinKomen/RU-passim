@@ -29,11 +29,14 @@
         <div  class="panel panel-none">
 
           <div class="row">
-            <div class="col-md-2 col-md-offset-8 text-right dropdown" style="margin-top: 5px;">
+            <div class="col-md-2 col-md-offset-8 text-right dropdown" style_WAS="margin-top: 5px;">
               {% if downloads %}
+                <span id="downloadstatus" class="hidden"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></span>
                 <a id="downloadmenu" role="button" class="btn jumbo-1 btn-s dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" 
+                   title="Select one of the available download options..."
                         onclick="" >
-                  Download<span class="caret"></span>
+                  <span class="glyphicon glyphicon-download"></span>
+                  <!-- <span class="caret"></span> -->
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="downloadmenu">
                   {% for ditem in downloads %}
@@ -44,7 +47,6 @@
                     {% endif %}
                   {% endfor %}
                 </ul>
-                <span id="downloadstatus" class="hidden"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></span>
               {% endif %}
             </div>
             <div class="col-md-2 text-right dropdown">
