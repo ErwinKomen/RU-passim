@@ -2958,6 +2958,97 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return sBack
 
+        def get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig):
+            """Given the opera, get the signature(s) it points to in a list"""
+
+            signaturesA = []
+            oErr = ErrHandle()
+            debug_level = 1
+            try:
+                # Get the opera ID
+                opera_id = oOpera['id']
+                # Get the signature(s)
+                if bUseOperaPassim and opera_id in opera_passim:
+                    # Get the relevant record
+                    oOperaNew = opera_passim[opera_id]
+                    # Look for clavis/frede/cppm
+                    add_sig_to_list(signaturesA, oOperaNew.get("clavis"), "cl", "CPL {}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("frede"), "gr", "{}")
+                    add_sig_to_list(signaturesA, oOperaNew.get("cppm"), "cl", "CPPM {}")
+
+                    other = oOperaNew.get("abk", "")
+                    if not other is None and other != "" and len(signaturesA) == 0:
+                        # Check if we can convert this
+                        bFound = False
+                        number = ""
+                        for item in huwa_conv_sig:
+                            mask = item['mask']
+                            huwa = item['huwa']
+                            m = re.match(mask, other)
+                            if m:
+                                bFound = True
+                                # Now get the number
+                                if len(m.groups(0)) > 0:
+                                    number = m.groups(0)[0]
+                                    if huwa.count('#') > 1:
+                                        iStop = 1
+                                    
+                                # Show what we are doing
+                                if debug_level > 1:
+                                    oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
+                                # Now we can break from the loop
+                                break
+                        if bFound:
+                            # Look for clavis/frede/cppm
+                            add_sig_replacing(signaturesA, item, "clavis", number, "cl")
+                            add_sig_replacing(signaturesA, item, "gryson", number, "gr")
+                            add_sig_replacing(signaturesA, item, "other", number, "ot")
+
+                        elif bAcceptNewOtherSignatures:
+                            # Check how long this [other] is
+                            if len(other) > 10:
+                                # Just add it to notes
+                                lst_notes.append("abk: {}".format(other))
+                            else:
+                                # THis is 10 characters or below, so it could actually be a real code
+                                signaturesA.append(dict(editype="ot", code=other))
+                        else:
+                            # Just add it to notes
+                            lst_notes.append("abk: {}".format(other))
+                    # Look for possible field [correction of abk]
+                    for k, v in oOperaNew.items():
+                        if "correction" in k and "abk" in k:
+                            # There is a correction: put it into notes
+                            lst_notes.append("{}: {}".format(k, v))
+                else:
+                    other = oOpera.get("abk", "")
+                    if not other is None and other != "":
+                        signaturesA.append(dict(editype="ot", code=other))
+                    clavis = get_table_list(tables['clavis'], opera_id, "name")
+                    add_sig_to_list(signaturesA, clavis, "cl", "CPL {}")
+
+                    frede = get_table_list(tables['frede'], opera_id, "name")
+                    add_sig_to_list(signaturesA, frede, "gr", "{}")
+
+                    cppm = get_table_list(tables['cppm'], opera_id, "name")
+                    add_sig_to_list(signaturesA, cppm, "cl", "CPPM {}")
+                # What we return is the list in [signaturesA] - check if these exist already
+                for item in signaturesA:
+                    code = item['code']
+                    editype = item['editype']
+                    obj_sig = Signature.objects.filter(code=code, editype=editype).first()
+                    if not obj_sig is None:
+                        gold = obj_sig.gold
+                        equal = gold.equal
+                        item['gold'] = gold.id
+                        item['ssg'] = equal.id
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_opera_signatures")
+                signaturesA = []
+
+            return signaturesA
+
         def get_signatures(oSsg, editype):
             """Get a list of signatures as string from this object"""
 
@@ -3047,6 +3138,10 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Make sure we have a more fitting download name
                 self.downloadname = "huwa_manu"
 
+                # Initialize counters
+                count_manu = 0
+                count_serm = 0
+
                 # (6) Read the Huwa library information
                 oLibraryInfo = self.read_libraries()
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
@@ -3084,7 +3179,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 count_manuscript = len(tables['handschrift'])
                 # lst_manuscript = []
                 lst_manu_string = []
-                lst_manu_string.append('{ "manuscripts": [')
+                lst_manu_string.append('[')     # NOTE: this will be a simple [] JSON list, 
+                                                #       which is what ManuscriptUploadJson is expecting!
                 for idx, oHandschrift in enumerate(tables['handschrift']):
                     # Show where we are
                     if idx % 100 == 0:
@@ -3095,6 +3191,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     handschrift_id = oHandschrift.get("id")
                     # NOTE: no need to supply [stype], since that must be set when reading the JSON
                     oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id)
+                    count_manu += 1
 
                     # Physical features of the manuscript:
                     # (1) Support = material
@@ -3167,6 +3264,7 @@ class EqualGoldHuwaToJson(BasicPart):
                         # Get the Opera table
                         if opera_id in opera_passim:
                             oOpera = opera_passim[opera_id]
+                            lst_notes = []
                             # Get all the necessary information of this Sermon Manifestation
                             title = oOpera.get("opera_langname", "")
                             note = oInhalt.get("bemerkungen", "")
@@ -3181,6 +3279,7 @@ class EqualGoldHuwaToJson(BasicPart):
                             #explicit = get_table_field(tables['des'], inhalt_id, "des_text", sIdField="inhalt")
                             explicit = oInhaltDes.get(str(inhalt_id), "")
                             # Get signatures (or should that go via the SSG link, since they are automatic ones?)
+                            signaturesA = get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig)
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON
@@ -3189,7 +3288,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 author = author_name, author_id = author_id, 
                                 title = title, incipit = incipit, explicit = explicit,
                                 note = note, keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],
-                                opera_id=opera_id
+                                signaturesA = signaturesA, opera_id=opera_id
                                 )
                             if bAddUnusedSermonFields:
                                 # Add sermon fields that this routine does not fill in
@@ -3203,7 +3302,8 @@ class EqualGoldHuwaToJson(BasicPart):
                                 oSermon['ssglinks'] = ""
                                 oSermon['keywordsU'] = []
                                 oSermon['signaturesM'] = []
-                                oSermon['signaturesA'] = []
+                                # oSermon['signaturesA'] = []
+                            count_serm += 1
 
                             # Check if we can see what [ssglinks] are needed by looking at the opera_id
                             ssglinks = [x['equal_id'] for x in EqualGoldExternal.objects.filter(externaltype="huwop", externalid=opera_id).values("equal_id")]
@@ -3242,7 +3342,9 @@ class EqualGoldHuwaToJson(BasicPart):
                 # (11) combine the sections into one object
                 # oData['manuscripts'] = lst_manuscript
                 lst_manu_string.append("]")
-                lst_manu_string.append("}")
+
+                # Provide the counts in the log
+                print("EqualGoldHuwaToJson MANU counts: {} manuscripts, {} sermons".format(count_manu, count_serm))
 
             elif self.import_type == "ssg":
                 # (8) Walk through the table with AF+Sermon information
