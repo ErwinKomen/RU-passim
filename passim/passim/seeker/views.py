@@ -5298,7 +5298,7 @@ class SermonListView(BasicList):
                 # Check on what kind of user I am
                 if not user_is_ingroup(self.request, app_editor):
                     # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")) # Thanks to LILAC, strip: .values('id')
                     fields['kwlist'] = kwlist
             
             # Check if a list of projects is given
