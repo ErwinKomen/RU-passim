@@ -2958,6 +2958,22 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return sBack
 
+        def get_manu_count(lst_inhalt, opera_id):
+            """Count the number of times [opera_id] occurs in [oInhalt]"""
+
+            count = 0
+            oErr = ErrHandle()
+            try:
+                for oInhalt in lst_inhalt:
+                    opera = oInhalt.get("opera")
+                    if opera == opera_id:
+                        count += 1
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_manu_count")
+
+            return count
+
         def get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig):
             """Given the opera, get the signature(s) it points to in a list"""
 
@@ -3036,12 +3052,13 @@ class EqualGoldHuwaToJson(BasicPart):
                 for item in signaturesA:
                     code = item['code']
                     editype = item['editype']
-                    obj_sig = Signature.objects.filter(code=code, editype=editype).first()
-                    if not obj_sig is None:
-                        gold = obj_sig.gold
-                        equal = gold.equal
-                        item['gold'] = gold.id
-                        item['ssg'] = equal.id
+                    lst_sig = Signature.objects.filter(code=code, editype=editype).values('gold_id', 'gold__equal_id')
+                    if not lst_sig is None and len(lst_sig) > 0:
+                        obj_sig = lst_sig[0]
+                        #gold = obj_sig.gold
+                        #equal = gold.equal
+                        item['gold'] = obj_sig['gold_id'] # gold.id
+                        item['ssg'] = obj_sig['gold__equal_id'] # equal.id
             except:
                 msg = oErr.get_error_message()
                 oErr.DoError("get_opera_signatures")
@@ -3280,6 +3297,8 @@ class EqualGoldHuwaToJson(BasicPart):
                             explicit = oInhaltDes.get(str(inhalt_id), "")
                             # Get signatures (or should that go via the SSG link, since they are automatic ones?)
                             signaturesA = get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig)
+                            # Count the number of manuscripts in which this opera occurs
+                            manu_count = get_manu_count(tables['inhalt'], opera_id)
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON
@@ -3288,7 +3307,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 author = author_name, author_id = author_id, 
                                 title = title, incipit = incipit, explicit = explicit,
                                 note = note, keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],
-                                signaturesA = signaturesA, opera_id=opera_id
+                                signaturesA = signaturesA, opera_id=opera_id, manu_count=manu_count
                                 )
                             if bAddUnusedSermonFields:
                                 # Add sermon fields that this routine does not fill in
