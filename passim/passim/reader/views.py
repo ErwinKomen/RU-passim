@@ -3702,7 +3702,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 sData = output.getvalue()
                 output.close()
 
-            if bDoCounting:
+            if bDoCounting and self.import_type == "ssg":
                 # Also show results of counting:
                 oErr.Status("Potential SSGs with manuscripts: 0={}, 1={}, many (with num)={} many (no num)={}".format(
                     count_manu_zero, count_manu_one, count_manu_many_num, count_manu_many_oth))
