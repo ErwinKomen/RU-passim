@@ -3166,12 +3166,20 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Transform the Inhalt table into a dictionary around [handschrift]
                 oInhaltHandschrift = {}
+                oInhaltOpera = {}
                 for oInhalt in tables['inhalt']:
+                    # (1) process handschrift
                     handschrift_id = str(oInhalt.get("handschrift"))
                     if not handschrift_id in oInhaltHandschrift:
                         oInhaltHandschrift[handschrift_id] = []
                     # Add it
                     oInhaltHandschrift[handschrift_id].append(oInhalt)
+                    # (2) Process opera
+                    opera_id = str(oInhalt.get("opera"))
+                    if not opera_id in oInhaltOpera:
+                        oInhaltOpera[opera_id] = 0
+                    # Add it
+                    oInhaltOpera[opera_id] += 1
 
                 # Transform the DES table into a dictionary around [inhalt]
                 oInhaltDes = {}
@@ -3298,7 +3306,8 @@ class EqualGoldHuwaToJson(BasicPart):
                             # Get signatures (or should that go via the SSG link, since they are automatic ones?)
                             signaturesA = get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig)
                             # Count the number of manuscripts in which this opera occurs
-                            manu_count = get_manu_count(tables['inhalt'], opera_id)
+                            # manu_count = get_manu_count(tables['inhalt'], opera_id)
+                            manu_count = oInhaltOpera.get(str(opera_id), 0)                            
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON
