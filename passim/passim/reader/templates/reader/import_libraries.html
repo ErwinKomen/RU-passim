@@ -1,0 +1,48 @@
+﻿{% if statuscode == "completed" %}
+  <div class='col-md-12'>
+    <p>
+    The list of Libraries has been processed, and {{results|length}} new Libraries have been added.
+    </p>
+    <p>
+      Possible actions:
+      <ul>
+        <li><b>Show</b> show the list of Libraries that have been added
+          <button class="btn btn-default btn-sm dropdown-toggle"
+                  type="button" data-toggle="collapse" data-target="#man-list">List</button>
+        </li>
+        <li><b>List</b> all Libraries
+            <!-- When ready press this button -->
+            <span><a class="btn btn-xs jumbo-1" role="button" href="{% url 'library_list' %}">List</a></span>
+        </li>
+      </ul>
+    </p>
+  </div>
+
+  <div class="col-md-12 collapse" id="man-list">
+    <table>
+      <thead><tr><th>#</th><th>Country</th><th>City</th><th>Library</th></tr></thead>
+      <tbody>
+        {% for item in results %}
+          <tr>
+            <td>{{forloop.counter}}</td>
+            <td>{{item.country}}</td>
+            <td>{{item.city}}</td>
+            <td>{{item.library}}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endif %}
+
+<!-- Any errors are shown here too-->
+<div class="errors">
+  {% if error_list and statuscode != "error" %} 
+    <h4>Errors:</h4>
+    <div>statuscode = {{statuscode}}</div>
+    {% for item in error_list %}
+      <div class="error-item">{{item}}</div>
+    {% endfor %}
+  {% endif %}
+</div>

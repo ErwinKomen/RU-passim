@@ -2100,7 +2100,7 @@ class ReaderImport(View):
 
             # The list of headers to be shown
             lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
-
+            
             if self.mForm is None:
                 # Process the request
                 bOkay, code = self.process_files(request, source, lResults, lHeader)
