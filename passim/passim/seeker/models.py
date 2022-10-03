@@ -1912,6 +1912,44 @@ class Location(models.Model):
         obj = self.location_identifiers.filter(idname="idVilleEtab").first()
         return "" if obj == None else obj.idvalue
 
+    def get_or_create_library(lib_name, lib_city, lib_country, sAddNote="added"):
+        oErr = ErrHandle()
+        lib_id = None
+        bAdded = False
+
+        try:
+            # (1) Get the Passim lib_country
+            obj_country = Location.get_location(country=lib_country)
+            country_set = [ obj_country ]
+            # (2) Get the Passim lib_city
+            obj_city = obj = Location.objects.filter(
+                name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
+            if obj_city is None:
+                # Add the city and the country it is in
+                loctype_city = LocationType.find("city")
+                obj_city = Location.objects.create(name=lib_city, loctype=loctype_city)
+                # Create a relation that the city is in the specified country
+                obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                            
+            # Try to get it
+            obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
+            if obj_lib is None:
+                # Add the library in the country/city
+                obj_lib = Library.objects.create(
+                    name=lib_name, snote=sAddNote,
+                    lcity=obj_city, lcountry=obj_country, location=obj_city
+                    )
+                bAdded = True
+            # Make sure we have the exact information for this library available
+            lib_city = obj_lib.lcity.name
+            lib_country = obj_lib.lcountry.name
+            lib_id = obj_lib.id
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Location/get_or_create_library")
+        # Return the appropriate information
+        return bAdded, lib_id, lib_city, lib_country
+
     def get_partof_html(self):
         lhtml = []
         for loc in self.above():
