@@ -49,7 +49,7 @@ import xml.etree.ElementTree as ElementTree
  
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
-from passim.utils import ErrHandle
+from passim.utils import ErrHandle, RomanNumbers
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
@@ -2924,6 +2924,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
             sBack = ""
             oErr = ErrHandle()
+            oRom = RomanNumbers()
             try:
                 lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
                 von_rv = str(oInhalt.get("von_rv", ""))
@@ -2932,6 +2933,20 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 von_bis = None if int(lst_von_bis[0]) == 0 else lst_von_bis[0]
                 bis_f = None if int(lst_bis_f[0]) == 0 else lst_bis_f[0]
+
+                # Treat negative numbers (see issue #532)
+                if not von_bis is None and re.match(r'-\d+', von_bis):
+                    order_num = int(von_bis)
+                    if order_num < -110: order_num = -110
+                    if order_num < 0:
+                        # Add 110 + 1 and turn into romans
+                        von_bis = oRom.intToRoman(order_num+110+1)
+                if not bis_f is None and re.match(r'-\d+', bis_f):
+                    order_num = int(bis_f)
+                    if order_num < -110: order_num = -110
+                    if order_num < 0:
+                        # Add 110 + 1 and turn into romans
+                        bis_f = oRom.intToRoman(order_num+110+1)
 
                 html = []
                 # Calculate from
@@ -3212,8 +3227,14 @@ class EqualGoldHuwaToJson(BasicPart):
                         oErr.Status("EqualGoldHuwaToJson manuscripts: {}/{}".format(idx+1, count_manuscript))
 
                     # Take over any information that should be
-                    idno = oHandschrift.get("signatur")
+                    idno = oHandschrift.get("signatur", "")
                     handschrift_id = oHandschrift.get("id")
+
+                    # If this [handschrift_id] has id '0', then skip it (see issue #532, responses CW)
+                    if handschrift_id == 0:
+                        # Skip this one, and continue with the next manuscript
+                        continue
+
                     # NOTE: no need to supply [stype], since that must be set when reading the JSON
                     oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id)
                     count_manu += 1
@@ -3274,12 +3295,19 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
 
+                    # Test on bibliothek = 2 and empty signatur (see issue #532)
+                    if bibliothek_id == 2 and idno == "":
+                        # Do not process this manuscript further
+                        continue
+
                     # Get and walk through the contents of this Handschrift
                     lst_inhalt = oInhaltHandschrift.get(str(handschrift_id), [])
                     # ------------ DEBUG ------------
                     if len(lst_inhalt) > 1 or handschrift_id == 460:
                         iStop = 1
                     # -------------------------------
+                    # Sort the list on the basis of `von_bis` (see issue #532)
+                    lst_inhalt = sorted(lst_inhalt, key=lambda x: x['von_bis'])
                     order = 1
                     lst_sermons = []
                     for idx, oInhalt in enumerate(lst_inhalt):
