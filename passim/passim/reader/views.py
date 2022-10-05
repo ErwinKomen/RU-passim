@@ -4247,6 +4247,9 @@ class ReaderHuwaImport(ReaderEqualGold):
 
             # Load the relations separately
             opera_relations = oOperaData.get("opera_relations")
+            # Create an opera-equality relation dictionary
+            oOperaEqual = self.get_relation_equals(opera_relations)
+
             # Load the opera definitions
             operas = oOperaData.get("operas")
 
@@ -4281,6 +4284,10 @@ class ReaderHuwaImport(ReaderEqualGold):
                 bMakeSG = False
 
                 # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
+                #     Note: the number of links to inhalt should not matter
+                #           An opus with a link to inhalt is part of a manuscript
+                #           An opus without link to inhalt is not part of a manuscript
+                #           But in both cases the opus can turn out to be an SSG (in our terms)
                 if manu_type == "zero_links":
                     # This Opera has no links to inhalt
                     # DOUBLE CHECK - at first we don't do anything with them
@@ -4362,6 +4369,31 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         return oBack
 
+    def get_relation_equals(self, opera_relations):
+        """Create a dictionary with the opera ID as key for equal relationships"""
+
+        oErr = ErrHandle()
+        oEqual = {}
+        try:
+            # Walk the list of relations
+            for oRelation in opera_relations:
+                src_id = oRelation.get("src")
+                dst_id = oRelation.get("dst")
+                linktype = oRelation.get("linktype")
+                if linktype == "eqs":
+                    # Add this equal relationship in the dictionary
+                    src_str = str(src_id)
+                    dst_str = str(dst_id)
+                    if not src_str in oEqual:
+                        oEqual[src_str] = dst_id
+                    if not dst_str in oEqual:
+                        oEqual[dst_str] = src_id
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_relation_equals")
+
+        return oEqual
+
     def add_relations(self, opera_relations):
         """Given the list of relations, see if anything can be added"""
 
@@ -4394,38 +4426,40 @@ class ReaderHuwaImport(ReaderEqualGold):
                 keyword = oRelation.get("keyword")
                 rel_num += 1
 
-                ## -------- DEBUGGING ----------------
-                #if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
-                
-                ## -------- DEBUGGING ----------------
-                #if src_id == 6301:
-                #    iStop = 1
-
                 # Retrieve the src and dst SSGs
                 src = get_opera_ssg(src_id)
                 if not src is None:
                     dst = get_opera_ssg(dst_id)
                     if not dst is None and not linktype is None and not spectype is None:
-                        # All essential ingredients are there: check if this relation already exists
-                        link = EqualGoldLink.objects.filter(src=src, dst=dst, linktype=linktype, spectype=spectype).first()
-                        if link is None:
-                            # Create a link
-                            link = EqualGoldLink.objects.create(src=src, dst=dst, linktype=linktype, spectype=spectype, alternatives="no")
-                            count_new += 1
-                            # Need to add a keyword, possibly?
-                            if not keyword is None and keyword != "":
-                                kw_obj = Keyword.objects.filter(name__iexact=keyword).first()
-                                if kw_obj is None:
-                                    kw_obj = Keyword.objects.create(name__iexact=keyword)
-                                # Check if there already is a kw link between [src] and [kw_obj]
-                                obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
-                                if obj is None:
-                                    obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
-                            
-                            oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
+                        # All essential ingredients are there...
+
+                        # If this is an [eqs] linktype, then it requires entirely different treatment
+                        if linktype == "eqs":
+                            # Check if the destination 
+                            pass
+
                         else:
-                            # Keep track of existing links
-                            count_existing += 1
+                        
+                            # check if this relation already exists
+                            link = EqualGoldLink.objects.filter(src=src, dst=dst, linktype=linktype, spectype=spectype).first()
+                            if link is None:
+                                # Create a link
+                                link = EqualGoldLink.objects.create(src=src, dst=dst, linktype=linktype, spectype=spectype, alternatives="no")
+                                count_new += 1
+                                # Need to add a keyword, possibly?
+                                if not keyword is None and keyword != "":
+                                    kw_obj = Keyword.objects.filter(name__iexact=keyword).first()
+                                    if kw_obj is None:
+                                        kw_obj = Keyword.objects.create(name__iexact=keyword)
+                                    # Check if there already is a kw link between [src] and [kw_obj]
+                                    obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
+                                    if obj is None:
+                                        obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
+                            
+                                oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
+                            else:
+                                # Keep track of existing links
+                                count_existing += 1
             # Report the counts
             oErr.Status("add_relations: new={}, existing={}, missing={}".format(count_new, count_existing, count_rel - count_new - count_existing))
             count = count_new + count_existing
