@@ -4386,8 +4386,10 @@ class ReaderHuwaImport(ReaderEqualGold):
                     # Add this equal relationship in the dictionary
                     src_str = str(src_id)
                     dst_str = str(dst_id)
+                    # Add the one relationship
                     if not src_str in oEqual:
                         oEqual[src_str] = dst_id
+                    # And add the reverse relationship
                     if not dst_str in oEqual:
                         oEqual[dst_str] = src_id
         except:
@@ -4565,13 +4567,19 @@ class ReaderHuwaImport(ReaderEqualGold):
             # Check if this opera equals another one
             equal_opera_id = None
             obj_eq = None
-            if not self.opera_equal is None:
+            if existing_id is None and not self.opera_equal is None:
+                # We have a relations dictionary!
                 str_opera = str(opera_id)
                 if str_opera in self.opera_equal:
+
+                    # There is another opera equalling this one
                     equal_opera_id = self.opera_equal[str_opera]
-                    obj_ext = EqualGoldExternal.objects.filter(externaltype="huwop", externalid=equal_opera_id).first()
+                    # Check if this has already been noted in the EqualGoldExternal table
+                    obj_ext = EqualGoldExternal.objects.filter(externaltype=EXTERNAL_HUWA_OPERA, externalid=equal_opera_id).first()
                     if not obj_ext is None:
-                        obj_eq = obj_ext.equal
+                        # Get the EqualGold object to which this one is equal
+                        # Assigning it to existing_id means that *NO* SSG will be created, but only an SG
+                        existing_id = obj_eq.equal.id
 
             # Make a subset identifier
             existing_type = existing_type.split(":")[0]
