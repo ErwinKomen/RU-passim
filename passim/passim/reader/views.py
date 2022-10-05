@@ -4341,6 +4341,7 @@ class ReaderHuwaImport(ReaderEqualGold):
                             # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
                             oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                         else:
+                            # This is now subset [ssg11n] - it may be imported
                             # Skip these: a subset is made of/for them
                             pass
                     elif sig_status == "opera_ssg_1_n":
