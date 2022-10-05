@@ -3295,8 +3295,8 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
 
-                    # Test on bibliothek = 2 and empty signatur (see issue #532)
-                    if bibliothek_id == 2 and idno == "":
+                    # Test on bibliothek = 2 (see issue #532)
+                    if bibliothek_id == 2:
                         # Do not process this manuscript further
                         continue
 
