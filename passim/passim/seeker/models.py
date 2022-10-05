@@ -2195,6 +2195,7 @@ class Library(models.Model):
         country = None
         city = None
         library = None
+        note = ""           # If *any* note is returned, the library search has been inexact
         try:
             if sCountry != "":
                 country = Location.objects.filter(name__iexact=sCountry).first()
@@ -2204,20 +2205,25 @@ class Library(models.Model):
                         library = Library.objects.filter(lcountry=country, lcity=city, name__iexact=sLibrary).first()
                     else:
                         library = Library.objects.filter(lcountry=country, name__iexact=sLibrary).first()
+                        note = "Library: no city [{}], Country={}, Library={}".format(sCity, sCountry, sLibrary)
                 else:
                     library = Library.objects.filter(name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
             elif sCity != "":
                 city = Location.objects.filter(name__iexact=sCity).first()
                 if city != None:
                     library = Library.objects.filter(lcity=city, name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], City={}, Library={}".format(sCountry, sCity, sLibrary)
                 else:
                     library = Library.objects.filter(name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
             elif sLibrary != "":
                 library = Library.objects.filter(name__iexact=sLibrary).first()
+                note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Library/get_best_match")
-        return country, city, library
+        return country, city, library, note
 
     def get_library(sId, sLibrary, bBracketed, country, city):
         iId = int(sId)
@@ -3415,6 +3421,7 @@ class Manuscript(models.Model):
         {'name': 'Country id',          'type': 'fk_id', 'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
         {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
         {'name': 'City id',             'type': 'fk_id', 'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        # THIS GOES WRONG: the Library must *NOT* be treated separately, but only in conjunction with lcountry and lcity!!!
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         # TODO: change FK project into m2m
@@ -3667,13 +3674,23 @@ class Manuscript(models.Model):
                                 obj.custom_set(path, value, **kwargs)
 
                     # Check what we now have for Country/City/Library
-                    lcountry, lcity, library = Library.get_best_match(country, city, library)
+                    lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
+                    # The country can safely added
                     if lcountry != None and lcountry != obj.lcountry:
                         obj.lcountry = lcountry
+                    # The city too can safely be added
                     if lcity != None and lcity != obj.lcity:
                         obj.lcity = lcity
+                    # But the library can only be added under the strictest conditions
                     if library != None and library != obj.library:
-                        obj.library = library
+                        if lib_note == "":
+                            # No notes, so add the library
+                            obj.library = library
+                        else:
+                            # There is a note, so the library may not be added
+                            notes = [] if self.notes is None else [ self.notes ]
+                            notes.append(lib_note)
+                            obj.notes = "\n".join(notes)
 
 
                     # Make sure the update the object

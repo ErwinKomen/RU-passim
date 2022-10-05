@@ -4143,6 +4143,7 @@ class ReaderHuwaImport(ReaderEqualGold):
 
     import_type = "huwajson"
     sourceinfo_url = "http://www.ru.nl"
+    opera_equal = None
 
     def process_files(self, request, source, lResults, lHeader):
         """Process a JSON file for HUWA import"""
@@ -4249,6 +4250,7 @@ class ReaderHuwaImport(ReaderEqualGold):
             opera_relations = oOperaData.get("opera_relations")
             # Create an opera-equality relation dictionary
             oOperaEqual = self.get_relation_equals(opera_relations)
+            self.opera_equal = oOperaEqual
 
             # Load the opera definitions
             operas = oOperaData.get("operas")
@@ -4559,6 +4561,17 @@ class ReaderHuwaImport(ReaderEqualGold):
             existing_type = oOpera['existing_ssg']['type']
             existing_id = oOpera['existing_ssg'].get("id")
             manu_type = oOpera['manu_type']
+
+            # Check if this opera equals another one
+            equal_opera_id = None
+            obj_eq = None
+            if not self.opera_equal is None:
+                str_opera = str(opera_id)
+                if str_opera in self.opera_equal:
+                    equal_opera_id = self.opera_equal[str_opera]
+                    obj_ext = EqualGoldExternal.objects.filter(externaltype="huwop", externalid=equal_opera_id).first()
+                    if not obj_ext is None:
+                        obj_eq = obj_ext.equal
 
             # Make a subset identifier
             existing_type = existing_type.split(":")[0]
