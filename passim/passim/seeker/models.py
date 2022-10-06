@@ -6428,6 +6428,16 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def get_author(self):
+        """Get a text representation of the author"""
+
+        sBack = "-"
+        if self.author is None:
+            sBack = "(undefined)"
+        else:
+            sBack = self.author.name
+        return sBack
+
     def get_code(self):
       """Make sure to return an intelligable form of the code"""
 
@@ -6608,6 +6618,14 @@ class EqualGold(models.Model):
         if self.moved:
             url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
         return url
+
+    def get_number(self):
+        """Get a text representation of the author"""
+
+        sBack = "-"
+        if not self.number is None:
+            sBack = self.number
+        return sBack
 
     def get_previous_code(self):
         """Get information on the SSG from which I derive"""
@@ -6831,8 +6849,12 @@ class EqualGold(models.Model):
         oErr = ErrHandle()
         try:
             # Check the highest sermon number for this author
-            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number","id")
             if qs_ssg.count() == 0:
+                iNumber = 1
+            elif qs_ssg.first().number is None:
+                # Apparently the items for this author have not been numbered yet
+                # So we need to return the first possible number
                 iNumber = 1
             else:
                 iNumber = qs_ssg.first().number + 1

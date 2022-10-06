@@ -4290,70 +4290,67 @@ class ReaderHuwaImport(ReaderEqualGold):
                 #           An opus with a link to inhalt is part of a manuscript
                 #           An opus without link to inhalt is not part of a manuscript
                 #           But in both cases the opus can turn out to be an SSG (in our terms)
-                if manu_type == "zero_links":
-                    # This Opera has no links to inhalt
-                    # DOUBLE CHECK - at first we don't do anything with them
+
+                # ------ issue #533: this distinction disappears now -----------
+                #if bDistinguishZeroLinks and manu_type == "zero_links":
+                #    # This Opera has no links to inhalt
+                #    # DOUBLE CHECK - at first we don't do anything with them
+                #    pass
+
+                ## First criterion: skip all manu_type 'zero_links']
+                #elif manu_type != 'zero_links':
+                #    # Second criterion: look at possible sig_status
+
+                # Most importantly, check whether HUWA mentions any signatures
+                if sig_status == "opera_ssg_0_0":
+                    # No signature is given
+                    # No further SSG/AF action needed, because:
+                    # - if they have no link to a manuscript, they are useless anyway
+                    # - if they *do* have a link to a manuscript, then they are just manifestations and there is no need for SG/SSG
                     pass
-
-                    # ============= PLEASE LEAVE THIS UNTIL issue #533 is SORTED OUT ======================
-                    # (asked: 13/jul/2022)
-                    ## Second criterion: check Gryson/Clavis code (via sig_status)
-                    #if sig_status == "opera_ssg_1_0":
-                    #    # Yes: import this one
-                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim], coll_super=coll_super, coll_gold=coll_gold)
-                    #elif sig_status == "opera_ssg_1_1":
-                    #    # Only create SSG if there is a match in inc/exp
-                    #    if ssg_type in ["ssgmF", "ssgmE"]:
-                    #        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                    #        oImported = self.import_one_json(oOpera,[project_huwa], coll_super=coll_super, coll_gold=coll_gold)
-                    # =====================================================================================
-
-                # First criterion: skip all manu_type 'zero_links']
-                elif manu_type != 'zero_links':
-                    # Second criterion: look at possible sig_status
-                    if sig_status == "opera_ssg_0_0":
-                        # Skip for now
-                        pass
-                    elif sig_status == "opera_ssg_0_n":
-                        # Check what the ACTION is for this one
-                        if action == "new AF":
-                            # Indicate that a new SG must be made for these
-                            bMakeSG = True
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        elif action == "link_to AF":
-                            # ONLY (!!!) create a link between the SSG and the OPERA number
-                            oImported = self.link_ssg_to_opera(oOpera)
-                    elif sig_status == "opera_ssg_1_0":
+                elif sig_status == "opera_ssg_0_n":
+                    # Check what the ACTION is for this one
+                    if action == "new AF" or action == "":
                         # Indicate that a new SG must be made for these
                         bMakeSG = True
-                        # Depending on ssg_type (though this appears to be irrelevant)
-                        if ssg_type == "ssgmF":
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        else:
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                    elif sig_status == "opera_ssg_1_1":
-                        # Indicate that a new SG must be made for these
-                        bMakeSG = True
-                        if ssg_type in ["ssgmF", "ssgmE"]:
-                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        else:
-                            # This is now subset [ssg11n] - it may be imported
-                            # Skip these: a subset is made of/for them
-                            pass
-                    elif sig_status == "opera_ssg_1_n":
-                        # Skip for now
-                        pass
-                    elif sig_status == "opera_ssg_n_1":
-                        # Skip for now
-                        pass
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    elif action == "link_to AF":
+                        # ONLY (!!!) create a link between the SSG and the OPERA number
+                        oImported = self.link_ssg_to_opera(oOpera)
+                elif sig_status == "opera_ssg_1_0":
+                    # Indicate that a new SG must be made for these
+                    bMakeSG = True
+                    # Depending on ssg_type (though this appears to be irrelevant)
+                    if ssg_type == "ssgmF":
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    else:
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_1_1":
+                    # Indicate that a new SG must be made for these
+                    bMakeSG = True
+                    if ssg_type in ["ssgmF", "ssgmE"]:
+                        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    else:
+                        # This is now subset [ssg11n] - it may be imported (will be checked online)
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_1_n":
+                    # Issue #533: may be imported and will be checked online
+                    oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_n_1":
+                    # Issue #533: may be imported and will be checked online
+                    oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                 # Process the [oImported]
-                if not oImported is None and oImported.get("msg") in ["read", "linked"]:
-                    oErr.Status("Huwa Import processing opera id={} as [{}] ({}/{})".format(
-                        opera_id, oImported.get("msg"), idx+1, num_operas))
+                if not oImported is None and oImported.get("msg") in ["read", "linked", "skipped"]:
+                    sExtra = ""
+                    if oImported.get("msg") == "read":
+                        # Get author info
+                        sExtra = " ({}/{})".format(oImported.get("author"), oImported.get("number"))
+                    oErr.Status("Huwa Import processing opera id={} as [{}] ({}/{}){}".format(
+                        opera_id, oImported.get("msg"), idx+1, num_operas, sExtra))
                     lst_imported.append(oImported)
 
             # Check if any relations from the list [opera_relations] can be added
@@ -4565,9 +4562,17 @@ class ReaderHuwaImport(ReaderEqualGold):
             existing_id = oOpera['existing_ssg'].get("id")
             manu_type = oOpera['manu_type']
 
+            # Check whether this OPERA has already been imported or not
+            obj_ext = EqualGoldExternal.objects.filter(externaltype=EXTERNAL_HUWA_OPERA, externalid=opera_id).first()
+            if not obj_ext is None:
+                # This particular Opera has already been processed
+                oImported['ssg'] = obj_ext.equal.get_code()
+                oImported['msg'] = 'skipped'
+                return oImported
+
             # Check if this opera equals another one
             equal_opera_id = None
-            obj_eq = None
+            obj_ext = None
             if existing_id is None and not self.opera_equal is None:
                 # We have a relations dictionary!
                 str_opera = str(opera_id)
@@ -4580,7 +4585,7 @@ class ReaderHuwaImport(ReaderEqualGold):
                     if not obj_ext is None:
                         # Get the EqualGold object to which this one is equal
                         # Assigning it to existing_id means that *NO* SSG will be created, but only an SG
-                        existing_id = obj_eq.equal.id
+                        existing_id = obj_ext.equal.id
 
             # Make a subset identifier
             existing_type = existing_type.split(":")[0]
@@ -4599,8 +4604,12 @@ class ReaderHuwaImport(ReaderEqualGold):
             ssg = None
             gold = None
 
+            if len(same_sig_ssgs) > 0:
+                # There already may be one SSG with the same Signature(s)
+                ssg = EqualGold.objects.filter(id__in=same_sig_ssgs).first()
+
             # If there is an existing SSG with the same Signature(s)...
-            if len(same_sig_ssgs) == 0 or oOpera.get("action") == "new AF":
+            if ssg is None or oOpera.get("action") == "new AF":
                 # Check if there is an existing SSG
                 if existing_id is None:
                     # No, there are no SSGs with the same sig yet: this means we are CREATING a new SSG and a new SG for it
@@ -4644,6 +4653,8 @@ class ReaderHuwaImport(ReaderEqualGold):
                 ssg.firstsig = get_firstsig(signatures)
                 ssg.save()
                 oImported['ssg'] = ssg.get_code()
+                oImported['author'] = ssg.get_author()
+                oImported['number'] = ssg.get_number()
 
                 # Create a link between the SSG and the opera identifier
                 EqualGoldExternal.objects.create(
@@ -4654,11 +4665,11 @@ class ReaderHuwaImport(ReaderEqualGold):
                 oImported['msg'] = "read"
 
             else:
-                # There already is at least one SSG with the same Signature(s)
-                ssg_id = same_sig_ssgs[0]
-                ssg = EqualGold.objects.filter(id=ssg_id).first()
+                # There already is an SSG that we can use as a basis!
 
                 oImported['ssg'] = ssg.get_code()
+                oImported['author'] = ssg.get_author()
+                oImported['number'] = ssg.get_number()
 
                 # Double check if this has already been done...
                 obj = EqualGoldExternal.objects.filter(

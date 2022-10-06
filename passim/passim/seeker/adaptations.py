@@ -35,7 +35,7 @@ adaptation_list = {
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
                        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
-                       'atype_def_equal', 'atype_acc_equal'],
+                       'atype_def_equal', 'atype_acc_equal', 'passim_author_number'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
@@ -839,6 +839,38 @@ def adapt_passim_code():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_passim_author_number():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    
+    try:
+        # (3) Get the author id for 'Undecided'
+        undecided = Author.objects.filter(name__iexact="undecided").first()
+        undecided_id = undecided.id
+
+        # Walk all SSGs and save those whose .number is none
+        qs = EqualGold.objects.filter(author__isnull=False, number__isnull=True).exclude(author=undecided).order_by('author_id')
+        for obj in qs:
+            # Double checking
+            if not obj.author is None and obj.number is None and not obj.author.id == undecided_id:
+                # Re-saving means getting a legitimate number
+                obj.save()
+
+        # Walk all SSGs whose [code] is null, but have a number
+        qs = EqualGold.objects.filter(author__isnull=False, code__isnull=True, number__isnull=False)
+        with transaction.atomic():
+            for obj in qs:
+                # Reset the number to none
+                obj.number = None
+                obj.save()
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 def adapt_passim_project_name_equal():
     oErr = ErrHandle()
