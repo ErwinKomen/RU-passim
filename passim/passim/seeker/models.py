@@ -3578,6 +3578,7 @@ class Manuscript(models.Model):
             team_group = kwargs.get("team_group")
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
+            sourcetype = kwargs.get("sourcetype", "")
             # First get the shelf mark
             idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
@@ -3586,28 +3587,70 @@ class Manuscript(models.Model):
                 # Get the standard project TH: hier naar kijken voor punt 4
                 # OLD: project = Project.get_default(username)
 
+                # ===================================
+                if idno == "Cod. 404":
+                    iStop = 1
+                # ===================================
+
                 # Retrieve or create a new manuscript with default values
-                if source == None:
-                    sCity = oManu.get("lcity")
-                    lCity = None
-                    if not sCity is None:
-                        sCountry = oManu.get("lcountry", "")
-                        # DOuble check city co-occurrence
-                        lCity = Location.get_location(sCity, sCountry)
-                    if lCity is None:
-                        obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
-                    else:
-                        obj = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man").first()
+                sCity = oManu.get("lcity")
+                lCity = None
+                if not sCity is None:
+                    sCountry = oManu.get("lcountry", "")
+                    # DOuble check city co-occurrence
+                    lCity = Location.get_location(sCity, sCountry)
+                if lCity is None:
+                    qs = Manuscript.objects.filter(idno=idno, mtype="man")
                 else:
-                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
+                    qs = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man")
+                # Okay, take the first object, no matter the source
+                obj = qs.first()
+                # Exclude anything that has the same source
+                obj_same = None
+                if not source is None:
+                    obj_same = qs.filter(source=source).first()
+
+                #if source == None:
+                #    sCity = oManu.get("lcity")
+                #    lCity = None
+                #    if not sCity is None:
+                #        sCountry = oManu.get("lcountry", "")
+                #        # DOuble check city co-occurrence
+                #        lCity = Location.get_location(sCity, sCountry)
+                #    if lCity is None:
+                #        obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
+                #    else:
+                #        obj = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man").first()
+                #else:
+                #    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
+
+                # Check if it exists *anywhere*
                 if obj == None:
                     # Doesn't exist: create it
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                     if not source is None:
                         obj.source = source
                 else:
+                    # Default overwriting message
+                    msg = "Attempt to overwrite manuscript shelfmark [{}]".format(idno)
+                    # Check if the object actually is from the same source
+                    if obj_same is None:
+                        if sourcetype == "huwa":
+                            # Check if the manuscript that exists was already read by HUWA
+                            dataset = obj.collections.first()
+                            if not dataset is None and "huwa" in dataset.name.lower():
+                                msg = "Attempt to overwrite HUWA manuscript shelfmark [{}]".format(idno)
+                    else:
+                        # This means the [obj] *is* from the same source
+                        if sourcetype == "huwa":
+                            # Get the handschrift
+                            handschrift_id = oManu.get("handschrift_id")
+                            msg = "Attempt to overwrite HUWA manuscript shelfmark [{}] (handschrift={})".format(idno, handschrift_id)
+                        else:
+                            msg = "Attempt to overwrite same-source manuscript shelfmark [{}]".format(idno)
+
                     # We are overwriting
-                    oErr.Status("Overwriting manuscript [{}]".format(idno))
+                    oErr.Status(msg)
                     bOverwriting = True
                     if 'overwriting' in oParams:
                         oParams['overwriting'] = True
@@ -3688,16 +3731,18 @@ class Manuscript(models.Model):
                             obj.library = library
                         else:
                             # There is a note, so the library may not be added
-                            notes = [] if self.notes is None else [ self.notes ]
+                            notes = [] if obj.notes is None else [ obj.notes ]
                             notes.append(lib_note)
                             obj.notes = "\n".join(notes)
 
+                    # Make sure we have a copy of the RAW json data for this manuscript
+                    obj.raw = json.dumps(oManu, indent=2)
 
                     # Make sure the update the object
                     obj.save()
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("Manuscript/add_one")
+            oErr.DoError("Manuscript/custom_add")
         return obj
 
     def custom_get(self, path, **kwargs):
@@ -5410,7 +5455,7 @@ class Codico(models.Model):
                 obj.save()
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("Codico/add_one")
+            oErr.DoError("Codico/custom_add")
         return obj
 
     def custom_get(self, path, **kwargs):

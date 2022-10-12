@@ -229,7 +229,6 @@ class ManuscriptUploadJson(ReaderImport):
     import_type = "json"
     sourceinfo_url = "https://www.ru.nl/passim/upload_json"
 
-
     def process_files(self, request, source, lResults, lHeader):
 
         def sermones_fixes(oManu):
@@ -291,13 +290,15 @@ class ManuscriptUploadJson(ReaderImport):
         oErr = ErrHandle()
         bOkay = True
         code = ""
+        sourcetype = ""
         oStatus = self.oStatus
+
         try:
             # Make sure we have the username
             username = self.username
             profile = Profile.get_user_profile(username)
             team_group = app_editor
-            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path', 'source': source}
 
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
@@ -336,15 +337,31 @@ class ManuscriptUploadJson(ReaderImport):
                                 lst_manu = [oManuList[x] for x in sorted_keys]
                                 # lst_manu = [v for k,v in sorted(oManuList.items(), key=lambda key: int(re.search(r'\d+', key).group()))]
 
-                            # Walk through the manuscripts
+                            # Look at the first manuscript to determine any specific source type
                             count_manu = len(lst_manu)
+                            if count_manu > 0:
+                                oManuFirst = lst_manu[0]
+                                datasets = oManuFirst.get("datasets")
+                                if not datasets is None and len(datasets) > 0:
+                                    sDataset = datasets[0].lower()
+                                    if "sermones" in sDataset:
+                                        sourcetype = "sermones"
+                                    elif "huwa" in sDataset:
+                                        sourcetype = "huwa"
+
+                            # Make sure we pass the sourcetype on to Manuscript.custom_add()
+                            kwargs['sourcetype'] = sourcetype
+
+
+                            # Walk through the manuscripts
                             for idx, oManu in enumerate(lst_manu):
                                 # There is one result per manuscript
                                 oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
 
 
                                 # Issue #509: literature fix
-                                sermones_fixes(oManu)
+                                if sourcetype == "sermones":
+                                    sermones_fixes(oManu)
                                 # Make sure the stype is set to "imported"
                                 oManu['stype'] = "imp"
 

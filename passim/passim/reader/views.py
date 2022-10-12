@@ -3236,7 +3236,8 @@ class EqualGoldHuwaToJson(BasicPart):
                         continue
 
                     # NOTE: no need to supply [stype], since that must be set when reading the JSON
-                    oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id)
+                    oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id,
+                                       keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],)
                     count_manu += 1
 
                     # Physical features of the manuscript:
@@ -3343,7 +3344,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 type = "Plain", locus = locus,
                                 author = author_name, author_id = author_id, 
                                 title = title, incipit = incipit, explicit = explicit,
-                                note = note, keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],
+                                note = note, keywords = ['HUWA'], datasets = ['HUWA_sermons'],
                                 signaturesA = signaturesA, opera_id=opera_id, manu_count=manu_count
                                 )
                             if bAddUnusedSermonFields:
