@@ -3122,7 +3122,7 @@ class EqualGoldHuwaToJson(BasicPart):
             # Note that sermons use the tables 'inc' and 'des' for the incipit and explicit
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'des', 'inc', 'inms', 'autor_inms',
                 'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land',
-                'material']
+                'material', 'tit', 'annus']
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -3179,6 +3179,22 @@ class EqualGoldHuwaToJson(BasicPart):
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
 
+                # Read other HUWA info: annus = year of 'handschrift'
+                oDates = {}
+                for oAnnus in tables['annus']:
+                    handschrift_id = str(oAnnus.get("handschrift"))
+                    # The year (range) may only contain number + hyphen
+                    annus_name = re.sub('[^0-9\-]', '', oAnnus.get("annus_name", ""))
+                    # Add to dictionary
+                    oDates[handschrift_id] = annus_name
+
+                # Read other HUWA info: title of sermon(s)
+                oTitles = {}
+                for oTit in tables['tit']:
+                    inhalt = str(oTit.get("inhalt"))
+                    sTitle = oTit.get("tit_text", "")
+                    oTitles[inhalt] = sTitle
+
                 # Transform the Inhalt table into a dictionary around [handschrift]
                 oInhaltHandschrift = {}
                 oInhaltOpera = {}
@@ -3229,6 +3245,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Take over any information that should be
                     idno = oHandschrift.get("signatur", "")
                     handschrift_id = oHandschrift.get("id")
+                    sHandschriftId = str(handschrift_id)
 
                     # If this [handschrift_id] has id '0', then skip it (see issue #532, responses CW)
                     if handschrift_id == 0:
@@ -3301,8 +3318,12 @@ class EqualGoldHuwaToJson(BasicPart):
                         # Do not process this manuscript further
                         continue
 
+                    # Other manuscript info: date
+                    if sHandschriftId in oDates:
+                        oManuscript['date'] = oDates[sHandschriftId]                    
+
                     # Get and walk through the contents of this Handschrift
-                    lst_inhalt = oInhaltHandschrift.get(str(handschrift_id), [])
+                    lst_inhalt = oInhaltHandschrift.get(sHandschriftId, [])
                     # ------------ DEBUG ------------
                     if len(lst_inhalt) > 1 or handschrift_id == 460:
                         iStop = 1
@@ -3314,6 +3335,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     for idx, oInhalt in enumerate(lst_inhalt):
                         # Get the opera id
                         opera_id=oInhalt.get("opera")
+                        sOperaId = str(opera_id)
                         inhalt_id = oInhalt.get("id")
                         # Get the Opera table
                         if opera_id in opera_passim:
@@ -3336,7 +3358,14 @@ class EqualGoldHuwaToJson(BasicPart):
                             signaturesA = get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig)
                             # Count the number of manuscripts in which this opera occurs
                             # manu_count = get_manu_count(tables['inhalt'], opera_id)
-                            manu_count = oInhaltOpera.get(str(opera_id), 0)                            
+                            manu_count = oInhaltOpera.get(str(opera_id), 0)   
+                            
+                            # Get possible title
+                            if title == "":
+                                # Look at the inhalt_id
+                                sInhaltId = str(inhalt_id)
+                                if sInhaltId in oTitles:
+                                    title = oTitles[sInhaltId]                         
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON

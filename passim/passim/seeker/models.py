@@ -3610,20 +3610,6 @@ class Manuscript(models.Model):
                 if not source is None:
                     obj_same = qs.filter(source=source).first()
 
-                #if source == None:
-                #    sCity = oManu.get("lcity")
-                #    lCity = None
-                #    if not sCity is None:
-                #        sCountry = oManu.get("lcountry", "")
-                #        # DOuble check city co-occurrence
-                #        lCity = Location.get_location(sCity, sCountry)
-                #    if lCity is None:
-                #        obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
-                #    else:
-                #        obj = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man").first()
-                #else:
-                #    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
-
                 # Check if it exists *anywhere*
                 if obj == None:
                     # Doesn't exist: create it
@@ -5542,24 +5528,6 @@ class Codico(models.Model):
                 # Possibly add each item from the list, if it doesn't yet exist
                 for date_item in dates:
                     self.add_one_daterange(date_item)
-                    #years = date_item.split("-")
-                    #yearstart = years[0].strip()
-                    #yearfinish = yearstart
-                    #if len(years) > 0: yearfinish = years[1].strip()
-                    ## Double check the lengths
-                    #if len(yearstart) > 4 or len(yearfinish) > 4:
-                    #    # We need to do better
-                    #    years = re.findall(r'\d{4}', value)
-                    #    yearstart = years[0]
-                    #    if len(years) == 0:
-                    #        yearfinish = yearstart
-                    #    else:
-                    #        yearfinish = years[1]
-
-                    #obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
-                    #if obj == None:
-                    #    # Doesn't exist, so create it
-                    #    obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
                 # Ready
             elif path == "origin":
                 if value != "" and value != "-":
