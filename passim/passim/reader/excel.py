@@ -376,12 +376,13 @@ class ManuscriptUploadJson(ReaderImport):
                                     msitems = oManu.get("msitems")
                                     if not msitems is None and len(msitems) > 0:
                                         sermon_siglist = []
-                                        for msitem in msitems:
+                                        for idx, msitem in enumerate(msitems):
                                             oSermon = msitem.get("sermon")
                                             sig = oSermon.get("signaturesA")
                                             if not sig is None:
-                                                sermon_siglist.append(sig)
-                                    html_en.append("Sermons: {}".format(", ".join(sermon_siglist)))
+                                                sermon_siglist.append("sermon {}: {}".format(idx+1, json.dumps(sig)))
+                                        sSiglist = ";\n".join(sermon_siglist)
+                                        html_en.append("Sermons: {}".format(sSiglist))
 
                                     # (3) Editornotes
                                     en = oManu.get("editornotes")
@@ -389,7 +390,7 @@ class ManuscriptUploadJson(ReaderImport):
                                         html_en.append(en)
 
                                     # COmbine the editor notes
-                                    manu.editornotes = "\n\n".join(html_en)
+                                    manu.editornotes = "\n\nHUWA sermon information:".join(html_en)
                                     manu.save()
 
                                     oResult['count'] += 1
