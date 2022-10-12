@@ -3395,6 +3395,12 @@ class EqualGoldHuwaToJson(BasicPart):
                     sComma = "" if idx + 1 >= count_manuscript else ","
                     lst_manu_string.append("{}{}".format(json.dumps(oManuscript, indent=2), sComma))
 
+                # Check the latest object, that it doesn't end with a comma
+                sManuLatest = lst_manu_string[-1]
+                if sManuLatest[-1] == ",":
+                    # Remove that comma
+                    sManuLatest = sManuLatest[:-1]
+                    lst_manu_string[-1] = sManuLatest
                 # (11) combine the sections into one object
                 # oData['manuscripts'] = lst_manuscript
                 lst_manu_string.append("]")
