@@ -1527,6 +1527,9 @@ class SearchManuForm(PassimModelForm):
 
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+    title_ta = forms.CharField(label=_("Codico_title"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching codico_titles input-sm', 'placeholder': 'Title...', 'style': 'width: 100%;'}))
+
 
     country     = forms.CharField(required=False)
     country_ta  = forms.CharField(label=_("Country"), required=False, 
@@ -1607,7 +1610,7 @@ class SearchManuForm(PassimModelForm):
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
-                  "manuidnos", "gldsiggrysons", "gldsigclavises", "names"]
+                  "manuidnos", "gldsiggrysons", "gldsigclavises", "codico_titles"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};

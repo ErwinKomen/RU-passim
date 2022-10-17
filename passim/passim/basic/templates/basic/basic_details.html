@@ -20,9 +20,9 @@
   <div>
     {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
-      <div class="panel panel-default gold-head subform">
-        <div class="row">&nbsp;</div>
-        <div class="row">
+      <div  class="panel panel-default">
+      <div class="row">&nbsp;</div>
+      <div class="row">
           <!-- Possibility to go back-->
           <div class="col-md-1">
             {% if backbutton %}
@@ -36,6 +36,53 @@
                  title="{{buttonspec.title}}">{{buttonspec.label|safe}}</a>
             {% endfor %}
           </div>
+          
+          <!-- Button for User comments-->
+          <div class="col-md-2 col-md-offset-9 text-right dropdown">
+            {% if comment_button %}
+              <!-- Comment button -->
+            
+            <a class="btn btn-s jumbo-1"
+               data-toggle="modal" 
+               data-target="#modal-comment">
+              <span class="glyphicon glyphicon-envelope" title="Add a user comment"></span>
+              {% if comment_count and comment_count > 0 %}
+                <span style='color:red;'> {{comment_count}}</span>
+              {% endif %}
+            </a>
+            {% endif %}
+          
+
+          <!-- Button for History and for Editing (if user has permission) -->          
+            {% if history_button %}
+              <!-- History button -->
+            <a class="btn btn-s jumbo-1"
+               data-toggle="modal" 
+               data-target="#modal-history">
+              <span class="glyphicon glyphicon-stats" title="Revision history"></span>
+            </a>
+            {% endif %}
+
+            {% if is_app_editor and admindetails and show_admin %}
+              <!-- Edit button -->
+              <a mode="edit" class="view-mode btn jumbo-1"
+                  onclick="ru.basic.goto_url('{{admindetails}}')">
+                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+              </a>
+            {% endif %}
+          <div class="row">&nbsp;</div>
+          </div>
+          
+          
+      </div>
+      </div>
+      <div class="panel panel-default gold-head subform">
+        
+        <div class="row">&nbsp;</div>
+        <div class="row">        
+          
+          <div class="col-md-1">            
+          </div>          
 
           <!-- Actual contents -->
           <div class="col-md-9">
@@ -306,7 +353,7 @@
                 </div>
 
                 <div class="hidden related-copy">
-                  <!-- THis is where a hidden copy is stored for a fast 'cancel' feature -->
+                  <!-- This is where a hidden copy is stored for a fast 'cancel' feature -->
                 </div>
               </div>
 
@@ -316,33 +363,9 @@
               <div id="add_to_details">{{add_to_details|safe}}</div>
             {% endif %}
 
-          </div>
-          <!-- Button for User comments-->
-          <div class="col-md-2" align ="right">
-            {% if comment_button %}
-              <!-- Comment button -->
-            
-            <a class="view-mode btn jumbo-1"
-               data-toggle="modal" 
-               data-target="#modal-comment">
-              <span class="glyphicon glyphicon-envelope" title="Add a user comment"></span>
-              {% if comment_count and comment_count > 0 %}
-                <span style='color:red;'> {{comment_count}}</span>
-              {% endif %}
-            </a>
-            {% endif %}
-          
+          </div>          
 
-          <!-- Button for History and for Editing (if user has permission) -->
-          
-            {% if history_button %}
-              <!-- History button -->
-            <a class="view-mode btn jumbo-1"
-               data-toggle="modal" 
-               data-target="#modal-history">
-              <span class="glyphicon glyphicon-stats" title="Revision history"></span>
-            </a>
-            {% endif %}
+          <!-- Button for Editing (if user has permission) -->
 
             {% if is_app_editor and admindetails and show_admin %}
               <!-- Edit button -->
@@ -356,7 +379,7 @@
         <div class="row">&nbsp;</div>
 
       </div>
-
+    
     {% elif authenticated and not permission %}
       <div class="explanation">
         <p>Dear user, you do not have permission to view this item.</p>

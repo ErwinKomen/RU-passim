@@ -10329,7 +10329,9 @@ class ManuscriptListView(BasicList):
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'title',         'dbfield': 'name',                  'keyS': 'srch_title'},
+            #{'filter': 'title',         'dbfield': 'name',                  'keyS': 'srch_title'}, LATER WEG
+            {'filter': 'title',         'fkfield': 'manuscriptcodicounits', 'keyS': 'title_ta',               'keyFK': 'name'},
+            
             {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origins__location|manuscriptcodicounits__origins', 
              # Issue #427. This was: 'manuscriptcodicounits__origin',                 
              'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
