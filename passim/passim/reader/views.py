@@ -2651,6 +2651,35 @@ class EqualGoldHuwaToJson(BasicPart):
                 iStop = 1
             return iCount
 
+        def get_city_land(ort_id, tables, oHuwaLand):
+            """Get the city and country from the [ort] id"""
+
+            oBack = None
+            oErr = ErrHandle()
+            try:
+                lst_ort = tables['ort']
+                oOrt = get_table_item(lst_ort, ort_id)
+                if not oOrt is None:
+                    # Found the location
+                    oBack['city'] = oOrt.get("ortsname")
+                    oBack['citynote'] = oOrt.get("bemerkungen")
+                    # Look for country
+                    land_id = oOrt.get("land")
+                    oLand = get_table_item(lst_land, land_id)
+                    if not oLand is None:
+                        # Found the country
+                        name = oLand.get("landname")
+                        if not name is None and name != "":
+                            oBack['country'] = name
+                            if name in oHuwaLand:
+                                oBack['country'] = oHuwaLand[oBack['country']]
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_city_land")
+            # Return the info we have
+            return oBack
+
         def get_library_info(id, tables):
             """Get the country/city/library name information for bibliothek.id"""
 
@@ -2828,7 +2857,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return author_id, msg
 
-        def get_extent(oHandschrift):
+        def get_extent(oHandschrift, oFF):
             """Derive an Extent description of the manuscript"""
 
             sBack = ""
@@ -2843,6 +2872,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 col = oHandschrift.get("col", "")
                 col_breite = oHandschrift.get("col_breite", "")
                 zeilen = oHandschrift.get("zeilen", "")
+                sId = str(oHandschrift.get("id", ""))
 
                 if folbl != "":
                     if fol_pag != "":
@@ -2870,6 +2900,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     if len(html) != 0: html.append(" ")
                     html.append("{} lines per page/column".format(zeilen))
 
+                # Look for comments
+                if sId in oFF:
+                    note = oFF[sId]
+                    html.append(" Note: {}".format(note))
+
                 # Combine into string
                 sBack = "".join(html)
             except:
@@ -2877,7 +2912,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 oErr.DoError("get_extent")
             return sBack
 
-        def get_format(oHandschrift):
+        def get_format(oHandschrift, oFormat):
             """Derive a Format description of the manuscript"""
 
             sBack = ""
@@ -2889,6 +2924,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 hs_breite = oHandschrift.get("hs_breite", "")
                 schrift_hoehe = oHandschrift.get("schrift_hoehe", "")
                 schrift_breite = oHandschrift.get("schrift_breite", "")
+                sId = str(oHandschrift.get("id", ""))
                 
                 if hs_breite != "" and format != "":
                     html.append("Ms: {} x {} mm".format(format, hs_breite))
@@ -2897,6 +2933,12 @@ class EqualGoldHuwaToJson(BasicPart):
                         html.append("Text: variable")
                     else:
                         html.append("Text: {} x {} mm".format(schrift_hoehe, schrift_breite))
+
+                # Look for comments
+                if sId in oFormat:
+                    note = oFormat[sId]
+                    html.append(" Note: {}".format(note))
+
                 # Combine into string
                 sBack = " ".join(html)
             except:
@@ -3081,6 +3123,13 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return signaturesA
 
+        def get_provenance(oHandschrift, oHerkunftBesitzer):
+            oBack = {}
+            sId = str(oHandschrift.get("id", ""))
+            if sId in oHerkunftBesitzer:
+                oBack = oHerkunftBesitzer[sId]
+            return oBack
+
         def get_signatures(oSsg, editype):
             """Get a list of signatures as string from this object"""
 
@@ -3122,7 +3171,7 @@ class EqualGoldHuwaToJson(BasicPart):
             # Note that sermons use the tables 'inc' and 'des' for the incipit and explicit
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'des', 'inc', 'inms', 'autor_inms',
                 'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land',
-                'material', 'tit', 'annus']
+                'material', 'tit', 'annus', 'ff_bem', 'format_bem']
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -3212,6 +3261,57 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Add it
                     oInhaltOpera[opera_id] += 1
 
+                # Transform the ff_bem table into a dictionary around [handschrift]
+                oFFbemHandschrift = {}
+                for oBem in tables['ff_bem']:
+                    handschrift_id = str(oInhalt.get("handschrift"))
+                    oFFbemHandschrift[handschrift_id] = oBem['name']
+                    bem = oBem['bemerkungen']
+                    if not bem is None and bem != "":
+                        oFFbemHandschrift[handschrift_id] = "{} ({})".format(oFFbemHandschrift[handschrift_id] , bem)
+
+                # Transform the format_bem table into a dictionary around [handschrift]
+                oFormatBemHandschrift = {}
+                for oBem in tables['format_bem']:
+                    handschrift_id = str(oInhalt.get("handschrift"))
+                    oFormatBemHandschrift[handschrift_id] = oBem['name']
+                    bem = oBem['bemerkungen']
+                    if not bem is None and bem != "":
+                        oFormatBemHandschrift[handschrift_id] = "{} ({})".format(oFormatBemHandschrift[handschrift_id] , bem)
+
+                # Get the Herkunft tables sorted out
+                oHerkunftBesitzerName = {}
+                oHerkunftBesitzer = {}
+                for oHBN in tables['herkunft_besitzer_name']:
+                    region = oHBN.get('region', '')
+                    name = oHBN.get('name', '')
+                    ort_id = str(oHBN.get('ort', ''))
+                    sId = str(oHBN.get("id"))
+                    combi = {}
+                    if not region is None and region != "":
+                        combi['region'] = region
+                    if not name is None and name != "":
+                        combi['name'] = name
+                    if ort_id != '0':
+                        oLoc = get_city_land(ort_id, tables, oHuwaLand)
+                        if 'city' in oLoc: combi['lcity'] = oLoc.get('city')
+                        if 'country' in oLoc: combi['lcountry'] = oLoc.get('country')
+
+                    oHerkunftBesitzerName[sId] = combi
+                for oHB in tables['herkunft_besitzer']:
+                    sId = str(oHB.get("handschrift"))
+                    combi = {}
+                    hbn_id = str(oHB.get('herkunft_besitzer_name', ''))
+                    if hbn_id in oHerkunftBesitzerName:
+                        combi['prov_loc'] = oHerkunftBesitzerName[hbn_id]
+                    oldsig = oHB.get("altesignatur", "")
+                    if oldsig != "": 
+                        combi['prov_oldsig'] = oldsig
+                    note = oHB.get("bemerkungen", "")
+                    if note != "": 
+                        combi['prov_note'] = note
+                    oHerkunftBesitzer[sId] = combi
+
                 # Transform the DES table into a dictionary around [inhalt]
                 oInhaltDes = {}
                 for oDes in tables['des']:
@@ -3261,9 +3361,9 @@ class EqualGoldHuwaToJson(BasicPart):
                     # (1) Support = material
                     oManuscript['support'] = get_support(oInhaltHandschrift, oSupport)
                     # (2) Extent: use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
-                    oManuscript['extent'] = get_extent(oHandschrift)
+                    oManuscript['extent'] = get_extent(oHandschrift, oFFbemHandschrift)
                     # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
-                    oManuscript['format'] = get_format(oHandschrift)
+                    oManuscript['format'] = get_format(oHandschrift, oFormatBemHandschrift)
 
                     # Figure out library and location
                     bibliothek_id = oHandschrift.get("bibliothek")
@@ -3312,6 +3412,9 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['library'] = lib_name
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
+
+                    # Possibly add provenance
+                    oManuscript['provenance'] = get_provenance(oHandschrift, oHerkunftBesitzer)
 
                     # Test on bibliothek = 2 (see issue #532)
                     if bibliothek_id == 2:
