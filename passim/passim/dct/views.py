@@ -26,9 +26,11 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
-from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2
+from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
+    Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
-from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct
+from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
+    SavedItem, SavedSearch, SelectItem
 from passim.dct.forms import ResearchSetForm, SetDefForm
 from passim.approve.models import EqualChange, EqualApproval
 
@@ -78,7 +80,6 @@ def sermones_reset(request):
         msg = oErr.get_error_message()
         oErr.DoError("sermones_reset")
         return redirect('home')
-
 
 def manuscript_ssgs(manu, bDebug = False):
     """Get the ordered list of SSGs related to a manuscript"""
@@ -162,7 +163,6 @@ def collection_ssgs(coll, bDebug = False):
         oErr.DoError("collection_ssgs")
     return lBack
 
-
 def dct_manulist(lst_manu, bDebug=False):
     """Create a DCT based on the manuscripts in the list"""
 
@@ -217,9 +217,12 @@ def dct_manulist(lst_manu, bDebug=False):
         oErr.DoError("dct_manulist")
     return lBack
 
+
+
+
 # =================== MY OWN DCT pages ===============
 def mypassim(request):
-    """Renders the MyPassim page (=PRE)."""
+    """Renders the MyPassim page (=PRE, Personal Research Environment)."""
     
     oErr = ErrHandle()
     try:
@@ -320,6 +323,628 @@ def mypassim(request):
 
     return render(request,template_name, context)
 
+
+# =================== MyPassim as model view attempt ======
+class MyPassimEdit(BasicDetails):
+    model = Profile
+    mform = None
+    prefix = "pre"  # Personal Research Environment
+    prefix_type = "simple"
+    title = "MY PASSIM"
+    template_name = "dct/mypassim.html"
+    mainitems = []
+
+    def custom_init(self, instance):
+        if user_is_authenticated(self.request):
+            # Get the profile id of this user
+            profile = Profile.get_user_profile(self.request.user.username)
+            self.object = profile
+        else:
+            pass
+        return None
+
+    def add_to_context(self, context, instance):
+        oErr = ErrHandle()
+        try:
+            profile = self.object
+            context['profile'] = profile
+            context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
+            context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
+            context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+
+            # COunting table sizes for the super user
+            if user_is_superuser(self.request):
+                table_infos = []
+                tables = [
+                    {'app': 'seeker',
+                     'models': ['Collection', 'Profile', 'Manuscript', 'SermonDescr', 'SermonHead', 'SermonGold', 
+                          'Codico', 'MsItem', 'Author', 'Keyword', 'Library', 'Origin', 'Provenance', 'SourceInfo', 'Signature',
+                          'SermonDescrEqual']},
+                    {'app': 'dct', 
+                     'models': ['ResearchSet', 'SetList', 'SetDef'] }
+                          ]
+                for oApp in tables:
+                    app_name = oApp['app']
+                    models = oApp['models']
+                    models.sort()
+                    for model in models:
+                        cls = apps.app_configs[app_name].get_model(model)
+                        count = cls.objects.count()
+                        oInfo = dict(app_name=app_name, model_name=model, count=count)
+                        table_infos.append(oInfo)
+                context['table_infos'] = table_infos
+
+            # Figure out any editing rights
+            qs = profile.projects.all()
+            context['edit_projects'] = "(none)"
+            if context['is_app_editor'] and qs.count() > 0:
+                html = []
+                for obj in qs:
+                    url = reverse('project2_details', kwargs={'pk': obj.id})
+                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
+                context['edit_projects'] = ",".join(html)
+
+            # Figure out which projects this editor may handle
+            if context['is_app_editor']:
+                qs = profile.project_editor.filter(status="incl")
+                if qs.count() == 0:
+                    sDefault = "(none)"
+                else:
+                    html = []
+                    for obj in qs:
+                        project = obj.project
+                        url = reverse('project2_details', kwargs={'pk': project.id})
+                        html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                    sDefault = ", ".join(html)
+                context['default_projects'] = sDefault
+
+            # Make sure to check (and possibly create) EqualApprove items for this user
+            iCount = EqualChange.check_projects(profile)
+
+            # What about the field changes that I have suggested?
+            context['count_fchange_all'] = profile.profileproposals.count()
+            context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
+
+            # How many do I need to approve?    
+            context['count_approve_all'] = profile.profileapprovals.count()
+            context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
+
+            # What about the SSG/AFs that I have suggested?
+            context['count_afadd_all'] = profile.profileaddings.count()
+            context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
+
+            # How many SSG/AFs do I need to approve?    
+            context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
+            context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
+
+            # Add any related objects
+            context['related_objects'] = self.get_related_objects(profile)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("mypassimedit/add_to_context")
+
+        return context
+
+    def get_related_objects(self, instance):
+        """Calculate and add related objects:
+
+        Currently:
+            - Saved items
+        To be extended (see issue #408):
+            - Saved searches
+        """
+
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+            oAdd = dict(value=value)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
+            rel_item.append(oAdd)
+            return True
+
+        def check_order(qs):
+            with transaction.atomic():
+                for idx, obj in enumerate(qs):
+                    if obj.order < 0:
+                        obj.order = idx + 1
+                        obj.save()
+
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Authorization: only app-editors may edit!
+        bMayEdit = user_is_ingroup(self.request, team_group)
+            
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = ""
+        sort_start_int = ""
+        sort_end = ""
+        if bMayEdit:
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
+
+        oErr = ErrHandle()
+        try:
+            # Make sure to work with the current user's profile
+            profile = self.object
+
+            # [1] =============================================================
+            # Get all 'SavedItem' objects that belong to the current user (=profile)
+            sitemset = dict(title="Saved items", prefix="svitem")  
+            if resizable: sitemset['gridclass'] = "resizable dragdrop"
+            sitemset['savebuttons'] = bMayEdit
+            sitemset['saveasbutton'] = False
+
+            qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+            # Also store the count
+            sitemset['count'] = qs_sitemlist.count()
+            sitemset['instance'] = instance
+            sitemset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_sitemlist)
+
+            # Walk these sitemlist
+            for obj in qs_sitemlist:
+                # The [obj] is of type `SavedItem`
+
+                rel_item = []
+
+                # The [item] depends on the sitemtype
+                item = None
+                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+                if obj.sitemtype in itemset:
+                    item = getattr(obj, itemset[obj.sitemtype])
+
+                # SavedItem: Order within the set of SavedItems
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SavedItem: Type
+                add_one_item(rel_item, obj.get_sitemtype_display(), False)
+
+                # SavedItem: title of the manu/serm/ssg/coll
+                kwargs = None
+                #if obj.name != None and obj.name != "":
+                #    kwargs = dict(name=obj.name)
+                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
+
+                # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
+                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            sitemset['rel_list'] = rel_list
+            sitemset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Type of saved item">Item</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="The title of the manuscript/sermon/authority-file/dataset/collection">Title</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of SSGs part of this item">Size</span>{}'.format(sort_start_int, sort_end)
+                ]
+            if bMayEdit:
+                sitemset['columns'].append("")
+            related_objects.append(sitemset)
+
+            # [2] ===============================================================
+            # Deal with Saved Searches!!!!
+            # TODO: implement
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("mypassimedit/get_related_objects")
+
+        # Return the adapted context
+        return related_objects
+
+    def get_field_value(self, type, instance, custom, kwargs=None):
+        sBack = ""
+        collection_types = ['hc', 'pd' ]
+
+        oErr = ErrHandle()
+        try:
+
+            if type == "manu":
+                # This is a Manuscript
+                if custom == "title":
+                    url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                        url, instance.get_city(), instance.get_library(), instance.idno)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this manuscript
+                    count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__codico__manuscript=instance).order_by('id').distinct().count()
+                    sBack = "{}".format(count)
+
+            elif type == "serm":
+                # This is a sermon description
+                if custom == "title":
+                    url = reverse("sermon_details", kwargs = {'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                        url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+                elif custom == "size":
+                    # Get the number of SSGs to which this Sermon points
+                    count = instance.equalgolds.count()
+                    sBack = "{}".format(count)
+
+            elif type == "ssg":
+                # This is an Authority File (=SSG)
+                if custom == "title":
+                    sBack = instance.get_passimcode_markdown()
+                    #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
+                    #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
+                    #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
+                elif custom == "size":
+                    count = 1   # There is just 1 authority file
+                    sBack = "{}".format(count)
+
+
+            elif type in collection_types:
+                if custom == "title":
+                    sTitle = "none"
+                    if instance is None:
+                        sBack = sTitle
+                    else:
+                        if type == "hc":
+                            # Historical collection
+                            url = reverse("collhist_details", kwargs={'pk': instance.id})
+                        else:
+                            # Private or Public dataset
+                            if instance.scope == "publ":
+                                url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                            else:
+                                url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                        if kwargs != None and 'name' in kwargs:
+                            title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                        else:
+                            title = instance.name
+                        sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this collection
+                    #count = "-1" if instance is None else instance.super_col.count()
+                    #sBack = "{}".format(count)
+                    sBack = instance.get_size_markdown()
+
+            elif type == "saveditem":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MyPassimEdit/get_field_value")
+
+        return sBack
+
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
+
+        try:
+            arg_hlist = "svitem-hlist"
+            arg_savenew = "svitem-savenew"
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                # Interpret the savenew parameter
+                savenew = self.qd[arg_savenew]
+
+                # Make sure we are not saving
+                self.do_not_save = True
+                # But that we do a new redirect
+                self.newRedirect = True
+
+                # Change the redirect URL
+                if self.redirectpage == "":
+                    self.redirectpage = reverse('mypassim_details')
+
+                # What we have is the ordered list of Manuscript id's that are part of this collection
+                with transaction.atomic():
+                    # Make sure the orders are correct
+                    for idx, item_id in enumerate(hlist):
+                        order = idx + 1
+                        lstQ = [Q(profile=instance)]
+                        lstQ.append(Q(**{"id": item_id}))
+                        obj = SavedItem.objects.filter(*lstQ).first()
+                        if obj != None:
+                            if obj.order != order:
+                                obj.order = order
+                                obj.save()
+                                bChanges = True
+                # See if any need to be removed
+                existing_item_id = [str(x.id) for x in SavedItem.objects.filter(profile=instance)]
+                delete_id = []
+                for item_id in existing_item_id:
+                    if not item_id in hlist:
+                        delete_id.append(item_id)
+                if len(delete_id)>0:
+                    lstQ = [Q(profile=instance)]
+                    lstQ.append(Q(**{"id__in": delete_id}))
+                    SavedItem.objects.filter(*lstQ).delete()
+                    bChanges = True
+
+                if bChanges:
+                    # (6) Re-calculate the order
+                    SavedItem.update_order(instance)
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MyPassimEdit/check_hlist")
+            return False
+
+
+class MyPassimDetails(MyPassimEdit):
+    """The HTML variant of [ResearchSetEdit]"""
+
+    rtype = "html"
+
+    def custom_init(self, instance):
+        # First process what needs to be done anyway
+        custom_result = super(MyPassimDetails, self).custom_init(instance)
+
+        # Now continue
+        profile = instance if not instance is None else self.object
+        if not profile is None:
+            # Check for hlist saving
+            self.check_hlist(profile)
+        return None
+
+
+
+# ================= Views for SavedItem, SelectItem ================
+
+class SavedItemApply(BasicPart):
+    """Either add or remove an item as saved data"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+            # We already know who we are
+            profile = self.obj
+
+            # Retrieve necessary parameters
+            sitemtype = self.qd.get("sitemtype")
+            sitemaction = self.qd.get("sitemaction")
+            saveditemid = self.qd.get("saveditemid")
+            itemid = self.qd.get("itemid")
+
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemidfield = itemset[sitemtype]
+
+            if sitemaction == "add":
+                # We are going to add an item as a saveditem
+                obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
+                if obj is None:
+                    obj = SavedItem.objects.create(
+                        profile=profile, sitemtype=sitemtype)
+                    # The particular attribute to set depends on the sitemtype
+                    setattr(obj, "{}_id".format(itemidfield), itemid)
+                    obj.save()
+                data['action'] = "added"
+            elif sitemaction == "remove" and not saveditemid is None:
+                # We need to remove *ALL* relevant items
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(sitemtype=sitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                delete_id = SavedItem.objects.filter(*lstQ).values("id")
+                if len(delete_id) > 0:
+                    SavedItem.objects.filter(id__in=delete_id).delete()
+                data['action'] = "removed"
+
+            # Possibly adapt the ordering of the saved items for this user
+            if 'action' in data:
+                # Something has happened
+                SavedItem.update_order(profile)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItemApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
+
+
+class SelectItemApply(BasicPart):
+    """Either add or remove an item as saved data"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+        oSelBasket = dict(
+            serm=dict(model=Basket, field_b="sermon", field_s="sermon", field_p="basketsize"),
+            manu=dict(model=BasketMan, field_b="manu", field_s="manuscript", field_p="basketsize_manu"),
+            ssg=dict(model=BasketSuper, field_b="super", field_s="equal", field_p="basketsize_super"),
+            gold=dict(model=BasketGold, field_b="gold", field_s="gold", field_p="basketsize_gold")
+            )
+        oSelDct = dict(
+            manu=dict(setlisttype="manu", field_s="manuscript"),
+            hc=dict(setlisttype="ssgd", field_s="collection"),
+            pd=dict(setlisttype="ssgd", field_s="collection")
+            )
+       
+        try:
+            # We already know who we are
+            profile = self.obj
+
+            # Retrieve necessary parameters
+            selitemtype = self.qd.get("selitemtype")
+            selitemaction = self.qd.get("selitemaction")
+            mode = self.qd.get("mode")
+            selitemid = self.qd.get("selitemid")
+            itemid = self.qd.get("itemid")
+            rsetoneid = None
+            for k,v in self.qd.items():
+                if "rsetone" in k:
+                    rsetoneid = v
+                    break
+
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemidfield = itemset[selitemtype]
+
+            if selitemaction == "-" and not mode is None:
+                selitemaction = mode
+
+            if selitemaction == "add":
+                # We are going to add an item as a selitem
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(selitemtype=selitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                obj = SelectItem.objects.filter(*lstQ).first()
+                if obj is None:
+                    obj = SelectItem.objects.create(profile=profile, selitemtype=selitemtype)
+                    # The particular attribute to set depends on the selitemtype
+                    setattr(obj, "{}_id".format(itemidfield), itemid)
+                    obj.save()
+                data['action'] = "added"
+            elif selitemaction == "remove" and not selitemid is None:
+                # We need to remove *ALL* relevant items
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(selitemtype=selitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                delete_id = SelectItem.objects.filter(*lstQ).values("id")
+                if len(delete_id) > 0:
+                    SelectItem.objects.filter(id__in=delete_id).delete()
+                data['action'] = "removed"
+
+            elif selitemaction == "clear_sel":
+                # Remove all selections for this item type
+                delete_id = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).values("id")
+                if len(delete_id) > 0:
+                    SelectItem.objects.filter(id__in=delete_id).delete()
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "clear_sel"
+
+            elif selitemaction == "add_saveitem":
+                # Add all selected items to the Saved Items
+                qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+                for obj_sel in qs:
+                    # Check if we have this already as SavedItem
+                    obj_sav = SavedItem.objects.filter(profile=profile, sitemtype=selitemtype,
+                            manuscript=obj_sel.manuscript, sermon=obj_sel.sermon,
+                            equal=obj_sel.equal, collection=obj_sel.collection).first()
+                    if obj_sav is None:
+                        # Create it
+                        obj_sav = SavedItem.objects.create(profile=profile, sitemtype=selitemtype,
+                                manuscript=obj_sel.manuscript, sermon=obj_sel.sermon,
+                                equal=obj_sel.equal, collection=obj_sel.collection)
+
+                # Remove the selection
+                qs.delete()
+
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "update_sav"
+
+            elif selitemaction == "add_basket":
+                # Double check: this functionality only exists for S, SG, SSG, M
+                if selitemtype in oSelBasket:
+                    # Add all selected items to the Basket of the currently selected listview
+                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                    # Figure out which selection object to use
+                    selParams = oSelBasket[selitemtype]
+                    cls = selParams['model']
+                    field_b = selParams['field_b']
+                    field_s = selParams['field_s']
+                    field_p = selParams['field_p']
+
+                    # Walk all selected items
+                    for obj_sel in qs:  
+                        # which object is this?
+                        obj = getattr(obj_sel, field_s)
+                                              
+                        # Check if this item already exists in the basket
+                        lstQ = [Q(profile=profile)]
+                        lstQ.append(Q(**{"{}".format(field_b): obj.id}))
+                        obj_basket = cls.objects.filter(*lstQ).first()
+                        if obj_basket is None:
+                            # Create a dictionry with the required stuff
+                            data_dict = dict(profile=profile)
+                            data_dict[field_b] = obj
+                            # Add it to the basket
+                            cls.objects.create(**data_dict)
+                    # Re-calculate the size of the basket
+                    basketsize = cls.objects.filter(profile=profile).count()
+
+                    # Adapt the profile's basketsize
+                    setattr(profile, field_p, basketsize)
+                    profile.save()
+
+                    data['basketsize'] = basketsize
+
+                    # Remove the selection
+                    qs.delete()
+
+                    # Indicate that the JS also needs to do some clearing
+                    data['action'] = "update_basket"
+
+            elif selitemaction == "add_dct":
+                # Double check: this functionality only exists for M, HC, PD
+                if selitemtype in oSelDct and not rsetoneid is None:
+                    # Add all selected items to the DCT
+                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                    # Figure out which selection object to use
+                    selParams = oSelDct[selitemtype]
+                    setlisttype = selParams['setlisttype']
+                    field_s = selParams['field_s']
+
+                    # Add all selected items to the DCT
+                    rset = ResearchSet.objects.filter(id=rsetoneid).first()
+                    if not rset is None:
+                        # Walk all the selected items
+                        for obj in qs:
+                            # Add this item to the chosen research set
+                            item = getattr(obj,field_s)
+                            rset.add_list(item, setlisttype)
+                        # make sure to add a link to the research set here
+                        data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                    # Remove the selection
+                    qs.delete()
+
+                    # Indicate that the JS also needs to do some clearing
+                    data['action'] = "update_dct"
+
+            
+
+            # Has something happened?
+            if 'action' in data:
+                # Okay, then re-calculate the amount of selected items
+                data['selitemcount'] = SelectItem.get_selectcount(profile, selitemtype)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItemApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 # =================== Model views for the DCT ========

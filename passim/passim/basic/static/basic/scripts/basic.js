@@ -2817,7 +2817,13 @@ var ru = (function ($, ru) {
                 $(elThis).addClass("jumbo-1");
                 // Must hide it and reset target
                 $(target).addClass("hidden");
+
+                // Process the <input> element
                 $(target).find("input").each(function (idx, elThis) {
+                  $(elThis).val("");
+                });
+                // Process the <textarea> element
+                $(target).find("textarea").each(function (idx, elThis) {
                   $(elThis).val("");
                 });
                 // Also reset all select 2 items
@@ -2993,6 +2999,81 @@ var ru = (function ($, ru) {
         }
       },
 
+      /**
+       * sel_button
+       *    Show or hide the select column
+       *
+       */
+      sel_button: function (elStart) {
+        var elTable = null,
+            elS = null,
+            elH = null,
+            selcount = "",
+            mode = "";
+
+        try {
+          // Find out which mode I am in
+          mode = ($(elStart).hasClass("jumbo-1")) ? "hide" : "show";
+
+          // Figure out what the selection count is
+          selcount = $(".selcount").first().html().trim();
+
+          // Find the table
+          elTable = $("table.table").first();
+          // Find the <h3> element
+          elH = $(elStart).closest("h3");
+          // Either hide or show the .select-column
+          switch (mode) {
+            case "hide":
+              // Turn into showing
+              $(elTable).find(".select-column").removeClass("hidden");
+              // Change the button into 'showing'
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-3");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").removeClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(".selcount").addClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              } else {
+                $(elH).find(".select-execute button").attr("disabled", false);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("show");
+              break;
+            case "show":
+              // Turn into hiding
+              $(elTable).find(".select-column").addClass("hidden");
+              // Change the button into 'hiding'
+              $(elStart).removeClass("jumbo-3");
+              $(elStart).addClass("jumbo-1");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").addClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(".selcount").removeClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("hide");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sel_button", ex);
+        }
+      },
+
+  
       /**
        * tabular_addrow
        *   Add one row into a tabular inline

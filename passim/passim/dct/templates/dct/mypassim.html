@@ -1,6 +1,12 @@
 {% extends "layout.html" %}
 {% load staticfiles %}
 
+{% block scripts %}
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
+    <script src="{% static 'basic/scripts/basic.js' %}"></script>
+    <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+{% endblock %}
+
 
 {% block content %}
 
@@ -15,28 +21,8 @@
 
   <div class="row">
     <div class="col-md-6">
-      <section>
-        <h3>
-          <span class="glyphicon glyphicon-minus"></span>
-          <span data-toggle="collapse" data-target="#items-area">Saved items</span>
-        </h3>
-        <div id="items-area" class="collapse-indicator in">
-          <p>Items that you have saved for quick reference.</p>
-          <div id="saveditems_set" class="row related-root">
-            {% include 'dct/rel_view.html' with related=saveditems %}
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h3>
-          <span class="glyphicon glyphicon-minus"></span>
-          <span data-toggle="collapse" data-target="#searches-area">Saved searches</span>
-        </h3>
-        <div id="searches-area" class="collapse-indicator in">
-          <p>Searches that you have made and that you have provided with a name.</p>
-        </div>
-      </section>
+      <!-- This is where the related sets appear, as their own sections -->
+      {% include 'dct/rel_view.html' with related=related_objects %}
 
       <section>
         <h3>
@@ -290,3 +276,4 @@
 
 </div>
 {% endblock %}
+

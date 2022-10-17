@@ -1,0 +1,15 @@
+
+<span targetid="#selitem_form_{{item.id}}" class="selitem">
+  {% if selitem.id %}
+    <a class="selitem-button-selected" onclick="ru.dct.do_selitem(this, 'add');"
+       title="Uncheck this item">
+      <span class="glyphicon glyphicon-check"></span>
+    </a>
+  {% else %}
+    <a class="selitem-button" onclick="ru.dct.do_selitem(this, 'remove');"
+       title="Select this item">
+      <span class="glyphicon glyphicon-unchecked"></span>
+    </a>
+  {% endif %}
+</span>
+

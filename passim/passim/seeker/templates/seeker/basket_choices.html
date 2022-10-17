@@ -7,7 +7,9 @@
     <span class="glyphicon glyphicon-shopping-cart"></span>
     <span>Basket</span>
     {% if basketsize > 0 %}
-      <span>({{basketsize}})</span>
+      <span id="basketsize">({{basketsize}})</span>
+    {% else %}
+      <span id="basketsize"></span>
     {% endif %}
     <span class="caret"></span>
   </a>

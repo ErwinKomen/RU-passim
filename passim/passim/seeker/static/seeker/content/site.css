@@ -1940,4 +1940,34 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     visibility: hidden;
 }
 
+/*.collapse-indicator:after {
+    font-family: 'Glyphicons Halfling';
+    content: "\e114";
+}
+
+.collapse-indicator.collapsed:after {
+    content: "\e080";
+}*/
+
+
+.sitem-button-selected > .glyphicon {
+    color: blue; /* #355e3b;  */
+    cursor: pointer;
+}
+
+.sitem-button {
+    color: gray; 
+    cursor: pointer;
+}
+
+
+.selitem-button-selected > .glyphicon {
+    color: darkgreen; /* #355e3b;  */
+    cursor: pointer;
+}
+
+.selitem-button {
+    color: gray; 
+    cursor: pointer;
+}
 

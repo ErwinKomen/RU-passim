@@ -1,0 +1,49 @@
+
+<form class="selitem-main" targeturl="{% url 'selitem_apply' profile.id %}">
+  {% csrf_token %}
+  <div class="hidden">
+    <input type="text" id="id_selitemtype"   name="selitemtype"   value="{{selitemtype}}" />
+    <input type="text" id="id_selitemaction" name="selitemaction" value="-" />
+  </div>
+
+  {% if listForm.rsetone %}
+    <div id="selitem-dct" class="row hidden">
+      <div class="col-md-3 pull-right">
+        <table style="width: 100%;">
+          <tbody>
+            <tr>
+              <!-- Allow selecting from available research sets -->
+              <td style="width: 100%">{{listForm.rsetone}}</td>
+            </tr>
+            <tr>
+              <td align="right">
+                <!-- Button to cancel -->
+                <a id="msel_rsetaddcancel" title="Cancel adding to a research set" 
+                   class="btn btn-sm jumbo-1" 
+                   onclick="ru.dct.do_selitem(this, 'cancel_dct');">
+                  <span>Cancel</span>
+                </a>
+
+                <!-- Button to actually add to the chosen research set -->
+                <a id="msel_rsetadd" title="Add selected items to a research set" 
+                   class="btn btn-sm jumbo-3" mode="add_dct"
+                   onclick="ru.dct.do_selitem('.selitem-main', 'add_dct');"  >
+                  <span>Add to this research set</span>
+                </a>
+
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Possibly show a link to the ResearchSet -->
+    <div id="selitem-rset" class="row hidden">
+      <div class="col-md-3 pull-right">
+        <a role="button" class="btn btn-sm jumbo-1" href="" title="Go to the research set to which the item has been added">Open research set</a>
+      </div>
+    </div>    
+  {% endif %}
+
+</form>

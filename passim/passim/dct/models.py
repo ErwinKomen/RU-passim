@@ -17,13 +17,16 @@ import json, copy
 # Take from my own app
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
+from passim.basic.models import UserSearch
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
-    Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword
+    Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
+    SermonDescr, EqualGold
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
 
 SETLIST_TYPE = "dct.setlisttype"
+SAVEDITEM_TYPE = "dct.saveditemtype"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -129,6 +132,43 @@ class ResearchSet(models.Model):
                 # Keep track of how the order should be
                 order += 1
         return None
+
+    def add_list(self, obj, setlisttype):
+        """Add a list of SSGs (either Manuscript or Collection) to the research set"""
+
+        oErr = ErrHandle()
+        bBack = True
+        try:
+            # Get the current size of the research set
+            iCount = self.researchset_setlists.count()
+            order = iCount + 1
+            setlist = None
+
+            # Action depends on the type of addition
+            if setlisttype == "manu":   # Add a manuscript
+                setlist = SetList.objects.filter(researchset=self, setlisttype=setlisttype, manuscript=obj).first()
+                if setlist is None:
+                    setlist = SetList.objects.create(
+                        researchset=self, order=order, setlisttype=setlisttype,
+                        manuscript=obj, name="Added via add_list")
+                pass
+            elif setlisttype == "ssgd":   # Add a hc or pd
+                setlist = SetList.objects.filter(researchset=self, setlisttype=setlisttype, collection=obj).first()
+                if setlist is None:
+                    setlist = SetList.objects.create(
+                        researchset=self, order=order, setlisttype=setlisttype,
+                        collection=obj, name="Added via add_list")
+
+            # If need be, calculate the contents
+            if not setlist is None:
+                self.update_ssglists()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/add_list")
+            bBack = False
+        # Return the status
+        return bBack
 
     def calculate_matches(self, ssglists):
         """Calculate the number of pm-matches for each list from ssglists"""
@@ -419,20 +459,19 @@ class SetList(models.Model):
         """
 
         oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 3000, "matches": 0}
-        if self.setlisttype == "manu":
+        if self.setlisttype == "manu":          # SSGs via Manuscript > sermons > SSG links
             # This is a manuscript
             oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
             oBack['size'] = self.manuscript.get_sermon_count()
             oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
             oBack['yearstart'] = self.manuscript.yearstart
             oBack['yearfinish'] = self.manuscript.yearfinish
-        elif self.setlisttype == "hist":
-            # Historical collection
+        elif self.setlisttype == "hist":        # Historical collection (of SSGs)
             oBack['top'] = "hc"
             oBack['main'] = self.collection.name
             oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})
-        elif self.setlisttype == "ssgd":
+            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
+        elif self.setlisttype == "ssgd":        # Personal/public dataset (of SSGs!!!)
             # Personal collection
             oBack['top'] = "pd"
             if self.name == None or self.name == "":
@@ -810,6 +849,186 @@ class SetDef(models.Model):
             oErr.DoError("SetDef/get_setlist")
         return oBack
 
+
+# ====================== Personal Research Environment models ========================================
+
+class SavedItem(models.Model):
+    """A saved item can be a M/S/SSG or HC or PD"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_saveditems")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each saved item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    sitemtype = models.CharField("Saved item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # Depending on the type of SavedItem, there is a pointer to the actual item
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_saveditems")
+    # [0-1] Sermon pointer
+    sermon = models.ForeignKey(SermonDescr, blank=True, null=True, on_delete=models.SET_NULL, related_name="sermon_saveditems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_saveditems")
+    # [0-1] Collection pointer (that can be HC, public or personal collection
+    collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_saveditems")
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        return sBack
+
+    def get_saveditem(item, profile, sitemtype):
+        """If this is a saved item for the indicated user, get that item"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                if sitemtype == "manu":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, manuscript=item).first()
+                elif sitemtype == "serm":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, sermon=item).first()
+                elif sitemtype == "ssg":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, equal=item).first()
+                elif sitemtype == "hc" or sitemtype == "pd":
+                    obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype, collection=item).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/get_saveditem")
+        return obj
+
+    def get_saveditem_button(item, profile, sitemtype):
+        """Provide a button to either turn this into a saved item or remove it as saved item"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            obj = SavedItem.get_saveditem(item, profile, sitemtype)
+            html = []
+            if obj is None:
+                # make it possible to turn this into a saved item
+                html.append("<a class='btn btn-xs jumbo-3' onclick='ru.dct.add_saveditem();'>")
+                html.append('<span class="glyphicon glyphicon-plus"></span>')
+                html.append('<span>Add to your saved items</span>')
+                html.append('</a>')
+            else:
+                # make it possible to remove this as saved item
+                html.append("<a class='btn btn-xs jumbo-4' onclick=''>")
+                html.append('<span class="glyphicon glyphicon-minus"></span>')
+                html.append('<span>Remove from your saved items</span>')
+                html.append('</a>')
+            # Combine into string
+            sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/get_saveditem_button")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = SavedItem.objects.filter(profile=self.profile).count() + 1
+        response = super(SavedItem, self).save(force_insert, force_update, using, update_fields)
+        # Return the regular save response
+        return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SavedItem.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem/update_saveditems")
+            bOkay = Falses
+        return bOkay
+    
+
+class SavedSearch(models.Model):
+    """A saved search links to the basic UserSearch"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savedsearches")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+
+    # [1] The usersearch that this saved search points to 
+    usersearch = models.ForeignKey(UserSearch, on_delete=models.CASCADE, related_name="usersearch_savedsearches")
+
+    def __str__(self):
+        sBack = "{}: {}".format(self.profile.user.username, self.usersearch.id)
+        return sBack
+
+
+class SelectItem(models.Model):
+    """A selected item can be a M/S/SSG or HC or PD"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_selectitems")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each saved item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # Depending on the type of SelectItem, there is a pointer to the actual item
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_selectitems")
+    # [0-1] Sermon pointer
+    sermon = models.ForeignKey(SermonDescr, blank=True, null=True, on_delete=models.SET_NULL, related_name="sermon_selectitems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_selectitems")
+    # [0-1] Collection pointer (that can be HC, public or personal collection
+    collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_selectitems")
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        return sBack
+
+    def get_selectitem(item, profile, selitemtype):
+        """If this is a selected item for the indicated user, get that item"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                if selitemtype == "manu":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, manuscript=item).first()
+                elif selitemtype == "serm":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, sermon=item).first()
+                elif selitemtype == "ssg":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, equal=item).first()
+                elif selitemtype == "hc" or selitemtype == "pd":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, collection=item).first()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItem/get_selectitem")
+        return obj
+
+    def get_selectcount(profile, selitemtype):
+        """Get the amount of selected items for this particular user / selitemtype"""
+
+        iCount = 0
+        oErr = ErrHandle()
+        try:
+            if not profile is None:
+                # Find out if this object exists
+                iCount = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).count()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItem/get_selectcount")
+        return iCount
 
 
 

@@ -4,7 +4,7 @@
 -
 {% else %}
   <div>
-    <span class="badge signature ot"  title="Click to show/hide..." data-toggle="collapse" data-target="#codi_origin_table" >
+    <span class="badge signature ot"  title="Click to show/hide..." data-toggle="collapse" data-target="#codi_origin_table_{{codi.id}}" >
     {% spaceless %}
       {% for cori in codi.codico_origins.all %}
         {% if cori.origin.name %}{{cori.origin.name}}
@@ -14,7 +14,7 @@
     {% endspaceless %}
     </span>
   </div>
-  <div id="codi_origin_table" class="inert collapse">
+  <div id="codi_origin_table_{{codi.id}}" class="inert collapse">
     <table>
       <tbody>
         {% for cori in codi.codico_origins.all %}

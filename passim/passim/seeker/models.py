@@ -15,10 +15,6 @@ import pytz
 from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
-from passim.utils import *
-from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
-from passim.seeker.excel import excel_to_list
-from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 import sys, os, io, re
 import copy
 import json
@@ -37,6 +33,12 @@ from pyzotero import zotero
 # from lxml import etree as ET
 # import xmltodict
 from xml.dom import minidom
+
+# From this own application
+from passim.utils import *
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
+from passim.seeker.excel import excel_to_list
+from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 
 re_number = r'\d+'
 
@@ -403,6 +405,7 @@ def get_comments(stype, usercomment=False, count=-1):
     """Get the comments for each manuscripts, sermon or equalgold"""
     # TH: hij komt hier helemaal niet
 
+    # Initialize what is returned
     sBack = ""
     
     if usercomment:
@@ -418,11 +421,10 @@ def get_comments(stype, usercomment=False, count=-1):
         html.append("   data-target='#modal-comment'>")
         html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
         sBack = "\n".join(html)
+    # Actually return
+    return sBack
 
-
-
-
-def get_stype_light(stype, usercomment=False, count=-1):
+def get_stype_light(stype, usercomment=False, count=-1, add=""):
     """HTML visualization of the different STYPE statuses"""
     # Get rid of the comments section
 
@@ -459,6 +461,14 @@ def get_stype_light(stype, usercomment=False, count=-1):
     #    html.append("   data-target='#modal-comment'>")
     #    html.append("   <span class='glyphicon glyphicon-envelope' title='Add a user comment'></span>{}</a></span>".format(count_code))
     #    sBack = "\n".join(html)
+
+    # Any additions?
+    if add != "":
+        html = []
+        html.append(sBack)
+        html.append("&nbsp;&nbsp;")
+        html.append(add)
+        sBack = "".join(html)
         
 
     # Return what we made
@@ -1902,6 +1912,44 @@ class Location(models.Model):
         obj = self.location_identifiers.filter(idname="idVilleEtab").first()
         return "" if obj == None else obj.idvalue
 
+    def get_or_create_library(lib_name, lib_city, lib_country, sAddNote="added"):
+        oErr = ErrHandle()
+        lib_id = None
+        bAdded = False
+
+        try:
+            # (1) Get the Passim lib_country
+            obj_country = Location.get_location(country=lib_country)
+            country_set = [ obj_country ]
+            # (2) Get the Passim lib_city
+            obj_city = obj = Location.objects.filter(
+                name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
+            if obj_city is None:
+                # Add the city and the country it is in
+                loctype_city = LocationType.find("city")
+                obj_city = Location.objects.create(name=lib_city, loctype=loctype_city)
+                # Create a relation that the city is in the specified country
+                obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                            
+            # Try to get it
+            obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
+            if obj_lib is None:
+                # Add the library in the country/city
+                obj_lib = Library.objects.create(
+                    name=lib_name, snote=sAddNote,
+                    lcity=obj_city, lcountry=obj_country, location=obj_city
+                    )
+                bAdded = True
+            # Make sure we have the exact information for this library available
+            lib_city = obj_lib.lcity.name
+            lib_country = obj_lib.lcountry.name
+            lib_id = obj_lib.id
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Location/get_or_create_library")
+        # Return the appropriate information
+        return bAdded, lib_id, lib_city, lib_country
+
     def get_partof_html(self):
         lhtml = []
         for loc in self.above():
@@ -2147,6 +2195,7 @@ class Library(models.Model):
         country = None
         city = None
         library = None
+        note = ""           # If *any* note is returned, the library search has been inexact
         try:
             if sCountry != "":
                 country = Location.objects.filter(name__iexact=sCountry).first()
@@ -2156,20 +2205,25 @@ class Library(models.Model):
                         library = Library.objects.filter(lcountry=country, lcity=city, name__iexact=sLibrary).first()
                     else:
                         library = Library.objects.filter(lcountry=country, name__iexact=sLibrary).first()
+                        note = "Library: no city [{}], Country={}, Library={}".format(sCity, sCountry, sLibrary)
                 else:
                     library = Library.objects.filter(name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
             elif sCity != "":
                 city = Location.objects.filter(name__iexact=sCity).first()
                 if city != None:
                     library = Library.objects.filter(lcity=city, name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], City={}, Library={}".format(sCountry, sCity, sLibrary)
                 else:
                     library = Library.objects.filter(name__iexact=sLibrary).first()
+                    note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
             elif sLibrary != "":
                 library = Library.objects.filter(name__iexact=sLibrary).first()
+                note = "Library: no country [{}], no city [{}], Library={}".format(sCountry, sCity, sLibrary)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Library/get_best_match")
-        return country, city, library
+        return country, city, library, note
 
     def get_library(sId, sLibrary, bBracketed, country, city):
         iId = int(sId)
@@ -3367,6 +3421,7 @@ class Manuscript(models.Model):
         {'name': 'Country id',          'type': 'fk_id', 'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
         {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
         {'name': 'City id',             'type': 'fk_id', 'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
+        # THIS GOES WRONG: the Library must *NOT* be treated separately, but only in conjunction with lcountry and lcity!!!
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         # TODO: change FK project into m2m
@@ -3381,6 +3436,7 @@ class Manuscript(models.Model):
         ]
 
     def __str__(self):
+        """Get this manuscript's name"""
         return self.name
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
@@ -3522,6 +3578,7 @@ class Manuscript(models.Model):
             team_group = kwargs.get("team_group")
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
+            sourcetype = kwargs.get("sourcetype", "")
             # First get the shelf mark
             idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
@@ -3530,28 +3587,56 @@ class Manuscript(models.Model):
                 # Get the standard project TH: hier naar kijken voor punt 4
                 # OLD: project = Project.get_default(username)
 
+                # ===================================
+                if idno == "Cod. 404":
+                    iStop = 1
+                # ===================================
+
                 # Retrieve or create a new manuscript with default values
-                if source == None:
-                    sCity = oManu.get("lcity")
-                    lCity = None
-                    if not sCity is None:
-                        sCountry = oManu.get("lcountry", "")
-                        # DOuble check city co-occurrence
-                        lCity = Location.get_location(sCity, sCountry)
-                    if lCity is None:
-                        obj = Manuscript.objects.filter(idno=idno, mtype="man").first()
-                    else:
-                        obj = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man").first()
+                sCity = oManu.get("lcity")
+                lCity = None
+                if not sCity is None:
+                    sCountry = oManu.get("lcountry", "")
+                    # DOuble check city co-occurrence
+                    lCity = Location.get_location(sCity, sCountry)
+                if lCity is None:
+                    qs = Manuscript.objects.filter(idno=idno, mtype="man")
                 else:
-                    obj = Manuscript.objects.exclude(source=source).filter(idno=idno, mtype="man").first()
+                    qs = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man")
+                # Okay, take the first object, no matter the source
+                obj = qs.first()
+                # Exclude anything that has the same source
+                obj_same = None
+                if not source is None:
+                    obj_same = qs.filter(source=source).first()
+
+                # Check if it exists *anywhere*
                 if obj == None:
                     # Doesn't exist: create it
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                     if not source is None:
                         obj.source = source
                 else:
+                    # Default overwriting message
+                    msg = "Attempt to overwrite manuscript shelfmark [{}]".format(idno)
+                    # Check if the object actually is from the same source
+                    if obj_same is None:
+                        if sourcetype == "huwa":
+                            # Check if the manuscript that exists was already read by HUWA
+                            dataset = obj.collections.first()
+                            if not dataset is None and "huwa" in dataset.name.lower():
+                                msg = "Attempt to overwrite HUWA manuscript shelfmark [{}]".format(idno)
+                    else:
+                        # This means the [obj] *is* from the same source
+                        if sourcetype == "huwa":
+                            # Get the handschrift
+                            handschrift_id = oManu.get("handschrift_id")
+                            msg = "Attempt to overwrite HUWA manuscript shelfmark [{}] (handschrift={})".format(idno, handschrift_id)
+                        else:
+                            msg = "Attempt to overwrite same-source manuscript shelfmark [{}]".format(idno)
+
                     # We are overwriting
-                    oErr.Status("Overwriting manuscript [{}]".format(idno))
+                    oErr.Status(msg)
                     bOverwriting = True
                     if 'overwriting' in oParams:
                         oParams['overwriting'] = True
@@ -3618,20 +3703,32 @@ class Manuscript(models.Model):
                                 obj.custom_set(path, value, **kwargs)
 
                     # Check what we now have for Country/City/Library
-                    lcountry, lcity, library = Library.get_best_match(country, city, library)
+                    lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
+                    # The country can safely added
                     if lcountry != None and lcountry != obj.lcountry:
                         obj.lcountry = lcountry
+                    # The city too can safely be added
                     if lcity != None and lcity != obj.lcity:
                         obj.lcity = lcity
+                    # But the library can only be added under the strictest conditions
                     if library != None and library != obj.library:
-                        obj.library = library
+                        if lib_note == "":
+                            # No notes, so add the library
+                            obj.library = library
+                        else:
+                            # There is a note, so the library may not be added
+                            notes = [] if obj.notes is None else [ obj.notes ]
+                            notes.append(lib_note)
+                            obj.notes = "\n".join(notes)
 
+                    # Make sure we have a copy of the RAW json data for this manuscript
+                    obj.raw = json.dumps(oManu, indent=2)
 
                     # Make sure the update the object
                     obj.save()
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("Manuscript/add_one")
+            oErr.DoError("Manuscript/custom_add")
         return obj
 
     def custom_get(self, path, **kwargs):
@@ -4258,7 +4355,18 @@ class Manuscript(models.Model):
         try:
             # Create a well sorted list of sermons
             if method == "msitem":
-                qs = self.manuitems.filter(order__gte=0).order_by('order')
+                # OLD (erwin): qs = self.manuitems.filter(order__gte=0).order_by('codico__order', 'order')
+                # More transparent:
+                qs = MsItem.objects.filter(codico__manuscript=self, order__gte=0).order_by('codico__order', 'order')
+                # New: just make sure that badly ordered elements get sorted out
+                with transaction.atomic():
+                    order = 1
+                    for obj in qs:
+                        if obj.order != order:
+                            obj.order = order
+                            obj.save()
+                        order += 1
+                # By this time all order elements are in-order
             elif method == "codicos":
                 # Look for the Reconstruction codico's
                 codico_lst = [x['codico__id'] for x in self.manuscriptreconstructions.order_by('order').values('codico__id')]
@@ -4330,11 +4438,12 @@ class Manuscript(models.Model):
             # Return the result
         return sermon_list
 
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_ssg_count(self, compare_link=False, collection = None):
@@ -5332,7 +5441,7 @@ class Codico(models.Model):
                 obj.save()
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("Codico/add_one")
+            oErr.DoError("Codico/custom_add")
         return obj
 
     def custom_get(self, path, **kwargs):
@@ -5419,24 +5528,6 @@ class Codico(models.Model):
                 # Possibly add each item from the list, if it doesn't yet exist
                 for date_item in dates:
                     self.add_one_daterange(date_item)
-                    #years = date_item.split("-")
-                    #yearstart = years[0].strip()
-                    #yearfinish = yearstart
-                    #if len(years) > 0: yearfinish = years[1].strip()
-                    ## Double check the lengths
-                    #if len(yearstart) > 4 or len(yearfinish) > 4:
-                    #    # We need to do better
-                    #    years = re.findall(r'\d{4}', value)
-                    #    yearstart = years[0]
-                    #    if len(years) == 0:
-                    #        yearfinish = yearstart
-                    #    else:
-                    #        yearfinish = years[1]
-
-                    #obj = Daterange.objects.filter(codico=self, yearstart=yearstart, yearfinish=yearfinish).first()
-                    #if obj == None:
-                    #    # Doesn't exist, so create it
-                    #    obj = Daterange.objects.create(codico=self, yearstart=yearstart, yearfinish=yearfinish)
                 # Ready
             elif path == "origin":
                 if value != "" and value != "-":
@@ -5742,7 +5833,7 @@ class Codico(models.Model):
             # This is from Manuscript, but we don't have Comments...
             count = self.comments.count()
             pass
-        sBack = get_stype_light(self.stype, usercomment, count)
+        sBack = get_stype_light(self.stype, usercomment=usercomment, count=count)
         return sBack
 
 
@@ -6350,6 +6441,16 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def get_author(self):
+        """Get a text representation of the author"""
+
+        sBack = "-"
+        if self.author is None:
+            sBack = "(undefined)"
+        else:
+            sBack = self.author.name
+        return sBack
+
     def get_code(self):
       """Make sure to return an intelligable form of the code"""
 
@@ -6531,6 +6632,14 @@ class EqualGold(models.Model):
             url = reverse('equalgold_details', kwargs={'pk': self.moved.id})
         return url
 
+    def get_number(self):
+        """Get a text representation of the author"""
+
+        sBack = "-"
+        if not self.number is None:
+            sBack = self.number
+        return sBack
+
     def get_previous_code(self):
         """Get information on the SSG from which I derive"""
 
@@ -6621,11 +6730,12 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_superlinks_markdown(self):
@@ -6752,8 +6862,12 @@ class EqualGold(models.Model):
         oErr = ErrHandle()
         try:
             # Check the highest sermon number for this author
-            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number")
+            qs_ssg = EqualGold.objects.filter(author=author).order_by("-number","id")
             if qs_ssg.count() == 0:
+                iNumber = 1
+            elif qs_ssg.first().number is None:
+                # Apparently the items for this author have not been numbered yet
+                # So we need to return the first possible number
                 iNumber = 1
             else:
                 iNumber = qs_ssg.first().number + 1
@@ -7045,7 +7159,6 @@ class SermonGold(models.Model):
                 siglist.append(item)
         return siglist
 
-
     def get_incipit(self):
         """Return the *searchable* incipit, without any additional formatting"""
         return self.srchincipit
@@ -7241,7 +7354,7 @@ class SermonGold(models.Model):
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+        sBack = get_stype_light(self.stype, usercomment=usercomment, count=count)
         return sBack
 
     def get_view(self):
@@ -7892,7 +8005,6 @@ class Collection(models.Model):
         sDate = self.created.strftime("%d/%b/%Y %H:%M")
         return sDate
 
-
     def get_copy(self, owner=None):
         """Create a copy of myself and return it"""
 
@@ -7951,11 +8063,12 @@ class Collection(models.Model):
         return self.name
     
     # Probably not necessary
-    def get_stype_light(self, usercomment=False):
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
-        sBack = get_stype_light(self.stype, usercomment, count)
+            print(count)
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_litrefs_markdown(self):
@@ -9403,8 +9516,8 @@ class SermonDescr(models.Model):
         """Get the manuscript that links to this sermondescr"""
 
         manu = None
-        if self.msitem and self.msitem.manu:
-            manu = self.msitem.manu
+        if self.msitem and self.msitem.codico and self.msitem.codico.manuscript:
+            manu = self.msitem.codico.manuscript
         return manu
 
     def get_note_markdown(self):
@@ -9496,12 +9609,12 @@ class SermonDescr(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_stype_light(self, usercomment=False): 
+    def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
             count = self.comments.count()
             print(count)
-        sBack = get_stype_light(self.stype, usercomment, count) # dit gaat dus naar models.py en komt weer terug
+        sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
         return sBack
 
     def get_comments(self, usercomment=False): # Ok, hij komt hier, niet met Sermons
@@ -9967,6 +10080,7 @@ class Range(models.Model):
                 if bStatus and not is_end(pos):
                     # Is there more stuff?
                     additional = sRange[pos:].strip()
+                    sRemark = additional
                     if obj != None:
                         obj.added = sRemark
                         bNeedSaving = True
@@ -10713,7 +10827,7 @@ class OriginCod(models.Model):
         ori = self.origin
         sName = ""
         sLoc = ""
-        url = reverse("origin_details", kwargs={'pk': origin.id})
+        url = reverse("origin_details", kwargs={'pk': ori.id})
         if ori.name != None and ori.name != "": sName = "{}: ".format(ori.name)
         if ori.location != None: sLoc = ori.location.name
         sBack = "<span class='badge signature gr'><a href='{}'>{}{}</a></span>".format(url, sName, sLoc)

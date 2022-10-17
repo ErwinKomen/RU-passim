@@ -35,9 +35,9 @@ adaptation_list = {
     'sermongold_list': ['sermon_gsig'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
                        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
-                       'atype_def_equal', 'atype_acc_equal'],
+                       'atype_def_equal', 'atype_acc_equal', 'passim_author_number'],
     'provenance_list': ['manuprov_m2m'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless']    
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
 
 
@@ -840,6 +840,38 @@ def adapt_passim_code():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_passim_author_number():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    
+    try:
+        # (3) Get the author id for 'Undecided'
+        undecided = Author.objects.filter(name__iexact="undecided").first()
+        undecided_id = undecided.id
+
+        # Walk all SSGs and save those whose .number is none
+        qs = EqualGold.objects.filter(author__isnull=False, number__isnull=True).exclude(author=undecided).order_by('author_id')
+        for obj in qs:
+            # Double checking
+            if not obj.author is None and obj.number is None and not obj.author.id == undecided_id:
+                # Re-saving means getting a legitimate number
+                obj.save()
+
+        # Walk all SSGs whose [code] is null, but have a number
+        qs = EqualGold.objects.filter(author__isnull=False, code__isnull=True, number__isnull=False)
+        with transaction.atomic():
+            for obj in qs:
+                # Reset the number to none
+                obj.number = None
+                obj.save()
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 def adapt_passim_project_name_equal():
     oErr = ErrHandle()
     bResult = True
@@ -1014,6 +1046,42 @@ def adapt_coll_ownerless():
     try:
         qs = Collection.objects.filter(owner__isnull=True)
         qs.delete()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_litref_check():
+    """Remove identical literature references per collection"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    try:
+        qs = Collection.objects.all()
+        for obj_coll in qs:
+            # Look for literatur references
+            lst_unique = []
+            lst_delete = []
+            for obj_litrefcol in obj_coll.collection_litrefcols.all():
+                # Get the litref ID and the pages
+                litref_id = obj_litrefcol.reference.id
+                pages = obj_litrefcol.pages
+                # Check if this is already in there
+                bFound = False
+                for oUnique in lst_unique:
+                    if oUnique['litref'] == litref_id and oUnique['pages'] == pages:
+                        bFound = True
+                        lst_delete.append(obj_litrefcol.id)
+                        break
+                # If it is not found
+                if not bFound:
+                    lst_unique.append(dict(litref=litref_id, pages=pages))
+            # Anything deletable?
+            if len(lst_delete) > 0:
+                print("adapt_litref_check: removing LitrefCol ids: {}".format(lst_delete))
+                LitrefCol.objects.filter(id__in=lst_delete).delete()
     except:
         bResult = False
         msg = oErr.get_error_message()

@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class dctConfig(AppConfig):
-    name = 'dct'
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'passim.dct'
+    # name = 'dct'

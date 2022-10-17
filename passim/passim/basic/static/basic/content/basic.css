@@ -127,3 +127,11 @@ td.ruler {
     top: 0;
     z-index: 1;
 }
+
+.selcount {
+    color: red;
+}
+
+.selcount.showing {
+    color: white;
+}

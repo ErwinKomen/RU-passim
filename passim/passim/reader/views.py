@@ -49,12 +49,12 @@ import xml.etree.ElementTree as ElementTree
  
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
-from passim.utils import ErrHandle
+from passim.utils import ErrHandle, RomanNumbers
 from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -2055,306 +2055,6 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     return oBack
 
 
-# =============== The OLD functions that WERE available in [urls.py] ===========
-def import_ead(request):
-    """Import one or more XML files that each contain one or more EAD items from Archives Et Manuscripts"""
-       
-    # Initialisations
-    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
-    arErr = []
-    error_list = []
-    transactions = []
-    data = {'status': 'ok', 'html': ''}
-    template_name = 'reader/import_manuscripts.html' # Adapt because of multiple descriptions in 1 xml?
-    obj = None
-    data_file = ""
-    bClean = False
-    username = request.user.username
-
-    # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
-    
-        # Remove previous status object for this user
-        Status.objects.filter(user=username).delete()
-        
-        # Create a status object 
-        oStatus = Status(user=username, type="ead", status="preparing")
-        oStatus.save()
-
-        form = UploadFilesForm(request.POST, request.FILES)
-        lResults = []
-        if form.is_valid():
-            # NOTE: from here a breakpoint may be inserted!
-            print('import_ead: valid form') 
-
-            # Create a SourceInfo object for this extraction
-            source = SourceInfo(url="https://ccfr.bnf.fr/", collector=username, profile = profile) 
-            source.save()
-            file_list = []
-
-            # Get the contents of the imported file
-            files = request.FILES.getlist('files_field')
-            if files != None:
-                for data_file in files:
-                    filename = data_file.name
-                    file_list.append(filename)
-
-                    # Set the status
-                    oStatus.set("reading", msg="file={}".format(filename))
-
-                    # Get the source file
-                    if data_file == None or data_file == "":
-                        arErr.append("No source file specified for the selected project")
-                    else:
-                        # Check the extension
-                        arFile = filename.split(".")
-                        extension = arFile[len(arFile)-1]
-
-                        # Further processing depends on the extension
-                        oResult = None
-                        if extension == "xml":
-                            # This is an XML file
-                            oResult = read_ecodex(username, data_file, filename, arErr, source=source) 
-
-                        # Determine a status code
-                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
-                        if oResult == None:
-                            arErr.append("There was an error. No manuscripts have been added")
-                        else:
-                            lResults.append(oResult)                        
-
-            # Adapt the 'source' to tell what we did
-            source.code = "Imported using the [import_ead??] function on these XML files: {}".format(", ".join(file_list)) 
-            source.save()
-            # Indicate we are ready
-            oStatus.set("ready")
-            # Get a list of errors
-            error_list = [str(item) for item in arErr]
-
-            # Create the context
-            context = dict(
-                statuscode=statuscode,
-                results=lResults,
-                error_list=error_list
-                )
-
-            if len(arErr) == 0:
-                # Get the HTML response
-                data['html'] = render_to_string(template_name, context, request)
-            else:
-                data['html'] = "Please log in before continuing"
-
-
-        else:
-            data['html'] = 'invalid form: {}'.format(form.errors)
-            data['status'] = "error"
-    else:
-        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
-        data['status'] = "error"
- 
-    # Return the information
-    return JsonResponse(data)
-
-
-def import_ecodex(request):
-    """Import one or more XML files that each contain one manuscript definition from e-codices, from Switzerland"""
-
-    # Initialisations
-    # NOTE: do ***not*** add a breakpoint until *AFTER* form.is_valid
-    arErr = []
-    error_list = []
-    transactions = []
-    data = {'status': 'ok', 'html': ''}
-    template_name = 'reader/import_manuscripts.html'
-    obj = None
-    data_file = ""
-    bClean = False
-    username = request.user.username
-
-    # Check if the user is authenticated and if it is POST
-    if request.user.is_authenticated and request.method == 'POST' and user_is_ingroup(request, 'passim_uploader'):
-
-        # Remove previous status object for this user
-        Status.objects.filter(user=username).delete()
-        # Create a status object
-        oStatus = Status(user=username, type="ecodex", status="preparing")
-        oStatus.save()
-
-        def add_manu(lst_manual, lst_read, status="", msg="", user="", name="", url="", yearstart="", yearfinish="",
-                     library="", idno="", filename=""):
-            oInfo = {}
-            oInfo['status'] = status
-            oInfo['msg'] = msg
-            oInfo['user'] = user
-            oInfo['name'] = name
-            oInfo['url'] = url
-            oInfo['yearstart'] = yearstart
-            oInfo['yearfinish'] = yearfinish
-            oInfo['library'] = library
-            oInfo['idno'] = idno
-            oInfo['filename'] = filename
-            if status == "error":
-                lst_manual.append(oInfo)
-            else:
-                lst_read.append(oInfo)
-            return True
-
-        form = UploadFilesForm(request.POST, request.FILES)
-        lResults = []
-        if form.is_valid():
-            # NOTE: from here a breakpoint may be inserted!
-            print('import_ecodex: valid form')
-            oErr = ErrHandle()
-            try:
-                # The list of headers to be shown
-                lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
-
-                # Create a SourceInfo object for this extraction
-                source = SourceInfo(url="http://e-codices.unifr.ch", collector=username)
-                source.save()
-                file_list = []
-
-                # Get the contents of the imported file
-                files = request.FILES.getlist('files_field')
-                if files != None:
-                    for data_file in files:
-                        filename = data_file.name
-                        file_list.append(filename)
-
-                        # Set the status
-                        oStatus.set("reading", msg="file={}".format(filename))
-
-                        # Get the source file
-                        if data_file == None or data_file == "":
-                            arErr.append("No source file specified for the selected project")
-                        else:
-                            # Check the extension
-                            arFile = filename.split(".")
-                            extension = arFile[len(arFile)-1]
-
-                            lst_manual = []
-                            lst_read = []
-
-                            # Further processing depends on the extension
-                            oResult = None
-                            if extension == "xml":
-                                # This is an XML file
-                                oResult = read_ecodex(username, data_file, filename, arErr, source=source)
-
-                                if oResult == None or oResult['status'] == "error":
-                                    # Process results
-                                    add_manu(lst_manual, lst_read, status=oResult['status'], msg=oResult['msg'], user=oResult['user'],
-                                                 filename=oResult['filename'])
-                                else:
-                                    # Get the results from oResult
-                                    obj = oResult['obj']
-                                    # Process results
-                                    add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                                                 name=oResult['name'], yearstart=obj.yearstart,
-                                                 yearfinish=obj.yearfinish,library=obj.library.name,
-                                                 idno=obj.idno,filename=oResult['filename'])
-
-                            elif extension == "txt":
-                                # Set the status
-                                oStatus.set("reading list", msg="file={}".format(filename))
-                                # (1) Read the TXT file
-                                lines = []
-                                bFirst = True
-                                for line in data_file:
-                                    # Get a good view of the line
-                                    sLine = line.decode("utf-8").strip()
-                                    if bFirst:
-                                        if "\ufeff" in sLine:
-                                            sLine = sLine.replace("\ufeff", "")
-                                        bFirst = False
-                                    lines.append(sLine)
-                                # (2) Walk through the list of XML file names
-                                for idx, xml_url in enumerate(lines):
-                                    xml_url = xml_url.strip()
-                                    if xml_url != "" and ".xml" in xml_url:
-                                        # Set the status
-                                        oStatus.set("reading XML", msg="{}: file={}".format(idx, xml_url))
-                                        # (3) Download the file from the internet and save it 
-                                        bOkay, sResult = download_file(xml_url)
-                                        if bOkay:
-                                            # We have the filename
-                                            xml_file = sResult
-                                            name = xml_url.split("/")[-1]
-                                            # (4) Read the e-codex manuscript
-                                            oResult = read_ecodex(username, xml_file, name, arErr, source=source)
-                                            # (5) Check before continuing
-                                            if oResult == None or oResult['status'] == "error":
-                                                msg = "unknown"  
-                                                if 'msg' in oResult: 
-                                                    msg = oResult['msg']
-                                                elif 'status' in oResult:
-                                                    msg = oResult['status']
-                                                arErr.append("Import-ecodex: file {} has not been loaded ({})".format(xml_url, msg))
-                                                # Process results
-                                                add_manu(lst_manual, lst_read, status="error", msg=msg, user=oResult['user'],
-                                                             filename=oResult['filename'])
-                                            else:
-                                                # Get the results from oResult
-                                                obj = oResult['obj']
-                                                # Process results
-                                                add_manu(lst_manual, lst_read, status=oResult['status'], user=oResult['user'],
-                                                             name=oResult['name'], yearstart=obj.yearstart,
-                                                             yearfinish=obj.yearfinish,library=obj.library.name,
-                                                             idno=obj.idno,filename=oResult['filename'])
-
-                                        else:
-                                            aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
-
-                            # Create a report and add it to what we return
-                            oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
-                            oReport = Report.make(username, "iecod", json.dumps(oContents))
-                                
-                            # Determine a status code
-                            statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
-                            if oResult == None:
-                                arErr.append("There was an error. No manuscripts have been added")
-                            else:
-                                lResults.append(oResult)
-
-                # Adapt the 'source' to tell what we did 
-                source.code = "Imported using the [import_ecodex] function on these XML files: {}".format(", ".join(file_list))
-                source.save()
-                # Indicate we are ready
-                oStatus.set("ready")
-                # Get a list of errors
-                error_list = [str(item) for item in arErr]
-
-                # Create the context
-                context = dict(
-                    statuscode=statuscode,
-                    results=lResults,
-                    error_list=error_list
-                    )
-
-                if len(arErr) == 0:
-                    # Get the HTML response
-                    data['html'] = render_to_string(template_name, context, request)
-                else:
-                    data['html'] = "Please log in before continuing"
-            except:
-                msg = oErr.get_error_message()
-                oErr.DoError("import_ecodex")
-                data['html'] = msg
-                data['status'] = "error"
-
-        else:
-            data['html'] = 'invalid form: {}'.format(form.errors)
-            data['status'] = "error"
-    else:
-        data['html'] = 'Only use POST and make sure you are logged in and authorized for uploading'
-        data['status'] = "error"
- 
-    # Return the information
-    return JsonResponse(data)
-
-# ============== End of OLD functions ==========================================
-
-
 class ReaderImport(View):
     # Initialisations
     arErr = []
@@ -2400,7 +2100,7 @@ class ReaderImport(View):
 
             # The list of headers to be shown
             lHeader = ['status', 'msg', 'name', 'yearstart', 'yearfinish', 'library', 'idno', 'filename', 'url']
-
+            
             if self.mForm is None:
                 # Process the request
                 bOkay, code = self.process_files(request, source, lResults, lHeader)
@@ -2862,8 +2562,10 @@ class EqualGoldHuwaToJson(BasicPart):
     MainModel = EqualGold
     template_name = "seeker/download_status.html"
     action = "download"
-    dtype = "json"       # downloadtype
+    dtype = "json"          # downloadtype
     prefix_type = "simple"
+    import_type = "ssg"     # Options: 'ssg', 'manu'
+    downloadname = "huwa_ssg"
 
     # Specify the relationships (see issue #526)
     relationships = [
@@ -2894,7 +2596,11 @@ class EqualGoldHuwaToJson(BasicPart):
         
         dt = self.qd.get('downloadtype', "")
         if dt != None and dt != '':
-            self.dtype = dt
+            if dt == "json_manu":
+                self.dtype = "json"
+                self.import_type = "manu"
+            else:
+                self.dtype = dt
 
     def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
@@ -2932,7 +2638,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 for oItem in lTable:
                     if oItem[sIdField] == id:
                         lBack.append(copy.copy(oItem))
-                        break
+                        #break
             return lBack
 
         def get_table_fk_count(lTable, id, sIdField):
@@ -2945,74 +2651,86 @@ class EqualGoldHuwaToJson(BasicPart):
                 iStop = 1
             return iCount
 
-        def get_library_info(id):
+        def get_library_info(id, tables):
             """Get the country/city/library name information for bibliothek.id"""
 
-            lst_bibliothek = huwa_tables['bibliothek']
-            lst_ort = huwa_tables['ort']
-            lst_land = huwa_tables['land']
             oLibrary = None
+            oErr = ErrHandle()
+            try:
+                lst_bibliothek = tables['bibliothek']
+                lst_ort = tables['ort']
+                lst_land = tables['land']
 
-            oBiblio = get_table_item(lst_bibliothek, id)
-            if not oBiblio is None:
-                # Found the library
-                bFoundLib = True
-                oLibrary = dict(
-                    name=oBiblio.get('bibl_name'),
-                    short = oBiblio.get('bibl_kurz'),
-                    url = oBiblio.get('url'),
-                    note = oBiblio.get("bemerkungen"))
-                # Look for city and country
-                ort_id = oBiblio.get("ort")
-                oOrt = get_table_item(lst_ort, ort_id)
-                if not oOrt is None:
-                    # Found the location
-                    oLibrary['city'] = oOrt.get("ortsname")
-                    oLibrary['citynote'] = oOrt.get("bemerkungen")
-                    # Look for country
-                    land_id = oBiblio.get("land")
-                    oLand = get_table_item(lst_land, land_id)
-                    if not oLand is None:
-                        # Found the country
-                        name = oLand.get("landname")
-                        if not name is None and name != "":
-                            oLibrary['country'] = name
+                oBiblio = get_table_item(lst_bibliothek, id)
+                if not oBiblio is None:
+                    # Found the library
+                    bFoundLib = True
+                    oLibrary = dict(
+                        name=oBiblio.get('bibl_name'),
+                        short = oBiblio.get('bibl_kurz'),
+                        url = oBiblio.get('url'),
+                        note = oBiblio.get("bemerkungen"))
+                    # Look for city and country
+                    ort_id = oBiblio.get("ort")
+                    oOrt = get_table_item(lst_ort, ort_id)
+                    if not oOrt is None:
+                        # Found the location
+                        oLibrary['city'] = oOrt.get("ortsname")
+                        oLibrary['citynote'] = oOrt.get("bemerkungen")
+                        # Look for country
+                        land_id = oOrt.get("land")
+                        oLand = get_table_item(lst_land, land_id)
+                        if not oLand is None:
+                            # Found the country
+                            name = oLand.get("landname")
+                            if not name is None and name != "":
+                                oLibrary['country'] = name
 
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_library_info")
             # Return the info we have
             return oLibrary
+
+        def get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country):
+            oErr = ErrHandle()
+            lib_id = None
+            try:
+                # (1) Get the Passim lib_country
+                obj_country = Location.get_location(country=lib_country)
+                country_set = [ obj_country ]
+                # (2) Get the Passim lib_city
+                obj_city = obj = Location.objects.filter(
+                    name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
+                if obj_city is None:
+                    # Add the city and the country it is in
+                    obj_city = Location.objects.create(name=lib_city, loctype__name="city")
+                    # Create a relation that the city is in the specified country
+                    obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                            
+                # Try to get it
+                obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
+                if obj_lib is None:
+                    # Add the library in the country/city
+                    obj_lib = Library.objects.create(
+                        name=lib_name, snote="Added from HUWA bibliothek ID {}".format(bibliothek_id),
+                        lcity=obj_city, lcountry=obj_country, location=obj_city
+                        )
+                # Make sure we have the exact information for this library available
+                lib_city = obj_lib.lcity.name
+                lib_country = obj_lib.lcountry.name
+                lib_id = obj_lib.id
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_or_create_library")
+            # Return the appropriate information
+            return lib_id, lib_city, lib_country
 
         def add_existing(sKey):
             if not sKey in existing_dict:
                 existing_dict[sKey] = 1
             else:
                 existing_dict[sKey] += 1
-
-        def get_signatures(oSsg, editype):
-            """Get a list of signatures as string from this object"""
-
-            sBack = ""
-            lSig = []
-            for oSig in oSsg.get("signaturesA"):
-                if oSig['editype'] == editype:
-                    lSig.append(oSig['code'])
-
-            sBack = json.dumps(lSig)
-            return sBack
-
-        def get_good_string(oSsg, field, second=None):
-            """Get a good string from [oSsg]"""
-
-            sBack = oSsg[field]
-            if not sBack is None:
-                if not second is None:
-                    sBack = sBack[second]
-                elif isinstance(sBack, int):
-                    sBack = str(sBack)
-            if sBack == None or sBack == "":
-                sBack = "'-"
-            elif sBack[0] == "=":
-                sBack = "'{}".format(sBack)
-            return sBack
 
         def add_sig_to_list(signatures, lst_sig, editype, code_format):
             oErr = ErrHandle()
@@ -3069,125 +2787,218 @@ class EqualGoldHuwaToJson(BasicPart):
                 msg = oErr.get_error_message()
                 oErr.DoError("add_sig_replacing")
 
-        # Initialize
-        oData = {}
-        sData = ""
-        bAcceptNewOtherSignatures = False
-        huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
-            'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land']
+        def get_author(oInhalt, tables, lst_authors):
+            """Get the PASSIM author id via the inhalt record"""
 
-        oErr = ErrHandle()
-        table_info = {}
-        author_info = {}
-        existing_dict = {}
-        sig_matching = {}
-        bDoCounting = True
-        bUseOperaPassim = True
-        rHasNumber = re.compile(r'.*[0-9].*')
-        rHashTag = re.compile(r'\#.*')
+            author_id = None
+            msg = ""
+            oErr = ErrHandle()
+            try:
+                # Get the right tables
+                lst_inms = tables['inms']
+                lst_autor_inms = tables['autor_inms']
+                lst_autor = tables['autor']
 
-        count_manu_zero = 0     # Number of items linked to ZERO manuscripts
-        count_manu_one = 0      # Number of items linked to just one manuscript
-        count_manu_many_num = 0 # Number of items linked to many manuscripts - with number in ABK
-        count_manu_many_oth = 0 # Number of items linked to many manuscripts - without number in ABK
+                # Look in [inms] for the field [inhalt]
+                inhalt_id = oInhalt.get("id")
+                oInms = get_table_item(lst_inms, inhalt_id, "inhalt")
+                if not oInms is None:
+                    # Look for the corresponding record in autor_inms
+                    oAutorInms = get_table_item(lst_autor_inms, oInms['id'], "inms")
+                    if not oAutorInms is None:
+                        # Look for the correct 'gold' Autor
+                        oAutor = get_table_item(lst_autor, oAutorInms['autor'], "id")
+                        if not oAutor is None:
+                            # At least get its name
+                            msg = oAutor['name']
+                            # We found the HUWA autor id
+                            autor_id = oAutor['id']
+                            if not autor_id is None:
+                                # Try find the Passim AUTHOR 
+                                oAuthorConv = get_table_item(lst_authors, autor_id, "huwa_id")
+                                if not oAuthorConv is None:
+                                    # Now get the proper passim id
+                                    author_id = oAuthorConv['passim_id']
+                                    # And get the proper PASSIM author name
+                                    msg = oAuthorConv['name']
+                pass
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_author")
 
-        try:
-            # (1) Read the Huwa to Passim author JSON
-            lst_authors = self.read_authors()
+            return author_id, msg
 
-            # (2) Read the Huwa inter-opera relations JSON
-            lst_relations = self.read_relations()
+        def get_extent(oHandschrift):
+            """Derive an Extent description of the manuscript"""
 
-            # (3) Get the author id for 'Undecided'
-            undecided = Author.objects.filter(name__iexact="undecided").first()
+            sBack = ""
+            oErr = ErrHandle()
+            html = []
+            try:
+                # use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
+                fol_pag = oHandschrift.get("fol_pag", "")
+                folbl = oHandschrift.get("folbl", "")
+                vors_vorne = oHandschrift.get("vors_vorne", "")
+                vors_hinten = oHandschrift.get("vors_hinten", "")
+                col = oHandschrift.get("col", "")
+                col_breite = oHandschrift.get("col_breite", "")
+                zeilen = oHandschrift.get("zeilen", "")
 
-            # (4) Read the HUWA db as tables
-            table_info = self.read_huwa()
-
-            # (5) Load the tables that we need
-            tables = self.get_tables(table_info, huwa_tables)
-
-            # (5b) Load the 'opera_passim' object, which is needed for correct Clavis / Frede / Cppm
-            opera_passim = self.read_opera_passim()
-
-            # (5c) Load the 'huwa_conv_sig' object: calculate Clavis/Frede/Cppm based on [abk]
-            huwa_conv_sig = self.read_huwa_conv_sig()
-
-            # (6) Read the Huwa library information
-            oLibraryInfo = self.read_libraries()
-            oLibHuwaPassim = oLibraryInfo['huwapassim']
-
-            # (7) Walk through the Manuscript tables: handschrift + inhalt
-            count_manuscript = len(tables['handschrift'])
-            lst_manuscript = []
-            for idx, oHandschrift in enumerate(tables['handschrift']):
-                # Show where we are
-                if idx % 100 == 0:
-                    oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
-
-                # Take over any information that should be
-                idno = oHandschrift.get("signatur")
-                handschrift_id = oHandschrift.get("id")
-                oManuscript = dict(id=idx+1, idno=idno, stype="imp")
-
-                # Figure out library and location
-                bibliothek_id = oHandschrift.get("bibliothek")
-                if not bibliothek_id is None:
-                    if bibliothek_id in oLibHuwaPassim:
-                        library_id = oLibHuwaPassim[str(bibliothek_id)]
-                        library = Library.objects.filter(id=library_id).first()
-                        lib_name = ""
-                        lib_city = ""
-                        lib_country = ""
-                        if not library is None:
-                            lib_name = library.name
-                            if not library.lcity is None:
-                                lib_city = library.lcity.name
-                            if not library.lcountry is None:
-                                lib_country = library.lcountry.name
+                if folbl != "":
+                    if fol_pag != "":
+                        html.append("{} {}".format(folbl, fol_pag))
                     else:
-                        # Get the details of this library
-                        oLibrary = get_library_info(bibliothek_id)
-                        lib_name = oLibrary.get("name", "")
-                        lib_city = oLibrary.get("city", "")
-                        lib_country = oLibrary.get("country", "")
+                        html.append("{} pp.".format(folbl))
+                if vors_vorne != "":
+                    if len(html) == 0:
+                        html.append(vors_vorne)
+                    else:
+                        html.append(", {}".format(vors_vorne))
+                    if vors_hinten != "":
+                        html.append("-{}".format(vors_hinten))
+                elif vors_hinten != "":
+                    if len(html) == 0:
+                        html.append(vors_hinten)
+                    else:
+                        html.append(", {}".format(vors_hinten))
+                if col != "":
+                    if len(html) != 0: html.append(" ")
+                    html.append("{} cols".format(col))
+                    if col_breite != "":
+                        html.append(" ({} mm wide)".format(col_breite))
+                if zeilen != "":
+                    if len(html) != 0: html.append(" ")
+                    html.append("{} lines per page/column".format(zeilen))
 
-                    # Add this information in the Passim Manuscript object
-                    oManuscript['library'] = lib_name
-                    oManuscript['lcity'] = lib_city
-                    oManuscript['lcountry'] = lib_country
+                # Combine into string
+                sBack = "".join(html)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_extent")
+            return sBack
 
-                # Get and walk through the contents of this Handschrift
-                lst_inhalt = get_table_items(tables['inhalt'], handschrift_id, "handschrift")
-                order = 1
+        def get_format(oHandschrift):
+            """Derive a Format description of the manuscript"""
+
+            sBack = ""
+            html = []
+            oErr = ErrHandle()
+            try:
+                # use fields format, hs_breite, schrift_hoehe, schrift_breite
+                format = oHandschrift.get("format", "")
+                hs_breite = oHandschrift.get("hs_breite", "")
+                schrift_hoehe = oHandschrift.get("schrift_hoehe", "")
+                schrift_breite = oHandschrift.get("schrift_breite", "")
+                
+                if hs_breite != "" and format != "":
+                    html.append("Ms: {} x {} mm".format(format, hs_breite))
+                if schrift_breite != "" and schrift_hoehe != "":
+                    if "var" in schrift_breite or "var" in schrift_hoehe:
+                        html.append("Text: variable")
+                    else:
+                        html.append("Text: {} x {} mm".format(schrift_hoehe, schrift_breite))
+                # Combine into string
+                sBack = " ".join(html)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_format")
+            return sBack
+
+        def get_good_string(oSsg, field, second=None):
+            """Get a good string from [oSsg]"""
+
+            sBack = oSsg[field]
+            if not sBack is None:
+                if not second is None:
+                    sBack = sBack[second]
+                elif isinstance(sBack, int):
+                    sBack = str(sBack)
+            if sBack == None or sBack == "":
+                sBack = "'-"
+            elif sBack[0] == "=":
+                sBack = "'{}".format(sBack)
+            return sBack
+
+        def get_locus(oInhalt):
+            """Get a complete LOCUS string combining von_bis, von_rv and bis_f, bis_rv"""
+
+            sBack = ""
+            oErr = ErrHandle()
+            oRom = RomanNumbers()
+            try:
+                lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
+                von_rv = str(oInhalt.get("von_rv", ""))
+                lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
+                bis_rv = str(oInhalt.get("bis_rv", ""))
+
+                von_bis = None if int(lst_von_bis[0]) == 0 else lst_von_bis[0]
+                bis_f = None if int(lst_bis_f[0]) == 0 else lst_bis_f[0]
+
+                # Treat negative numbers (see issue #532)
+                if not von_bis is None and re.match(r'-\d+', von_bis):
+                    order_num = int(von_bis)
+                    if order_num < -110: order_num = -110
+                    if order_num < 0:
+                        # Add 110 + 1 and turn into romans
+                        von_bis = oRom.intToRoman(order_num+110+1)
+                if not bis_f is None and re.match(r'-\d+', bis_f):
+                    order_num = int(bis_f)
+                    if order_num < -110: order_num = -110
+                    if order_num < 0:
+                        # Add 110 + 1 and turn into romans
+                        bis_f = oRom.intToRoman(order_num+110+1)
+
+                html = []
+                # Calculate from
+                lst_from = []
+                if von_rv != "": lst_from.append(von_rv)
+                if not von_bis is None: lst_from.append(von_bis)
+                sFrom = "".join(lst_from)
+
+                # Calculate until
+                lst_until = []
+                if bis_rv != "": lst_until.append(bis_rv)
+                if not bis_f is None: lst_until.append(bis_f)
+                sUntil = "".join(lst_until)
+
+                # Combine the two
+                if sFrom == sUntil:
+                    sBack = sFrom
+                else:
+                    sBack = "{}-{}".format(sFrom, sUntil)
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_locus")
+
+            return sBack
+
+        def get_manu_count(lst_inhalt, opera_id):
+            """Count the number of times [opera_id] occurs in [oInhalt]"""
+
+            count = 0
+            oErr = ErrHandle()
+            try:
                 for oInhalt in lst_inhalt:
-                    # Get all the necessary information of this Sermon Manifestation
-                    oSermon = dict(
-                        order = order,
-                        opera_id=oInhalt.get("opera")
-                        )
-                    order += 1
+                    opera = oInhalt.get("opera")
+                    if opera == opera_id:
+                        count += 1
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_manu_count")
 
+            return count
 
-                # Add this to the list of Manuscripts
-                lst_manuscript.append(oManuscript)
+        def get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig):
+            """Given the opera, get the signature(s) it points to in a list"""
 
-            # (8) Walk through the table with AF+Sermon information
-            signature_dict = {}     # Each entry contains a list of OPERA ids that have this signature
-            lst_opera = []
-            count_opera = len(tables['opera'])
-            for idx, oOpera in enumerate(tables['opera']):
+            signaturesA = []
+            oErr = ErrHandle()
+            debug_level = 1
+            try:
+                # Get the opera ID
                 opera_id = oOpera['id']
-                # Take over any information that should
-                oSsg = dict(id=idx+1, opera=opera_id)
-
-                # Show where we are
-                if idx % 100 == 0:
-                    oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
-
                 # Get the signature(s)
-                signaturesA = []
-                lst_notes = []
                 if bUseOperaPassim and opera_id in opera_passim:
                     # Get the relevant record
                     oOperaNew = opera_passim[opera_id]
@@ -3214,7 +3025,8 @@ class EqualGoldHuwaToJson(BasicPart):
                                         iStop = 1
                                     
                                 # Show what we are doing
-                                oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
+                                if debug_level > 1:
+                                    oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
                                 # Now we can break from the loop
                                 break
                         if bFound:
@@ -3251,216 +3063,674 @@ class EqualGoldHuwaToJson(BasicPart):
 
                     cppm = get_table_list(tables['cppm'], opera_id, "name")
                     add_sig_to_list(signaturesA, cppm, "cl", "CPPM {}")
+                # What we return is the list in [signaturesA] - check if these exist already
+                for item in signaturesA:
+                    code = item['code']
+                    editype = item['editype']
+                    lst_sig = Signature.objects.filter(code=code, editype=editype).values('gold_id', 'gold__equal_id')
+                    if not lst_sig is None and len(lst_sig) > 0:
+                        obj_sig = lst_sig[0]
+                        #gold = obj_sig.gold
+                        #equal = gold.equal
+                        item['gold'] = obj_sig['gold_id'] # gold.id
+                        item['ssg'] = obj_sig['gold__equal_id'] # equal.id
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_opera_signatures")
+                signaturesA = []
 
-                oSsg['signaturesA'] = signaturesA
-                # Process the signatures in the [signature_dict]
-                add_sig_to_dict(signaturesA, signature_dict, opera_id)
+            return signaturesA
 
-                # Get the Incipit and the Explicit
-                oSsg['incipit'] = get_table_field(tables['incipit'], int(oOpera.get('incipit')), "incipit_text")
-                oSsg['explicit'] = get_table_field(tables['desinit'], int(oOpera.get('desinit')), "desinit_text")
+        def get_signatures(oSsg, editype):
+            """Get a list of signatures as string from this object"""
 
-                # Make good notes for further processing
-                oSsg['note_langname'] = oOpera.get("opera_langname","")
-                remarks = oOpera.get("bemerkungen", "")
-                if remarks != "": lst_notes.append("Remarks: {}".format(remarks))
-                oSsg['notes'] = "\n".join(lst_notes)
+            sBack = ""
+            lSig = []
+            for oSig in oSsg.get("signaturesA"):
+                if oSig['editype'] == editype:
+                    lSig.append(oSig['code'])
 
-                # Get to the [datum_opera]
-                oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
+            sBack = json.dumps(lSig)
+            return sBack
 
-                # Get the *AUTHOR* (obligatory) for this entry
-                passim_author = undecided
-                huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
-                if huwa_autor_id != "": 
-                    passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
-                    if passim_author is None:
-                        # What to do now?
-                        passim_author = undecided
-                oSsg['author'] = dict(id=passim_author.id, name= passim_author.name)
+        def get_support(oHandschrift, oSupport):
+            sBack = ""
+            oErr = ErrHandle()
+            try:
+                material = oHandschrift.get("material")
+                if not material is None and material != "":
+                    sBack = oSupport[str(material)]
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_support")
+            return sBack
 
-                if bDoCounting:
-                    # Check if the [abq] field contains a number or not
-                    bAbqHasNumber = False
-                    if rHasNumber.match(other): bAbqHasNumber = True
+        # Initialize
+        oHuwaLand = { "Algerien": "Algeria", "Australien": "Australia", "Belgien": "Belgium",
+            "Deutschland": "Germany", "Dänemark": "Denmark", "Finnland": "Finland", "Frankreich": "France",
+            "Irland": "Ireland", "Italien": "Italy", "Kanada": "Canada", "Luxembourg": "Luxembourg",
+            "Niederlande": "Netherlands","Polen": "Poland", "Portugal": "Portugal", "Rumänien": "Romania",
+            "Russland": "Russia","Schweden": "Sweden", "Schweiz": "Switzerland", "Slowakei": "Slovakia",
+            "Spanien": "Spain", "Tschechien": "Czechia", "Tunesien": "Tunisia", "USA": "United States",
+            "Ungarn": "Hungary", "United Kingdom": "United Kingdom", "Vaticano": "Vatican", "Österreich": "Austria" }
+        oData = {}
+        sData = ""
+        bAcceptNewOtherSignatures = False
 
-                    # Get the number of manuscripts linked to this particular opera entry
-                    oSsg['manuscripts'] = get_table_fk_count(tables['inhalt'], opera_id, "opera")
-                    manu_type = "-"
-                    if oSsg['manuscripts'] == 0:
-                        count_manu_zero += 1
-                        manu_type = "zero_links" # "zero links"
-                    elif oSsg['manuscripts'] == 1:
-                        count_manu_one += 1
-                        manu_type = "one_link" # "one link"
-                    elif oSsg['manuscripts'] > 1:
-                        if bAbqHasNumber:
-                            count_manu_many_num += 1
-                            manu_type = "many_links_ABK_num" # "many links ABK has number"
+        # the huwa_tables depend on the import type
+        if self.import_type == "manu":
+            # Note that sermons use the tables 'inc' and 'des' for the incipit and explicit
+            huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'des', 'inc', 'inms', 'autor_inms',
+                'autor', 'autor_opera', 'datum_opera', 'inhalt', 'handschrift', 'bibliothek', 'ort', 'land',
+                'material', 'tit', 'annus']
+        else:
+            huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
+                'autor', 'autor_opera', 'datum_opera']
+
+        oErr = ErrHandle()
+        table_info = {}
+        author_info = {}
+        existing_dict = {}
+        sig_matching = {}
+        bDoCounting = True
+        bAddUnusedSermonFields = False
+        bUseOperaPassim = True
+        rHasNumber = re.compile(r'.*[0-9].*')
+        rHashTag = re.compile(r'\#.*')
+
+        count_manu_zero = 0     # Number of items linked to ZERO manuscripts
+        count_manu_one = 0      # Number of items linked to just one manuscript
+        count_manu_many_num = 0 # Number of items linked to many manuscripts - with number in ABK
+        count_manu_many_oth = 0 # Number of items linked to many manuscripts - without number in ABK
+
+        try:
+            # (1) Read the Huwa to Passim author JSON
+            lst_authors = self.read_authors()
+
+            # (2) Read the Huwa inter-opera relations JSON
+            lst_relations = self.read_relations()
+
+            # (3) Get the author id for 'Undecided'
+            undecided = Author.objects.filter(name__iexact="undecided").first()
+
+            # (4) Read the HUWA db as tables
+            table_info = self.read_huwa()
+
+            # (5) Load the tables that we need
+            tables = self.get_tables(table_info, huwa_tables)
+
+            # (5b) Load the 'opera_passim' object, which is needed for correct Clavis / Frede / Cppm
+            opera_passim = self.read_opera_passim()
+
+            # (5c) Load the 'huwa_conv_sig' object: calculate Clavis/Frede/Cppm based on [abk]
+            huwa_conv_sig = self.read_huwa_conv_sig()
+
+            # What if we are reading Manuscript information?
+            if self.import_type == "manu":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_manu"
+
+                # Initialize counters
+                count_manu = 0
+                count_serm = 0
+
+                # (6) Read the Huwa library information
+                oLibraryInfo = self.read_libraries()
+                oLibHuwaPassim = oLibraryInfo['huwapassim']
+                oLibHuwaOnly = oLibraryInfo.get("huwaonly")
+
+                # Read other HUWA info: annus = year of 'handschrift'
+                oDates = {}
+                for oAnnus in tables['annus']:
+                    handschrift_id = str(oAnnus.get("handschrift"))
+                    # The year (range) may only contain number + hyphen
+                    annus_name = re.sub('[^0-9\-]', '', oAnnus.get("annus_name", ""))
+                    # Add to dictionary
+                    oDates[handschrift_id] = annus_name
+
+                # Read other HUWA info: title of sermon(s)
+                oTitles = {}
+                for oTit in tables['tit']:
+                    inhalt = str(oTit.get("inhalt"))
+                    sTitle = oTit.get("tit_text", "")
+                    oTitles[inhalt] = sTitle
+
+                # Transform the Inhalt table into a dictionary around [handschrift]
+                oInhaltHandschrift = {}
+                oInhaltOpera = {}
+                for oInhalt in tables['inhalt']:
+                    # (1) process handschrift
+                    handschrift_id = str(oInhalt.get("handschrift"))
+                    if not handschrift_id in oInhaltHandschrift:
+                        oInhaltHandschrift[handschrift_id] = []
+                    # Add it
+                    oInhaltHandschrift[handschrift_id].append(oInhalt)
+                    # (2) Process opera
+                    opera_id = str(oInhalt.get("opera"))
+                    if not opera_id in oInhaltOpera:
+                        oInhaltOpera[opera_id] = 0
+                    # Add it
+                    oInhaltOpera[opera_id] += 1
+
+                # Transform the DES table into a dictionary around [inhalt]
+                oInhaltDes = {}
+                for oDes in tables['des']:
+                    inhalt_id = str(oDes['inhalt'])
+                    oInhaltDes[inhalt_id] = oDes['des_text']
+
+                # Transform the INC table into a dictionary around [inhalt]
+                oInhaltInc = {}
+                for oInc in tables['inc']:
+                    inhalt_id = str(oInc['inhalt'])
+                    oInhaltInc[inhalt_id] = oInc['inc_text']
+
+                # Change the materials into a dictionary
+                oSupport = {}
+                for oMat in tables['material']:
+                    mat_name = oMat['material_name']
+                    if not oMat is None and oMat != "":
+                        oSupport[str(oMat['id'])] = mat_name
+
+                # (7) Walk through the Manuscript tables: handschrift + inhalt
+                count_manuscript = len(tables['handschrift'])
+                # lst_manuscript = []
+                lst_manu_string = []
+                lst_manu_string.append('[')     # NOTE: this will be a simple [] JSON list, 
+                                                #       which is what ManuscriptUploadJson is expecting!
+                for idx, oHandschrift in enumerate(tables['handschrift']):
+                    # Show where we are
+                    if idx % 100 == 0:
+                        oErr.Status("EqualGoldHuwaToJson manuscripts: {}/{}".format(idx+1, count_manuscript))
+
+                    # Take over any information that should be
+                    idno = oHandschrift.get("signatur", "")
+                    handschrift_id = oHandschrift.get("id")
+                    sHandschriftId = str(handschrift_id)
+
+                    # If this [handschrift_id] has id '0', then skip it (see issue #532, responses CW)
+                    if handschrift_id == 0:
+                        # Skip this one, and continue with the next manuscript
+                        continue
+
+                    # NOTE: no need to supply [stype], since that must be set when reading the JSON
+                    oManuscript = dict(id=idx+1, idno=idno, handschrift_id=handschrift_id,
+                                       keywords = ['HUWA'], datasets = ['HUWA_manuscripts'],)
+                    count_manu += 1
+
+                    # Physical features of the manuscript:
+                    # (1) Support = material
+                    oManuscript['support'] = get_support(oInhaltHandschrift, oSupport)
+                    # (2) Extent: use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
+                    oManuscript['extent'] = get_extent(oHandschrift)
+                    # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
+                    oManuscript['format'] = get_format(oHandschrift)
+
+                    # Figure out library and location
+                    bibliothek_id = oHandschrift.get("bibliothek")
+                    if not bibliothek_id is None:
+                        lib_id = None
+
+                        # A library has been specified for this manuscript
+                        if bibliothek_id in oLibHuwaPassim:
+                            library_id = oLibHuwaPassim[str(bibliothek_id)]
+                            library = Library.objects.filter(id=library_id).first()
+                            lib_name = ""
+                            lib_city = ""
+                            lib_country = ""
+                            if not library is None:
+                                lib_name = library.name
+                                if not library.lcity is None:
+                                    lib_city = library.lcity.name
+                                if not library.lcountry is None:
+                                    lib_country = library.lcountry.name
+                                lib_id = library.id
+                        elif bibliothek_id in oLibHuwaOnly:
+                            # This library is known in HUWA, but not in Passim: try to add it
+                            oLibrary = oLibHuwaOnly[bibliothek_id]
+                            # Always get the pre-defined details
+                            lib_name = oLibrary.get("name", "")
+                            lib_city = oLibrary.get("city", "")
+                            lib_country = oLibrary.get("country", "")
+
+                            if lib_name != "" and lib_city != "" and lib_country != "":
+                                lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
                         else:
-                            count_manu_many_oth += 1
-                            manu_type = "many_links_ABK_txt" # "many links ABK text only"
-                    oSsg['manu_type'] = manu_type
+                            # Get the details of this library
+                            oLibrary = get_library_info(bibliothek_id, tables)
+                            # Always get the pre-defined details
+                            lib_name = oLibrary.get("name", "")
+                            lib_city = oLibrary.get("city", "")
+                            lib_country = oLibrary.get("country", "")
+                            if lib_country != "" and lib_country in oHuwaLand:
+                                lib_country = oHuwaLand[lib_country]
 
-                    # Check if there already is a SSG with the inc/expl
-                    qs = EqualGold.objects.filter(incipit__iexact=oSsg['incipit'], explicit__iexact=oSsg['explicit'])
-                    count = qs.count()
-                    if count == 0:
-                        existing_ssg = dict(id=None, type="ssgmN: no inc/exp match")
-                        add_existing("ssgmN")
-                    elif count == 1:
-                        # This must be a match
-                        obj = qs.first()
-                        existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmF: full inc/exp match")
-                        add_existing("ssgmF")
-                    elif count > 1 and (oSsg['incipit'] == "" or oSsg['explicit'] == ""):
-                        existing_ssg = dict(id=None, type="ssgmE: empty inc or exp")
-                        add_existing("ssgmE")
-                    else:
-                        # Check further on the author
-                        obj = qs.filter(author=passim_author).first()
-                        if obj is None:
-                            # Found matching inc/exp, but not a matching author
-                            existing_ssg = [dict(id=x.id, code=x.code, type="ssgmAM: author mismatch") for x in qs]
-                            add_existing("ssgmAM")
+                            # NOTE: do *NOT* attempt to add this library.
+                            #       it requires manual correction
+
+                        # Add this information in the Passim Manuscript object
+                        oManuscript['library_id'] = lib_id
+                        oManuscript['library'] = lib_name
+                        oManuscript['lcity'] = lib_city
+                        oManuscript['lcountry'] = lib_country
+
+                    # Test on bibliothek = 2 (see issue #532)
+                    if bibliothek_id == 2:
+                        # Do not process this manuscript further
+                        continue
+
+                    # Other manuscript info: date
+                    if sHandschriftId in oDates:
+                        oManuscript['date'] = oDates[sHandschriftId]                    
+
+                    # Get and walk through the contents of this Handschrift
+                    lst_inhalt = oInhaltHandschrift.get(sHandschriftId, [])
+                    # ------------ DEBUG ------------
+                    if len(lst_inhalt) > 1 or handschrift_id == 460:
+                        iStop = 1
+                    # -------------------------------
+                    # Sort the list on the basis of `von_bis` (see issue #532)
+                    lst_inhalt = sorted(lst_inhalt, key=lambda x: x['von_bis'])
+                    order = 1
+                    lst_sermons = []
+                    for idx, oInhalt in enumerate(lst_inhalt):
+                        # Get the opera id
+                        opera_id=oInhalt.get("opera")
+                        sOperaId = str(opera_id)
+                        inhalt_id = oInhalt.get("id")
+                        # Get the Opera table
+                        if opera_id in opera_passim:
+                            oOpera = opera_passim[opera_id]
+                            lst_notes = []
+                            # Get all the necessary information of this Sermon Manifestation
+                            title = oOpera.get("opera_langname", "")
+                            note = oInhalt.get("bemerkungen", "")
+                            # Convert locus information into a Passim locus string
+                            locus = get_locus(oInhalt)
+                            # Getting the author also works differently
+                            author_id, author_name = get_author(oInhalt, tables, lst_authors)
+                            # Get the incipit
+                            # incipit = get_table_field(tables['inc'], inhalt_id, "inc_text", sIdField="inhalt")
+                            incipit = oInhaltInc.get(str(inhalt_id), "")
+                            # Get the explicit
+                            #explicit = get_table_field(tables['des'], inhalt_id, "des_text", sIdField="inhalt")
+                            explicit = oInhaltDes.get(str(inhalt_id), "")
+                            # Get signatures (or should that go via the SSG link, since they are automatic ones?)
+                            signaturesA = get_opera_signatures(oOpera, lst_notes, opera_passim, huwa_conv_sig)
+                            # Count the number of manuscripts in which this opera occurs
+                            # manu_count = get_manu_count(tables['inhalt'], opera_id)
+                            manu_count = oInhaltOpera.get(str(opera_id), 0)   
+                            
+                            # Get possible title
+                            if title == "":
+                                # Look at the inhalt_id
+                                sInhaltId = str(inhalt_id)
+                                if sInhaltId in oTitles:
+                                    title = oTitles[sInhaltId]                         
+
+                            # Combine into a Sermon record
+                            # NOTE: no need to set [stype], since that must be set when reading the JSON
+                            oSermon = dict(
+                                type = "Plain", locus = locus,
+                                author = author_name, author_id = author_id, 
+                                title = title, incipit = incipit, explicit = explicit,
+                                note = note, keywords = ['HUWA'], datasets = ['HUWA_sermons'],
+                                signaturesA = signaturesA, opera_id=opera_id, manu_count=manu_count
+                                )
+                            if bAddUnusedSermonFields:
+                                # Add sermon fields that this routine does not fill in
+                                oSermon['sectiontitle'] = None
+                                oSermon['postscriptum'] = None
+                                oSermon['brefs'] = None
+                                oSermon['quote'] = ""
+                                oSermon['feast'] = ""
+                                oSermon['additional'] = ""
+                                oSermon['literature'] = ""
+                                oSermon['ssglinks'] = ""
+                                oSermon['keywordsU'] = []
+                                oSermon['signaturesM'] = []
+                                # oSermon['signaturesA'] = []
+                            count_serm += 1
+
+                            # Check if we can see what [ssglinks] are needed by looking at the opera_id
+                            ssglinks = [x['equal_id'] for x in EqualGoldExternal.objects.filter(externaltype="huwop", externalid=opera_id).values("equal_id")]
+                            if len(ssglinks) > 0:
+                                oSermon['ssglinks'] = ssglinks
+
+                            # Add the sermon to the list
+                            lst_sermons.append(oSermon)
+                            # Make sure we retain the correct order
+                            order += 1
+
+                    # Walk through the sermons and create correct msitems
+                    lst_msitems = []
+                    order = 1
+                    for idx, oSermon in enumerate(lst_sermons):
+                        if idx + 1 == len(lst_sermons):
+                            sNext = ""
                         else:
-                            existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmFA: full inc/exp/author match")
-                            add_existing("ssgmFA")
-                    oSsg['existing_ssg'] = existing_ssg
+                            sNext = order + 1
+                        oMsItem = dict(
+                            order = order, parent = "", firstchild = "", next = sNext, sermon = oSermon
+                            )
+                        lst_msitems.append(oMsItem)
 
-                    same_sig_ssgs = []
-                    if len(signaturesA) > 0:
-                        # Build a Q-expression
-                        expr = ( Q(code__iexact=signaturesA[0]['code']) & Q(editype=signaturesA[0]['editype']) )
-                        for oSig in signaturesA[1:]:
-                            expr |= ( Q(code__iexact=oSig['code']) & Q(editype=oSig['editype']) )
-                        
-                        # Get a list of signature id's
-                        sig_ids = [x['id'] for x in Signature.objects.filter(expr).values('id')]
+                        order += 1
+                    # Add the msitem list to the manuscript
+                    oManuscript['msitems'] = lst_msitems
 
-                        if len(sig_ids) > 0:
-                            # Check if there already is a SSG with one of the signatures in the list
-                            qs = EqualGold.objects.filter(equal_goldsermons__goldsignatures__id__in=sig_ids).distinct().values('id')
-                            # same_sig_ssgs = qs.count()
-                            # Better: give a list of SSG ids with the same sigs
-                            same_sig_ssgs = [x['id'] for x in qs]
+                    # Add this to the list of Manuscripts
+                    # lst_manuscript.append(oManuscript)
 
-                    # Add the results of the SSG match
-                    oSsg['same_sig_ssgs'] = same_sig_ssgs
+                    # Serialize the Manuscript into JSON
+                    sComma = "" if idx + 1 >= count_manuscript else ","
+                    lst_manu_string.append("{}{}".format(json.dumps(oManuscript, indent=2), sComma))
 
-                # Add this to the list of SSGs
-                lst_opera.append(oSsg)
+                # Check the latest object, that it doesn't end with a comma
+                sManuLatest = lst_manu_string[-1]
+                if sManuLatest[-1] == ",":
+                    # Remove that comma
+                    sManuLatest = sManuLatest[:-1]
+                    lst_manu_string[-1] = sManuLatest
+                # (11) combine the sections into one object
+                # oData['manuscripts'] = lst_manuscript
+                lst_manu_string.append("]")
 
-            # (9) Process the inter-opera relations 
-            lst_opera_rel = []
-            oRelationship = {x['rel_id']:x  for x in EqualGoldHuwaToJson.relationships }
-            count_rel = len(lst_relations)
-            for idx, oRel in enumerate(lst_relations):
-                # Show where we are
-                if idx % 100 == 0:
-                    oErr.Status("EqualGoldHuwaToJson relations: {}/{}".format(idx+1, count_rel))
+                # Provide the counts in the log
+                print("EqualGoldHuwaToJson MANU counts: {} manuscripts, {} sermons".format(count_manu, count_serm))
 
-                opera_src = oRel.get('opera_src')
-                opera_dst = oRel.get('opera_dst')
-                rel_id = oRel.get('rel_id')
+            elif self.import_type == "ssg":
+                # (8) Walk through the table with AF+Sermon information
+                signature_dict = {}     # Each entry contains a list of OPERA ids that have this signature
+                lst_opera = []
+                count_opera = len(tables['opera'])
+                for idx, oOpera in enumerate(tables['opera']):
+                    opera_id = oOpera['id']
+                    # Take over any information that should
+                    oSsg = dict(id=idx+1, opera=opera_id)
 
-                # Make sure that the destination always is a list
-                opera_dst = [ opera_dst ] if isinstance(opera_dst, int) else opera_dst
+                    # Show where we are
+                    if idx % 100 == 0:
+                        oErr.Status("EqualGoldHuwaToJson opera's: {}/{}".format(idx+1, count_opera))
 
-                # Get the row of this relation
-                oRel = oRelationship[rel_id]
-                linktypes = oRel.get("linktypes", [])
-                spectypes = oRel.get("spectypes", [])
-                bDirectional = (oRel.get("dir") == "yes")
+                    # Get the signature(s)
+                    signaturesA = []
+                    lst_notes = []
+                    if bUseOperaPassim and opera_id in opera_passim:
+                        # Get the relevant record
+                        oOperaNew = opera_passim[opera_id]
+                        # Look for clavis/frede/cppm
+                        add_sig_to_list(signaturesA, oOperaNew.get("clavis"), "cl", "CPL {}")
+                        add_sig_to_list(signaturesA, oOperaNew.get("frede"), "gr", "{}")
+                        add_sig_to_list(signaturesA, oOperaNew.get("cppm"), "cl", "CPPM {}")
 
-                # If this relation does *NOT* contain a linktype, then we cannot process it!!!
-                if len(linktypes) > 0:
+                        other = oOperaNew.get("abk", "")
+                        if not other is None and other != "" and len(signaturesA) == 0:
+                            # Check if we can convert this
+                            bFound = False
+                            number = ""
+                            for item in huwa_conv_sig:
+                                mask = item['mask']
+                                huwa = item['huwa']
+                                m = re.match(mask, other)
+                                if m:
+                                    bFound = True
+                                    # Now get the number
+                                    if len(m.groups(0)) > 0:
+                                        number = m.groups(0)[0]
+                                        if huwa.count('#') > 1:
+                                            iStop = 1
+                                    
+                                    # Show what we are doing
+                                    oErr.Status("HUWA=[{}] with number={} for other={}".format(huwa, number, other))
+                                    # Now we can break from the loop
+                                    break
+                            if bFound:
+                                # Look for clavis/frede/cppm
+                                add_sig_replacing(signaturesA, item, "clavis", number, "cl")
+                                add_sig_replacing(signaturesA, item, "gryson", number, "gr")
+                                add_sig_replacing(signaturesA, item, "other", number, "ot")
 
-                    # Start creating this opera relation
-                    for dst in opera_dst:
-                        for linktype in linktypes:
-                            oOperaRel = dict(src=opera_src, dst=dst)
-                            oReverse = None
-                            if len(spectypes) == 0:
-                                oOperaRel['linktype'] = linktype
-                            elif bDirectional and len(spectypes) > 1:
-                                oReverse = dict(src=dst, dst=opera_src)
-                                oOperaRel['linktype'] = linktype
-                                oOperaRel['spectype'] = spectypes[0]
-                                oReverse['linktype'] = linktype
-                                oReverse['spectype'] = spectypes[1]
-                                if rel_id == 11:
-                                    # Signal excerpt
-                                    oOperaRel['keyword'] = 'excerpt'
-                                    oReverse['keyword'] = 'excerpt'
+                            elif bAcceptNewOtherSignatures:
+                                # Check how long this [other] is
+                                if len(other) > 10:
+                                    # Just add it to notes
+                                    lst_notes.append("abk: {}".format(other))
+                                else:
+                                    # THis is 10 characters or below, so it could actually be a real code
+                                    signaturesA.append(dict(editype="ot", code=other))
                             else:
-                                oOperaRel['linktype'] = linktype
-                                oOperaRel['spectype'] = spectypes[0]
-                            # Add items to list
-                            lst_opera_rel.append(oOperaRel)
-                            if not oReverse is None:
-                                lst_opera_rel.append(oReverse)
-                else:
-                    # Show that we are skipping this relation
-                    msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
-                    oErr.Status(msg)
-
-            # (10) Calculate the signature status (see issue #533)
-            for idx, oOperaSsg in enumerate(lst_opera):
-                sig_status = "unknown"
-                # Get the opera signatures
-                signaturesA = ["{}: {}".format(x['editype'], x['code']) for x in oOperaSsg['signaturesA'] ]
-
-                # Get matching existing Passim SSG/AFs via these signature(s)
-                same_sig_ssgs = oOperaSsg['same_sig_ssgs']
-
-                if len(same_sig_ssgs) == 0:
-                    # There are no matching existing Passim SSGs
-                    if len(signaturesA) == 0:
-                        sig_status = "opera_ssg_0_0"
+                                # Just add it to notes
+                                lst_notes.append("abk: {}".format(other))
+                        # Look for possible field [correction of abk]
+                        for k, v in oOperaNew.items():
+                            if "correction" in k and "abk" in k:
+                                # There is a correction: put it into notes
+                                lst_notes.append("{}: {}".format(k, v))
                     else:
-                        sig_status = "opera_ssg_1_0"
-                elif len(signaturesA) == 0:
-                    # There are no Opera signatures, but there are 
-                    sig_status = "opera_ssg_0_1"
-                else:
-                    # Get the signatures of the Passim SSG
-                    signaturesP = [ "{}: {}".format(x.editype, x.code) for x in Signature.objects.filter(gold__equal__id__in=same_sig_ssgs) ]
-                    count = 0
-                    for sigA in signaturesA:
-                        if sigA in signaturesP:
-                            count += 1
-                    if len(signaturesA) == len(signaturesP) and count == len(signaturesA):
-                        # There is a full 1-1 match between Opara and Passim signatures
-                        sig_status = "opera_ssg_1_1"
-                    else:
+                        other = oOpera.get("abk", "")
+                        if not other is None and other != "":
+                            signaturesA.append(dict(editype="ot", code=other))
+                        clavis = get_table_list(tables['clavis'], opera_id, "name")
+                        add_sig_to_list(signaturesA, clavis, "cl", "CPL {}")
+
+                        frede = get_table_list(tables['frede'], opera_id, "name")
+                        add_sig_to_list(signaturesA, frede, "gr", "{}")
+
+                        cppm = get_table_list(tables['cppm'], opera_id, "name")
+                        add_sig_to_list(signaturesA, cppm, "cl", "CPPM {}")
+
+                    oSsg['signaturesA'] = signaturesA
+                    # Process the signatures in the [signature_dict]
+                    add_sig_to_dict(signaturesA, signature_dict, opera_id)
+
+                    # Get the Incipit and the Explicit
+                    oSsg['incipit'] = get_table_field(tables['incipit'], int(oOpera.get('incipit')), "incipit_text")
+                    oSsg['explicit'] = get_table_field(tables['desinit'], int(oOpera.get('desinit')), "desinit_text")
+
+                    # Make good notes for further processing
+                    oSsg['note_langname'] = oOpera.get("opera_langname","")
+                    remarks = oOpera.get("bemerkungen", "")
+                    if remarks != "": lst_notes.append("Remarks: {}".format(remarks))
+                    oSsg['notes'] = "\n".join(lst_notes)
+
+                    # Get to the [datum_opera]
+                    oSsg['date_estimate'] = get_table_field(tables['datum_opera'], opera_id, "datum", "opera")
+
+                    # Get the *AUTHOR* (obligatory) for this entry
+                    passim_author = undecided
+                    huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
+                    if huwa_autor_id != "": 
+                        passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
+                        if passim_author is None:
+                            # What to do now?
+                            passim_author = undecided
+                    oSsg['author'] = dict(id=passim_author.id, name= passim_author.name)
+
+                    if bDoCounting:
+                        # Check if the [abq] field contains a number or not
+                        bAbqHasNumber = False
+                        if rHasNumber.match(other): bAbqHasNumber = True
+
+                        # Get the number of manuscripts linked to this particular opera entry
+                        oSsg['manuscripts'] = get_table_fk_count(tables['inhalt'], opera_id, "opera")
+                        manu_type = "-"
+                        if oSsg['manuscripts'] == 0:
+                            count_manu_zero += 1
+                            manu_type = "zero_links" # "zero links"
+                        elif oSsg['manuscripts'] == 1:
+                            count_manu_one += 1
+                            manu_type = "one_link" # "one link"
+                        elif oSsg['manuscripts'] > 1:
+                            if bAbqHasNumber:
+                                count_manu_many_num += 1
+                                manu_type = "many_links_ABK_num" # "many links ABK has number"
+                            else:
+                                count_manu_many_oth += 1
+                                manu_type = "many_links_ABK_txt" # "many links ABK text only"
+                        oSsg['manu_type'] = manu_type
+
+                        # Check if there already is a SSG with the inc/expl
+                        qs = EqualGold.objects.filter(incipit__iexact=oSsg['incipit'], explicit__iexact=oSsg['explicit'])
+                        count = qs.count()
                         if count == 0:
-                            sig_status = "opera_ssg_0_n"
-                        elif count == len(signaturesA):
-                            # everything of Opera is in Passim, but Passim has more
-                            sig_status = "opera_ssg_1_n"
+                            existing_ssg = dict(id=None, type="ssgmN: no inc/exp match")
+                            add_existing("ssgmN")
+                        elif count == 1:
+                            # This must be a match
+                            obj = qs.first()
+                            existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmF: full inc/exp match")
+                            add_existing("ssgmF")
+                        elif count > 1 and (oSsg['incipit'] == "" or oSsg['explicit'] == ""):
+                            existing_ssg = dict(id=None, type="ssgmE: empty inc or exp")
+                            add_existing("ssgmE")
                         else:
-                            # There is an overlap between opera/passim signatures > 1
-                            # but the number of Opera and Passim signatures is not entirely equal
-                            sig_status = "opera_ssg_n_1"
-                if bDoCounting:
-                    if not sig_status in sig_matching:
-                        sig_matching[sig_status] = 0
-                    sig_matching[sig_status] += 1
+                            # Check further on the author
+                            obj = qs.filter(author=passim_author).first()
+                            if obj is None:
+                                # Found matching inc/exp, but not a matching author
+                                existing_ssg = [dict(id=x.id, code=x.code, type="ssgmAM: author mismatch") for x in qs]
+                                add_existing("ssgmAM")
+                            else:
+                                existing_ssg = dict(id=obj.id, code=obj.code, type="ssgmFA: full inc/exp/author match")
+                                add_existing("ssgmFA")
+                        oSsg['existing_ssg'] = existing_ssg
 
-                # Save the sig_status                
-                oOperaSsg['existing_ssg']['sig_status'] = sig_status
+                        same_sig_ssgs = []
+                        if len(signaturesA) > 0:
+                            # Build a Q-expression
+                            expr = ( Q(code__iexact=signaturesA[0]['code']) & Q(editype=signaturesA[0]['editype']) )
+                            for oSig in signaturesA[1:]:
+                                expr |= ( Q(code__iexact=oSig['code']) & Q(editype=oSig['editype']) )
+                        
+                            # Get a list of signature id's
+                            sig_ids = [x['id'] for x in Signature.objects.filter(expr).values('id')]
 
-            # (11) combine the sections into one object
-            oData['operas'] = lst_opera
-            oData['opera_relations'] = lst_opera_rel
-            oData['sig_dict'] = signature_dict
-            oData['manuscripts'] = lst_manuscript
+                            if len(sig_ids) > 0:
+                                # Check if there already is a SSG with one of the signatures in the list
+                                qs = EqualGold.objects.filter(equal_goldsermons__goldsignatures__id__in=sig_ids).distinct().values('id')
+                                # same_sig_ssgs = qs.count()
+                                # Better: give a list of SSG ids with the same sigs
+                                same_sig_ssgs = [x['id'] for x in qs]
+
+                        # Add the results of the SSG match
+                        oSsg['same_sig_ssgs'] = same_sig_ssgs
+
+                    # Add this to the list of SSGs
+                    lst_opera.append(oSsg)
+
+                # (9) Process the inter-opera relations 
+                lst_opera_rel = []
+                oRelationship = {x['rel_id']:x  for x in EqualGoldHuwaToJson.relationships }
+                count_rel = len(lst_relations)
+                for idx, oRel in enumerate(lst_relations):
+                    # Show where we are
+                    if idx % 100 == 0:
+                        oErr.Status("EqualGoldHuwaToJson relations: {}/{}".format(idx+1, count_rel))
+
+                    opera_src = oRel.get('opera_src')
+                    opera_dst = oRel.get('opera_dst')
+                    rel_id = oRel.get('rel_id')
+
+                    # Make sure that the destination always is a list
+                    opera_dst = [ opera_dst ] if isinstance(opera_dst, int) else opera_dst
+
+                    # Get the row of this relation
+                    oRel = oRelationship[rel_id]
+                    linktypes = oRel.get("linktypes", [])
+                    spectypes = oRel.get("spectypes", [])
+                    bDirectional = (oRel.get("dir") == "yes")
+
+                    # If this relation does *NOT* contain a linktype, then we cannot process it!!!
+                    if len(linktypes) > 0:
+
+                        # Start creating this opera relation
+                        for dst in opera_dst:
+                            for linktype in linktypes:
+                                oOperaRel = dict(src=opera_src, dst=dst)
+                                oReverse = None
+                                if len(spectypes) == 0:
+                                    oOperaRel['linktype'] = linktype
+                                elif bDirectional and len(spectypes) > 1:
+                                    oReverse = dict(src=dst, dst=opera_src)
+                                    oOperaRel['linktype'] = linktype
+                                    oOperaRel['spectype'] = spectypes[0]
+                                    oReverse['linktype'] = linktype
+                                    oReverse['spectype'] = spectypes[1]
+                                    if rel_id == 11:
+                                        # Signal excerpt
+                                        oOperaRel['keyword'] = 'excerpt'
+                                        oReverse['keyword'] = 'excerpt'
+                                else:
+                                    oOperaRel['linktype'] = linktype
+                                    oOperaRel['spectype'] = spectypes[0]
+                                # Add items to list
+                                lst_opera_rel.append(oOperaRel)
+                                if not oReverse is None:
+                                    lst_opera_rel.append(oReverse)
+                    else:
+                        # Show that we are skipping this relation
+                        msg = "download HUWA json: skip rel[{}] src={} to dst={} (no linktype)".format(rel_id, opera_src, str(opera_dst))
+                        oErr.Status(msg)
+
+                # (10) Calculate the signature status (see issue #533)
+                for idx, oOperaSsg in enumerate(lst_opera):
+                    sig_status = "unknown"
+                    # Get the opera signatures
+                    signaturesA = ["{}: {}".format(x['editype'], x['code']) for x in oOperaSsg['signaturesA'] ]
+
+                    # Get matching existing Passim SSG/AFs via these signature(s)
+                    same_sig_ssgs = oOperaSsg['same_sig_ssgs']
+
+                    if len(same_sig_ssgs) == 0:
+                        # There are no matching existing Passim SSGs
+                        if len(signaturesA) == 0:
+                            sig_status = "opera_ssg_0_0"
+                        else:
+                            sig_status = "opera_ssg_1_0"
+                    elif len(signaturesA) == 0:
+                        # There are no Opera signatures, but there are 
+                        sig_status = "opera_ssg_0_1"
+                    else:
+                        # Get the signatures of the Passim SSG
+                        signaturesP = [ "{}: {}".format(x.editype, x.code) for x in Signature.objects.filter(gold__equal__id__in=same_sig_ssgs) ]
+                        count = 0
+                        for sigA in signaturesA:
+                            if sigA in signaturesP:
+                                count += 1
+                        if len(signaturesA) == len(signaturesP) and count == len(signaturesA):
+                            # There is a full 1-1 match between Opara and Passim signatures
+                            sig_status = "opera_ssg_1_1"
+                        else:
+                            if count == 0:
+                                sig_status = "opera_ssg_0_n"
+                            elif count == len(signaturesA):
+                                # everything of Opera is in Passim, but Passim has more
+                                sig_status = "opera_ssg_1_n"
+                            else:
+                                # There is an overlap between opera/passim signatures > 1
+                                # but the number of Opera and Passim signatures is not entirely equal
+                                sig_status = "opera_ssg_n_1"
+                    if bDoCounting:
+                        if not sig_status in sig_matching:
+                            sig_matching[sig_status] = 0
+                        sig_matching[sig_status] += 1
+
+                    # Save the sig_status                
+                    oOperaSsg['existing_ssg']['sig_status'] = sig_status
+
+                # (11) combine the sections into one object
+                oData['operas'] = lst_opera
+                oData['opera_relations'] = lst_opera_rel
+                oData['sig_dict'] = signature_dict
             
             # Convert oData to stringified JSON
             if dtype == "json":
-                # convert to string
-                sData = json.dumps(oData, indent=2)
+                if self.import_type == "manu":
+                    # Combine the lst_manu_string
+                    sData = "\n".join(lst_manu_string)
+                else:
+                    # convert to string
+                    sData = json.dumps(oData, indent=2)
 
             elif dtype == "csv" or dtype == "xlsx":
                 # 
@@ -3505,7 +3775,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 sData = output.getvalue()
                 output.close()
 
-            if bDoCounting:
+            if bDoCounting and self.import_type == "ssg":
                 # Also show results of counting:
                 oErr.Status("Potential SSGs with manuscripts: 0={}, 1={}, many (with num)={} many (no num)={}".format(
                     count_manu_zero, count_manu_one, count_manu_many_num, count_manu_many_oth))
@@ -3576,7 +3846,20 @@ class EqualGoldHuwaToJson(BasicPart):
         try:
             authors_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_passim_author.json"))
             with open(authors_json, "r", encoding="utf-8") as f:
-                lst_authors = json.load(f)
+                lst_interim = json.load(f)
+
+            # Make sure that all the 'huwa_id' fields are integers and not string
+            for oAuthor in lst_interim:
+                if isinstance(oAuthor['huwa_id'], str):
+                    sHuwaIds = oAuthor['huwa_id'].replace(" ", "")
+                    arHuwaIds = re.split(r"[\;\/]", sHuwaIds)
+                    for sHuwaId in arHuwaIds:
+                        iHuwaId = int(sHuwaId.strip())
+                        oOneAuthor = copy.copy(oAuthor)
+                        oOneAuthor['huwa_id'] = iHuwaId
+                        lst_authors.append(oOneAuthor)
+                else:
+                    lst_authors.append(copy.copy(oAuthor))
         except:
             msg = oErr.get_error_message()
             oErr.DoError("HuwaEqualGoldToJson/read_authors")
@@ -3711,16 +3994,10 @@ class EqualGoldHuwaToJson(BasicPart):
         return oTables
 
 
-class EqualGoldHuwaOperaToJson(EqualGoldHuwaToJson):
-    """Read HUWA operas (SSG and Sermon) from database into JSON"""
-
-    pass
-
-
-class EqualGoldHuwaManuToJson(EqualGoldHuwaToJson):
+class ManuscriptHuwaToJson(EqualGoldHuwaToJson):
     """Read HUWA manuscripts from database into JSON"""
 
-    pass
+    import_type = "manu"
 
 
 class ReaderEqualGold(View):
@@ -3902,6 +4179,7 @@ class ReaderHuwaImport(ReaderEqualGold):
 
     import_type = "huwajson"
     sourceinfo_url = "http://www.ru.nl"
+    opera_equal = None
 
     def process_files(self, request, source, lResults, lHeader):
         """Process a JSON file for HUWA import"""
@@ -4006,6 +4284,10 @@ class ReaderHuwaImport(ReaderEqualGold):
 
             # Load the relations separately
             opera_relations = oOperaData.get("opera_relations")
+            # Create an opera-equality relation dictionary
+            oOperaEqual = self.get_relation_equals(opera_relations)
+            self.opera_equal = oOperaEqual
+
             # Load the opera definitions
             operas = oOperaData.get("operas")
 
@@ -4040,69 +4322,71 @@ class ReaderHuwaImport(ReaderEqualGold):
                 bMakeSG = False
 
                 # issue #558: opera with no links to inhalt that have been assigned a Gryson/Clavis-code in the "opera_passim" document.
-                if manu_type == "zero_links":
-                    # This Opera has no links to inhalt
-                    # DOUBLE CHECK - at first we don't do anything with them
+                #     Note: the number of links to inhalt should not matter
+                #           An opus with a link to inhalt is part of a manuscript
+                #           An opus without link to inhalt is not part of a manuscript
+                #           But in both cases the opus can turn out to be an SSG (in our terms)
+
+                # ------ issue #533: this distinction disappears now -----------
+                #if bDistinguishZeroLinks and manu_type == "zero_links":
+                #    # This Opera has no links to inhalt
+                #    # DOUBLE CHECK - at first we don't do anything with them
+                #    pass
+
+                ## First criterion: skip all manu_type 'zero_links']
+                #elif manu_type != 'zero_links':
+                #    # Second criterion: look at possible sig_status
+
+                # Most importantly, check whether HUWA mentions any signatures
+                if sig_status == "opera_ssg_0_0":
+                    # No signature is given
+                    # No further SSG/AF action needed, because:
+                    # - if they have no link to a manuscript, they are useless anyway
+                    # - if they *do* have a link to a manuscript, then they are just manifestations and there is no need for SG/SSG
                     pass
-
-                    # ============= PLEASE LEAVE THIS UNTIL issue #533 is SORTED OUT ======================
-                    # (asked: 13/jul/2022)
-                    ## Second criterion: check Gryson/Clavis code (via sig_status)
-                    #if sig_status == "opera_ssg_1_0":
-                    #    # Yes: import this one
-                    #    oImported = self.import_one_json(oOpera, [project_huwa, project_passim], coll_super=coll_super, coll_gold=coll_gold)
-                    #elif sig_status == "opera_ssg_1_1":
-                    #    # Only create SSG if there is a match in inc/exp
-                    #    if ssg_type in ["ssgmF", "ssgmE"]:
-                    #        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                    #        oImported = self.import_one_json(oOpera,[project_huwa], coll_super=coll_super, coll_gold=coll_gold)
-                    # =====================================================================================
-
-                # First criterion: skip all manu_type 'zero_links']
-                elif manu_type != 'zero_links':
-                    # Second criterion: look at possible sig_status
-                    if sig_status == "opera_ssg_0_0":
-                        # Skip for now
-                        pass
-                    elif sig_status == "opera_ssg_0_n":
-                        # Check what the ACTION is for this one
-                        if action == "new AF":
-                            # Indicate that a new SG must be made for these
-                            bMakeSG = True
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        elif action == "link_to AF":
-                            # ONLY (!!!) create a link between the SSG and the OPERA number
-                            oImported = self.link_ssg_to_opera(oOpera)
-                    elif sig_status == "opera_ssg_1_0":
+                elif sig_status == "opera_ssg_0_n":
+                    # Check what the ACTION is for this one
+                    if action == "new AF" or action == "":
                         # Indicate that a new SG must be made for these
                         bMakeSG = True
-                        # Depending on ssg_type (though this appears to be irrelevant)
-                        if ssg_type == "ssgmF":
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        else:
-                            # Yes: import this one
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                    elif sig_status == "opera_ssg_1_1":
-                        # Indicate that a new SG must be made for these
-                        bMakeSG = True
-                        if ssg_type in ["ssgmF", "ssgmE"]:
-                            # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
-                            oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
-                        else:
-                            # Skip these: a subset is made of/for them
-                            pass
-                    elif sig_status == "opera_ssg_1_n":
-                        # Skip for now
-                        pass
-                    elif sig_status == "opera_ssg_n_1":
-                        # Skip for now
-                        pass
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    elif action == "link_to AF":
+                        # ONLY (!!!) create a link between the SSG and the OPERA number
+                        oImported = self.link_ssg_to_opera(oOpera)
+                elif sig_status == "opera_ssg_1_0":
+                    # Indicate that a new SG must be made for these
+                    bMakeSG = True
+                    # Depending on ssg_type (though this appears to be irrelevant)
+                    if ssg_type == "ssgmF":
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    else:
+                        # Yes: import this one
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_1_1":
+                    # Indicate that a new SG must be made for these
+                    bMakeSG = True
+                    if ssg_type in ["ssgmF", "ssgmE"]:
+                        # Import through matching of HUWA/PASSIM AFs through their Gryson/Clavis code
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                    else:
+                        # This is now subset [ssg11n] - it may be imported (will be checked online)
+                        oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_1_n":
+                    # Issue #533: may be imported and will be checked online
+                    oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
+                elif sig_status == "opera_ssg_n_1":
+                    # Issue #533: may be imported and will be checked online
+                    oImported = self.import_one_json(oOpera,[project_huwa], bMakeSG, coll_super=coll_super, coll_gold=coll_gold)
                 # Process the [oImported]
-                if not oImported is None and oImported.get("msg") in ["read", "linked"]:
-                    oErr.Status("Huwa Import processing opera id={} as [{}] ({}/{})".format(
-                        opera_id, oImported.get("msg"), idx+1, num_operas))
+                if not oImported is None and oImported.get("msg") in ["read", "linked", "skipped"]:
+                    sExtra = ""
+                    if oImported.get("msg") == "read":
+                        # Get author info
+                        sExtra = " ({}/{})".format(oImported.get("author"), oImported.get("number"))
+                    oErr.Status("Huwa Import processing opera id={} as [{}] ({}/{}){}".format(
+                        opera_id, oImported.get("msg"), idx+1, num_operas, sExtra))
                     lst_imported.append(oImported)
 
             # Check if any relations from the list [opera_relations] can be added
@@ -4120,6 +4404,33 @@ class ReaderHuwaImport(ReaderEqualGold):
             oResult['msg'] = msg
 
         return oBack
+
+    def get_relation_equals(self, opera_relations):
+        """Create a dictionary with the opera ID as key for equal relationships"""
+
+        oErr = ErrHandle()
+        oEqual = {}
+        try:
+            # Walk the list of relations
+            for oRelation in opera_relations:
+                src_id = oRelation.get("src")
+                dst_id = oRelation.get("dst")
+                linktype = oRelation.get("linktype")
+                if linktype == "eqs":
+                    # Add this equal relationship in the dictionary
+                    src_str = str(src_id)
+                    dst_str = str(dst_id)
+                    # Add the one relationship
+                    if not src_str in oEqual:
+                        oEqual[src_str] = dst_id
+                    # And add the reverse relationship
+                    if not dst_str in oEqual:
+                        oEqual[dst_str] = src_id
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_relation_equals")
+
+        return oEqual
 
     def add_relations(self, opera_relations):
         """Given the list of relations, see if anything can be added"""
@@ -4153,38 +4464,40 @@ class ReaderHuwaImport(ReaderEqualGold):
                 keyword = oRelation.get("keyword")
                 rel_num += 1
 
-                ## -------- DEBUGGING ----------------
-                #if bDebug: oErr.Status("Add_relations number: {}".format(rel_num))
-                
-                ## -------- DEBUGGING ----------------
-                #if src_id == 6301:
-                #    iStop = 1
-
                 # Retrieve the src and dst SSGs
                 src = get_opera_ssg(src_id)
                 if not src is None:
                     dst = get_opera_ssg(dst_id)
                     if not dst is None and not linktype is None and not spectype is None:
-                        # All essential ingredients are there: check if this relation already exists
-                        link = EqualGoldLink.objects.filter(src=src, dst=dst, linktype=linktype, spectype=spectype).first()
-                        if link is None:
-                            # Create a link
-                            link = EqualGoldLink.objects.create(src=src, dst=dst, linktype=linktype, spectype=spectype, alternatives="no")
-                            count_new += 1
-                            # Need to add a keyword, possibly?
-                            if not keyword is None and keyword != "":
-                                kw_obj = Keyword.objects.filter(name__iexact=keyword).first()
-                                if kw_obj is None:
-                                    kw_obj = Keyword.objects.create(name__iexact=keyword)
-                                # Check if there already is a kw link between [src] and [kw_obj]
-                                obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
-                                if obj is None:
-                                    obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
-                            
-                            oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
+                        # All essential ingredients are there...
+
+                        # If this is an [eqs] linktype, then it requires entirely different treatment
+                        if linktype == "eqs":
+                            # Check if the destination 
+                            pass
+
                         else:
-                            # Keep track of existing links
-                            count_existing += 1
+                        
+                            # check if this relation already exists
+                            link = EqualGoldLink.objects.filter(src=src, dst=dst, linktype=linktype, spectype=spectype).first()
+                            if link is None:
+                                # Create a link
+                                link = EqualGoldLink.objects.create(src=src, dst=dst, linktype=linktype, spectype=spectype, alternatives="no")
+                                count_new += 1
+                                # Need to add a keyword, possibly?
+                                if not keyword is None and keyword != "":
+                                    kw_obj = Keyword.objects.filter(name__iexact=keyword).first()
+                                    if kw_obj is None:
+                                        kw_obj = Keyword.objects.create(name__iexact=keyword)
+                                    # Check if there already is a kw link between [src] and [kw_obj]
+                                    obj = EqualGoldKeyword.objects.filter(equal=src, keyword=kw_obj).first()
+                                    if obj is None:
+                                        obj = EqualGoldKeyword.objects.create(equal=src, keyword=kw_obj)
+                            
+                                oErr.Status("Add_relations src={} dst={}".format(src_id, dst_id))
+                            else:
+                                # Keep track of existing links
+                                count_existing += 1
             # Report the counts
             oErr.Status("add_relations: new={}, existing={}, missing={}".format(count_new, count_existing, count_rel - count_new - count_existing))
             count = count_new + count_existing
@@ -4285,6 +4598,31 @@ class ReaderHuwaImport(ReaderEqualGold):
             existing_id = oOpera['existing_ssg'].get("id")
             manu_type = oOpera['manu_type']
 
+            # Check whether this OPERA has already been imported or not
+            obj_ext = EqualGoldExternal.objects.filter(externaltype=EXTERNAL_HUWA_OPERA, externalid=opera_id).first()
+            if not obj_ext is None:
+                # This particular Opera has already been processed
+                oImported['ssg'] = obj_ext.equal.get_code()
+                oImported['msg'] = 'skipped'
+                return oImported
+
+            # Check if this opera equals another one
+            equal_opera_id = None
+            obj_ext = None
+            if existing_id is None and not self.opera_equal is None:
+                # We have a relations dictionary!
+                str_opera = str(opera_id)
+                if str_opera in self.opera_equal:
+
+                    # There is another opera equalling this one
+                    equal_opera_id = self.opera_equal[str_opera]
+                    # Check if this has already been noted in the EqualGoldExternal table
+                    obj_ext = EqualGoldExternal.objects.filter(externaltype=EXTERNAL_HUWA_OPERA, externalid=equal_opera_id).first()
+                    if not obj_ext is None:
+                        # Get the EqualGold object to which this one is equal
+                        # Assigning it to existing_id means that *NO* SSG will be created, but only an SG
+                        existing_id = obj_ext.equal.id
+
             # Make a subset identifier
             existing_type = existing_type.split(":")[0]
             manu_type= manu_type.split("_")[0]
@@ -4302,8 +4640,12 @@ class ReaderHuwaImport(ReaderEqualGold):
             ssg = None
             gold = None
 
+            if len(same_sig_ssgs) > 0:
+                # There already may be one SSG with the same Signature(s)
+                ssg = EqualGold.objects.filter(id__in=same_sig_ssgs).first()
+
             # If there is an existing SSG with the same Signature(s)...
-            if len(same_sig_ssgs) == 0 or oOpera.get("action") == "new AF":
+            if ssg is None or oOpera.get("action") == "new AF":
                 # Check if there is an existing SSG
                 if existing_id is None:
                     # No, there are no SSGs with the same sig yet: this means we are CREATING a new SSG and a new SG for it
@@ -4347,6 +4689,8 @@ class ReaderHuwaImport(ReaderEqualGold):
                 ssg.firstsig = get_firstsig(signatures)
                 ssg.save()
                 oImported['ssg'] = ssg.get_code()
+                oImported['author'] = ssg.get_author()
+                oImported['number'] = ssg.get_number()
 
                 # Create a link between the SSG and the opera identifier
                 EqualGoldExternal.objects.create(
@@ -4357,11 +4701,11 @@ class ReaderHuwaImport(ReaderEqualGold):
                 oImported['msg'] = "read"
 
             else:
-                # There already is at least one SSG with the same Signature(s)
-                ssg_id = same_sig_ssgs[0]
-                ssg = EqualGold.objects.filter(id=ssg_id).first()
+                # There already is an SSG that we can use as a basis!
 
                 oImported['ssg'] = ssg.get_code()
+                oImported['author'] = ssg.get_author()
+                oImported['number'] = ssg.get_number()
 
                 # Double check if this has already been done...
                 obj = EqualGoldExternal.objects.filter(

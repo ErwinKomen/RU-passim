@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class basicConfig(AppConfig):
-    name = 'basic'
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'passim.basic'
+    # name = 'basic'

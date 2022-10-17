@@ -229,7 +229,6 @@ class ManuscriptUploadJson(ReaderImport):
     import_type = "json"
     sourceinfo_url = "https://www.ru.nl/passim/upload_json"
 
-
     def process_files(self, request, source, lResults, lHeader):
 
         def sermones_fixes(oManu):
@@ -291,13 +290,15 @@ class ManuscriptUploadJson(ReaderImport):
         oErr = ErrHandle()
         bOkay = True
         code = ""
+        sourcetype = ""
         oStatus = self.oStatus
+
         try:
             # Make sure we have the username
             username = self.username
             profile = Profile.get_user_profile(username)
             team_group = app_editor
-            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path', 'source': source}
 
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
@@ -336,15 +337,31 @@ class ManuscriptUploadJson(ReaderImport):
                                 lst_manu = [oManuList[x] for x in sorted_keys]
                                 # lst_manu = [v for k,v in sorted(oManuList.items(), key=lambda key: int(re.search(r'\d+', key).group()))]
 
-                            # Walk through the manuscripts
+                            # Look at the first manuscript to determine any specific source type
                             count_manu = len(lst_manu)
+                            if count_manu > 0:
+                                oManuFirst = lst_manu[0]
+                                datasets = oManuFirst.get("datasets")
+                                if not datasets is None and len(datasets) > 0:
+                                    sDataset = datasets[0].lower()
+                                    if "sermones" in sDataset:
+                                        sourcetype = "sermones"
+                                    elif "huwa" in sDataset:
+                                        sourcetype = "huwa"
+
+                            # Make sure we pass the sourcetype on to Manuscript.custom_add()
+                            kwargs['sourcetype'] = sourcetype
+
+
+                            # Walk through the manuscripts
                             for idx, oManu in enumerate(lst_manu):
                                 # There is one result per manuscript
                                 oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
 
 
                                 # Issue #509: literature fix
-                                sermones_fixes(oManu)
+                                if sourcetype == "sermones":
+                                    sermones_fixes(oManu)
                                 # Make sure the stype is set to "imported"
                                 oManu['stype'] = "imp"
 
@@ -376,12 +393,13 @@ class ManuscriptUploadJson(ReaderImport):
                                     msitems = oManu.get("msitems")
                                     if not msitems is None and len(msitems) > 0:
                                         sermon_siglist = []
-                                        for msitem in msitems:
+                                        for idx, msitem in enumerate(msitems):
                                             oSermon = msitem.get("sermon")
                                             sig = oSermon.get("signaturesA")
                                             if not sig is None:
-                                                sermon_siglist.append(sig)
-                                    html_en.append("Sermons: {}".format(", ".join(sermon_siglist)))
+                                                sermon_siglist.append("sermon {}: {}".format(idx+1, json.dumps(sig)))
+                                        sSiglist = ";\n".join(sermon_siglist)
+                                        html_en.append("Sermons: {}".format(sSiglist))
 
                                     # (3) Editornotes
                                     en = oManu.get("editornotes")
@@ -389,7 +407,7 @@ class ManuscriptUploadJson(ReaderImport):
                                         html_en.append(en)
 
                                     # COmbine the editor notes
-                                    manu.editornotes = "\n\n".join(html_en)
+                                    manu.editornotes = "\n\nHUWA sermon information:".join(html_en)
                                     manu.save()
 
                                     oResult['count'] += 1
@@ -790,5 +808,149 @@ class ManuscriptUploadGalway(ReaderImport):
             oManu = None
 
         return oManu, oCodico
+
+
+class LibraryUploadExcel(ReaderImport):
+    """Specific parameters for importing manuscripts from Excel"""
+
+    import_type = "excel"
+    sourceinfo_url = "https://www.ru.nl/passim/upload_library_excel"
+    template_name = "reader/import_libraries.html"
+
+    def process_files(self, request, source, lResults, lHeader):
+
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        try:
+            # Make sure we have the username
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path'}
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+                        lst_added = []
+
+                        # Further processing depends on the extension
+                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+
+                        lHeader.clear()
+                        lHeader.append("Country")
+                        lHeader.append("City")
+                        lHeader.append("Library")
+
+                        if extension == "xlsx":
+                            # This is an Excel file: read the file using openpyxl
+                            # Write data temporarily to the WRITABLE dir, but with a temporary filename
+                            tmp_path = os.path.abspath(os.path.join( MEDIA_DIR, filename))
+                            with io.open(tmp_path, "wb") as f:
+                                sData = data_file.read()
+                                f.write(sData)
+
+                            # Read string file
+                            wb = openpyxl.load_workbook(tmp_path, read_only=True)
+                            sheetnames = wb.sheetnames
+                            ws_data = None
+                            for sname in sheetnames:
+                                if "data" in sname.lower():
+                                    ws_data = wb[sname]
+                                    break
+                            # Do we have a 'Data' worksheet?
+                            if not ws_data is None:
+                                # Process the header details
+                                oHeader = dict(lcountry=0, lcity=0, library=0, toevoegen=0, opmerkingen=0, approved=0)
+                                row_num = 1
+                                col_num = 1
+                                while not ws_data.cell(row=row_num, column=col_num).value is None:
+                                    sKey = ws_data.cell(row=row_num, column=col_num).value
+                                    if sKey in oHeader:
+                                        oHeader[sKey] = col_num
+                                    col_num += 1
+
+                                # Double check to see if we now have all the columns needed
+                                bMissing = False
+                                for k,v in oHeader.items():
+                                    if v is None or v == 0:
+                                        bMissing = True
+                                        break
+
+                                # Can we continue?
+                                if bMissing:
+                                    # We cannot continue: informatino is missing
+                                    bOkay = False
+                                    code = "Missing header"
+                                else:
+                                    # Yes, find out how many libraries there are right now
+                                    lib_count = Library.objects.count()
+                                    loc_count = Location.objects.count()
+
+                                    # Yes, we can continue: walk through all rows
+                                    row_num = 2
+                                    while not ws_data.cell(row=row_num, column=1).value is None:
+                                        # Process this row
+                                        lcountry = ws_data.cell(row=row_num, column=oHeader['lcountry']).value
+                                        lcity = ws_data.cell(row=row_num, column=oHeader['lcity']).value
+                                        library = ws_data.cell(row=row_num, column=oHeader['library']).value
+                                        toevoegen = ws_data.cell(row=row_num, column=oHeader['toevoegen']).value
+                                        opmerkingen = ws_data.cell(row=row_num, column=oHeader['opmerkingen']).value
+                                        approved = ws_data.cell(row=row_num, column=oHeader['approved']).value
+
+                                        if not approved is None and approved == "j":
+                                            # Add library
+                                            sNote = "Menna approved LibraryUploadExcel"
+                                            added, lib_id, lib_city, lib_country = Location.get_or_create_library(library, lcity, lcountry, sNote)
+
+                                            # Has this been added?
+                                            if added:
+                                                # Then put it into a list
+                                                oAdded = dict(country=lcountry, city=lcity, library=library)
+                                                lResults.append(oAdded)
+
+                                        # Go to the next row
+                                        row_num += 1
+ 
+                                    # Check what has been added
+                                    lib_added = Library.objects.count() - lib_count
+                                    loc_added = Location.objects.count() - loc_count
+
+
+
+                        # Create a report and add it to what we return
+                        
+                        oContents = {'headers': lHeader, 'libraries': lib_added, 'locations': loc_added,
+                                     'added': lResults}
+                        oReport = Report.make(username, "ixlsx", json.dumps(oContents, indent=2))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+
+            code = "Imported using the [library_upload_excel] function on this file list: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+        return bOkay, code
+
 
 

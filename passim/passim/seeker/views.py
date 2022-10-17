@@ -89,7 +89,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads
 from passim.bible.models import Reference
-from passim.dct.models import ResearchSet, SetList
+from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
     approval_parse_adding, approval_parse_removing, approval_parse_deleting, addapproval_pending
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
@@ -640,6 +640,71 @@ def adapt_regex_incexp(value):
         value = value.replace("ae", "e").replace("e", "a?e").translate(oTranslation)
 
     return value
+
+def get_saveditem_html(request, instance, profile, htmltype="button", sitemtype=None):
+    """Get an indication whether this is a saved item, or allow to add it"""
+
+    oErr = ErrHandle()
+    sBack = ""
+    try:
+        if not sitemtype is None:
+            obj = SavedItem.get_saveditem(instance, profile, sitemtype)
+            context = {}
+            context['profile'] = profile
+            context['saveditem'] = obj
+            context['item'] = instance
+            context['sitemtype'] = sitemtype
+            context['sitemaction'] = "add" if obj is None else "remove"
+
+            template_name = "dct/sitem_button.html"
+            if htmltype == "form":
+                template_name = "dct/sitem_form.html"
+
+            sBack = render_to_string(template_name, context, request)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_saveditem_html")
+    return sBack
+
+def get_selectitem_info(request, instance, profile, selitemtype=None, context={}):
+    """Get an indication whether this is a select item, or allow to add it"""
+
+    oErr = ErrHandle()
+    sBack = ""
+    try:
+        if not selitemtype is None:
+            html = []
+            # context = {}
+            context['profile'] = profile
+            context['selitemtype'] = selitemtype
+
+            # Is this the main form or not?
+            if instance is None:
+                # This is the main form
+                template_name = "dct/selitem_main.html"
+                html.append( render_to_string(template_name, context, request))
+
+            else:
+
+                obj = SelectItem.get_selectitem(instance, profile, selitemtype)
+                context['selitem'] = obj
+                context['item'] = instance
+                context['selitemaction'] = "add" if obj is None else "remove"
+
+                template_name = "dct/selitem_button.html"
+                html.append( render_to_string(template_name, context, request))
+
+                template_name = "dct/selitem_form.html"
+                html.append( render_to_string(template_name, context, request))
+
+            sBack = "\n".join(html)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_selectitem_info")
+    return sBack
+
+
+
 
 
 # ================= STANDARD views =====================================
@@ -4382,12 +4447,18 @@ class SermonEdit(BasicDetails):
             context['mainitems'].append(
                 {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
                 )
+
+        # Prepare saveditem handling
+        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
+        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
+
         # Get the main items
         mainitems_main = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
+            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
             # -------- HIDDEN field values ---------------
             {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
             # --------------------------------------------
+            {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
             {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
             {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
             {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
@@ -4508,6 +4579,10 @@ class SermonEdit(BasicDetails):
         lhtml = []
         lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
         context['comment_count'] = instance.comments.count()
+
+        # Also add the saved item form
+        lhtml.append(saveditem_form)
+
         # Store the after_details in the context
         context['after_details'] = "\n".join(lhtml)
 
@@ -4954,6 +5029,7 @@ class SermonListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "sermo"
+    sel_button = "serm"
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Manifestations"
@@ -4962,7 +5038,7 @@ class SermonListView(BasicList):
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
-                  'sectiontitle', 'title', '','', 'stype']
+                  'sectiontitle', 'title', '','','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
@@ -4970,21 +5046,22 @@ class SermonListView(BasicList):
         {'name': 'Gryson/Clavis', 'order': 'o=2', 'type': 'str', 'custom': 'signature', 'allowwrap': True, 'options': '111111',
          'title': 'Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon'}, 
         {'name': 'Incipit ... Explicit', 
-                                'order': 'o=3', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True},
-        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'},
-        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str', 'custom': 'msdate',
+                                'order': 'o=3', 'type': 'str',  'custom': 'incexpl', 'main': True, 'linkdetails': True},
+        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str',  'custom': 'manuscript'},
+        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str',  'custom': 'msdate',
          'title': 'Date of the manuscript'},
-        {'name': 'Section',     'order': 'o=6', 'type': 'str', 'custom': 'sectiontitle', 
+        {'name': 'Section',     'order': 'o=6', 'type': 'str',  'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
-        {'name': 'Title',       'order': 'o=7', 'type': 'str', 'custom': 'title', 
+        {'name': 'Title',       'order': 'o=7', 'type': 'str',  'custom': 'title', 
          'allowwrap': True,           'autohide': "on", 'filter': 'filter_title'},        
-        {'name': 'Locus',       'order': '',    'type': 'str', 'field':  'locus' },
-        {'name': 'Links',       'order': '',    'type': 'str', 'custom': 'links'},
-        {'name': 'Status',      'order': 'o=10', 'type': 'str', 'custom': 'status'}]
+        {'name': 'Locus',       'order': '',    'type': 'str',  'field':  'locus' },
+        {'name': '',            'order': '',    'type': 'str',  'custom':  'saved' },
+        {'name': 'Links',       'order': '',    'type': 'str',  'custom': 'links'},
+        {'name': 'Status',      'order': 'o=11', 'type': 'str', 'custom': 'status'}]
 
     filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
                 {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
-                {"name": "Author type",      "id": "filter_atype",          "enabled": False},
+                {"name": "Author type",      "id": "filter_autype",         "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
                 {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
@@ -5032,7 +5109,7 @@ class SermonListView(BasicList):
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
-            {'filter': 'atype',                                         'keyS': 'authortype',  'help': 'authorhelp'},
+            {'filter': 'autype',                                        'keyS': 'authortype',  'help': 'authorhelp'},
             {'filter': 'signature',     'fkfield': 'signatures|equalgolds__equal_goldsermons__goldsignatures',      'help': 'signature',     
                                         'keyS': 'signature_a', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist_a', 'infield': 'code' },
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures',      'help': 'signature',     
@@ -5071,6 +5148,12 @@ class SermonListView(BasicList):
             ]}
          ]
 
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        # {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
+
     def initializations(self):
         oErr = ErrHandle()
         try:
@@ -5085,6 +5168,10 @@ class SermonListView(BasicList):
 
             # Make sure to set a basic filter
             self.basic_filter = Q(mtype="man")
+
+            # Make the profile available
+            self.profile = Profile.get_user_profile(self.request.user.username)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonListiew/initializations")
@@ -5096,6 +5183,12 @@ class SermonListView(BasicList):
         context['basketsize'] = 0 if profile == None else profile.basketsize
         context['basket_show'] = reverse('basket_show')
         context['basket_update'] = reverse('basket_update')
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "serm")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_basketqueryset(self):
@@ -5139,6 +5232,12 @@ class SermonListView(BasicList):
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
                     sIdNo))
                 sTitle = manu.idno
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="serm")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="serm")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "msdate":
             manu = instance.get_manuscript()
             # Get the yearstart-yearfinish
@@ -5199,7 +5298,7 @@ class SermonListView(BasicList):
                 # Check on what kind of user I am
                 if not user_is_ingroup(self.request, app_editor):
                     # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")) # Thanks to LILAC, strip: .values('id')
                     fields['kwlist'] = kwlist
             
             # Check if a list of projects is given
@@ -5356,6 +5455,10 @@ class SermonListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance, context):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
 
 
 class OnlineSourceEdit(BasicDetails):
@@ -6950,7 +7053,8 @@ class ProjectEdit(BasicDetails):
             # Define the main items to show and edit
             context['mainitems'] = [
                 {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
-                {'type': 'line',  'label': "Editors:",  'value': instance.get_editor_markdown()}
+                {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
+                 'title': 'All the current users that have approval rights for this project'}
                 ]       
 
             # Also add a delete Warning Statistics message (see issue #485)
@@ -7105,7 +7209,15 @@ class CollAnyEdit(BasicDetails):
 
     def custom_init(self, instance):
         if instance != None and instance.settype == "hc":
-            self.formset_objects.append({'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
+            # First check if the 'clit' is already in the formset_objects or not
+            bFound = False
+            for oItem in self.formset_objects:
+                if oItem['prefix'] == "clit":
+                    bFound = True
+                    break
+            if not bFound:
+                self.formset_objects.append(
+                    {'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
         if instance != None:
             self.datasettype = instance.type
         return None
@@ -7194,9 +7306,14 @@ class CollAnyEdit(BasicDetails):
         # Need to know who this is
         profile = Profile.get_user_profile(self.request.user.username)
 
+        # Prepare saveditem handling
+        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
+        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
+
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+            {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
             {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
             {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
             ]
@@ -7271,8 +7388,19 @@ class CollAnyEdit(BasicDetails):
             lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
+
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
             # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)                        
+            context['after_details'] = "\n".join(lhtml)    
+        else:
+            lhtml = []                    
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)    
 
         # Any dataset may optionally be elevated to a historical collection
         # BUT: only if a person has permission
@@ -7409,11 +7537,12 @@ class CollAnyEdit(BasicDetails):
                     newpages = cleaned.get("newpages")
                     # Also get the litref
                     oneref = cleaned.get("oneref")
-                    if oneref:
-                        litref = cleaned['oneref']
-                        # Check if all is in order
-                        if litref:
-                            form.instance.reference = litref
+                    if not oneref is None:
+                        # Double check if this combination [oneref/newpages] is already connected to [instance] or not
+                        obj = LitrefCol.objects.filter(reference=oneref, pages=newpages, collection=instance).first()
+                        if obj is None:
+                            # It is not there yet: add it
+                            form.instance.reference = oneref
                             if newpages:
                                 form.instance.pages = newpages
                     # Note: it will get saved with form.save()
@@ -8660,6 +8789,11 @@ class CollectionListView(BasicList):
             ]} # {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'} eruit
         ]
 
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
+
     def initializations(self):
         if self.prefix == "sermo":
             self.plural_name = "Sermon collections"
@@ -8696,14 +8830,15 @@ class CollectionListView(BasicList):
             self.titlesg = "Personal Dataset"
             self.plural_name = "Datasets"
             self.sg_name = "Dataset"  
-            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', 'created', '']
+            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', '', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Scope',       'order': 'o=3', 'type': 'str', 'custom': 'scope'},
                 {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
-                {'name': 'Created',     'order': 'o=5', 'type': 'str', 'custom': 'created'},
+                {'name': '',            'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+                {'name': 'Created',     'order': 'o=6', 'type': 'str', 'custom': 'created'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
             self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False},
@@ -8726,13 +8861,14 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "Public Datasets"
             self.sg_name = "Public Dataset"  
-            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '']
+            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
                 {'name': 'Dataset',     'order': 'o=2', 'type': 'str', 'field': 'name', 'linkdetails': True, 'main': True},
                 {'name': 'Created',     'order': 'o=3', 'type': 'str', 'custom': 'created'},
                 {'name': 'Owner',       'order': 'o=4', 'type': 'str', 'custom': 'owner'},
+                {'name': '',            'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
                 {'name': 'Frequency',   'order': '',    'type': 'str', 'custom': 'links'}
             ]  
             self.filters = [ {"name": "Public dataset", "id": "filter_collection", "enabled": False}]
@@ -8750,13 +8886,14 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', 'ssgauthornum', 'created']
+            self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
                 {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
-                {'name': 'Author count',            'order': 'o=3', 'type': 'int', 'custom': 'authcount'},
-                {'name': 'Added',                 'order': 'o=4', 'type': 'str', 'custom': 'created'}
+                {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+                {'name': 'Author count',            'order': 'o=4', 'type': 'int', 'custom': 'authcount'},
+                {'name': 'Added',                   'order': 'o=5', 'type': 'str', 'custom': 'created'}
             ]  
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
@@ -8867,15 +9004,25 @@ class CollectionListView(BasicList):
                     {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}]}
                 ]
                 # ======== One-time adaptations ==============
+        self.sel_button = self.settype
         
         listview_adaptations("collhist_list")
         
+        # Make the profile available
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
 
     def add_to_context(self, context, initial):
         if self.prefix == "priv":
             context['prefix'] = self.prefix
             context['user_button'] = render_to_string('seeker/dataset_add.html', context, self.request)
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(self.profile, self.settype)
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_own_list(self):
@@ -9060,7 +9207,19 @@ class CollectionListView(BasicList):
             url = reverse('collhist_temp', kwargs={'pk': instance.id})
             html.append("<a href='{}' title='Create a template based on this historical collection'><span class='glyphicon glyphicon-open' style='color: darkblue;'></span></a>".format(url))
             sBack = "\n".join(html)
+        elif custom == "saved":
+            # Prepare saveditem handling
+            html = []
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype=self.settype)
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype=self.settype)
+            html.append(saveditem_button)
+            html.append(saveditem_form)
+            sBack = "".join(html)
         return sBack, sTitle
+
+    def get_selectitem_info(self, instance, context):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.settype, context)
     
 
 class CommentSend(BasicPart):
@@ -9323,10 +9482,6 @@ class ManuscriptEdit(BasicDetails):
     history_button = True
     comment_button = True
     
-    #MdrFormSet = inlineformset_factory(Manuscript, Daterange,
-    #                                     form=DaterangeForm, min_num=0,
-    #                                     fk_name = "manuscript",
-    #                                     extra=0, can_delete=True, can_order=False)
     McolFormSet = inlineformset_factory(Manuscript, CollectionMan,
                                        form=ManuscriptCollectionForm, min_num=0,
                                        fk_name="manuscript", extra=0)
@@ -9406,14 +9561,20 @@ class ManuscriptEdit(BasicDetails):
                 context['mainitems'].append(
                     {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
                     )
+
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
+
             # Get the main items
             mainitems_main = [
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),  'field_key': 'stype'},
-                {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),        'field_key': 'lcountry'},
-                {'type': 'plain', 'label': "City:",         'value': instance.get_city(),           'field_key': 'lcity',
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),      'field_key': 'stype'},
+                {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
+                {'type': 'plain', 'label': "Country:",      'value': instance.get_country(),          'field_key': 'lcountry'},
+                {'type': 'plain', 'label': "City:",         'value': instance.get_city(),             'field_key': 'lcity',
                  'title': 'City, village or abbey (monastery) of the library'},
-                {'type': 'safe', 'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
-                {'type': 'plain', 'label': "Shelfmark:",   'value': instance.idno,                 'field_key': 'idno'},
+                {'type': 'safe',  'label': "Library:",      'value': instance.get_library_markdown(), 'field_key': 'library'},
+                {'type': 'plain', 'label': "Shelfmark:",    'value': instance.idno,                   'field_key': 'idno'},
                 # Project assignment: see below
                 # {'type': 'plain', 'label': "Project:",      'value': instance.get_project_markdown(),       'field_key': 'project'},
                 # {'type': 'plain', 'label': "Project2:",      'value': instance.get_project_markdown2(),       'field_key': 'project2'},
@@ -9557,9 +9718,13 @@ class ManuscriptEdit(BasicDetails):
             initial = dict(otype="manu", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('manu', instance, profile)            
-            lhtml = []
+            
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
+
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
 
@@ -9988,6 +10153,20 @@ class ManuscriptHierarchy(ManuscriptDetails):
                 # Debugging:
                 str_hlist = json.dumps(hlist, indent=2)
 
+                # Step 0: make sure that the very *FIRST* element contains a 'codi' item
+                if not 'codi' in hlist[0]:
+                    codi_id = None
+                    for item in hlist:
+                        if 'codi' in item:
+                            codi_id = item['codi']
+                            break
+                    if codi_id is None:
+                        # We are in *DEEP* trouble. Not one single CODI
+                        errHandle.Status("ManuscriptHierarchy: Cannot find first CODI. Manu={}".format(instance.id))
+                    else:
+                        hlist[0]['codi'] = codi_id
+
+
                 # Step 1: Convert any new hierarchical elements into [MsItem] with SermonHead
                 head_to_id = {}
                 deletables = []
@@ -10022,100 +10201,109 @@ class ManuscriptHierarchy(ManuscriptDetails):
                         bNeedSaving = False
                         # Get the msitem of this item
                         msitem = MsItem.objects.filter(id=getid(item, "id", head_to_id)).first()
-                        # Get the next if any
-                        next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
-                        # Get the first child
-                        firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
-                        # Get the parent
-                        parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
+                        # if this doesn't exist (anymore), just skip it
+                        if not msitem is None:
+                            # Get the next if any
+                            next = None if item['nextid'] == "" else MsItem.objects.filter(id=getid(item, "nextid", head_to_id)).first()
+                            # Get the first child
+                            firstchild = None if item['firstchild'] == "" else MsItem.objects.filter(id=getid(item, "firstchild", head_to_id)).first()
+                            # Get the parent
+                            parent = None if item['parent'] == "" else MsItem.objects.filter(id=getid(item, "parent", head_to_id)).first()
 
-                        # Get a possible codi id
-                        codi_id = item.get("codi")
-                        if codi_id != None:
-                            if codi == None or codi.id != codi_id:
-                                codi = Codico.objects.filter(id=codi_id).first()
-                                # Possibly reset the codi order
-                                if codi_order != codi.order:
-                                    codi.order = codi_order
-                                    codi.save()
-                                codi_order += 1
+                            # Get a possible codi id
+                            codi_id = item.get("codi")
+                            if codi_id != None:
+                                if codi == None or codi.id != codi_id:
+                                    codi = Codico.objects.filter(id=codi_id).first()
+                                    # Possibly reset the codi order
+                                    if codi_order != codi.order:
+                                        codi.order = codi_order
+                                        codi.save()
+                                    codi_order += 1
 
-                        # Safe guarding
-                        if codi is None:
-                            errHandle.Status("ManuscriptHierarchy: codi is none")
-                            x = msitem.itemsermons.first()
-                        # Possibly set the msitem codi
-                        if msitem.codico != codi:
-                            msitem.codico = codi
-                            bNeedSaving = True
-                        elif codi == None and msitem.codico == None:
-                            # This MsItem is inserted before something that may already have a codico
-                            codi = instance.manuscriptcodicounits.order_by('order').first()
-                            if codi != None:
+                            # Safe guarding
+                            if codi is None:
+                                errHandle.Status("ManuscriptHierarchy: codi is none. Manu={}, msitem={}".format(instance.id, msitem.id))
+                                x = msitem.itemsermons.first()
+
+                            # Possibly set the msitem codi
+                            if msitem.codico != codi:
                                 msitem.codico = codi
                                 bNeedSaving = True
+                            elif codi == None and msitem.codico == None:
+                                # This MsItem is inserted before something that may already have a codico
+                                codi = instance.manuscriptcodicounits.order_by('order').first()
+                                if codi != None:
+                                    msitem.codico = codi
+                                    bNeedSaving = True
 
-                        # Possibly adapt the [shead] title and locus
-                        itemhead = msitem.itemheads.first()
-                        if itemhead and 'title' in item and 'locus' in item:
-                            title= item['title'].strip()
-                            locus = item['locus']
-                            if itemhead.title != title or itemhead.locus != locus:
-                                itemhead.title = title.strip()
-                                itemhead.locus = locus
-                                # Save the itemhead
-                                itemhead.save()
+                            # Possibly adapt the [shead] title and locus
+                            itemhead = msitem.itemheads.first()
+                            if itemhead and 'title' in item and 'locus' in item:
+                                title= item['title'].strip()
+                                locus = item['locus']
+                                if itemhead.title != title or itemhead.locus != locus:
+                                    itemhead.title = title.strip()
+                                    itemhead.locus = locus
+                                    # Save the itemhead
+                                    itemhead.save()
                             
-                        order = idx + 1
+                            order = idx + 1
 
-                        sermon_id = "none"
-                        if msitem.itemsermons.count() > 0:
-                            sermon_id = msitem.itemsermons.first().id
-                        sermonlog = dict(sermon=sermon_id)
-                        bAddSermonLog = False
+                            sermon_id = "none"
+                            sermonlog = dict(msitem=msitem.id)
+                            if msitem.itemsermons.count() > 0:
+                                sermon_id = msitem.itemsermons.first().id
+                                sermonlog['sermon'] =sermon_id
+                            elif not itemhead is None:
+                                srmhead_id = itemhead.id
+                                sermonlog['srmhead']=srmhead_id
+                            else:
+                                sermonlog['srmwarn']="no SD or SH".format(msitem.id)
+                            bAddSermonLog = False
 
-                        # Check if anytyhing changed
-                        if msitem.order != order:
-                            # Implement the change
-                            msitem.order = order
-                            bNeedSaving =True
-                        if msitem.parent is not parent:
-                            # Track the change
-                            old_parent_id = "none" if msitem.parent == None else msitem.parent.id
-                            new_parent_id = "none" if parent == None else parent.id
-                            if old_parent_id != new_parent_id:
+                            # Check if anytyhing changed
+                            if msitem.order != order:
+                                # Implement the change
+                                msitem.order = order
+                                bNeedSaving =True
+                            if msitem.parent is not parent:
                                 # Track the change
-                                sermonlog['parent_new'] = new_parent_id
-                                sermonlog['parent_old'] = old_parent_id
+                                old_parent_id = "none" if msitem.parent == None else msitem.parent.id
+                                new_parent_id = "none" if parent == None else parent.id
+                                if old_parent_id != new_parent_id:
+                                    # Track the change
+                                    sermonlog['parent_new'] = new_parent_id
+                                    sermonlog['parent_old'] = old_parent_id
+                                    bAddSermonLog = True
+
+                                    # Implement the change
+                                    msitem.parent = parent
+                                    bNeedSaving = True
+                                else:
+                                    no_change = 1
+
+                            if msitem.firstchild != firstchild:
+                                # Implement the change
+                                msitem.firstchild = firstchild
+                                bNeedSaving =True
+                            if msitem.next != next:
+                                # Track the change
+                                old_next_id = "none" if msitem.next == None else msitem.next.id
+                                new_next_id = "none" if next == None else next.id
+                                sermonlog['next_new'] = new_next_id
+                                sermonlog['next_old'] = old_next_id
                                 bAddSermonLog = True
 
                                 # Implement the change
-                                msitem.parent = parent
-                                bNeedSaving = True
-                            else:
-                                no_change = 1
-
-                        if msitem.firstchild != firstchild:
-                            # Implement the change
-                            msitem.firstchild = firstchild
-                            bNeedSaving =True
-                        if msitem.next != next:
-                            # Track the change
-                            old_next_id = "none" if msitem.next == None else msitem.next.id
-                            new_next_id = "none" if next == None else next.id
-                            sermonlog['next_new'] = new_next_id
-                            sermonlog['next_old'] = old_next_id
-                            bAddSermonLog = True
-
-                            # Implement the change
-                            msitem.next = next
-                            bNeedSaving =True
-                        # Do we need to save this one?
-                        if bNeedSaving:
-                            msitem.save()
-                            if bAddSermonLog:
-                                # Store the changes
-                                hierarchy.append(sermonlog)
+                                msitem.next = next
+                                bNeedSaving =True
+                            # Do we need to save this one?
+                            if bNeedSaving:
+                                msitem.save()
+                                if bAddSermonLog:
+                                    # Store the changes
+                                    hierarchy.append(sermonlog)
 
                 details = dict(id=instance.id, savetype="change", changes=dict(hierarchy=hierarchy))
                 passim_action_add(self, instance, details, "save")
@@ -10274,23 +10462,27 @@ class ManuscriptListView(BasicList):
     use_team_group = True
     paginate_by = 20
     bUseFilter = True
+    profile = None
+    sel_button = "manu"
     prefix = "manu"
     sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Manuscripts"
     basketview = False
     template_help = "seeker/filter_help.html"
 
-    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
-    order_heads = [{'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
+    order_heads = [
+        {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
                     'title': 'City or other location, such as monastery'},
-                   {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
-                   {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
-                   {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-                   {'name': 'From',     'order': 'o=5', 'type': 'int', 'custom': 'from',    'align': 'right'},
-                   {'name': 'Until',    'order': 'o=6', 'type': 'int', 'custom': 'until',   'align': 'right'},
-                   {'name': 'Status',   'order': 'o=7', 'type': 'str', 'custom': 'status'},
-                   {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
+        {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
+        {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+        {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+        {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
+        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
+        {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ 
         {"name": "Shelfmark",       "id": "filter_manuid",           "enabled": False},
         {"name": "Country",         "id": "filter_country",          "enabled": False},
@@ -10384,12 +10576,23 @@ class ManuscriptListView(BasicList):
             ]}
          ]
     uploads = reader_uploads
-    downloads = [{"label": "Ead:Excel", "dtype": "xlsx", "url": 'ead_results'},
-                 {"label": "Ead:csv (tab-separated)", "dtype": "csv", "url": 'ead_results'},
-                 {"label": None},
-                 {"label": "Ead:json", "dtype": "json", "url": 'ead_results'}]
+    downloads = [
+        {"label": "Ead:Excel", "dtype": "xlsx", "url": 'ead_results'},
+        {"label": "Ead:csv (tab-separated)", "dtype": "csv", "url": 'ead_results'},
+        {"label": None},
+        {"label": "Ead:json", "dtype": "json", "url": 'ead_results'},
+        {"label": None},
+        {"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},
+                 
+                 ]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
+
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
 
     def initializations(self):
         # Possibly add to 'uploads'
@@ -10453,6 +10656,8 @@ class ManuscriptListView(BasicList):
         # ======== One-time adaptations ==============
         listview_adaptations("manuscript_list")
 
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
 
     def add_to_context(self, context, initial):
@@ -10469,6 +10674,11 @@ class ManuscriptListView(BasicList):
         context['basket_update'] = reverse('basket_update_manu')
 
         context['colltype'] = "manu"
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "manu")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
 
         return context
 
@@ -10509,6 +10719,12 @@ class ManuscriptListView(BasicList):
             if codico != None and codico.name != None:
                 html.append("<span class='manuscript-title'>| {}</span>".format(codico.name[:100]))
                 sTitle = codico.name
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="manu")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="manu")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
@@ -10695,6 +10911,10 @@ class ManuscriptListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance, context):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
   
 
 class ManuscriptDownload(BasicPart):
@@ -11004,7 +11224,7 @@ class CodicoEdit(BasicDetails):
 
             # Get the main items
             mainitems_main = [
-                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(True),    'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),    'field_key': 'stype'},
                 # -------- HIDDEN field values ---------------
                 {'type': 'plain', 'label': "Manuscript id", 'value': manu_id,   'field_key': "manuscript",  'empty': 'hide'},
                 # --------------------------------------------
@@ -11608,7 +11828,7 @@ class SermonGoldEdit(BasicDetails):
                  'title': 'Belongs to the equality set of Authority file...', 'field_key': "equal"}, 
                 {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
                  'title': 'Other Sermons Gold members of the same equality set'},
-                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(True), 'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(), 'field_key': 'stype', 'hidenew': True},
                 {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
                 {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
                  'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
@@ -11929,10 +12149,15 @@ class EqualGoldEdit(BasicDetails):
             username = profile.user.username
             team_group = app_editor
 
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="ssg")
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="ssg")
+
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(True),'field_key': 'stype'},
+                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
+                {'type': 'safe',  'label': "Saved item:",    'value': saveditem_button          },
                 {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
 
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
@@ -12025,19 +12250,30 @@ class EqualGoldEdit(BasicDetails):
                 lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
+
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)
 
             # Signal that we have select2
             context['has_select2'] = True
 
-            # SPecification of the new button
-            context['new_button_title'] = "Sermon Gold"
-            context['new_button_name'] = "gold"
-            context['new_button_url'] = reverse("gold_details")
-            context['new_button_params'] = [
-                {'name': 'gold-n-equal', 'value': instance.id}
-                ]
+            # Test if the code to "add a new sermon gold" may be safely added or not
+            if instance.moved is None:
+                self.new_button = True
+                context['new_button'] = True
+                # SPecification of the new button
+                context['new_button_title'] = "Sermon Gold"
+                context['new_button_name'] = "gold"
+                context['new_button_url'] = reverse("gold_details")
+                context['new_button_params'] = [
+                    {'name': 'gold-n-equal', 'value': instance.id}
+                    ]
+            else:
+                self.new_button = False
+                context['new_button'] = False
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldEdit/add_to_context")
@@ -12589,7 +12825,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # And in all cases: make sure we redirect to the 'clean' GET page
                 self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
-            elif instance != None and instance.id != None:
+            elif instance != None and instance.id != None and instance.moved is None:
                 context['sections'] = []
 
                 # Lists of related objects
@@ -12799,10 +13035,11 @@ class EqualGoldListView(BasicList):
     use_team_group = True
     template_help = "seeker/filter_help.html"
     prefix = "ssg"
+    sel_button = "ssg"
     bUseFilter = True  
     plural_name = "Authority Files"
     sg_name = "Authority File"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
+    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
     order_default= order_cols
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
@@ -12815,6 +13052,7 @@ class EqualGoldListView(BasicList):
          'title': "The Gryson/Clavis codes of all the Sermons Gold in this equality set"},
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Authority file"},        
+        {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
         {'name': 'Manifestations',          'order': 'o=5'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
         {'name': 'Contains',                'order': 'o=6'   , 'type': 'int', 'custom': 'size',
@@ -12887,6 +13125,12 @@ class EqualGoldListView(BasicList):
     custombuttons = [{"name": "scount_histogram", "title": "Sermon Histogram", 
                       "icon": "th-list", "template_name": "seeker/scount_histogram.html" }]
 
+    selectbuttons = [
+        {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
+        {'title': 'Add to basket',      'mode': 'add_basket',   'button': 'jumbo-1', 'glyphicon': 'glyphicon-shopping-cart'},
+        # {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
+
     def initializations(self):
 
         # ======== One-time adaptations ==============
@@ -12918,6 +13162,9 @@ class EqualGoldListView(BasicList):
                               type="multiple", msg=msg)
                 self.uploads.append(oJson)
 
+        # Make the profile available
+        self.profile = Profile.get_user_profile(self.request.user.username)
+
         return None
     
     def add_to_context(self, context, initial):
@@ -12927,6 +13174,12 @@ class EqualGoldListView(BasicList):
         context['basket_show'] = reverse('basket_show_super')
         context['basket_update'] = reverse('basket_update_super')
         context['histogram_data'] = self.get_histogram_data('d3')
+
+        # Count the number of selected items
+        iCount = SelectItem.get_selectcount(profile, "ssg")
+        if iCount > 0:
+            context['sel_count'] = str(iCount)
+
         return context
 
     def get_histogram_data(self, method='d3'):
@@ -13019,6 +13272,12 @@ class EqualGoldListView(BasicList):
                 url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
                 short = sig.short()
                 html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "saved":
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="ssg")
+            saveditem_form = get_saveditem_html(self.request, instance, self.profile, "form", sitemtype="ssg")
+            html.append(saveditem_button)
+            html.append(saveditem_form)
         elif custom == "status":
             # Provide the status traffic light
             html.append(instance.get_stype_light())
@@ -13072,6 +13331,10 @@ class EqualGoldListView(BasicList):
     def get_helptext(self, name):
         """Use the get_helptext function defined in models.py"""
         return get_helptext(name)
+
+    def get_selectitem_info(self, instance, context):
+        """Use the get_selectitem_info() defined earlier in this views.py"""
+        return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
         
 
 class EqualGoldScountDownload(BasicPart):
@@ -13090,9 +13353,11 @@ class EqualGoldScountDownload(BasicPart):
     def get_queryset(self, prefix):
 
         # Construct the QS
-        qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
-            'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
-            'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+        #qs = TestsetUnit.objects.all().order_by('testset__round', 'testset__number').values(
+        #    'testset__round', 'testset__number', 'testunit__speaker__name', 'testunit__fname',
+        #    'testunit__sentence__name', 'testunit__ntype', 'testunit__speaker__gender')
+        qs = EqualGold.objects.none()
+        #TODO: this should be corrected
 
         return qs
 
@@ -13328,7 +13593,13 @@ class EqualGoldLinkEdit(BasicDetails):
         """Add to the existing context"""
 
         # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
         context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,                       'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,                       'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
             {'type': 'safe',  'label': "Source AF:",    'value': instance.src.get_view(True) },
             {'type': 'safe',  'label': "Target AF:",    'value': instance.dst.get_view(True) },
             {'type': 'plain', 'label': "Link type:",    'value': instance.get_linktype_display(),       'field_key': 'linktype'},
@@ -13593,6 +13864,8 @@ class LibraryListView(BasicList):
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'library_results'},
                  {"label": None},
                  {"label": "json", "dtype": "json", "url": 'library_results'}]
+    uploads = [{"title": "huwa", "label": "Huwa", "url": "library_upload_excel", "type": "multiple", 
+                "msg": "Upload Huwa library Excel files"}]
 
     def initializations(self):
         oErr = ErrHandle()

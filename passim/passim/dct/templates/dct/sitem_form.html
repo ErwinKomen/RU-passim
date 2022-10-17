@@ -1,0 +1,11 @@
+
+<form id="sitem_form_{{item.id}}" targeturl="{% url 'saveditem_apply' profile.id %}">
+  {% csrf_token %}
+  <div class="hidden">
+    <input type="text" id="id_saveditemid" name="saveditemid" value="{% if saveditem %}{{saveditem.id}}{% else %}{% endif %}" />
+    <input type="text" id="id_itemid"      name="itemid"      value="{% if item %}{{item.id}}{% else %}{% endif %}" />
+    <input type="text" id="id_sitemtype"   name="sitemtype"   value="{{sitemtype}}" />
+    <input type="text" id="id_sitemaction" name="sitemaction" value="{{sitemaction}}" />
+  </div>
+</form>
+

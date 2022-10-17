@@ -21,7 +21,7 @@ from passim.seeker.visualizations import *
 from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
-from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel
 from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
     EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
@@ -61,7 +61,7 @@ urlpatterns = [
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^guide', passim.seeker.views.guide, name='guide'),
-    url(r'^mypassim', passim.dct.views.mypassim, name='mypassim'),
+    url(r'^mypassim$', passim.dct.views.mypassim, name='mypassim'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
@@ -89,10 +89,6 @@ urlpatterns = [
     url(r'^search/library', LibraryListView.as_view(), name='library_search'),
     url(r'^search/author', AuthorListView.as_view(), name='author_search'),
 
-    url(r'^libraries/download', LibraryListDownload.as_view(), name='library_results'),
-    url(r'^authors/download', AuthorListDownload.as_view(), name='author_results'),
-    url(r'^manuscript/ead/download', ManuEadDownload.as_view(), name='ead_results'),
-
     url(r'^manuscript/list', ManuscriptListView.as_view(), name='manuscript_list'),
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
@@ -102,6 +98,8 @@ urlpatterns = [
     url(r'^manuscript/import/json/$', ManuscriptUploadJson.as_view(), name='manuscript_upload_json'),
     url(r'^manuscript/import/galway/$', ManuscriptUploadGalway.as_view(), name='manuscript_upload_galway'),
     url(r'^manuscript/codico/$', ManuscriptCodico.as_view(), name='manuscript_codico'),
+    url(r'^manuscript/huwa/download/$', ManuscriptHuwaToJson.as_view(), name='manuscript_huwajson'),
+    url(r'^manuscript/ead/download', ManuEadDownload.as_view(), name='ead_results'),
 
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
     url(r'^codico/details(?:/(?P<pk>\d+))?/$', CodicoDetails.as_view(), name='codico_details'),
@@ -120,6 +118,8 @@ urlpatterns = [
     url(r'^library/list', LibraryListView.as_view(), name='library_list'),
     url(r'^library/details(?:/(?P<pk>\d+))?/$', LibraryDetails.as_view(), name='library_details'),
     url(r'^library/edit(?:/(?P<pk>\d+))?/$', LibraryEdit.as_view(), name='library_edit'),
+    url(r'^library/download', LibraryListDownload.as_view(), name='library_results'),
+    url(r'^library/import/excel/$', LibraryUploadExcel.as_view(), name='library_upload_excel'),
 
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
@@ -222,6 +222,7 @@ urlpatterns = [
     url(r'^author/list', AuthorListView.as_view(), name='author_list'),
     url(r'^author/details(?:/(?P<pk>\d+))?/$', AuthorDetails.as_view(), name='author_details'),
     url(r'^author/edit(?:/(?P<pk>\d+))?/$', AuthorEdit.as_view(), name='author_edit'),
+    url(r'^author/download', AuthorListDownload.as_view(), name='author_results'),
 
     url(r'^report/list', ReportListView.as_view(), name='report_list'),
     url(r'^report/details(?:/(?P<pk>\d+))?/$', ReportDetails.as_view(), name='report_details'),
@@ -271,7 +272,6 @@ urlpatterns = [
     url(r'^project/edit(?:/(?P<pk>\d+))?/$', ProjectEdit.as_view(), name='project2_edit'), 
 
     url(r'^source/list', SourceListView.as_view(), name='source_list'),
-    # url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetailsView.as_view(), name='source_details'),
     url(r'^source/details(?:/(?P<pk>\d+))?/$', SourceDetails.as_view(), name='source_details'),
     url(r'^source/edit(?:/(?P<pk>\d+))?/$', SourceEdit.as_view(), name='source_edit'),
 
@@ -298,6 +298,10 @@ urlpatterns = [
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
     url(r'^dct/download(?:/(?P<pk>\d+))?/$', SetDefDownload.as_view(), name='setdef_download'),
+    url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
+    url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
+    url(r'^saveditem/apply(?:/(?P<pk>\d+))?/$', SavedItemApply.as_view(), name='saveditem_apply'),
+    url(r'^selitem/apply(?:/(?P<pk>\d+))?/$', SelectItemApply.as_view(), name='selitem_apply'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),
@@ -329,8 +333,6 @@ urlpatterns = [
 
     url(r'^api/import/authors/$', passim.seeker.views.import_authors, name='import_authors'),
     url(r'^api/import/gold/$', passim.seeker.views.import_gold, name='import_gold'),
-    #url(r'^api/import/ecodex/$', passim.seeker.views.import_ecodex, name='import_ecodex'),
-    #url(r'^api/import/ead/$', passim.seeker.views.import_ead, name='import_ead'),
 
     url(r'^api/import/pdf_lit/$', passim.seeker.views.do_create_pdf_lit, name='create_pdf_lit'), 
     url(r'^api/import/pdf_edi/$', passim.seeker.views.do_create_pdf_edi, name='create_pdf_edi'), 
@@ -341,9 +343,6 @@ urlpatterns = [
     url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
 
     # ================ Any READER APP URLs should come here =======================================
-    #url(r'^reader/import/ecodex/$', passim.reader.views.import_ecodex, name='import_ecodex'),
-    #url(r'^reader/import/ead/$', passim.reader.views.import_ead, name='import_ead'),
-    # ========== NEW method =======================================================================
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),

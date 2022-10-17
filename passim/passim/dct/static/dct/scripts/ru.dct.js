@@ -11,6 +11,7 @@ var $ = jQuery;
       // ru.basic.init_events();
       // ru.basic.init_typeahead();
       ru.dct.load_dct();
+      ru.dct.init_selection();
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
       $('[data-toggle="popover"]').popover();
@@ -1895,6 +1896,7 @@ var ru = (function ($, ru) {
       dct_save: function (el, elDctId, save_mode) {
         var frm = null,
             data = null,
+            err = "#little_err_msg",
             targeturl = null,
             contents = null,
             ssglists = null,
@@ -1996,6 +1998,359 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_saveditem
+       *    Add or remove saved item request
+       *
+       */
+      do_saveditem: function (elStart, sAction) {
+        var frm = null,
+            targeturl = "",
+            action = "",
+            data = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest(".sitem").attr("targetid");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the URL
+          targeturl = $(frm).attr("targeturl");
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "deleted":
+                      case "removed":
+                        // $(elStart).css("color", "gray");
+                        $(elStart).removeClass("sitem-button-selected");
+                        $(elStart).addClass("sitem-button");
+                        $(elStart).html('<span class="glyphicon glyphicon-star-empty"></span>');
+                        $(elStart).attr("title", "Add to your saved items");
+                        // Change the sitem action to be taken
+                        $("#id_sitemaction").val("add");
+                        break;
+                      case "added":
+                        // $(elStart).css("color", "red");
+                        $(elStart).removeClass("sitem-button");
+                        $(elStart).addClass("sitem-button-selected");
+                        $(elStart).html('<span class="glyphicon glyphicon-star"></span>');
+                        $(elStart).attr("title", "Remove from your saved items");
+                        // Change the sitem action to be taken
+                        $("#id_sitemaction").val("remove");
+                        break;
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+
+        } catch (ex) {
+          private_methods.errMsg("do_saveditem", ex);
+        }
+      },
+
+      /**
+       * do_selitem
+       *    Check or uncheck items for selection
+       *
+       */
+      do_selitem: function (elStart, sAction) {
+        var frm = null,
+            targeturl = "",
+            action = "",
+            elTd = null,
+            i = 0,
+            elSelItemDct = "#selitem-dct",
+            elSelItemRset = "#selitem-rset",
+            err = "#little_err_msg",
+            selitemcount = "",
+            data = null;
+
+        try {
+          // In general: hide the -rset
+          $(elSelItemRset).addClass("hidden");
+
+          // Is this just canceling?
+          switch (sAction) {
+            case "cancel_dct":
+              // This is just canceling the current idea of selecting a Research Set
+              $(elSelItemDct).addClass("hidden");
+              return;
+            case "show_dct":
+              // Make sure the researcher can select a Research Set
+              $(elSelItemDct).removeClass("hidden");
+              $(elSelItemRset).addClass("hidden");
+              return;
+          }
+
+          // Get to the form
+          if ($(elStart)[0].localName.toLowerCase() === "form") {
+            frm = $(elStart);
+          } else {
+            frm = $(elStart).closest(".selitem").attr("targetid");
+          }
+          // Get the data
+          data = $(frm).serializeArray();
+          // Append the action to it
+          data.push({name: "mode", value: sAction});
+
+          // Find nearest <td>
+          elTd = $(elStart).closest("td");
+
+          // Get the URL
+          targeturl = $(frm).attr("targeturl");
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  // Get selitemcount
+                  selitemcount = response['selitemcount'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "update_sav":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                          // Make sure the SavedItem is showing
+                          el = $(elTr).find(".sitem-button").first();
+                          if (el.length > 0) {
+                            $(el).find("span").removeClass("glyphicon-star-empty");
+                            $(el).find("span").addClass("glyphicon-star");
+                            $(el).removeClass("sitem-button");
+                            $(el).addClass("sitem-button-selected");
+                            // $(el).attr("onclick", 'ru.dct.do_saveditem(this, "add");');
+                            $(el).attr("title", "Remove from your saved items");
+
+                            $(el).unbind("click").on("click", function (evt) {
+                              ru.dct.do_saveditem(elStart, "remove");
+                            });
+                            $(el).closest("td").find("#id_sitemaction").val("remove");
+                          }
+                        });
+
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        break;
+                      case "update_basket":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                        });
+
+                        // Make sure the Basket number is showing correctly
+                        $("#basketsize").html("(" + response.basketsize + ")");
+
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        break;
+                      case "update_dct":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td"),
+                              elTr = $(el).closest("tr");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+
+                        });
+                        // Adapt selitemcount
+                        selitemcount = 0;
+                        // Also make sure to close the selitem-dct
+                        $(elSelItemDct).addClass("hidden");
+                        $(elSelItemRset).find("a").first().attr("href", response.researchset);
+                        $(elSelItemRset).removeClass("hidden");
+                        break;
+                      case "clear_sel":
+                        // Adapt all relevant material
+                        $(".selitem-button-selected").each(function (idx, el) {
+                          var elTd = $(el).closest("td");
+
+                          // Change the class
+                          $(el).removeClass("selitem-button-selected");
+                          $(el).addClass("selitem-button");
+                          $(el).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                          $(el).attr("title", "Select this item");
+                          // Change the sitem action to be taken
+                          $(elTd).find("#id_selitemaction").val("add");
+                        });
+                        break;
+                      case "deleted":
+                      case "removed":
+                        $(elStart).removeClass("selitem-button-selected");
+                        $(elStart).addClass("selitem-button");
+                        $(elStart).html('<span class="glyphicon glyphicon-unchecked"></span>');
+                        $(elStart).attr("title", "Select this item");
+                        // Change the sitem action to be taken
+                        $(elTd).find("#id_selitemaction").val("add");
+                        break;
+                      case "added":
+                        // $(elStart).css("color", "red");
+                        $(elStart).removeClass("selitem-button");
+                        $(elStart).addClass("selitem-button-selected");
+                        $(elStart).html('<span class="glyphicon glyphicon-check"></span>');
+                        $(elStart).attr("title", "Uncheck this item");
+                        // Change the sitem action to be taken
+                        $(elTd).find("#id_selitemaction").val("remove");
+                        break;
+                    }
+                    // Adapt the amount of selected items
+                    if (selitemcount !== undefined) {
+                      if (selitemcount <= 0) {
+                        $(".selcount").html("");
+                        $("h3 .select-execute button").attr("disabled", true);
+                      } else {
+                        $(".selcount").html(selitemcount);
+                        $("h3 .select-execute button").attr("disabled", false);
+                      }
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+
+        } catch (ex) {
+          private_methods.errMsg("do_selitem", ex);
+        }
+      },
+
+      /**
+       * init_selection
+       *    Initialize selecting stuff
+       *
+       */
+      init_selection: function () {
+        try {
+          // Visit every button under class 'select-execute'
+
+          $(".select-execute button").each(function (idx, el) {
+            var mode = $(el).attr("mode"),
+                elStart = $(".selitem-main").first();
+
+            $(el).unbind("click").on("click", function (evt) {
+              ru.dct.do_selitem(elStart, mode);
+            });
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("init_selection", ex);
+        }
+      },
+
+      /**
        * load_dct
        *    Ask for the DCT definition using AJAX
        *
@@ -2016,6 +2371,11 @@ var ru = (function ($, ru) {
           // Get to the form
           frm = $(elDctId).closest("form");
           data = frm.serializeArray();
+
+          // Sanity check
+          if ($(elDctId).length === 0) {
+            return;
+          }
 
           // Get the data right now
           // Try to delete: send a POST

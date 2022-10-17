@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class styloConfig(AppConfig):
-    name = 'stylo'
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'passim.stylo'
+    # name = 'stylo'

@@ -873,6 +873,8 @@ class BasicList(ListView):
     bHasParameters = False
     bUseFilter = False
     new_button = True
+    sel_button = False
+    sel_count = ""
     initial = None
     listform = None
     has_select2 = False
@@ -893,6 +895,7 @@ class BasicList(ListView):
     searches = []
     downloads = []
     custombuttons = []
+    selectbuttons = []
     list_fields = []
     uploads = []
     delete_line = False
@@ -905,6 +908,7 @@ class BasicList(ListView):
     lst_typeaheads = []
     sort_order = ""
     col_wrap = ""
+    sel_mode = ""
     param_list = []
     qs = None
     page_function = "ru.basic.search_paged_start"
@@ -994,13 +998,21 @@ class BasicList(ListView):
         context['basic_edit'] = self.basic_edit if self.basic_edit != "" else "{}_edit".format(self.basic_name)
         context['basic_details'] = self.basic_details if self.basic_details != "" else "{}_details".format(self.basic_name)
 
+        # Make sure we get selection mode right early enough...
+        selmode = self.qd.get("s", None)
+        if selmode != None:
+            self.sel_mode = selmode.strip()
+
         # Make sure to transform the 'object_list'  into a 'result_list'
-        context['result_list'] = self.get_result_list(context['object_list'])
+        context['result_list'] = self.get_result_list(context['object_list'], context)
 
         context['sortOrder'] = self.sort_order
         context['colWrap'] = self.col_wrap
+        context['selMode'] = self.sel_mode
 
         context['new_button'] = self.new_button
+        context['sel_button'] = self.sel_button
+        context['sel_count'] = self.sel_count
         context['add_text'] = self.add_text
 
         context['admin_editable'] = self.admin_editable
@@ -1026,6 +1038,10 @@ class BasicList(ListView):
                     # get the code of the template
                     pass
             context['custombuttons'] = self.custombuttons
+
+        # Selection buttons
+        if len(self.selectbuttons) > 0:
+            context['selectbuttons'] = self.selectbuttons
 
         # Delete button per line?
         if self.delete_line:
@@ -1128,6 +1144,14 @@ class BasicList(ListView):
 
         context['permission'] = self.permission
 
+        # Fill in the selection information
+        selectitem_info = ""
+        if not self.sel_button is None and self.sel_button != "":
+            # Prepare selected item handling
+            selectitem_info = self.get_selectitem_info(None, context)
+
+        context['sel_info'] = selectitem_info
+
         # Add the search url
         if self.usersearch_id == "":
             context['usersearch'] = ""
@@ -1144,7 +1168,7 @@ class BasicList(ListView):
     def add_to_context(self, context, initial):
         return context
 
-    def get_result_list(self, obj_list):
+    def get_result_list(self, obj_list, context):
         result_list = []
         # Walk all items in the object list
         for obj in obj_list:
@@ -1207,6 +1231,14 @@ class BasicList(ListView):
                 result['admindetails'] = reverse(admindetails, args=[obj.id])
             except:
                 pass
+
+            # Fill in the selection information
+            selectitem_info = ""
+            if not self.sel_button is None and self.sel_button != "":
+                # Prepare selected item handling
+                selectitem_info = self.get_selectitem_info(obj, context)
+
+            result['sel_info'] = selectitem_info
 
             # Add to the list of results
             result_list.append(result)
@@ -1430,6 +1462,9 @@ class BasicList(ListView):
         # Return the resulting filtered and sorted queryset
         self.qs = qs
         return qs
+
+    def get_selectitem_info(self, instance, context):
+        return ""
 
     def view_queryset(self, qs):
         return None
@@ -2215,6 +2250,7 @@ class BasicPart(View):
     form_objects = []       # List of forms to be processed
     formset_objects = []    # List of formsets to be processed
     previous = None         # Return to this
+    downloadname = None     # Name used for downloading
     bDebug = False          # Debugging information
     redirectpage = ""       # Where to redirect to
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
@@ -2444,14 +2480,17 @@ class BasicPart(View):
 
                     # Create name for download
                     # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
-                    modelname = self.MainModel.__name__
+                    if self.downloadname is None:
+                        downloadname = self.MainModel.__name__
+                    else:
+                        downloadname = self.downloadname
                     obj_id = "n" if self.obj == None else self.obj.id
                     extension = self.dtype
                     if self.dtype == "excel":
                         extension = "xlsx"
                     elif self.dtype == "tei" or self.dtype == "xml-tei":
                         extension = "xml"
-                    sDbName = "passim_{}_{}.{}".format(modelname, obj_id, extension)
+                    sDbName = "passim_{}_{}.{}".format(downloadname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":
                         sContentType = "text/tab-separated-values"
@@ -2463,7 +2502,7 @@ class BasicPart(View):
                         sContentType = "application/svg"
                         sData = self.qd['downloaddata']
                         # Set the filename correctly
-                        sDbName = "passim_{}_{}.svg".format(modelname, obj_id)
+                        sDbName = "passim_{}_{}.svg".format(downloadname, obj_id)
                     elif self.dtype == "hist-png":
                         sContentType = "image/png"
                         # Read the base64 encoded part
@@ -2478,7 +2517,7 @@ class BasicPart(View):
                             # Decode base64 into binary
                             sData = base64.decodestring(sData)
                             # Set the filename correctly
-                            sDbName = "passim_{}_{}.png".format(modelname, obj_id)
+                            sDbName = "passim_{}_{}.png".format(downloadname, obj_id)
 
                     # Excel needs additional conversion
                     if self.dtype in ["excel"]:
