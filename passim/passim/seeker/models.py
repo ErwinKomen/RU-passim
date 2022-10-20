@@ -7923,6 +7923,25 @@ class SermonGoldKeyword(models.Model):
         return response
     
 
+class SermonGoldExternal(models.Model):
+    """Link between a SermonGold and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, related_name="goldexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "SG_{} to id_{} ({})".format(self.gold.id, self.externalid, self.externaltype)
+        return sBack
+
+
 class Ftextlink(models.Model):
     """Link to the full text of a critical edition of a Gold Sermon"""
 

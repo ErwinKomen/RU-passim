@@ -55,7 +55,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Collection, CollectionSuper, CollectionGold, LocationRelation, \
-    Script, Scribe, \
+    Script, Scribe, SermonGoldExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -4901,6 +4901,11 @@ class ReaderHuwaImport(ReaderEqualGold):
                     author_id=author_id, incipit=incipit, explicit=explicit, equal=ssg)
                 oImported['gold'] = gold.id
 
+                # (3b) Make sure that there is a link between this SG and Opera
+                SermonGoldExternal.objects.create(
+                    gold=gold, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                    subset = subset)
+
                 # (4) Add a keyword to the SG to indicate this is from HUWA
                 kw_huwa = Keyword.objects.filter(name__contains="HUWA created", visibility="edi").first()
                 if kw_huwa is None:
@@ -4954,6 +4959,11 @@ class ReaderHuwaImport(ReaderEqualGold):
                             author_id=author_id, incipit=incipit, explicit=explicit, equal=ssg)
 
                         oImported['gold'] = gold.id
+
+                        # (3b) Make sure that there is a link between this SG and Opera
+                        SermonGoldExternal.objects.create(
+                            gold=gold, externalid=opera_id, externaltype=EXTERNAL_HUWA_OPERA,
+                            subset = subset)
 
                         # (3) Add all the signatures, linking them to the correct SG
                         oImported['siglist'] = add_signatures_to_sg(signatures, gold)

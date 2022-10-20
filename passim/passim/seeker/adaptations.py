@@ -21,10 +21,11 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, OnlineSources, \
-    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
+    get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
+    EXTERNAL_HUWA_OPERA
 
 
 adaptation_list = {
@@ -32,7 +33,7 @@ adaptation_list = {
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
                         'codico_origin', 'import_onlinesources', 'dateranges'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
-    'sermongold_list': ['sermon_gsig'],
+    'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
                        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
                        'atype_def_equal', 'atype_acc_equal', 'passim_author_number'],
@@ -602,6 +603,39 @@ def adapt_sermon_gsig():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_huwa_opera_import():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    # Specific Report items that need to be processed
+    report_id = [32, 34]
+    
+    try:
+        # Process report items
+        for report in Report.objects.filter(id__in=report_id):
+            # Get the contents as a data object
+            oData = json.loads(report.contents)
+            # Get the list of objects that have been read
+            lst_read = oData.get("read")
+            # Walk through this list looking for gold/opera matches
+            for oItem in lst_read:
+                gold_id = oItem.get("gold")
+                opera_id = oItem.get("opera")
+                if not gold_id is None and not opera_id is None and isinstance(gold_id, int) and isinstance(opera_id, int):
+                    # We have a match!! - Check if it is already in SermonGoldExternal
+                    obj = SermonGoldExternal.objects.filter(gold_id=gold_id, externalid=opera_id).first()
+                    if obj is None:
+                        # Check if the gold is still there
+                        gold = SermonGold.objects.filter(id=gold_id).first()
+                        if not gold is None:
+                            # Create it
+                            obj = SermonGoldExternal.objects.create(gold=gold, externalid=opera_id, externaltype = EXTERNAL_HUWA_OPERA)
+                            print("Created SermonGoldExternal opera={} gold={}".format(opera_id, gold_id))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 # =========== Part of equalgold_list ==================
 def adapt_author_anonymus():
     oErr = ErrHandle()
@@ -870,7 +904,6 @@ def adapt_passim_author_number():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
-
 
 def adapt_passim_project_name_equal():
     oErr = ErrHandle()
