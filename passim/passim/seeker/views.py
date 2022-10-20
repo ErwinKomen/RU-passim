@@ -82,7 +82,8 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, EqualGoldExternal, SermonGoldExternal, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
@@ -4454,6 +4455,19 @@ class SermonEdit(BasicDetails):
             # Prepare saveditem handling
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not istemplate and not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
 
             # Get the main items
             mainitems_main = [
@@ -9574,6 +9588,19 @@ class ManuscriptEdit(BasicDetails):
             # Prepare saveditem handling
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not istemplate and not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = ManuscriptExternal.objects.filter(manu=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
 
             # Get the main items
             mainitems_main = [
