@@ -82,7 +82,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, EqualGoldExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
@@ -11865,6 +11865,20 @@ class SermonGoldEdit(BasicDetails):
                 ]
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            ssg = instance.equal
+            if not ssg is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = EqualGoldExternal.objects.filter(equal=ssg).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
 
             # Add comment modal stuff
             initial = dict(otype="gold", objid=instance.id, profile=profile)
