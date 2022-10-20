@@ -10618,8 +10618,8 @@ class ManuscriptListView(BasicList):
         {"label": None},
         {"label": "Ead:json", "dtype": "json", "url": 'ead_results'},
         {"label": None},
-        {"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},
-                 
+        {"label": "Huwa Manuscripts: json", "dtype": "json", "url": 'manuscript_huwajson'},
+        #{"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},                 
                  ]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
@@ -13204,6 +13204,7 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: json",  "dtype": "json", "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
+                {"label": "Huwa Literature: json", "dtype": "json", "url": 'manuscript_huwalitjson'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False

@@ -34,9 +34,10 @@ adaptation_list = {
                         'codico_origin', 'import_onlinesources', 'dateranges'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
-    'equalgold_list': ['author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-                       'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
-                       'atype_def_equal', 'atype_acc_equal', 'passim_author_number'],
+    'equalgold_list': [
+        'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
+        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
+        'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
@@ -99,7 +100,6 @@ def adapt_dateranges():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
-
 
 def adapt_msitemcleanup():
     method = "UseAdaptations"
@@ -980,6 +980,19 @@ def adapt_atype_acc_equal():
                 if bNeedSaving:
                     equal.save()
                         
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_huwa_ssg_literature():
+    """Issue #587: add editions and literature to HUWA SSGs"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        pass
     except:
         bResult = False
         msg = oErr.get_error_message()

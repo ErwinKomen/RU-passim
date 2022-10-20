@@ -3176,6 +3176,9 @@ class EqualGoldHuwaToJson(BasicPart):
                 'material', 'tit', 'annus', 'ff_bem', 'format_bem', 'hs_notiz',
                 'schreiber_name', 'schreiber', 'schrift_name', "schrift",
                 'herkunft_besitzer_name', 'herkunft_besitzer']
+        elif self.import_type == "edilit":
+            # Tables needed to read the Editions and Literature for opera SSGs
+            huwa_tables = ["literatur", "editionen"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -4222,6 +4225,12 @@ class ManuscriptHuwaToJson(EqualGoldHuwaToJson):
     """Read HUWA manuscripts from database into JSON"""
 
     import_type = "manu"
+
+
+class EqualGoldHuwaLitToJson(EqualGoldHuwaToJson):
+    """Read HUWA literature for SSG from database into JSON"""
+
+    import_type = "edilit"
 
 
 class ReaderEqualGold(View):
