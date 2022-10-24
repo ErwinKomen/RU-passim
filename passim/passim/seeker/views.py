@@ -11749,6 +11749,23 @@ class SermonGoldListView(BasicList):
         # ======== One-time adaptations ==============
         listview_adaptations("sermongold_list")
 
+        # Should json be added?
+        if user_is_superuser(self.request):
+            # Possibly add to 'uploads'
+            bHasJson = False
+            for item in self.uploads:
+                if item['title'] == "huwajson":
+                    bHasJson = True
+
+            # Should json be added?
+            if not bHasJson:
+                # Add a reference to the Json upload method
+                msg = "Upload Opera Editions from a HUWA json specification."
+                oJson = dict(title="huwajson", label="HUWA opera editions json",
+                              url=reverse('gold_upload_json'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
         return None
 
     def adapt_search(self, fields):
@@ -11905,6 +11922,14 @@ class SermonGoldEdit(BasicDetails):
                         # Okay, the user has the right to see the externalid
                         oItem = dict(type="plain", label="HUWA id", value=externalid)
                         context['mainitems'].insert(0, oItem)
+                        # The user also has the right to see EDITION information
+                        if not instance.edinote is None and instance.edinote[0] == "[":
+                            # Read the list of literature references
+                            lst_edilit = json.loads(instance.edinote)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/gold_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
 
             # Add comment modal stuff
             initial = dict(otype="gold", objid=instance.id, profile=profile)
@@ -13204,7 +13229,7 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: json",  "dtype": "json", "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
-                {"label": "Huwa Literature: json", "dtype": "json", "url": 'manuscript_huwalitjson'}
+                {"label": "Huwa Literature: json", "dtype": "json", "url": 'equalgold_huwalitjson'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False

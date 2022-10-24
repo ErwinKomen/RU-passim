@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 # General imports
 import io, sys, os, re
 import openpyxl, json
+import copy
 from openpyxl.utils.cell import get_column_letter
 from openpyxl.cell import Cell
 from openpyxl import Workbook
@@ -34,7 +35,8 @@ import requests
 from passim.settings import APP_PREFIX, MEDIA_DIR
 from passim.utils import ErrHandle
 
-from passim.seeker.models import Manuscript, SermonDescr, Profile, Report, Codico, Location, LocationType, Library
+from passim.seeker.models import Manuscript, SermonDescr, Profile, Report, Codico, Location, LocationType, Library, \
+    SermonGoldExternal
 from passim.seeker.views import app_editor
 from passim.reader.views import ReaderImport
 from passim.reader.forms import UploadFileForm
@@ -227,7 +229,7 @@ class ManuscriptUploadExcel(ReaderImport):
 
 class ManuscriptUploadJson(ReaderImport):
     import_type = "json"
-    sourceinfo_url = "https://www.ru.nl/passim/upload_json"
+    sourceinfo_url = "https://www.ru.nl/passim/upload_manu_json"
 
     def process_files(self, request, source, lResults, lHeader):
 
@@ -953,4 +955,123 @@ class LibraryUploadExcel(ReaderImport):
         return bOkay, code
 
 
+class SermonGoldUploadJson(ReaderImport):
+    import_type = "json"
+    sourceinfo_url = "https://www.ru.nl/passim/upload_sg_json"
+
+    def process_files(self, request, source, lResults, lHeader):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        sourcetype = ""
+        oStatus = self.oStatus
+
+        try:
+            # Make sure we have the username
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group, 'keyfield': 'path', 'source': source}
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+
+
+                        if extension == "json":
+                            # This is a JSON file: Load the file into a variable
+                            sData = data_file.read()
+                            lst_edilit = json.loads( sData.decode(encoding="utf8"))
+
+                            # Check if this is a dictionary or a list
+                            if isinstance(lst_edilit, dict):
+                                # It is a dictionary: turn it into a list
+                                oEdiList = lst_edilit
+                                sorted_keys = sorted(oEdiList.keys(), key=lambda x: int(re.search(r'\d+', x).group()))
+                                lst_edilit = [oEdiList[x] for x in sorted_keys]
+
+                            # Look at the first manuscript to determine any specific source type
+                            count_edilit = len(lst_edilit)
+
+                            # Make sure we pass the sourcetype on to Manuscript.custom_add()
+                            kwargs['sourcetype'] = sourcetype
+
+                            # Walk through the Edition elements
+                            for idx, oEdiLit in enumerate(lst_edilit):
+                                # Show where we are
+                                if idx % 100 == 0:
+                                    oErr.Status("SermonGoldUploadJson editions: {}/{}".format(idx+1, count_edilit))
+
+                                # There is one result per manuscript
+                                oResult = {'status': 'ok', 'count': 0, 'edition': 0, 'msg': "", 'user': username}
+
+                                edition_id = oEdiLit.get("edition")
+                                opera_id = oEdiLit.get("opera")
+                                # Find the correct element, the gold
+                                qs = SermonGoldExternal.objects.filter(externalid=opera_id)
+                                # Process all the gold items in it
+                                for obj in qs:
+                                    gold = obj.gold
+                                    # Get the current edition stuff
+                                    lst_edi = []
+                                    if not gold.edinote is None:
+                                        lst_edi = json.loads(gold.edinote)
+                                    # Check if the [edition_id] is already in there
+                                    bFound = False
+                                    for oItem in lst_edi:
+                                        if edition_id == oItem.get("edition"):
+                                            bFound = True
+                                    if not bFound:
+                                        # This edition needs to be added
+                                        lst_edi.append(copy.copy(oEdiLit))
+                                        # Save the object
+                                        gold.edinote = json.dumps(lst_edi, indent=2)
+                                        gold.save()
+
+                                        msg = "-"
+                                        oRead = dict(status="ok", msg=msg, name="-", 
+                                                        edition=edition_id, opera=opera_id,
+                                                        gold=gold.id, filename="-", url="-")
+                                        lst_read.append(oRead)
+    
+    
+                        # Create a report and add it to what we return
+                        
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "ijson", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No manuscripts have been added")
+                        else:
+                            lResults.append(oResult)
+
+
+            code = "Imported using the [import_json] function on this file list: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+        return bOkay, code
 

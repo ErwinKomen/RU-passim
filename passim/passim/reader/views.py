@@ -2682,6 +2682,43 @@ class EqualGoldHuwaToJson(BasicPart):
             # Return the info we have
             return oBack
 
+        def get_ort(ort_id, ort, land, oHuwaLand):
+            """Get the city and country from the [ort] id"""
+
+            oBack = {}
+            oErr = ErrHandle()
+            try:
+                if isinstance(ort_id, int):
+                    ort_id = str(ort_id)
+                # Get the ort
+                oOrt = ort.get(ort_id)
+                if not oOrt is None:
+                    # Found the location
+                    ortsname = oOrt.get("ortsname")
+                    if not ortsname is None and ortsname != "":
+                        oBack['city'] = oOrt.get("ortsname")
+                    bem = oOrt.get("bemerkungen")
+                    if not bem is None and bem != "":
+                        oBack['citynote'] = oOrt.get("bemerkungen")
+                    # Look for country
+                    land_id = str(oOrt.get("land"))
+                    oLand = land.get(land_id)
+                    if not oLand is None:
+                        # Found the country
+                        name = oLand.get("landname")
+                        if not name is None and name != "":
+                            oBack['country'] = name
+                            if name in oHuwaLand:
+                                oBack['country'] = oHuwaLand[oBack['country']]
+                # Check on the length of what we return
+                if len(oBack) == 0:
+                    oBack = None
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("EqualGoldHuwaToJson/get_data/get_ort")
+            # Return the info we have
+            return oBack
+
         def get_library_info(id, tables):
             """Get the country/city/library name information for bibliothek.id"""
 
@@ -2963,6 +3000,45 @@ class EqualGoldHuwaToJson(BasicPart):
                 sBack = "'{}".format(sBack)
             return sBack
 
+        def get_edipp(oEdi):
+            """Get a from until page range from table [editionen]"""
+
+            sBack = ""
+            oErr = ErrHandle()
+            try:
+                lst_seiten = str(oEdi.get("seiten", "")).split('.')
+                von_rv = str(oEdi.get("seitenattr", ""))
+                lst_bis = str(oEdi.get("bis", "")).split('.')
+                bis_rv = str(oEdi.get("bisattr", ""))
+
+                seiten = None if int(lst_seiten[0]) == 0 else lst_seiten[0]
+                bis = None if int(lst_bis[0]) == 0 else lst_bis[0]
+
+                html = []
+                # Calculate from
+                lst_from = []
+                if von_rv != "": lst_from.append(von_rv)
+                if not seiten is None: lst_from.append(seiten)
+                sFrom = "".join(lst_from)
+
+                # Calculate until
+                lst_until = []
+                if bis_rv != "": lst_until.append(bis_rv)
+                if not bis is None: lst_until.append(bis)
+                sUntil = "".join(lst_until)
+
+                # Combine the two
+                if sFrom == sUntil:
+                    sBack = sFrom
+                else:
+                    sBack = "{}-{}".format(sFrom, sUntil)
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_locus")
+
+            return sBack
+
         def get_locus(oInhalt):
             """Get a complete LOCUS string combining von_bis, von_rv and bis_f, bis_rv"""
 
@@ -3178,7 +3254,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 'herkunft_besitzer_name', 'herkunft_besitzer']
         elif self.import_type == "edilit":
             # Tables needed to read the Editions and Literature for opera SSGs
-            huwa_tables = ["literatur", "editionen"]
+            huwa_tables = ["literatur", "editionen", "verfasser", "reihe", "ort", "land"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -3611,6 +3687,96 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Provide the counts in the log
                 print("EqualGoldHuwaToJson MANU counts: {} manuscripts, {} sermons".format(count_manu, count_serm))
 
+            elif self.import_type == "edilit":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_edilit"
+
+                # (5d) Make sure that the Editions are in the right table and accessible by id
+                editionen = tables.get("editionen")
+
+                # Transform tables into dictionaries: literatur, reihe, ort, land, verfasser
+                oLiteratur = {str(x['id']):x for x in tables['literatur']}
+                oReihe = { str(x['id']):x for x in tables['reihe']}
+                oOrt = { str(x['id']):x for x in tables['ort']}
+                oLand = { str(x['id']):x for x in tables['land']}
+                oVerfasser = { str(x['id']):x for x in tables['verfasser']}
+
+                # Start creating a list of edition literature
+                lst_ssg_edi = []
+
+                # Process each edition
+                count_edilit = len(editionen)
+                for idx, edition in enumerate(editionen):
+                    # Show where we are
+                    if idx % 100 == 0:
+                        oErr.Status("EqualGoldHuwaToJson edilit: {}/{}".format(idx+1, count_edilit))
+
+                    # at least get the opera id
+                    opera_id = edition.get("opera")
+                    edition_id = edition.get("id")
+
+                    # =========== DEBUG ====================
+                    if opera_id == 38:
+                        iStop = 1
+                    # ======================================
+
+                    # Start getting all needed information for this edition
+                    oEdition = dict(opera=opera_id, edition=edition_id)
+                    pp = get_edipp(edition)
+                    if not pp is None and pp != "":
+                        oEdition['pp'] = pp
+                    # Find corresponding literature
+                    literatur_id = edition.get('literatur')
+                    if not literatur_id is None and literatur_id > 0:
+                        literatur = oLiteratur.get(str(literatur_id))
+                        # If possible get a title from here
+                        literaturtitel = literatur.get("titel")
+                        if not literaturtitel is None and literaturtitel != "":
+                            oEdition['literaturtitel'] = literaturtitel
+
+                        # Get from here: jahr, band
+                        jahr = literatur.get("jahr")
+                        band = literatur.get("band")
+                        if not jahr is None and jahr != "": oEdition['year'] = jahr
+                        if not band is None and band != "": oEdition['band'] = band
+
+                        # Calculate the 'ort' from here
+                        oLoc = get_ort(literatur.get("ort"), oOrt, oLand, oHuwaLand)
+                        if not oLoc is None:
+                            oEdition['location'] = copy.copy(oLoc)
+
+                        # Find corresponding [reihe]
+                        reihe_id = literatur.get("reihe")
+                        if not reihe_id is None:
+                            reihe = oReihe.get(str(reihe_id))
+                            reihetitel = reihe.get("reihetitel")
+                            reihekurz = reihe.get("reihekurz")
+                            if not reihetitel is None and reihetitel != "": oEdition['reihetitel'] = reihetitel
+                            if not reihekurz is None and reihekurz != "": oEdition['reihekurz'] = reihekurz
+                        # Look for the verfasser(author)
+                        verfasser_id = literatur.get("verfasser")
+                        if not verfasser_id is None:
+                            verfasser = oVerfasser.get(str(verfasser_id))
+                            if not verfasser is None:
+                                author = []
+                                name = verfasser.get("name")
+                                vorname = verfasser.get("vorname")
+                                if not name is None and name != "":
+                                    author.append(name.strip())
+                                if not vorname is None and vorname != "":
+                                    author.append(vorname.strip())
+                                if len(author) > 0:
+                                    oEdition['author'] = dict(full=", ".join(author), name=name)
+                                    if not vorname is None and vorname != "":
+                                        oEdition['author']['firstname'] = vorname
+
+                    # Add this item to the list
+                    lst_ssg_edi.append(oEdition)
+
+                # Show the amount of stuff that has been gathered
+                count = len(lst_ssg_edi)
+                oErr.Status("EqualGoldHuwaToJson EDILIT count: {}".format(count))
+
             elif self.import_type == "ssg":
                 # (8) Walk through the table with AF+Sermon information
                 signature_dict = {}     # Each entry contains a list of OPERA ids that have this signature
@@ -3901,6 +4067,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 if self.import_type == "manu":
                     # Combine the lst_manu_string
                     sData = "\n".join(lst_manu_string)
+                elif self.import_type == "edilit":
+                    sData = json.dumps(lst_ssg_edi, indent=2)
                 else:
                     # convert to string
                     sData = json.dumps(oData, indent=2)
@@ -4408,7 +4576,7 @@ class ReaderEqualGold(View):
 
 
 class ReaderHuwaImport(ReaderEqualGold):
-    """HUWA import via a JSON file"""
+    """HUWA import SSGs via a JSON file"""
 
     import_type = "huwajson"
     sourceinfo_url = "http://www.ru.nl"

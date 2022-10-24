@@ -21,7 +21,8 @@ from passim.seeker.visualizations import *
 from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
-from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel, \
+    SermonGoldUploadJson
 from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
     EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
@@ -290,6 +291,7 @@ urlpatterns = [
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
+    url(r'^gold/import/json/$', SermonGoldUploadJson.as_view(), name='gold_upload_json'),
 
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),

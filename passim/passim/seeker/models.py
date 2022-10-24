@@ -6983,6 +6983,9 @@ class SermonGold(models.Model):
     # [1] Every gold sermon has a list of signatures that are automatically created
     siglist = models.TextField("List of signatures", default="[]")
 
+    # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
+    edinote = models.TextField("Edition note", null=True, blank=True)
+
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default=STYPE_MANUAL)
     # [0-1] Status note
