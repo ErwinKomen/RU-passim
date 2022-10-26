@@ -9616,7 +9616,7 @@ class SermonDescr(models.Model):
 
     def get_note_markdown(self):
         """Get the contents of the note field using markdown"""
-        return adapt_markdown(self.note)
+        return adapt_markdown(self.note, False)
 
     def get_project_markdown2(self): 
         lHtml = []
