@@ -4474,6 +4474,12 @@ class EqualGoldHuwaLitToJson(EqualGoldHuwaToJson):
     import_type = "edilit"
 
 
+class EqualGoldHuwaOpera(EqualGoldHuwaToJson):
+    """Post-processing of HUWA opera-tied BHL, BHM, THLL, RETR - also create JSON"""
+
+    import_type = "opera"
+
+
 class ReaderEqualGold(View):
     arErr = []
     error_list = []

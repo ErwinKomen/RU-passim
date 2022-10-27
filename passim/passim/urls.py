@@ -131,6 +131,7 @@ urlpatterns = [
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
     url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
     url(r'^ssg/huwa/literature/$', EqualGoldHuwaLitToJson.as_view(), name='equalgold_huwalitjson'),
+    url(r'^ssg/huwa/opera/$', EqualGoldHuwaOpera.as_view(), name='equalgold_huwaopera'),
     url(r'^ssg/import/edilit/$', EqualGoldUploadEdilit.as_view(), name='equalgold_upload_edilit'),
 
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
