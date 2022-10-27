@@ -3,7 +3,7 @@
     <table class="func-view" style="width: 100%;">
       <thead>
         <tr>
-          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th><th>Series</th><th>Vol</th><th>Location</th>
+          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th><th>Title (series/literature)</th><th>Vol</th><th>Location</th>
         </tr>
       </thead>
       <tbody>
@@ -14,7 +14,17 @@
             <td valign="top" class="tdnowrap">{{edilit.year}}</td>
             <td valign="top">{{edilit.reihekurz}}</td>
             <td valign="top" class="tdnowrap">{{edilit.pp}}</td>
-            <td valign="top">{{edilit.reihetitel}}</td>
+            <td valign="top">
+              {% if edilit.reihetitel %}
+                {{edilit.reihetitel}}
+              {% elif edilit.literaturtitel %}
+                {{edilit.literaturtitel}}
+              {% elif edilit.title %}
+                {{edilit.title}}
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td valign="top" class="tdnowrap">{{edilit.band}}</td>
             <td valign="top">
               {{edilit.location.city}}

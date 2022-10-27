@@ -11927,7 +11927,7 @@ class SermonGoldEdit(BasicDetails):
                             # Read the list of literature references
                             lst_edilit = json.loads(instance.edinote)
                             context['edilits'] = lst_edilit
-                            value = render_to_string('seeker/gold_edilit.html', context, self.request)
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
                             oItemEdi = dict(type="safe", label="HUWA editions", value=value)
                             context['mainitems'].append(oItemEdi)
 
@@ -12289,6 +12289,14 @@ class EqualGoldEdit(BasicDetails):
                         # Okay, the user has the right to see the externalid
                         oItem = dict(type="plain", label="HUWA id", value=externalid)
                         context['mainitems'].insert(0, oItem)
+                        # The user also has the right to see EDITION information
+                        if not instance.edinote is None and instance.edinote[0] == "[":
+                            # Read the list of literature references
+                            lst_edilit = json.loads(instance.edinote)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
 
             # Some tests can only be performed if this is *not* a new instance
             if not instance is None and not instance.id is None:
@@ -13233,9 +13241,12 @@ class EqualGoldListView(BasicList):
                 ]
             # Possibly add to 'uploads'
             bHasJson = False
+            bHasEdilit = False
             for item in self.uploads:
                 if item['title'] == "huwajson":
                     bHasJson = True
+                elif item['title'] == "huwaedilit":
+                    bHasEdilit = True
 
             # Should json be added?
             if not bHasJson:
@@ -13249,6 +13260,14 @@ class EqualGoldListView(BasicList):
                               url=reverse('import_huwa'),
                               type="multiple", msg=msg)
                 self.uploads.append(oJson)
+            if not bHasEdilit:
+                # Add a reference to the Edilit JSON upload method
+                msg = "Upload EdiLit from a HUWA edilit json specification."
+                oJson = dict(title="huwaedilit", label="HUWA edilit",
+                              url=reverse('equalgold_upload_edilit'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
 
         # Make the profile available
         self.profile = Profile.get_user_profile(self.request.user.username)

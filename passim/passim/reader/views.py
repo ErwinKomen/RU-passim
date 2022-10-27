@@ -3254,7 +3254,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 'herkunft_besitzer_name', 'herkunft_besitzer']
         elif self.import_type == "edilit":
             # Tables needed to read the Editions and Literature for opera SSGs
-            huwa_tables = ["literatur", "editionen", "verfasser", "reihe", "ort", "land"]
+            huwa_tables = ["literatur", "editionen", "verfasser", "reihe", "ort", "land",
+                           "loci", "bloomfield", "schoenberger", "stegmueller", "huwa", "incipit", "desinit"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -3694,12 +3695,33 @@ class EqualGoldHuwaToJson(BasicPart):
                 # (5d) Make sure that the Editions are in the right table and accessible by id
                 editionen = tables.get("editionen")
 
+                lst_specific = [
+                    {'table': 'bloomfield', 
+                     'author': {'full': 'Bloomfield, Morton W.', 'name': 'Bloomfield', 'firstname': 'Morton W.'}, 
+                     'pp_field': 'pp',
+                     'title': 'Incipits of Latin works on the virtues and vices, 1100-1500 A.D.',
+                     'year': '1979', 'location': 'Cambridge, MA'},
+                    {'table': 'schoenberger', 
+                     'author': {'full': 'Schönberger, R. and Kible, B. (eds.)', 'name': 'Schönberger', 'firstname': 'R.'},  
+                     'pp_field': 'pp',
+                     'title': 'Repertorium edierter Texte des Mittelalters aus dem Bereich der Philosophie und angrenzender Gebiete',
+                     'year': '1994', 'location': 'Berlin'},
+                    {'table': 'stegmueller', 
+                     'author': {'full': 'Stegmüller, F.', 'name': 'Stegmüller', 'firstname': 'F.'},  
+                     'pp_field': 'pp',
+                     'title': 'Repertorium Biblicum Medii Aevi',
+                     'year': '1950-1980', 'location': 'Madrid'},
+                    {'table': 'huwa', 'author': {'full': 'HUWA', 'name': 'HUWA'},  'pp_field': 'title'},
+                    ]
+
                 # Transform tables into dictionaries: literatur, reihe, ort, land, verfasser
                 oLiteratur = {str(x['id']):x for x in tables['literatur']}
                 oReihe = { str(x['id']):x for x in tables['reihe']}
                 oOrt = { str(x['id']):x for x in tables['ort']}
                 oLand = { str(x['id']):x for x in tables['land']}
                 oVerfasser = { str(x['id']):x for x in tables['verfasser']}
+                oIncipit = { str(x['id']):x['incipit_text'] for x in tables['incipit']}
+                oExplicit = { str(x['id']):x['desinit_text'] for x in tables['desinit']}
 
                 # Start creating a list of edition literature
                 lst_ssg_edi = []
@@ -3769,9 +3791,60 @@ class EqualGoldHuwaToJson(BasicPart):
                                     oEdition['author'] = dict(full=", ".join(author), name=name)
                                     if not vorname is None and vorname != "":
                                         oEdition['author']['firstname'] = vorname
+                        # Check if this 'edition' has any items in 'loci'
+                        lst_loci = []
+                        for oItem in tables['loci']:
+                            if oItem.get("editionen") == edition_id:
+                                # Need to add a LOCI item
+                                oLoci = dict(page=oItem.get('seite_col'), line=oItem.get("zeile"))
+                                cap = oItem.get("cap")
+                                if not cap is None:
+                                    oLoci['cap'] = cap
+                                # Possibly add incipit and/or explicit
+                                incipit = oIncipit[str(oItem.get("incipit"))]
+                                explicit = oExplicit[str(oItem.get("desinit"))]
+                                if not incipit is None and incipit != "":
+                                    oLoci['incipit'] = incipit
+                                if not explicit is None and explicit != "":
+                                    oLoci['explicit'] = explicit
+
+                                # Add this to the list
+                                lst_loci.append(oLoci)
+                        # Do we have a list?
+                        if len(lst_loci) > 0:
+                            # Yes, there is a list: add it to this edition
+                            oEdition['loci'] = copy.copy(lst_loci)
 
                     # Add this item to the list
                     lst_ssg_edi.append(oEdition)
+
+                    # Look at other tables via the opera id
+                    if not opera_id is None and opera_id > 0:
+
+                        # Look for schoenberger, bloomfield and stegmueller and huwa
+                        for oSpecific in lst_specific:
+                            table_name = oSpecific.get("table")
+                            pp_field = oSpecific.get("pp_field")
+                            author = oSpecific.get("author")
+                            title = oSpecific.get("title")
+                            location = oSpecific.get("location")
+                            year = oSpecific.get("year")
+                            for oItem in tables[table_name]:
+                                if oItem.get('opera') == opera_id:
+                                    # Add this one
+                                    oEdition = dict(opera=opera_id, edition=edition_id)
+                                    # Fill in the details from the [oItem]
+                                    name_field = oItem.get("name")
+                                    oEdition[pp_field] = name_field
+
+                                    # Fill in details from above
+                                    oEdition['author'] = copy.copy(author)
+                                    if not title is None: oEdition['title'] = copy.copy(title)
+                                    if not location is None: oEdition['location'] = copy.copy(location)
+                                    if not year is None: oEdition['year'] = copy.copy(year)
+
+                                    # Add this item to the list
+                                    lst_ssg_edi.append(oEdition)
 
                 # Show the amount of stuff that has been gathered
                 count = len(lst_ssg_edi)

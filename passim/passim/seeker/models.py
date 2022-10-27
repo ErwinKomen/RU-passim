@@ -6325,6 +6325,9 @@ class EqualGold(models.Model):
     # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
+    # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
+    edinote = models.TextField("Edition note", null=True, blank=True)
+
     # [1] Every SSG has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="-")
     # [1] Every SSG has an approval type

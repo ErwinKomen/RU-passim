@@ -37,7 +37,8 @@ adaptation_list = {
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
         'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
-        'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature'],
+        'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
+        'huwa_edilit_remove'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
@@ -997,6 +998,33 @@ def adapt_huwa_ssg_literature():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_huwa_edilit_remove():
+    """Clear contents of field [edilit] from SG and from SSG"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # (1) SG
+        with transaction.atomic():
+            for obj in SermonGold.objects.all():
+                if not obj.edinote is None:
+                    obj.edinote = ""
+                    obj.edinote = None
+                    obj.save()
+        # (1) SSG
+        with transaction.atomic():
+            for obj in EqualGold.objects.all():
+                if not obj.edinote is None:
+                    obj.edinote = ""
+                    obj.edinote = None
+                    obj.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 # =========== Part of provenance_list ==================
