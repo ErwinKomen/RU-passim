@@ -4155,6 +4155,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 lst_gold = []
                 lst_super = []
                 lst_bhlbhm = []
+                lst_skip = []
                 profile = Profile.get_user_profile(self.request.user.username)
 
                 # Walk all the BHL, BHM, THLL
@@ -4172,10 +4173,14 @@ class EqualGoldHuwaToJson(BasicPart):
                         opera_id = oSigItem.get("opera")
                         sSigName = "{} {}".format(prepend, oSigItem.get("name") )
 
+                        if sSigName == "BHL 793":
+                            iStop = 4
+
                         # Find the SermonGold entry (if existing)
                         equal = None
                         gold = None
                         sig = None
+                        bFound = False
                         for gold in SermonGold.objects.filter(goldexternals__externalid=opera_id):
                             # Take over this equal
                             equal =gold.equal
@@ -4209,38 +4214,82 @@ class EqualGoldHuwaToJson(BasicPart):
                             # Create a Signature tied to this Gold
                             sig = Signature.objects.create(code=sSigName, editype=editype, gold=gold)                           
                             # Make sure the Gold is properly tied to the opera in SermonGoldExternal
-                            obj = SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop").first()
+                            obj = SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop", gold=gold).first()
                             if obj is None:
                                 obj = SermonGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", gold=gold)
                             # Make sure the gold is tied to the proper Dataset of gold imports
                             lst_gold.append(gold)
+                            lst_bhlbhm.append(dict(opera=opera_id, gold=gold.id, signature=sSigName, editype=editype))
                         elif sig is None and not gold is None:
                             # There already is a SG, but it doesn't yet have the new signature
                             sig = Signature.objects.create(code=sSigName, editype=editype, gold=gold)                           
                             # Make sure the Gold is properly tied to the opera in SermonGoldExternal
-                            obj = SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop").first()
+                            obj = SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop", gold=gold).first()
                             if obj is None:
                                 obj = SermonGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", gold=gold)
                             # Make sure the gold is tied to the proper Dataset of gold imports
                             lst_gold.append(gold)
+                            lst_bhlbhm.append(dict(opera=opera_id, gold=gold.id, signature=sSigName, editype=editype))
                         else:
+                            # There is no 
                             # The information is already known - no further action needed
-                            pass
+                            iSkip = 3
 
                         # Find the EqualGold entry (if existing)
+                        qs_ssg = EqualGold.objects.filter(equalexternals__externalid=opera_id)
                         if equal is None:
+                            # Double check if no SG has been found too
+                            if gold is None:
+                                # No SG has been found - it is not possible to add the information!
+                                oSkip = dict(signature=sSigName, opera=opera_id, action="skip", reason="No SSG and no SG yet")
+                                lst_bhlbhm.append(oSkip)
+                            else:
+                                # Check if there is a signature already
+                                sig = Signature.objects.filter(code=sSigName, editype=editype, gold=gold).first()
+                                if sig is None:
+                                    # There already is a SG, but it doesn't yet have the new signature
+                                    sig = Signature.objects.create(code=sSigName, editype=editype, gold=gold)                           
+                                    # Make sure the Gold is properly tied to the opera in SermonGoldExternal
+                                    obj = SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop", gold=gold).first()
+                                    if obj is None:
+                                        obj = SermonGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", gold=gold)
+                                    # Make sure the gold is tied to the proper Dataset of gold imports
+                                    lst_gold.append(gold)
+                                    lst_bhlbhm.append(dict(opera=opera_id, gold=gold.id, signature=sSigName, editype=editype))
+                                    # End then the SSG should be created too - on the basis of 
+                                    equal = EqualGold.objects.create()
+
+                                    # Then tie the SG to the SSG
+                                    gold.equal = equal
+                                    gold.save()
+                        elif qs_ssg.count() == 0:
+                            # There is an SSG tied to the SG, but none has been tied to the opera_id yet
+                            # So create a new SG based on the 
                             pass
                         else:
-                            for ssg in EqualGold.objects.filter(equalexternals__externalid=opera_id):
+                            # We have both an SSG tied to the SG already, and we have SSGs tied to the opera id
+                            for ssg in qs_ssg:
                                 # Double check if the signature already occurs in any of these
                                 bFound = False
+                                equal = ssg
                                 for sig in Signature.objects.filter(gold__equal=ssg, editype=editype):
                                     if sig.code.lower() == sSigName.lower():
                                         bFound = True
+                                        # Jump out of the inner loop
                                         break
-                                if not bFound:
-                                    # Add the 
-                                    pass
+                                if bFound:
+                                    # Jump out of the outer loop
+                                    break
+                            # Check if the combination of SSG and Gold/Sig has been found
+                            if not bFound:
+                                # The [sSigName] has not been found as added to an SG yet
+                                # Create a gold and add it
+                                iSkip = 1
+                            else:
+                                # Okay, it has been found: there already is an SSG connected to this signature (via SG)
+                                iSkip = 2
+                            
+                            iContinue = 1
 
                 # Create a proper dataset for gold and for super with scope *team*
                 sNowTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
