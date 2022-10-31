@@ -1,0 +1,39 @@
+﻿<div>
+  {% if edilits|length > 0 %}
+    <table class="func-view" style="width: 100%;">
+      <thead>
+        <tr>
+          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th><th>Title (series/literature)</th><th>Vol</th><th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for edilit in edilits %}
+          <tr>
+            <td valign="top" class="tdnowrap">{{edilit.edition}}</td>
+            <td valign="top" class="tdnowrap">{{edilit.author.full}}</td>
+            <td valign="top" class="tdnowrap">{{edilit.year}}</td>
+            <td valign="top">{{edilit.reihekurz}}</td>
+            <td valign="top" class="tdnowrap">{{edilit.pp}}</td>
+            <td valign="top">
+              {% if edilit.reihetitel %}
+                {{edilit.reihetitel}}
+              {% elif edilit.literaturtitel %}
+                {{edilit.literaturtitel}}
+              {% elif edilit.title %}
+                {{edilit.title}}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td valign="top" class="tdnowrap">{{edilit.band}}</td>
+            <td valign="top">
+              {{edilit.location.city}}
+              {% if edilit.location.country %}, {{edilit.location.country}}{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+

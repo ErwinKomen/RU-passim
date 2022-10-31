@@ -21,7 +21,8 @@ from passim.seeker.visualizations import *
 from passim.dct.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
-from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel
+from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel, \
+    SermonGoldUploadJson, EqualGoldUploadEdilit
 from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
     EqualApprovalDetails, EqualApprovalEdit, EqualApprovalUserDetails, EqualApprovalUserEdit, \
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
@@ -129,6 +130,9 @@ urlpatterns = [
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
     url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
+    url(r'^ssg/huwa/literature/$', EqualGoldHuwaLitToJson.as_view(), name='equalgold_huwalitjson'),
+    url(r'^ssg/huwa/opera/$', EqualGoldHuwaOpera.as_view(), name='equalgold_huwaopera'),
+    url(r'^ssg/import/edilit/$', EqualGoldUploadEdilit.as_view(), name='equalgold_upload_edilit'),
 
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),
     url(r'^ssg/graph/download(?:/(?P<pk>\d+))?/$', EqualGoldGraphDownload.as_view(), name='equalgold_graph_download'),
@@ -289,6 +293,7 @@ urlpatterns = [
     url(r'^gold/list', SermonGoldListView.as_view(), name='search_gold'),
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
+    url(r'^gold/import/json/$', SermonGoldUploadJson.as_view(), name='gold_upload_json'),
 
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),

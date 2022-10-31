@@ -83,6 +83,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
@@ -4433,158 +4434,180 @@ class SermonEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Need to know who this user (profile) is
-        profile = Profile.get_user_profile(self.request.user.username)
+        oErr = ErrHandle()
 
-        istemplate = (instance.mtype == "tem")
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
 
-        # Define the main items to show and edit
-        # manu_id = None if instance == None or instance.manu == None else instance.manu.id
-        manu_id = None if instance == None else instance.get_manuscript().id
-        context['mainitems'] = []
-        # Possibly add the Template identifier
-        if istemplate:
-            context['mainitems'].append(
-                {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
-                )
+            istemplate = (instance.mtype == "tem")
 
-        # Prepare saveditem handling
-        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
-        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
+            # Define the main items to show and edit
+            # manu_id = None if instance == None or instance.manu == None else instance.manu.id
+            manu_id = None if instance == None else instance.get_manuscript().id
+            context['mainitems'] = []
+            # Possibly add the Template identifier
+            if istemplate:
+                context['mainitems'].append(
+                    {'type': 'plain', 'label': "Template:", 'value': instance.get_template_link(profile)}
+                    )
 
-        # Get the main items
-        mainitems_main = [
-            {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
-            # -------- HIDDEN field values ---------------
-            {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
-            # --------------------------------------------
-            {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
-            {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
-            {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
-            {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
-            {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
-            {'type': 'safe',  'label': "Lectio:",               'value': instance.get_quote_markdown(),'field_key': 'quote'}, 
-            {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
-            # Issue #237, delete subtitle
-            {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle', 
-             'editonly': True, 'title': 'The subtitle field is legacy. It is edit-only, non-viewable'},
-            {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown(), 
-             'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
-            {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown(),
-             'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
-            {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown(),
-             'field_key': 'postscriptum'}, 
-            # Issue #23: delete bibliographic notes
-            {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
-             'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
-            {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}
-             ]
-        exclude_field_keys = ['locus']
-        for item in mainitems_main: 
-            # Make sure to exclude field key 'locus'
-            if not istemplate or item['field_key'] not in exclude_field_keys:
-                context['mainitems'].append(item)
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
 
-        # Bibref and Cod. notes can only be added to non-templates
-        if not istemplate:
-            mainitems_BibRef ={'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-             'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]}
-            context['mainitems'].append(mainitems_BibRef)
-            mainitems_CodNotes ={'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       
-             'field_key': 'additional',   'title': 'Codicological notes'}
-            context['mainitems'].append(mainitems_CodNotes)
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not istemplate and not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
 
-        mainitems_more =[
-            {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
-            ]
-        for item in mainitems_more: context['mainitems'].append(item)
+            # Get the main items
+            mainitems_main = [
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),'field_key': 'stype'}, # TH: hier worden de comments opgepikt
+                # -------- HIDDEN field values ---------------
+                {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
+                {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
+                {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
+                {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
+                {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
+                {'type': 'safe',  'label': "Lectio:",               'value': instance.get_quote_markdown(),'field_key': 'quote'}, 
+                {'type': 'plain', 'label': "Title:",                'value': instance.title,            'field_key': 'title'},
+                # Issue #237, delete subtitle
+                {'type': 'plain', 'label': "Sub title:",            'value': instance.subtitle,         'field_key': 'subtitle', 
+                 'editonly': True, 'title': 'The subtitle field is legacy. It is edit-only, non-viewable'},
+                {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown(), 
+                 'field_key': 'incipit',  'key_ta': 'srmincipit-key'}, 
+                {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown(),
+                 'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
+                {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown(),
+                 'field_key': 'postscriptum'}, 
+                # Issue #23: delete bibliographic notes
+                {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
+                 'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
+                {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}
+                 ]
+            exclude_field_keys = ['locus']
+            for item in mainitems_main: 
+                # Make sure to exclude field key 'locus'
+                fk = item.get("field_key")
+                is_in_exclude_field_keys = False if fk is None else (fk in exclude_field_keys)
+                if not istemplate or not is_in_exclude_field_keys:
+                # if not istemplate or item['field_key'] not in exclude_field_keys:
+                    context['mainitems'].append(item)
 
-        if not istemplate:
-            username = profile.user.username
-            team_group = app_editor
-            mainitems_m2m = [
-                {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
-                 # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-                 'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
-                 'title': 'Keywords attached to the Authority file(s)'},
-                {'type': 'line',    'label': "Gryson/Clavis:",'value': instance.get_eqsetsignatures_markdown('combi'),
-                 'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
-                {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
-                 'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
-                 'multiple': True,
-                 'field_list': 'siglist_m', 'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
-                {'type': 'plain',   'label': "Personal datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                 'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
-                {'type': 'plain',   'label': "Public datasets (link):",  'value': instance.get_collection_link("pd"), 
-                 'title': "Public datasets in which an Authority file is that is linked to this sermon"},
-                {'type': 'plain',   'label': "Historical collections (link):",  'value': instance.get_collection_link("hc"), 
-                 'title': "Historical collections in which an Authority file is that is linked to this sermon"},
-                {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
-                 'title': "Editions of the Sermons Gold that are part of the same equality set"},
-                {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
-                # Project2 HIER
-                {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+            # Bibref and Cod. notes can only be added to non-templates
+            if not istemplate:
+                mainitems_BibRef ={'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                 'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[4]}
+                context['mainitems'].append(mainitems_BibRef)
+                mainitems_CodNotes ={'type': 'plain', 'label': "Cod. notes:",           'value': instance.additional,       
+                 'field_key': 'additional',   'title': 'Codicological notes'}
+                context['mainitems'].append(mainitems_CodNotes)
+
+            mainitems_more =[
+                {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
                 ]
-            for item in mainitems_m2m: context['mainitems'].append(item)
-        # IN all cases
-        mainitems_SSG = {'type': 'line',    'label': "Authority file links:",  'value': self.get_superlinks_markdown(instance), 
-             'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
-             'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssgdist_template'}
-        context['mainitems'].append(mainitems_SSG)
-        # Notes:
-        # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
+            for item in mainitems_more: context['mainitems'].append(item)
 
-        # Add a button back to the Manuscript
-        topleftlist = []
-        if instance.get_manuscript():
-            manu = instance.get_manuscript()
-            buttonspecs = {'label': "Manuscript", 
-                 'title': "Return to manuscript {}".format(manu.idno), 
-                 'url': reverse('manuscript_details', kwargs={'pk': manu.id})}
-            topleftlist.append(buttonspecs)
-            lcity = "" if manu.lcity == None else "{}, ".format(manu.lcity.name)
-            lib = "" if manu.library == None else "{}, ".format(manu.library.name)
-            idno = "{}{}{}".format(lcity, lib, manu.idno)
-        else:
-            idno = "(unknown)"
-        context['topleftbuttons'] = topleftlist
-        # Add something right to the SermonDetails title
-        # OLD: context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
-        # Changed in issue #241: show the PASSIM code
-        context['title_addition'] = instance.get_passimcode_markdown()
-        # Add the manuscript's IDNO completely right
-        title_right = ["<span class='manuscript-manifes' title='Manuscript'>{}</span>".format(
-            idno)]
-        #    ... as well as the *title* of the Codico to which I belong
-        codico = instance.msitem.codico
+            if not istemplate:
+                username = profile.user.username
+                team_group = app_editor
+                mainitems_m2m = [
+                    {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
+                     # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+                     'field_list': 'kwlist',         'fso': self.formset_objects[1]},
+                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                     'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
+                     'title': 'Keywords attached to the Authority file(s)'},
+                    {'type': 'line',    'label': "Gryson/Clavis:",'value': instance.get_eqsetsignatures_markdown('combi'),
+                     'title': "Gryson/Clavis codes of the Sermons Gold that are part of the same equality set + those manually linked to this manifestation Sermon"}, 
+                    {'type': 'line',    'label': "Gryson/Clavis (manual):",'value': instance.get_sermonsignatures_markdown(),
+                     'title': "Gryson/Clavis codes manually linked to this manifestation Sermon", 'unique': True, 'editonly': True, 
+                     'multiple': True,
+                     'field_list': 'siglist_m', 'fso': self.formset_objects[3], 'template_selection': 'ru.passim.sigs_template'},
+                    {'type': 'plain',   'label': "Personal datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                     'multiple': True,  'field_list': 'collist_s',      'fso': self.formset_objects[2] },
+                    {'type': 'plain',   'label': "Public datasets (link):",  'value': instance.get_collection_link("pd"), 
+                     'title': "Public datasets in which an Authority file is that is linked to this sermon"},
+                    {'type': 'plain',   'label': "Historical collections (link):",  'value': instance.get_collection_link("hc"), 
+                     'title': "Historical collections in which an Authority file is that is linked to this sermon"},
+                    {'type': 'line',    'label': "Editions:",           'value': instance.get_editions_markdown(),
+                     'title': "Editions of the Sermons Gold that are part of the same equality set"},
+                    {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
+                    # Project2 HIER
+                    {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+                    ]
+                for item in mainitems_m2m: context['mainitems'].append(item)
+            # IN all cases
+            mainitems_SSG = {'type': 'line',    'label': "Authority file links:",  'value': self.get_superlinks_markdown(instance), 
+                 'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
+                 'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssgdist_template'}
+            context['mainitems'].append(mainitems_SSG)
+            # Notes:
+            # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
 
-        # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
-        # Issue #422: change the text of the [codi_title]
-        codi_title = "cod. unit. {}".format(codico.order)
-        title_right.append("&nbsp;<span class='codico-title-manifes' title='Codicologial unit'>{}</span>".format(codi_title))
-        context['title_right'] = "".join(title_right)
+            # Add a button back to the Manuscript
+            topleftlist = []
+            if instance.get_manuscript():
+                manu = instance.get_manuscript()
+                buttonspecs = {'label': "Manuscript", 
+                     'title': "Return to manuscript {}".format(manu.idno), 
+                     'url': reverse('manuscript_details', kwargs={'pk': manu.id})}
+                topleftlist.append(buttonspecs)
+                lcity = "" if manu.lcity == None else "{}, ".format(manu.lcity.name)
+                lib = "" if manu.library == None else "{}, ".format(manu.library.name)
+                idno = "{}{}{}".format(lcity, lib, manu.idno)
+            else:
+                idno = "(unknown)"
+            context['topleftbuttons'] = topleftlist
+            # Add something right to the SermonDetails title
+            # OLD: context['title_addition'] = instance.get_eqsetsignatures_markdown('first')
+            # Changed in issue #241: show the PASSIM code
+            context['title_addition'] = instance.get_passimcode_markdown()
+            # Add the manuscript's IDNO completely right
+            title_right = ["<span class='manuscript-manifes' title='Manuscript'>{}</span>".format(
+                idno)]
+            #    ... as well as the *title* of the Codico to which I belong
+            codico = instance.msitem.codico
 
-        #context['count_comments'] = instance.get_comments(True)
+            # Old code for [codi_title]: codi_title = "?" if codico == None or codico.name == "" else codico.name
+            # Issue #422: change the text of the [codi_title]
+            codi_title = "cod. unit. {}".format(codico.order)
+            title_right.append("&nbsp;<span class='codico-title-manifes' title='Codicologial unit'>{}</span>".format(codi_title))
+            context['title_right'] = "".join(title_right)
 
-        # Signal that we have select2
-        context['has_select2'] = True
+            #context['count_comments'] = instance.get_comments(True)
 
-        # Add comment modal stuff
-        initial = dict(otype="sermo", objid=instance.id, profile=profile)
-        context['commentForm'] = CommentForm(initial=initial, prefix="com")
-        context['comment_list'] = get_usercomments('sermo', instance, profile)
-        lhtml = []
-        lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
-        context['comment_count'] = instance.comments.count()
+            # Signal that we have select2
+            context['has_select2'] = True
 
-        # Also add the saved item form
-        lhtml.append(saveditem_form)
+            # Add comment modal stuff
+            initial = dict(otype="sermo", objid=instance.id, profile=profile)
+            context['commentForm'] = CommentForm(initial=initial, prefix="com")
+            context['comment_list'] = get_usercomments('sermo', instance, profile)
+            lhtml = []
+            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+            context['comment_count'] = instance.comments.count()
 
-        # Store the after_details in the context
-        context['after_details'] = "\n".join(lhtml)
+            # Also add the saved item form
+            lhtml.append(saveditem_form)
+
+            # Store the after_details in the context
+            context['after_details'] = "\n".join(lhtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonEdit/add_to_context")
 
         # Return the context we have made
         return context
@@ -9566,6 +9589,19 @@ class ManuscriptEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
 
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not istemplate and not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = ManuscriptExternal.objects.filter(manu=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
+
             # Get the main items
             mainitems_main = [
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_stype_light(),      'field_key': 'stype'},
@@ -10582,8 +10618,8 @@ class ManuscriptListView(BasicList):
         {"label": None},
         {"label": "Ead:json", "dtype": "json", "url": 'ead_results'},
         {"label": None},
-        {"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},
-                 
+        {"label": "Huwa Manuscripts: json", "dtype": "json", "url": 'manuscript_huwajson'},
+        #{"label": "Huwa Manuscripts: json",  "dtype": "json_manu", "url": 'equalgold_huwajson'},                 
                  ]
     custombuttons = [{"name": "search_ecodex", "title": "Convert e-codices search results into a list", 
                       "icon": "music", "template_name": "seeker/search_ecodices.html" }]
@@ -11713,6 +11749,23 @@ class SermonGoldListView(BasicList):
         # ======== One-time adaptations ==============
         listview_adaptations("sermongold_list")
 
+        # Should json be added?
+        if user_is_superuser(self.request):
+            # Possibly add to 'uploads'
+            bHasJson = False
+            for item in self.uploads:
+                if item['title'] == "huwajson":
+                    bHasJson = True
+
+            # Should json be added?
+            if not bHasJson:
+                # Add a reference to the Json upload method
+                msg = "Upload Opera Editions from a HUWA json specification."
+                oJson = dict(title="huwajson", label="HUWA opera editions json",
+                              url=reverse('gold_upload_json'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
         return None
 
     def adapt_search(self, fields):
@@ -11856,6 +11909,27 @@ class SermonGoldEdit(BasicDetails):
                 ]
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = SermonGoldExternal.objects.filter(gold=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
+                        # The user also has the right to see EDITION information
+                        if not instance.edinote is None and instance.edinote[0] == "[":
+                            # Read the list of literature references
+                            lst_edilit = json.loads(instance.edinote)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
 
             # Add comment modal stuff
             initial = dict(otype="gold", objid=instance.id, profile=profile)
@@ -12202,6 +12276,27 @@ class EqualGoldEdit(BasicDetails):
                 ]
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = EqualGoldExternal.objects.filter(equal=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        context['mainitems'].insert(0, oItem)
+                        # The user also has the right to see EDITION information
+                        if not instance.edinote is None and instance.edinote[0] == "[":
+                            # Read the list of literature references
+                            lst_edilit = json.loads(instance.edinote)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
 
             # Some tests can only be performed if this is *not* a new instance
             if not instance is None and not instance.id is None:
@@ -13142,12 +13237,16 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: json",  "dtype": "json", "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
+                {"label": "Huwa Literature: json", "dtype": "json", "url": 'equalgold_huwalitjson'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False
+            bHasEdilit = False
             for item in self.uploads:
                 if item['title'] == "huwajson":
                     bHasJson = True
+                elif item['title'] == "huwaedilit":
+                    bHasEdilit = True
 
             # Should json be added?
             if not bHasJson:
@@ -13161,6 +13260,14 @@ class EqualGoldListView(BasicList):
                               url=reverse('import_huwa'),
                               type="multiple", msg=msg)
                 self.uploads.append(oJson)
+            if not bHasEdilit:
+                # Add a reference to the Edilit JSON upload method
+                msg = "Upload EdiLit from a HUWA edilit json specification."
+                oJson = dict(title="huwaedilit", label="HUWA edilit",
+                              url=reverse('equalgold_upload_edilit'),
+                              type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
 
         # Make the profile available
         self.profile = Profile.get_user_profile(self.request.user.username)

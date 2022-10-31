@@ -1746,6 +1746,18 @@ class Profile(models.Model):
 
         return bBack
 
+    def is_project_approver(self, sProject):
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            prj = Project2.objects.filter(name__icontains=sProject).first()
+            edi = ProjectEditor.objects.filter(profile=self, project=prj).first()
+            bResult = (not edi is None)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("is_project_approver")
+        return bResult
+
 
 class Visit(models.Model):
     """One visit to part of the application"""
@@ -3316,6 +3328,32 @@ class Comment(models.Model):
         return otypes[self.otype]
 
 
+class Scribe(models.Model):
+    """A codico (part of manuscript) can have one Scribe assigned to it """
+
+    # [1] Name of the scribe 
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] Optional note on this scribe
+    note = models.TextField("Note on the scribe", blank=True, null=True)
+    # [0-1] A scribe may have an ID from the database from which it was read
+    external = models.IntegerField("ID in external DB", blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Script(models.Model):
+    """A codico (part of manuscript) can have one Script assigned to it """
+
+    # [1] Name of the script 
+    name = models.CharField("Name", max_length=LONG_STRING)
+    # [0-1] A script may have an ID from the database from which it was read
+    external = models.IntegerField("ID in external DB", blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
@@ -3371,6 +3409,7 @@ class Manuscript(models.Model):
     saved = models.DateTimeField(null=True, blank=True)
 
     # [0-1] A manuscript may have an ID from the database from which it was read
+    #       NOTE: better to use ManuscriptExternal table!!!
     external = models.IntegerField("ID in external DB", null=True)
 
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
@@ -3415,6 +3454,7 @@ class Manuscript(models.Model):
         {'name': 'Editor Notes',        'type': 'field', 'path': 'notes_editor_in_dutch', 'target': 'editornotes'},
         {'name': 'Url',                 'type': 'field', 'path': 'url'},
         {'name': 'External id',         'type': 'field', 'path': 'external'},
+        {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Shelf mark',          'type': 'field', 'path': 'idno'},                            # WAS: ,      'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Country',             'type': 'fk',    'path': 'lcountry',  'fkfield': 'name', 'model': 'Location'},
@@ -3878,6 +3918,18 @@ class Manuscript(models.Model):
                         # Create this stuff
                         ManuscriptExt.objects.create(manuscript=self, url=link_name)
                 # Ready
+            elif path == "externals":
+                # These are external IDs like for HUWA
+                externals = value_lst
+                for oExternal in externals:
+                    externalid = oExternal.get("externalid")
+                    externaltype = oExternal.get("externaltype")
+                    if not externalid is None and not externaltype is None:
+                        # Process it
+                        obj = ManuscriptExternal.objects.filter(manu=self, externalid=externalid, externaltype=externaltype).first()
+                        if obj is None:
+                            # Add it
+                            obj = ManuscriptExternal.objects.create(manu=self, externalid=externalid, externaltype=externaltype)
             else:
                 # Figure out what to do in this case
                 pass
@@ -5285,6 +5337,10 @@ class Codico(models.Model):
     origins = models.ManyToManyField("Origin", through="OriginCod")
      # [m] Many-to-many: keywords per Codico
     keywords = models.ManyToManyField(Keyword, through="CodicoKeyword", related_name="keywords_codi")
+     # [m] Many-to-many: scribes per Codico
+    scribes = models.ManyToManyField(Scribe, through="CodicoScribe", related_name="scribes_codi")
+     # [m] Many-to-many: scripts per Codico
+    scripts = models.ManyToManyField(Script, through="CodicoScript", related_name="scripts_codi")
     # [m] Many-to-many: one codico can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_codi")
 
@@ -6269,6 +6325,9 @@ class EqualGold(models.Model):
     # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
+    # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
+    edinote = models.TextField("Edition note", null=True, blank=True)
+
     # [1] Every SSG has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="-")
     # [1] Every SSG has an approval type
@@ -6926,6 +6985,9 @@ class SermonGold(models.Model):
 
     # [1] Every gold sermon has a list of signatures that are automatically created
     siglist = models.TextField("List of signatures", default="[]")
+
+    # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
+    edinote = models.TextField("Edition note", null=True, blank=True)
 
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default=STYPE_MANUAL)
@@ -7867,6 +7929,25 @@ class SermonGoldKeyword(models.Model):
         return response
     
 
+class SermonGoldExternal(models.Model):
+    """Link between a SermonGold and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a SermonGold instance ...
+    gold = models.ForeignKey(SermonGold, related_name="goldexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "SG_{} to id_{} ({})".format(self.gold.id, self.externalid, self.externaltype)
+        return sBack
+
+
 class Ftextlink(models.Model):
     """Link to the full text of a critical edition of a Gold Sermon"""
 
@@ -8433,6 +8514,9 @@ class SermonDescr(models.Model):
     # [1] Every SermonDescr may be a manifestation (default) or a template (optional)
     mtype = models.CharField("Manifestation type", choices=build_abbr_list(MANIFESTATION_TYPE), max_length=5, default="man")
 
+    ## [0-1] A manuscript may have an ID from the database from which it was read
+    #external = models.IntegerField("ID in external DB", null=True)
+
     ## ================ Calculated fields ===============================
     ## [1] Number of sermons 'equal' to me
     #scount = models.IntegerField("Equal sermon count", default=0)
@@ -8497,6 +8581,7 @@ class SermonDescr(models.Model):
         {'name': 'FirstChild',          'type': '',      'path': 'firstchild'},
         {'name': 'Next',                'type': '',      'path': 'next'},
         {'name': 'Type',                'type': '',      'path': 'type'},
+        {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
         {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
@@ -8922,6 +9007,18 @@ class SermonDescr(models.Model):
                                     super = ssg)
                                 # Log what has happened
                                 if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
+            elif path == "externals":
+                # These are external IDs like for HUWA
+                externals = value_lst
+                for oExternal in externals:
+                    externalid = oExternal.get("externalid")
+                    externaltype = oExternal.get("externaltype")
+                    if not externalid is None and not externaltype is None:
+                        # Process it
+                        obj = SermonDescrExternal.objects.filter(manu=self, externalid=externalid, externaltype=externaltype).first()
+                        if obj is None:
+                            # Add it
+                            obj = SermonDescrExternal.objects.create(manu=self, externalid=externalid, externaltype=externaltype)
             else:
                 # Figure out what to do in this case
                 pass
@@ -9522,7 +9619,7 @@ class SermonDescr(models.Model):
 
     def get_note_markdown(self):
         """Get the contents of the note field using markdown"""
-        return adapt_markdown(self.note)
+        return adapt_markdown(self.note, False)
 
     def get_project_markdown2(self): 
         lHtml = []
@@ -10259,6 +10356,25 @@ class SermonDescrProject(models.Model):
         return response
 
 
+class SermonDescrExternal(models.Model):
+    """Link between a SermonDescr and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a SermonDescr instance ...
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "S_{} to id_{} ({})".format(self.sermon.id, self.externalid, self.externaltype)
+        return sBack
+
+
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -10290,6 +10406,25 @@ class ManuscriptProject(models.Model):
         return response
 
 
+class ManuscriptExternal(models.Model):
+    """Link between a Manuscript and an identifier of an external data supplier, like e.g. HUWA"""
+
+    # [1] The link is between a Manuscript instance ...
+    manu = models.ForeignKey(Manuscript, related_name="manuexternals", on_delete=models.CASCADE)
+    # [1] The identifier of the external project
+    externalid = models.IntegerField("External identifier", default=0)
+    # [1] The type of external project
+    externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
+                            max_length=5, default=EXTERNAL_HUWA_OPERA)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "S_{} to id_{} ({})".format(self.manu.id, self.externalid, self.externaltype)
+        return sBack
+
+
 class CodicoKeyword(models.Model):
     """Relation between a Codico and a Keyword"""
 
@@ -10297,6 +10432,34 @@ class CodicoKeyword(models.Model):
     codico = models.ForeignKey(Codico, related_name="codico_kw", on_delete=models.CASCADE)
     # [1] ...and a keyword instance
     keyword = models.ForeignKey(Keyword, related_name="codico_kw", on_delete=models.CASCADE)
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class CodicoScribe(models.Model):
+    """Relation between a Codico and a Scribe"""
+
+    # [1] The link is between a Codico instance ...
+    codico = models.ForeignKey(Codico, related_name="codico_scr", on_delete=models.CASCADE)
+    # [1] ...and a scribe instance
+    scribe = models.ForeignKey(Scribe, related_name="codico_scr", on_delete=models.CASCADE)
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Note on the scribe for this codico", blank=True, null=True)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+
+
+class CodicoScript(models.Model):
+    """Relation between a Codico and a Script"""
+
+    # [1] The link is between a Codico instance ...
+    codico = models.ForeignKey(Codico, related_name="codico_sct", on_delete=models.CASCADE)
+    # [1] ...and a script instance
+    script = models.ForeignKey(Script, related_name="codico_sct", on_delete=models.CASCADE)
+    # [0-1] Further details are perhaps required too
+    note = models.TextField("Note on the script for this codico", blank=True, null=True)
+
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
 
