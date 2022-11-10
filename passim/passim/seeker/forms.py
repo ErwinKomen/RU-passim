@@ -2831,11 +2831,12 @@ class SermonGoldForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = SermonGold
-        fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype', 'srchincipit', 'srchexplicit', 'equal' ]
+        fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype', 'srchincipit', 'srchexplicit', 'equal', 'retractationes' ]
         widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'bibliography':forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace', 'class': 'searching'}),
+                 'retractationes':forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'equal':       SuperOneWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
@@ -2853,6 +2854,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['stype'].required = False
             self.fields['codename'].required = False
             self.fields['codetype'].required = False
+            self.fields['retractationes'].required = False
 
             # Choice field initialization
             self.fields['codetype'].choices = CODE_TYPE

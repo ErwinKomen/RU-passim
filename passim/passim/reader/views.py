@@ -4324,7 +4324,15 @@ class EqualGoldHuwaToJson(BasicPart):
 
                 # Make sure the correct list of things is returned
                 # TODO!!!
-            
+
+            elif self.import_type == "retr":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_retr"
+
+                # Note: this only looks at *existing* SGs to tackle...
+                sRetrTable = oInfo.get("retr")
+
+           
             # Convert oData to stringified JSON
             if dtype == "json":
                 if self.import_type == "manu":
@@ -4670,6 +4678,12 @@ class EqualGoldHuwaOpera(EqualGoldHuwaToJson):
     """Post-processing of HUWA opera-tied BHL, BHM, THLL, RETR - also create JSON"""
 
     import_type = "opera"
+
+
+class EqualGoldHuwaRetr(EqualGoldHuwaToJson):
+    """Post-processing of HUWA opera-tied RETR - also create JSON"""
+
+    import_type = "retr"
 
 
 class ReaderEqualGold(View):
