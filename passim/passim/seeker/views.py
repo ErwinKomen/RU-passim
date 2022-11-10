@@ -11889,14 +11889,14 @@ class SermonGoldEdit(BasicDetails):
                  'title': 'Belongs to the equality set of Authority file...', 'field_key': "equal"}, 
                 {'type': 'safe',  'label': "Together with:",        'value': instance.get_eqset,
                  'title': 'Other Sermons Gold members of the same equality set'},
-                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(), 'field_key': 'stype', 'hidenew': True},
-                {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author, 'field_key': 'author'},
+                {'type': 'plain', 'label': "Status:",               'value': instance.get_stype_light(),    'field_key': 'stype', 'hidenew': True},
+                {'type': 'plain', 'label': "Associated author:",    'value': instance.get_author,           'field_key': 'author'},
                 {'type': 'safe',  'label': "Incipit:",              'value': instance.get_incipit_markdown, 
                  'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
                 {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
                  'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
-                {'type': 'plain', 'label': "Retractationes:",       'value': instance.retractationes, 'field_key': 'retractationes'},
-                {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
+                {'type': 'plain', 'label': "Retractationes:",       'value': instance.get_retr(),           'field_key': 'retractationes'},
+                {'type': 'plain', 'label': "Bibliography:",         'value': instance.get_bibliography_markdown(),  'field_key': 'bibliography'},
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                  'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
@@ -13247,7 +13247,8 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: csv",          "dtype": "csv",  "url": 'equalgold_huwajson'},
                 {"label": "Huwa AFs: Excel",        "dtype": "xlsx", "url": 'equalgold_huwajson'},
                 {"label": "Huwa Literature: json",  "dtype": "json", "url": 'equalgold_huwalitjson'},
-                {"label": "Huwa BHL etc: json",     "dtype": "json", "url": 'equalgold_huwaopera'}
+                {"label": "Huwa BHL etc: json",     "dtype": "json", "url": 'equalgold_huwaopera'},
+                {"label": "Huwa retractationes: json",  "dtype": "json", "url": 'equalgold_huwaretr'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False

@@ -7376,6 +7376,15 @@ class SermonGold(models.Model):
         # Return the whole queryset that was found
         return qs
 
+    def get_retr(self):
+        """Get the retractationes in a readable format"""
+
+        sBack = "-"
+        if not self.retractationes is None:
+            retractationes = self.retractationes.replace("\r", "").replace("\n", "  \n")
+            sBack = adapt_markdown(retractationes, False)
+        return sBack
+
     def get_sermon_string(self):
         """Get a string summary of this one"""
 

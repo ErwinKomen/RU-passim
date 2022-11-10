@@ -3259,6 +3259,9 @@ class EqualGoldHuwaToJson(BasicPart):
         elif self.import_type == "opera":
             # Tables needed to process the information in BHL, BHM, THLL and RETR 
             huwa_tables = ["bhl", "bhm", "thll", "retr"]
+        elif self.import_type == "retr":
+            # Tables needed to process the information in RETR 
+            huwa_tables = ["retr"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -4328,10 +4331,50 @@ class EqualGoldHuwaToJson(BasicPart):
             elif self.import_type == "retr":
                 # Make sure we have a more fitting download name
                 self.downloadname = "huwa_retr"
+                oData = {}
+                oData['skip'] = []
+                oData['add'] = []
+                count_skipped = 0
+                count_added = 0
 
                 # Note: this only looks at *existing* SGs to tackle...
-                sRetrTable = oInfo.get("retr")
+                for oRetrTable in tables.get("retr"):
+                    # Get the operaid, knoell and mutz
+                    opera_id = oRetrTable.get("opera")
+                    name_knoell = oRetrTable.get("name_knoell")
+                    name_mutz = oRetrTable.get("name_mutz")
 
+                    # Look for the SG that links to this opera
+                    lst_gold = [x.gold for x in SermonGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop")]
+                    if len(lst_gold) == 0:
+                        # Try to find a connection between SSG and Opera
+                        equal_ids = [x.equal.id for x in EqualGoldExternal.objects.filter(externalid=opera_id, externaltype="huwop")]
+                        lst_gold = [x for x in SermonGold.objects.filter(equal__id__in=equal_ids) ]
+                    if len(lst_gold) == 0:
+                        # We cannot process this one
+                        oRetr = dict(opera=opera_id, action="skip")
+                        oData['skip'].append(oRetr)
+                        count_skipped += 1
+                    else:
+                        # We can process it
+                        for gold in lst_gold:
+                            # gold = obj.gold
+                            oRetr = dict(opera=opera_id, action="add", gold=gold.id)
+                            oData['add'].append(oRetr)
+                            count_added += 1
+                            retractationes = gold.retractationes
+                            if retractationes is None:
+                                lst_retractationes = []
+                            else:
+                                lst_retractationes = retractationes.split("\n")  #  json.loads(retractationes)
+                            # Add knoell and mutz
+                            lst_retractationes.append("P. Knöll (ed.), Retractationes, CSEL 36 (1902): **{}**".format(name_knoell))
+                            lst_retractationes.append("A. Mutzenbecher (ed.), Retractationum Libri II, CCSL 57 (1984): **{}**".format(name_mutz))
+                            # Put this back into the gold object
+                            gold.retractationes = "\n".join(lst_retractationes) # json.dumps(lst_retractationes, indent=2)
+                            gold.save()
+                oData['count_skip'] = count_skipped
+                oData['count_add'] = count_added
            
             # Convert oData to stringified JSON
             if dtype == "json":
@@ -4342,6 +4385,8 @@ class EqualGoldHuwaToJson(BasicPart):
                     sData = json.dumps(lst_ssg_edi, indent=2)
                 elif self.import_type == "opera":
                     sData = json.dumps(lst_bhlbhm, indent=2)
+                elif self.import_type == "retr":
+                    sData = json.dumps(oData, indent=2)
                 else:
                     # convert to string
                     sData = json.dumps(oData, indent=2)
