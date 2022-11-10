@@ -1218,8 +1218,6 @@ table.compact-table td:hover {
     cursor: pointer;
 }
 
-
-
 .keyword {
     color: darkblue;
     font-family: monospace;
@@ -1258,6 +1256,24 @@ table.compact-table td:hover {
     background-color: gray;
 }
 
+.feast {
+    color: darkblue;    
+    background-color: lightgoldenrodyellow;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 4px;
+}
+
+.postscriptum {
+    color: black;
+    background-color: lightcyan;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 90%;
+    padding: 0px 3px;
+}
+
 .project {
     color: black;
     font-family: monospace;
@@ -1276,7 +1292,7 @@ table.compact-table td:hover {
 
 
 .sermon-author {
-  color: darkblue;
+  color: darkblue; 
 }
 
 .sermon-nickname {

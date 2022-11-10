@@ -9205,7 +9205,7 @@ class CollectionListView(BasicList):
             if number > 0:
                 url = reverse('equalgold_list')
                 html.append("<a href='{}?ssg-collist_hist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+                html.append("<span class='badge jumbo-3 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
         elif custom == "type":
@@ -14871,11 +14871,19 @@ class BasketUpdate(BasicPart):
                 if operation == "collcreate":
                     # Save the current basket as a collection that needs to receive a name
                     # Note: this assumes [scope='priv'] default
-                    coll = Collection.objects.create(path=history, settype="pd",
-                            descrip="Created from a {} listview basket".format(self.colltype), 
-                            owner=profile, type=self.colltype)
+                    if self.colltype != "super":
+                        coll = Collection.objects.create(path=history, settype="pd",
+                                descrip="Created from a {} listview basket".format(self.colltype), 
+                                owner=profile, type=self.colltype)
+                    else:
+                        coll = Collection.objects.create(path=history, settype="pd",
+                                descrip="Created from a Authority file listview basket", 
+                                owner=profile, type=self.colltype)
                     # Assign it a name based on its ID number and the owner
-                    name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)
+                    if self.colltype != "super":
+                        name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)                         
+                    else:
+                        name = "{}_{}_{}".format(profile.user.username, coll.id, "af")
                     coll.name = name
                     coll.save()
                 elif operation == "rsetcreate":
