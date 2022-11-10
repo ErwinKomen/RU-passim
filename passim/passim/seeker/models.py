@@ -9484,7 +9484,6 @@ class SermonDescr(models.Model):
         for keyword in self.keywords.all().order_by('name'):
             # Create a display for this topic
             lHtml.append("<span class='keyword'>{}</span>".format(keyword.name))
-
         sBack = ", ".join(lHtml)
         return sBack
 

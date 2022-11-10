@@ -3,6 +3,7 @@
 <span class="manusermo sig-auto hidden">
   <span class="signature">{{sermon.signature_auto_string}}</span>
 </span>
+
 <span class="manusermo sig-manual hidden">
   {% if sermon.sermonsignatures.all|length > 0 %}
     <span class="signature ma">{{sermon.signature_string}}</span>
@@ -44,6 +45,10 @@
 <span class="manusermo explicit">
   {% if sermon.explicit %}<i>{{sermon.explicit}}</i>{% endif %}
 </span>
+
+{% if sermon.postscriptum %}<span class="manusermo postscriptum hidden">(PS: {{sermon.postscriptum}})</span>{% endif %}
+
+{% if sermon.feast %}<span class="manusermo feast hidden">{{sermon.feast.name}}</span>{% endif %}
 
 {% if sermon.note %}<span class="manusermo note hidden">(Note: {{sermon.note}})</span>{% endif %}
 
