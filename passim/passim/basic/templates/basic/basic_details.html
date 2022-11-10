@@ -20,7 +20,7 @@
   <div>
     {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
-      <div class="panel none">      
+      <div class="panel panel-none" style="margin-top: 15px;">      
         <div class="row">
           <!-- Possibility to go back-->
           <div class="col-md-3">
@@ -67,7 +67,6 @@
                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
               </a>
             {% endif %}
-          <div class="row">&nbsp;</div>
           </div>
                     
         </div>
@@ -351,7 +350,7 @@
                 <div class="hidden related-copy">
                   <!-- This is where a hidden copy is stored for a fast 'cancel' feature -->
                 </div>
-              
+              </div>
 
             {% endfor %}
 
@@ -363,14 +362,13 @@
 
           <!-- Button for Editing (if user has permission) -->
 
-            {% if is_app_editor and admindetails and show_admin %}
-              <!-- Edit button -->
-              <a mode="edit" class="view-mode btn jumbo-1"
-                  onclick="ru.basic.goto_url('{{admindetails}}')">
-                <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
-              </a>
-            {% endif %}
-          </div>
+          {% if is_app_editor and admindetails and show_admin %}
+            <!-- Edit button -->
+            <a mode="edit" class="view-mode btn jumbo-1"
+                onclick="ru.basic.goto_url('{{admindetails}}')">
+              <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+            </a>
+          {% endif %}
         </div>
         <div class="row">&nbsp;</div>
 

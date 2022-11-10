@@ -13234,10 +13234,11 @@ class EqualGoldListView(BasicList):
         # Should json be added?
         if user_is_superuser(self.request):
             self.downloads = [
-                {"label": "Huwa AFs: json",  "dtype": "json", "url": 'equalgold_huwajson'},
-                {"label": "Huwa AFs: csv",   "dtype": "csv",  "url": 'equalgold_huwajson'},
-                {"label": "Huwa AFs: Excel", "dtype": "xlsx", "url": 'equalgold_huwajson'},
-                {"label": "Huwa Literature: json", "dtype": "json", "url": 'equalgold_huwalitjson'}
+                {"label": "Huwa AFs: json",         "dtype": "json", "url": 'equalgold_huwajson'},
+                {"label": "Huwa AFs: csv",          "dtype": "csv",  "url": 'equalgold_huwajson'},
+                {"label": "Huwa AFs: Excel",        "dtype": "xlsx", "url": 'equalgold_huwajson'},
+                {"label": "Huwa Literature: json",  "dtype": "json", "url": 'equalgold_huwalitjson'},
+                {"label": "Huwa BHL etc: json",     "dtype": "json", "url": 'equalgold_huwaopera'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False
