@@ -5056,8 +5056,7 @@ class SermonListView(BasicList):
     new_button = False      # Don't show the [Add new sermon] button here. It is shown under the Manuscript Details view.
     basketview = False
     plural_name = "Manifestations"
-    basic_name = "sermon"
-    template_help = "seeker/filter_help.html"
+    basic_name = "sermon"    
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
@@ -10504,8 +10503,7 @@ class ManuscriptListView(BasicList):
     sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Manuscripts"
     basketview = False
-    template_help = "seeker/filter_help.html"
-
+    
     order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
@@ -11504,7 +11502,6 @@ class CodicoListView(BasicList):
     paginate_by = 20
     bUseFilter = True
     prefix = "codi"
-    template_help = "seeker/filter_help.html"
     order_cols = ['manuscript__idno', 'name', 'order', 'yearstart','yearfinish', 'stype']
     order_default = order_cols
     order_heads = [{'name': 'Manuscript', 'order': 'o=1', 'type': 'str', 'custom': 'manu'},
@@ -11619,8 +11616,7 @@ class SermonGoldListView(BasicList):
     prefix = "gold"
     basic_name = "gold"
     plural_name = "Gold sermons"
-    sg_name = "Gold sermon"
-    template_help = "seeker/filter_help.html"
+    sg_name = "Gold sermon"    
     new_button = False      # Don't show the [Add a new Gold Sermon] button here. 
                             # Issue #173: creating Gold Sermons may only happen from SuperSermonGold list view
     has_select2 = True
@@ -13127,8 +13123,7 @@ class EqualGoldListView(BasicList):
     model = EqualGold
     listform = SuperSermonGoldForm
     has_select2 = True  # Check
-    use_team_group = True
-    template_help = "seeker/filter_help.html"
+    use_team_group = True    
     prefix = "ssg"
     sel_button = "ssg"
     bUseFilter = True  
@@ -13735,7 +13730,6 @@ class EqualGoldLinkListView(BasicList):
     model = EqualGoldLink
     listform = EqualGoldLinkForm
     has_select2 = True  # Check
-    template_help = "seeker/filter_help.html"
     prefix = "ssglink"
     bUseFilter = True  
     plural_name = "Authority File links"
