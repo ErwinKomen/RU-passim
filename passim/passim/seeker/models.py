@@ -6988,6 +6988,8 @@ class SermonGold(models.Model):
 
     # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
     edinote = models.TextField("Edition note", null=True, blank=True)
+    # [0-1] A SermonGold may optionally have a Retractationes field specific for changes/additions of Augustine work
+    retractationes = models.TextField("Retractationes", null=True, blank=True)
 
     # [1] Every gold sermon has a status - this is *NOT* related to model 'Status'
     stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default=STYPE_MANUAL)

@@ -9244,6 +9244,8 @@ class CollectionListView(BasicList):
         return get_selectitem_info(self.request, instance, self.profile, self.settype, context)
     
 
+# ================= COMMENT =============================
+
 class CommentSend(BasicPart):
     """Receive a comment from a user"""
 
@@ -9489,6 +9491,8 @@ class CommentListView(BasicList):
             oErr.DoError("CommentListView/get_field_value")
         return sBack, sTitle
 
+
+# ================= MANUSCRIPT =============================
 
 class ManuscriptEdit(BasicDetails):
     """The details of one manuscript"""
@@ -11181,6 +11185,8 @@ class ManuscriptDownload(BasicPart):
         return sData
 
 
+# ================= CODICO =============================
+
 class CodicoEdit(BasicDetails):
     """The details of one codicological unit"""
 
@@ -11608,6 +11614,8 @@ class CodicoListView(BasicList):
         return get_helptext(name)
 
 
+# ================= SERMONGOLD =============================
+
 class SermonGoldListView(BasicList):
     """Search and list manuscripts"""
     
@@ -11883,6 +11891,7 @@ class SermonGoldEdit(BasicDetails):
                  'field_key': 'incipit',  'key_ta': 'gldincipit-key'}, 
                 {'type': 'safe',  'label': "Explicit:",             'value': instance.get_explicit_markdown,
                  'field_key': 'explicit', 'key_ta': 'gldexplicit-key'}, 
+                {'type': 'plain', 'label': "Retractationes:",       'value': instance.retractationes, 'field_key': 'retractationes'},
                 {'type': 'plain', 'label': "Bibliography:",         'value': instance.bibliography, 'field_key': 'bibliography'},
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                  'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
