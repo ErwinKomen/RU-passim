@@ -3264,7 +3264,7 @@ class EqualGoldHuwaToJson(BasicPart):
             huwa_tables = ["retr"]
         elif self.import_type == "indiculum":
             # Tables needed to process the information in RETR 
-            huwa_tables = ["opera", "indiculum", "identifik"]
+            huwa_tables = ["opera", 'desinit', 'incipit', "indiculum", "identifik"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -4391,12 +4391,22 @@ class EqualGoldHuwaToJson(BasicPart):
                 # Create a list for gold and super, so that they can be added to datasets
                 lst_gold = []
                 lst_super = []
+                lst_newgold = []
+                lst_newsuper = []
                 profile = Profile.get_user_profile(self.request.user.username)
 
                 # Make sure to load the opera, identifik and indiculum tables
                 lst_identifik = tables.get("identifik")
                 lst_indiculum = tables.get("indiculum")
+                lst_opera = tables.get("opera")
+                lst_desinit = tables.get("desinit")
+                lst_incipit = tables.get("incipit")
                 oIndiculums = {str(x['id']):x for x in lst_indiculum }
+                oOperas = {str(x['id']):x for x in lst_opera }
+                oDesinits = {str(x['id']):x for x in lst_desinit }
+                oIncipits = {str(x['id']):x for x in lst_incipit }
+
+                # Other initializations
                 editype="ot"
 
                 author = Author.objects.filter(name__iexact="Augustinus Hipponensis").first()
@@ -4412,6 +4422,8 @@ class EqualGoldHuwaToJson(BasicPart):
                     indiculum_id = oIdentifik.get("indiculum")
                     # Only continue if the opera_id is 'real' as well as the indiculum_id
                     if opera_id > 0 and indiculum_id != '0':
+                        # NOTE: this batch has an OPERA, so contains more information
+
                         # Get the right indiculum
                         oIndiculum = oIndiculums[str(indiculum_id)]
                         indiculum_signatur = oIndiculum.get('indiculum_signatur')
@@ -4429,6 +4441,18 @@ class EqualGoldHuwaToJson(BasicPart):
 
                             code_t = oIndiculum.get('text', '').strip()
 
+                            # Determine incipit and explicit
+                            inc = ""
+                            exp = ""
+                            oOpera = oOperas.get(str(opera_id))
+                            if not oOpera is None:
+                                oIncipit = oIncipits.get(str(oOpera['incipit']))
+                                oDesinit = oDesinits.get(str(oOpera['desinit']))
+                                if not oIncipit is None:
+                                    inc = oIncipit.get("incipit_text")
+                                if not oDesinit is None:
+                                    exc = oDesinit.get("desinit_text")
+
                             # Find or create the signature
                             sig_p = Signature.objects.filter(editype=editype, code__iexact=code_p).first()
                             sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t).first()
@@ -4436,9 +4460,9 @@ class EqualGoldHuwaToJson(BasicPart):
                                 sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t.replace("ev", "eu")).first()
                             if sig_p is None:
                                 # There is no corresponding SG yet, so create it, but first create the correct SSG
-                                equal = EqualGold.objects.create(author=author)
+                                equal = EqualGold.objects.create(author=author, incipit=inc, explicit=exc)
                                 # Next create the correct SG
-                                gold = SermonGold.objects.create(equal=equal, author=author)
+                                gold = SermonGold.objects.create(equal=equal, author=author, incipit=inc, explicit=exc)
                                 # Only now create the correct Signature
                                 sig_p = Signature.objects.create(editype=editype, code=code_p, gold = gold)
 
@@ -4452,6 +4476,8 @@ class EqualGoldHuwaToJson(BasicPart):
                                 # Make [gold] and [equal] part of the right Project
                                 lst_super.append(equal)
                                 lst_gold.append(gold)
+                                lst_newsuper.append(dict(equal=equal.id, sig_p=code_p, incipit=inc, explicit=exc))
+                                lst_newgold.append(dict(gold=gold.id, sig_p=code_p, incipit=inc, explicit=exc))
 
                                 # Indicate where we have them from
                                 SermonGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", gold=gold)
@@ -4524,6 +4550,8 @@ class EqualGoldHuwaToJson(BasicPart):
                                 # Make [gold] and [equal] part of the right Project
                                 lst_super.append(equal)
                                 lst_gold.append(gold)
+                                lst_newsuper.append(dict(equal=equal.id, sig_p=code_p))
+                                lst_newgold.append(dict(gold=gold.id, sig_p=code_p))
                             elif sig_t is None:
                                 # First check on the number of signatures associated with the gold
                                 sig_count = sig_p.gold.goldsignatures.count()
@@ -4544,7 +4572,6 @@ class EqualGoldHuwaToJson(BasicPart):
                         for gold in lst_gold:
                             # Tie it to a new collection
                             CollectionGold.objects.create(gold=gold, collection=coll_gold)
-                            oData['gold'].append(gold.id)
 
                 if len(lst_super) > 0:
                     # Yes, create a dataset
@@ -4562,9 +4589,10 @@ class EqualGoldHuwaToJson(BasicPart):
                             if obj is None:
                                 # Add it
                                 obj = EqualGoldProject.objects.create(project=project, equal=super)
-                            oData['super'].append(super.id)
 
                 # Make sure the correct list of things is returned
+                oData['super'] = lst_newsuper
+                oData['gold'] = lst_newgold
                 oData['count_super'] = len(oData['super'])
                 oData['count_gold'] = len(oData['gold'])
            
