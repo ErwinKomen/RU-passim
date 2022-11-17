@@ -55,7 +55,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Collection, CollectionSuper, CollectionGold, LocationRelation, \
-    Script, Scribe, SermonGoldExternal,  \
+    Script, Scribe, SermonGoldExternal, SermonGoldKeyword,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -3262,6 +3262,9 @@ class EqualGoldHuwaToJson(BasicPart):
         elif self.import_type == "retr":
             # Tables needed to process the information in RETR 
             huwa_tables = ["retr"]
+        elif self.import_type == "indiculum":
+            # Tables needed to process the information in RETR 
+            huwa_tables = ["opera", "indiculum", "identifik"]
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -4318,7 +4321,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     with transaction.atomic():
                         for super in lst_super:
                             # Tie it to a new collection
-                            CollectionGold.objects.create(super=super, collection=coll_super)
+                            CollectionSuper.objects.create(super=super, collection=coll_super)
                             # Check if it is tied to the project
                             obj = EqualGoldProject.objects.filter(project=project, equal=super).first()                        
                             if obj is None:
@@ -4375,6 +4378,195 @@ class EqualGoldHuwaToJson(BasicPart):
                             gold.save()
                 oData['count_skip'] = count_skipped
                 oData['count_add'] = count_added
+
+            elif self.import_type == "indiculum":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_indiculum"
+                oData = {}
+                oData['gold'] = []
+                oData['super'] = []
+
+                # Get to the proper project
+                project = Project2.objects.filter(name__icontains="huwa").first()
+                # Create a list for gold and super, so that they can be added to datasets
+                lst_gold = []
+                lst_super = []
+                profile = Profile.get_user_profile(self.request.user.username)
+
+                # Make sure to load the opera, identifik and indiculum tables
+                lst_identifik = tables.get("identifik")
+                lst_indiculum = tables.get("indiculum")
+                oIndiculums = {str(x['id']):x for x in lst_indiculum }
+                editype="ot"
+
+                author = Author.objects.filter(name__iexact="Augustinus Hipponensis").first()
+                kw = Keyword.objects.filter(name="deperditus").first()
+
+                # Keep track of indiculum id's that have been processed
+                lst_indiculum_ids = []
+
+                # Process everything that is in [identifik]
+
+                for oIdentifik in lst_identifik:
+                    opera_id = oIdentifik.get("opera")
+                    indiculum_id = oIdentifik.get("indiculum")
+                    # Only continue if the opera_id is 'real' as well as the indiculum_id
+                    if opera_id > 0 and indiculum_id != '0':
+                        # Get the right indiculum
+                        oIndiculum = oIndiculums[str(indiculum_id)]
+                        indiculum_signatur = oIndiculum.get('indiculum_signatur')
+                        indiculum_genus = oIndiculum.get('indiculum_genus')
+                        indiculum_nummer = oIndiculum.get('indiculum_nummer')
+
+                        if indiculum_signatur != 0:
+                            # Define the signatures
+                            lst_possidius = []
+                            lst_possidius.append("Possidius {}".format(indiculum_signatur))
+                            if indiculum_genus != 0:
+                                lst_possidius.append(", {}".format(indiculum_genus))
+                            lst_possidius.append(" {}".format(indiculum_nummer))
+                            code_p = "".join(lst_possidius)
+
+                            code_t = oIndiculum.get('text', '').strip()
+
+                            # Find or create the signature
+                            sig_p = Signature.objects.filter(editype=editype, code__iexact=code_p).first()
+                            sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t).first()
+                            if sig_t is None and code_t != "":
+                                sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t.replace("ev", "eu")).first()
+                            if sig_p is None:
+                                # There is no corresponding SG yet, so create it, but first create the correct SSG
+                                equal = EqualGold.objects.create(author=author)
+                                # Next create the correct SG
+                                gold = SermonGold.objects.create(equal=equal, author=author)
+                                # Only now create the correct Signature
+                                sig_p = Signature.objects.create(editype=editype, code=code_p, gold = gold)
+
+                                if sig_t is None and code_t != "":
+                                    # First check on the number of signatures associated with the gold
+                                    sig_count = gold.goldsignatures.count()
+                                    if sig_count == 1:
+                                        # We only have the Possidius code: extend it
+                                        sig_t = Signature.objects.create(editype=editype, code=code_t, gold = gold)
+
+                                # Make [gold] and [equal] part of the right Project
+                                lst_super.append(equal)
+                                lst_gold.append(gold)
+
+                                # Indicate where we have them from
+                                SermonGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", gold=gold)
+                                EqualGoldExternal.objects.create(externalid=opera_id, externaltype="huwop", equal=equal)
+
+                                # Add proper keyword
+                                SermonGoldKeyword.objects.create(gold=gold, keyword=kw)
+                                EqualGoldKeyword.objects.create(equal=equal, keyword=kw)
+
+                            elif sig_t is None and code_t != "":
+                                # First check on the number of signatures associated with the gold
+                                sig_count = sig_p.gold.goldsignatures.count()
+                                if sig_count == 1:
+                                    # There is a sig_p, but no sig_t. Hook this to the same gold
+                                    sig_t = Signature.objects.create(editype=editype, code=code_t, gold = sig_p.gold)
+                            else:
+                                # The Signature already exists, so nothing needs to be done here
+                                pass
+
+
+                            # Add the indiculum id to those that have been processed
+                            lst_indiculum_ids.append(indiculum_id)
+
+                # Process all the indiculums that were not treated previously
+                for oIndiculum in lst_indiculum:
+                    indiculum_id = oIdentifik.get("indiculum")
+                    if not indiculum_id in lst_indiculum_ids:
+                        # Yes, process this one - but note: we are not able to tie it to a particular SG/SSG via OPERA
+                        # Get the right indiculum
+                        oIndiculum = oIndiculums[str(indiculum_id)]
+                        indiculum_signatur = oIndiculum.get('indiculum_signatur')
+                        indiculum_genus = oIndiculum.get('indiculum_genus')
+                        indiculum_nummer = oIndiculum.get('indiculum_nummer')
+
+                        if indiculum_signatur != 0:
+                            # Define the signatures
+                            lst_possidius = []
+                            lst_possidius.append("Possidius {}".format(indiculum_signatur))
+                            if indiculum_genus != 0:
+                                lst_possidius.append(", {}".format(indiculum_genus))
+                            lst_possidius.append(" {}".format(indiculum_nummer))
+                            code_p = "".join(lst_possidius)
+
+                            code_t = oIndiculum.get('text').strip()
+
+                            # Find or create the signature
+                            sig_p = Signature.objects.filter(editype=editype, code__iexact=code_p).first()
+                            sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t).first()
+                            if sig_t is None:
+                                sig_t = Signature.objects.filter(editype=editype, code__iexact=code_t.replace("ev", "eu")).first()
+                            if sig_p is None:
+                                # There is no corresponding SG yet, so create it, but first create the correct SSG
+                                equal = EqualGold.objects.create(author=author)
+                                # Next create the correct SG
+                                gold = SermonGold.objects.create(equal=equal, author=author)
+                                # Only now create the correct Signature
+                                sig_p = Signature.objects.create(editype=editype, code=code_p, gold = gold)
+
+                                if sig_t is None and code_t != "":
+                                    # First check on the number of signatures associated with the gold
+                                    sig_count = gold.goldsignatures.count()
+                                    if sig_count == 1:
+                                        # We only have the Possidius code: extend it
+                                        sig_t = Signature.objects.create(editype=editype, code=code_t.replace("ev", "eu"), gold = gold)
+
+                                # Add proper keyword
+                                SermonGoldKeyword.objects.create(gold=gold, keyword=kw)
+                                EqualGoldKeyword.objects.create(equal=equal, keyword=kw)
+
+                                # Make [gold] and [equal] part of the right Project
+                                lst_super.append(equal)
+                                lst_gold.append(gold)
+                            elif sig_t is None:
+                                # First check on the number of signatures associated with the gold
+                                sig_count = sig_p.gold.goldsignatures.count()
+                                if sig_count == 1:
+                                    # There is a sig_p, but no sig_t. Hook this to the same gold
+                                    sig_t = Signature.objects.create(editype=editype, code=code_t, gold = sig_p.gold)
+
+                # Create a proper dataset for gold and for super with scope *team*
+                sNowTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                if len(lst_gold) > 0:
+                    # Yes, create dataset
+                    sDatasetGold = "Huwa SG import {}".format(sNowTime)
+                    coll_gold = Collection.objects.create(
+                        name=sDatasetGold, readonly=True, owner=profile,
+                        scope="team", type="gold", settype="pd",
+                        descrip="Automatically uploaded SG from HUWA JSON at {}".format(sNowTime))
+                    with transaction.atomic():
+                        for gold in lst_gold:
+                            # Tie it to a new collection
+                            CollectionGold.objects.create(gold=gold, collection=coll_gold)
+                            oData['gold'].append(gold.id)
+
+                if len(lst_super) > 0:
+                    # Yes, create a dataset
+                    sDatasetSsg = "Huwa SSG/AF import {}".format(sNowTime)
+                    coll_super = Collection.objects.create(
+                        name=sDatasetSsg, readonly=True, owner=profile,
+                        scope="team", type="super", settype="pd",
+                        descrip="Automatically uploaded SSG/AF from HUWA JSON at {}".format(sNowTime))
+                    with transaction.atomic():
+                        for super in lst_super:
+                            # Tie it to a new collection
+                            CollectionSuper.objects.create(super=super, collection=coll_super)
+                            # Check if it is tied to the project
+                            obj = EqualGoldProject.objects.filter(project=project, equal=super).first()                        
+                            if obj is None:
+                                # Add it
+                                obj = EqualGoldProject.objects.create(project=project, equal=super)
+                            oData['super'].append(super.id)
+
+                # Make sure the correct list of things is returned
+                oData['count_super'] = len(oData['super'])
+                oData['count_gold'] = len(oData['gold'])
            
             # Convert oData to stringified JSON
             if dtype == "json":
@@ -4385,7 +4577,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     sData = json.dumps(lst_ssg_edi, indent=2)
                 elif self.import_type == "opera":
                     sData = json.dumps(lst_bhlbhm, indent=2)
-                elif self.import_type == "retr":
+                elif self.import_type in ["retr", "indiculum"]:
                     sData = json.dumps(oData, indent=2)
                 else:
                     # convert to string
@@ -4729,6 +4921,12 @@ class EqualGoldHuwaRetr(EqualGoldHuwaToJson):
     """Post-processing of HUWA opera-tied RETR - also create JSON"""
 
     import_type = "retr"
+
+
+class EqualGoldHuwaIndiculum(EqualGoldHuwaToJson):
+    """Post-processing of HUWA opera-tied INDICULUM - also create JSON"""
+
+    import_type = "indiculum"
 
 
 class ReaderEqualGold(View):

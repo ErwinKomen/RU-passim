@@ -13243,7 +13243,8 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa AFs: Excel",        "dtype": "xlsx", "url": 'equalgold_huwajson'},
                 {"label": "Huwa Literature: json",  "dtype": "json", "url": 'equalgold_huwalitjson'},
                 {"label": "Huwa BHL etc: json",     "dtype": "json", "url": 'equalgold_huwaopera'},
-                {"label": "Huwa retractationes: json",  "dtype": "json", "url": 'equalgold_huwaretr'}
+                {"label": "Huwa retractationes: json",  "dtype": "json", "url": 'equalgold_huwaretr'},
+                {"label": "Huwa indiculum: json",   "dtype": "json", "url": 'equalgold_huwaindiculum'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False
