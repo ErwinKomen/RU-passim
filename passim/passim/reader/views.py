@@ -55,7 +55,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Collection, CollectionSuper, CollectionGold, LocationRelation, \
-    Script, Scribe, SermonGoldExternal, SermonGoldKeyword,  \
+    Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 
 # ======= from RU-Basic ========================
@@ -3220,6 +3220,25 @@ class EqualGoldHuwaToJson(BasicPart):
             sBack = json.dumps(lSig)
             return sBack
 
+        def get_ssg(opera_id):
+            """Given the opera ID, try to get the SSG as it has been imported already"""
+
+            obj = None
+            oErr = ErrHandle()
+            try:
+                external = EqualGoldExternal.objects.filter(externalid=opera_id).first()
+                if external is None:
+                    # Try to find SG
+                    external = SermonGoldExternal.objects.filter(externalid=opera_id).first()
+                    if not external is None:
+                        obj = external.gold.equal
+                else:
+                    obj = external.equal
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_ssg")
+            return obj
+
         def get_support(oHandschrift, oSupport):
             sBack = ""
             oErr = ErrHandle()
@@ -3265,6 +3284,9 @@ class EqualGoldHuwaToJson(BasicPart):
         elif self.import_type == "indiculum":
             # Tables needed to process the information in RETR 
             huwa_tables = ["opera", 'desinit', 'incipit', "indiculum", "identifik"]
+        elif self.import_type == "nebenwerk":
+            # Tables needed to process the information in NEBENWERK 
+            huwa_tables = ["opera", 'nebenwerk']
         else:
             huwa_tables = ["opera", 'clavis', 'frede', 'cppm', 'desinit', 'incipit',
                 'autor', 'autor_opera', 'datum_opera']
@@ -4419,7 +4441,6 @@ class EqualGoldHuwaToJson(BasicPart):
                 lst_indiculum_ids = []
 
                 # Process everything that is in [identifik]
-
                 for oIdentifik in lst_identifik:
                     opera_id = oIdentifik.get("opera")
                     indiculum_id = oIdentifik.get("indiculum")
@@ -4605,6 +4626,58 @@ class EqualGoldHuwaToJson(BasicPart):
                 oData['count_super'] = len(oData['super'])
                 oData['count_gold'] = len(oData['gold'])
            
+            elif self.import_type == "nebenwerk":
+                # Make sure we have a more fitting download name
+                self.downloadname = "huwa_nebenwerk" 
+                oData = {}
+                oData['gold'] = []
+                oData['super'] = []
+                oData['skip'] = []
+
+                # Get to the proper project
+                project = Project2.objects.filter(name__icontains="huwa").first()
+                # Create a list for gold and super, so that they can be added to datasets
+                lst_gold = []
+                lst_super = []
+                profile = Profile.get_user_profile(self.request.user.username)
+                
+                # Make sure to load the opera and nebenwerk tables
+                lst_nebenwerk = tables.get("nebenwerk")
+                lst_opera = tables.get("opera")
+                oOperas = {str(x['id']):x for x in lst_opera }
+
+                # process everything that is in [nebenwerk]
+                for oNebenwerk in lst_nebenwerk:
+                    # Get the stuff from this table
+                    id = oNebenwerk.get("id")
+                    opera_id = oNebenwerk.get("opera")
+                    ist_von = oNebenwerk.get("ist_von")
+                    hauptwerk_id = oNebenwerk.get("hauptwerk")
+                    remark = oNebenwerk.get("bemerkungen")
+
+                    # Find the SSG directly, if possible, otherwise via SG
+                    ssg_low = get_ssg(opera_id)
+                    ssg_main = get_ssg(hauptwerk_id)
+                    # If both are existing
+                    if not ssg_low is None and not ssg_main is None:
+                        # Necessary: find a possible S that was imported from HUWA and is linked to this SSG
+                        sermons = [x.sermon for x in SermonDescrExternal.objects.filter(externalid=opera_id, externaltype="huwop")]
+                        # Process all these sermons
+                        if len(sermons) == 0:
+                            # Cannot process them
+                            oData['skip'].append(dict(nebenwerk=id, opera=opera_id, hauptwerk=hauptwerk_id,
+                                                      msg="No sermondescr with opera id {}".format(opera_id)))
+                        else:
+                            for sermon in sermons:
+                                # Check link from low to main
+
+                                pass
+
+                    else:
+                        # Cannot process them
+                        oData['skip'].append(dict(nebenwerk=id, opera=opera_id, hauptwerk=hauptwerk_id, 
+                                                  msg="One of opera or hauptwerk not in SSGs"))
+
             # Convert oData to stringified JSON
             if dtype == "json":
                 if self.import_type == "manu":
@@ -4964,6 +5037,12 @@ class EqualGoldHuwaIndiculum(EqualGoldHuwaToJson):
     """Post-processing of HUWA opera-tied INDICULUM - also create JSON"""
 
     import_type = "indiculum"
+
+
+class EqualGoldHuwaNebenwerk(EqualGoldHuwaToJson):
+    """Post-processing of HUWA table [nebenwerk] that ties SSG to SSG"""
+
+    import_type = "nebenwerk"
 
 
 class ReaderEqualGold(View):

@@ -354,6 +354,7 @@ class ManuscriptUploadJson(ReaderImport):
                             # Make sure we pass the sourcetype on to Manuscript.custom_add()
                             kwargs['sourcetype'] = sourcetype
 
+                            lst_msg = []
 
                             # Walk through the manuscripts
                             for idx, oManu in enumerate(lst_manu):
@@ -422,6 +423,9 @@ class ManuscriptUploadJson(ReaderImport):
                                 else:
                                     oErr.Status("{}/{}: {}".format(idx+1, count_manu, manu.idno))
 
+                                    if 'msg' in params:
+                                        lst_msg.append(params['msg'])
+
                                     # Now get the codicological unit that has been automatically created and adapt it
                                     codico = manu.manuscriptcodicounits.first()
                                     if codico != None:
@@ -446,6 +450,9 @@ class ManuscriptUploadJson(ReaderImport):
 
                                         # Keep track of the number of sermons read
                                         oResult['sermons'] += 1
+
+                                        # Some sourcetype specific processing of SERMON
+
 
                                         # Get parent, firstchild, next
                                         parent = oMsItem['parent']
@@ -500,6 +507,10 @@ class ManuscriptUploadJson(ReaderImport):
                                                 yearstart=yearstart, yearfinish=yearfinish,
                                                 library=library, idno=idno, filename="-", url="-")
                                 lst_read.append(oRead)
+
+                            # Possibly show messages
+                            if len(lst_msg) > 0:
+                                oErr.Status("Messages:\n{}".format(json.dumps(lst_msg, indent=2)))
 
                         # Create a report and add it to what we return
                         

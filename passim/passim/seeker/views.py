@@ -13244,7 +13244,8 @@ class EqualGoldListView(BasicList):
                 {"label": "Huwa Literature: json",  "dtype": "json", "url": 'equalgold_huwalitjson'},
                 {"label": "Huwa BHL etc: json",     "dtype": "json", "url": 'equalgold_huwaopera'},
                 {"label": "Huwa retractationes: json",  "dtype": "json", "url": 'equalgold_huwaretr'},
-                {"label": "Huwa indiculum: json",   "dtype": "json", "url": 'equalgold_huwaindiculum'}
+                {"label": "Huwa indiculum: json",   "dtype": "json", "url": 'equalgold_huwaindiculum'},
+                {"label": "Huwa nebenwerk: json",   "dtype": "json", "url": 'equalgold_huwanebenwerk'}
                 ]
             # Possibly add to 'uploads'
             bHasJson = False
