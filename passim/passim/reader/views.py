@@ -4412,6 +4412,9 @@ class EqualGoldHuwaToJson(BasicPart):
                 author = Author.objects.filter(name__iexact="Augustinus Hipponensis").first()
                 kw = Keyword.objects.filter(name="deperditus").first()
 
+                # ====== DEBUGGING ==============
+                lst_missing_ind = [3, 2, 8, 12, 13, 376, 15, 16, 19, 25, 30, 32, 33, 343, 338]
+
                 # Keep track of indiculum id's that have been processed
                 lst_indiculum_ids = []
 
@@ -4420,6 +4423,12 @@ class EqualGoldHuwaToJson(BasicPart):
                 for oIdentifik in lst_identifik:
                     opera_id = oIdentifik.get("opera")
                     indiculum_id = oIdentifik.get("indiculum")
+                    
+                    # ========= DEBUG ===================
+                    if int(indiculum_id) in lst_missing_ind:
+                        iStop = 1
+                    # ===================================
+
                     # Only continue if the opera_id is 'real' as well as the indiculum_id
                     if opera_id > 0 and indiculum_id != '0':
                         # NOTE: this batch has an OPERA, so contains more information
