@@ -326,6 +326,8 @@ class ManuscriptUploadJson(ReaderImport):
                         # Further processing depends on the extension
                         oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
 
+                        lst_msg = []
+
                         if extension == "json":
                             # This is a JSON file: Load the file into a variable
                             sData = data_file.read()
@@ -353,8 +355,6 @@ class ManuscriptUploadJson(ReaderImport):
 
                             # Make sure we pass the sourcetype on to Manuscript.custom_add()
                             kwargs['sourcetype'] = sourcetype
-
-                            lst_msg = []
 
                             # Walk through the manuscripts
                             for idx, oManu in enumerate(lst_manu):
@@ -512,9 +512,8 @@ class ManuscriptUploadJson(ReaderImport):
                             if len(lst_msg) > 0:
                                 oErr.Status("Messages:\n{}".format(json.dumps(lst_msg, indent=2)))
 
-                        # Create a report and add it to what we return
-                        
-                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        # Create a report and add it to what we return                        
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read, 'msg': lst_msg}
                         oReport = Report.make(username, "ijson", json.dumps(oContents))
                                 
                         # Determine a status code
