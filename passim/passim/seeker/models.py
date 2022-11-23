@@ -3779,15 +3779,21 @@ class Manuscript(models.Model):
                     # Process the title for this manuscript
                     if obj.title == "SUPPLY A NAME": obj.title="-"
                     for codico in obj.manuscriptcodicounits.all():
-                        # Evaluate all the sermons under it
-                        sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
-                        etc = "" if sermons.count() <= 1 else " etc."
-                        titles = [x['title'] for x in sermons if not x['title'] is None]
-                        if len(titles) > 0:
-                            title = "{}{}".format(titles[0], etc)
+                        # Check if this codico has a proper name...
+                        codico_name = oManu.get("codico_name")
+                        if codico_name is None:
+                            if codico.name is None or codico.name == "SUPPLY A NAME":
+                                # Evaluate all the sermons under it
+                                sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
+                                etc = "" if sermons.count() <= 1 else " etc."
+                                titles = [x['title'] for x in sermons if not x['title'] is None]
+                                if len(titles) > 0:
+                                    title = "{}{}".format(titles[0], etc)
+                                else:
+                                    title = "(unknown)"
+                                codico.name = title
                         else:
-                            title = "(unknown)"
-                        codico.name = title
+                            codico.name = codico_name
 
                     # Make sure we have a copy of the RAW json data for this manuscript
                     obj.raw = json.dumps(oManu, indent=2)
@@ -5382,6 +5388,7 @@ class Codico(models.Model):
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Codico_Notes',        'type': 'func',  'path': 'notes'},
         {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
         {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
         {'name': 'Scribeinfo',          'type': 'func',  'path': 'scribeinfo'},
@@ -5676,6 +5683,9 @@ class Codico(models.Model):
                     obj_script = Script.objects.filter(name__iexact=name).first()
                     if not obj_script is None:
                         CodicoScript.objects.create(codico=self, script=obj_script, note=note)
+            elif path == "notes":
+                # Get anything from 'codico_notes'
+                self.notes = value
             else:
                 # Figure out what to do in this case
                 pass
