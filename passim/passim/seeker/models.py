@@ -3776,6 +3776,19 @@ class Manuscript(models.Model):
                             notes.append(lib_note)
                             obj.notes = "\n".join(notes)
 
+                    # Process the title for this manuscript
+                    if obj.title == "SUPPLY A NAME": obj.title="-"
+                    for codico in obj.manuscriptcodicounits.all():
+                        # Evaluate all the sermons under it
+                        sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
+                        etc = "" if sermons.count() <= 1 else " etc."
+                        titles = [x['title'] for x in sermons if not x['title'] is None]
+                        if len(titles) > 0:
+                            title = "{}{}".format(titles[0], etc)
+                        else:
+                            title = "(unknown)"
+                        codico.name = title
+
                     # Make sure we have a copy of the RAW json data for this manuscript
                     obj.raw = json.dumps(oManu, indent=2)
 
