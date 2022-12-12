@@ -132,6 +132,9 @@ urlpatterns = [
     url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
     url(r'^ssg/huwa/literature/$', EqualGoldHuwaLitToJson.as_view(), name='equalgold_huwalitjson'),
     url(r'^ssg/huwa/opera/$', EqualGoldHuwaOpera.as_view(), name='equalgold_huwaopera'),
+    url(r'^ssg/huwa/retractationes/$', EqualGoldHuwaRetr.as_view(), name='equalgold_huwaretr'),
+    url(r'^ssg/huwa/indiculum/$', EqualGoldHuwaIndiculum.as_view(), name='equalgold_huwaindiculum'),
+    url(r'^ssg/huwa/nebenwerk/$', EqualGoldHuwaNebenwerk.as_view(), name='equalgold_huwanebenwerk'),
     url(r'^ssg/import/edilit/$', EqualGoldUploadEdilit.as_view(), name='equalgold_upload_edilit'),
 
     url(r'^ssg/scount/histo/download', EqualGoldScountDownload.as_view(), name='equalgold_scount_download'),

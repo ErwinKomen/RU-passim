@@ -3633,6 +3633,11 @@ class Manuscript(models.Model):
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
+            # Need to have external information
+            externals = oManu.get("externals")
+            externalid = None
+            if not externals is None and len(externals) > 0: 
+                externalid = externals[0].get("externalid")
             # First get the shelf mark
             idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
@@ -3670,6 +3675,16 @@ class Manuscript(models.Model):
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                     if not source is None:
                         obj.source = source
+                elif sourcetype == "huwa" and not externalid is None:
+                    # We are going to read it anyway, but adapt the [idno] to reflect this
+                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                    if not source is None:
+                        obj.source = source
+                    obj.idno = "{} (huwa={})".format(idno,externalid)
+                    # We are adding one that is already there
+                    msg = "Adding double shelfmark: {} manu={}".format(obj.idno, obj.id)
+                    oErr.Status(msg)
+                    oParams['msg'] = msg
                 else:
                     # Default overwriting message
                     msg = "Attempt to overwrite manuscript shelfmark [{}]".format(idno)
@@ -3774,6 +3789,25 @@ class Manuscript(models.Model):
                             notes = [] if obj.notes is None else [ obj.notes ]
                             notes.append(lib_note)
                             obj.notes = "\n".join(notes)
+
+                    # Process the title for this manuscript
+                    if obj.title == "SUPPLY A NAME": obj.title="-"
+                    for codico in obj.manuscriptcodicounits.all():
+                        # Check if this codico has a proper name...
+                        codico_name = oManu.get("codico_name")
+                        if codico_name is None:
+                            if codico.name is None or codico.name == "SUPPLY A NAME":
+                                # Evaluate all the sermons under it
+                                sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
+                                etc = "" if sermons.count() <= 1 else " etc."
+                                titles = [x['title'] for x in sermons if not x['title'] is None]
+                                if len(titles) > 0:
+                                    title = "{}{}".format(titles[0], etc)
+                                else:
+                                    title = "(unknown)"
+                                codico.name = title
+                        else:
+                            codico.name = codico_name
 
                     # Make sure we have a copy of the RAW json data for this manuscript
                     obj.raw = json.dumps(oManu, indent=2)
@@ -5368,7 +5402,11 @@ class Codico(models.Model):
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Origin',              'type': 'func',  'path': 'origin'},
+        {'name': 'Codico_Notes',        'type': 'func',  'path': 'notes'},
         {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
+        {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
+        {'name': 'Scribeinfo',          'type': 'func',  'path': 'scribeinfo'},
+        {'name': 'Scriptinfo',          'type': 'func',  'path': 'scriptinfo'},
         ]
 
     class Meta:
@@ -5483,7 +5521,7 @@ class Codico(models.Model):
                             # Note overwriting
                             old_value = getattr(obj, path)
                             if value != old_value:
-                                if bOverwriting:
+                                if bOverwriting and not old_value is None:
                                     # Show that this overwriting took place
                                     obj.action_add_change(username, "import", path, old_value, value)
                                 # Set the correct field's value
@@ -5592,6 +5630,8 @@ class Codico(models.Model):
                 value_lst = value.split(",")
                 for idx, item in enumerate(value_lst):
                     value_lst[idx] = value_lst[idx].strip()
+            elif isinstance(value, dict):
+                value_lst = [ value ] 
             if path == "dateranges" or path == "date":
                 # TRanslate the string into a list
                 dates = value_lst # json.loads(value)
@@ -5638,6 +5678,28 @@ class Codico(models.Model):
                         # Make link between provenance and codico
                         ProvenanceCod.objects.create(codico=self, provenance=provenance, note="Automatically added Codico/custom_getkv")
                 # Ready
+            elif path == "scribeinfo":
+                scribe_infos = value_lst
+                for oInfo in scribe_infos:
+                    name = oInfo.get("name").strip()
+                    note = oInfo.get("note", "").strip()
+                    # Find the script
+                    obj_scribe = Scribe.objects.filter(name__iexact=name).first()
+                    if not obj_scribe is None:
+                        CodicoScribe.objects.create(codico=self, scribe=obj_scribe, note=note)
+                pass
+            elif path == "scriptinfo":
+                scribe_infos = value_lst
+                for oInfo in scribe_infos:
+                    name = oInfo.get("name").strip()
+                    note = oInfo.get("note", "").strip()
+                    # Find the script
+                    obj_script = Script.objects.filter(name__iexact=name).first()
+                    if not obj_script is None:
+                        CodicoScript.objects.create(codico=self, script=obj_script, note=note)
+            elif path == "notes":
+                # Get anything from 'codico_notes'
+                self.notes = value
             else:
                 # Figure out what to do in this case
                 pass
@@ -7389,6 +7451,15 @@ class SermonGold(models.Model):
         qs = self.related_to.filter(sermongold_dst__linktype=linktype, sermongold_dst__dst=self)
         # Return the whole queryset that was found
         return qs
+
+    def get_retr(self):
+        """Get the retractationes in a readable format"""
+
+        sBack = "-"
+        if not self.retractationes is None:
+            retractationes = self.retractationes.replace("\r", "").replace("\n", "  \n")
+            sBack = adapt_markdown(retractationes, False)
+        return sBack
 
     def get_sermon_string(self):
         """Get a string summary of this one"""
