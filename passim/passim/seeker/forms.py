@@ -2353,13 +2353,13 @@ class CollectionForm(PassimModelForm):
     ssgauthorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgsiglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))    
     ssgcode     = forms.CharField(label=_("Passim code"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
-                                    'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
+                                    'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))    
     ssgpassimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
-                                                       'class': 'searching'}))
+                                                       'class': 'searching'}))    
     ssgkwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgnumber   = forms.CharField(label=_("Author Number"), required=False,
@@ -2378,8 +2378,13 @@ class CollectionForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
     sermotitle  = forms.CharField(label=_("Title"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Title'}))
+    
     sermofeast  = forms.CharField(label=_("Feast"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))
+    
+    sermofeastlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
@@ -2401,6 +2406,10 @@ class CollectionForm(PassimModelForm):
     # MANUSCRIPT-specific
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
+    country_ta  = forms.CharField(label=_("Country"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city_ta     = forms.CharField(label=_("City"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
@@ -2486,7 +2495,7 @@ class CollectionForm(PassimModelForm):
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
         self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
         self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
+        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') # Gaat ok lijkt het
         self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
         # S section
@@ -2494,6 +2503,7 @@ class CollectionForm(PassimModelForm):
         self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
         self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
         self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
+        self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
 
         # M section
         self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
@@ -3122,16 +3132,16 @@ class SuperSermonGoldForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'settype': 'hc', 'data-debug': 'true', 'data-ajax--cache': "false",
-                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-placeholder': 'Select multiple Historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['superlist'].widget = EqualGoldLinkAddOnlyWidget(attrs={
