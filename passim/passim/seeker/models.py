@@ -3465,7 +3465,7 @@ class Manuscript(models.Model):
         {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
         # TODO: change FK project into m2m
-        {'name': 'Project',             'type': 'fk',    'path': 'project',   'fkfield': 'name', 'model': 'Project2'},
+        {'name': 'Projects',            'type': 'func',  'path': 'projects'},   #,  'fkfield': 'name', 'model': 'Project2'},
 
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
@@ -3777,7 +3777,7 @@ class Manuscript(models.Model):
                             obj.notes = "\n".join(notes)
 
                     # Process the title for this manuscript
-                    if obj.title == "SUPPLY A NAME": obj.title="-"
+                    if obj.name == "SUPPLY A NAME": obj.name="-"
                     for codico in obj.manuscriptcodicounits.all():
                         # Check if this codico has a proper name...
                         codico_name = oManu.get("codico_name")
@@ -3831,6 +3831,8 @@ class Manuscript(models.Model):
                 sBack = self.get_eqsetsignatures_markdown(plain=True)
             elif path == "ssglinks":
                 sBack = self.get_eqset()
+            elif path == "projects":
+                sBack = self.get_projects(plain=True)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/custom_get")
@@ -3849,7 +3851,10 @@ class Manuscript(models.Model):
                 key = "{}_id".format(key)
             if self != None:
                 if item['type'] == 'field':
-                    value = getattr(self, item['path'])
+                    if 'target' in item:
+                        value = getattr(self, item['target'])
+                    else:
+                        value = getattr(self, item['path'])
                 elif item['type'] == "fk":
                     fk_obj = getattr(self, item['path'])
                     if fk_obj != None:
@@ -3964,6 +3969,17 @@ class Manuscript(models.Model):
                         if obj is None:
                             # Add it
                             obj = ManuscriptExternal.objects.create(manu=self, externalid=externalid, externaltype=externaltype)
+            elif path == "projects":
+                # The projects to which this item belongs
+                prj_names = value_lst
+                for prj_name in value_lst:
+                    # Get the project object
+                    prj = Project2.objects.filter(name__iexact=prj_name).first()
+                    if not prj is None:
+                        # Check the link to this project
+                        obj = ManuscriptProject.objects.filter(project=prj, manuscript=self).first()
+                        if obj is None:
+                            obj = ManuscriptProject.objects.create(project=prj, manuscript=self)
             else:
                 # Figure out what to do in this case
                 pass
@@ -4345,13 +4361,16 @@ class Manuscript(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, sBack)
         return sBack
 
-    def get_projects(self):
+    def get_projects(self, plain=False):
         sBack = "-" 
         if self.projects.count() > 0:
             html = []
             for obj in self.projects.all().order_by("name"):
                 html.append(obj.name)
-            sBack = ", ".join(html)
+            if plain:
+                sBack = json.dumps(html)
+            else:
+                sBack = ", ".join(html)
         return sBack
 
     def get_project_markdown2(self): 
@@ -8944,7 +8963,7 @@ class SermonDescr(models.Model):
                     if keyfield == "name":
                         # Adaptation for empty lists
                         if value == "[]": value = ""
-                    else:
+                    elif not value is None:
                         if value == "": 
                             value = None
                         elif value[0] == '[':

@@ -194,20 +194,23 @@ class ManuscriptUploadExcel(ReaderImport):
                                             if parent_id != '' and parent_id != None:
                                                 # parent_id = str(parent_id)
                                                 parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
-                                                oSermo['sermon'].msitem.parent = parent.msitem
-                                                oSermo['sermon'].msitem.save()
+                                                if not parent is None:
+                                                    oSermo['sermon'].msitem.parent = parent.msitem
+                                                    oSermo['sermon'].msitem.save()
                                             # Process firstchild
                                             if firstchild_id != '' and firstchild_id != None:
                                                 # firstchild_id = str(firstchild_id)
                                                 firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
-                                                oSermo['sermon'].msitem.firstchild = firstchild.msitem
-                                                oSermo['sermon'].msitem.save()
+                                                if not firstchild is None:
+                                                    oSermo['sermon'].msitem.firstchild = firstchild.msitem
+                                                    oSermo['sermon'].msitem.save()
                                             # Process next
                                             if next_id != '' and next_id != None:
                                                 # next_id = str(next_id)
                                                 nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
-                                                oSermo['sermon'].msitem.next = nextone.msitem
-                                                oSermo['sermon'].msitem.save()
+                                                if not nextone is None:
+                                                    oSermo['sermon'].msitem.next = nextone.msitem
+                                                    oSermo['sermon'].msitem.save()
 
 
                         # Create a report and add it to what we return
