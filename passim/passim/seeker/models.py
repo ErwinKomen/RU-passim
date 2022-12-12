@@ -3219,6 +3219,20 @@ class Project2(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
+#class AltPageNumber(models.Model):
+#    """Alternative page numbers can de linked to a SermonDescr"""
+
+#    # [0-1] Optional alternative page numbering of this sermon on the manuscript
+#    pages = models.CharField("Pages", null=True, blank=True, max_length=LONG_STRING)
+#    # [0-1] Any notes for this alternative page number
+#    note = models.TextField("Note", null=True, blank=True)
+#    # [1] links to a user via profile
+#    #profile = models.ForeignKey(Profile, related_name="profilealtpage", on_delete=models.CASCADE)
+#    # [1] Date created (automatically done)
+#    created = models.DateTimeField(default=get_current_datetime)
+
+#    def __str__(self):
+#        return self.pages
 
 class Keyword(models.Model):
     """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
@@ -8550,6 +8564,9 @@ class SermonDescr(models.Model):
     # [m] Many-to-many: one manuscript can belong to one or more projects
     projects = models.ManyToManyField(Project2, through="SermonDescrProject", related_name="project2_sermons")
 
+    # [m] Many-to-many: one sermon can have a series of alternative page numbering systems
+    # altpages = models.ManyToManyField(AltPageNumber, related_name="altpage_sermons")
+
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
     #     Note: when a Manuscript is removed, all its associated SermonDescr are also removed
@@ -9632,6 +9649,17 @@ class SermonDescr(models.Model):
             lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
         sBack = ", ".join(lHtml)
         return sBack
+
+    #def get_altpage_markdown(self): # of via Keywords?
+    #    lHtml = []
+    #    # Visit all project items
+    #    for altpage in self.pages.all().order_by('name'):
+    #        # Determine where clicking should lead to
+    #        url = "{}?sermo-projlist={}".format(reverse('sermon_list'), project2.id) 
+    #        # Create a display for this topic            
+    #        lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
+    #    sBack = ", ".join(lHtml)
+    #    return sBack
 
     def get_passimcode_markdown(self):
         """Get the Passim code (and a link to it)"""

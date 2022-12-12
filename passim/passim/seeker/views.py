@@ -4475,8 +4475,9 @@ class SermonEdit(BasicDetails):
                 # -------- HIDDEN field values ---------------
                 {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
                 # --------------------------------------------
-                {'type': 'safe',  'label': "Saved item:",   'value': saveditem_button          },
+                {'type': 'safe',  'label': "Saved item:",           'value': saveditem_button          },
                 {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
+                #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.locus,      'field_key': "locus"}, 
                 {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
                 {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
                 {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
@@ -4547,6 +4548,8 @@ class SermonEdit(BasicDetails):
                     {'type': 'line',    'label': "Literature:",         'value': instance.get_litrefs_markdown()},
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
+                    # AltPageNumber HIER
+                    {'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
             # IN all cases
@@ -5081,7 +5084,7 @@ class SermonListView(BasicList):
         {'name': 'Links',       'order': '',    'type': 'str',  'custom': 'links'},
         {'name': 'Status',      'order': 'o=11', 'type': 'str', 'custom': 'status'}]
 
-    filters = [ {"name": "Gryson/Clavis",    "id": "filter_signature",      "enabled": False},
+    filters = [ {"name": "Gryson/Clavis/Other code",    "id": "filter_signature",      "enabled": False},
                 {"name": "Attr. author",     "id": "filter_author",         "enabled": False},
                 {"name": "Author type",      "id": "filter_autype",         "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
@@ -5106,7 +5109,7 @@ class SermonListView(BasicList):
                 {"name": "Historical",       "id": "filter_collhc",         "enabled": False, "head_id": "filter_collection"},
                 {"name": "Shelfmark",        "id": "filter_manuid",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Country",          "id": "filter_country",        "enabled": False, "head_id": "filter_manuscript"},
-                {"name": "City/location",    "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "City/Location",    "id": "filter_city",           "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Library",          "id": "filter_library",        "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Origin",           "id": "filter_origin",         "enabled": False, "head_id": "filter_manuscript"},
                 {"name": "Provenance",       "id": "filter_provenance",     "enabled": False, "head_id": "filter_manuscript"},
@@ -5128,7 +5131,9 @@ class SermonListView(BasicList):
             {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_term'},
             {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_include'},
             {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_exclude'},
+            
             {'filter': 'code',          'fkfield': 'sermondescr_super__super', 'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            
             {'filter': 'author',        'fkfield': 'author',            'keyS': 'authorname',
                                         'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'sermo-authorname' },
             {'filter': 'autype',                                        'keyS': 'authortype',  'help': 'authorhelp'},
@@ -8915,7 +8920,7 @@ class CollectionListView(BasicList):
                 {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
                 {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
                 {'name': 'Author count',            'order': 'o=4', 'type': 'int', 'custom': 'authcount'},
-                {'name': 'Added',                   'order': 'o=5', 'type': 'str', 'custom': 'created'}
+                #{'name': 'Added',                   'order': 'o=5', 'type': 'str', 'custom': 'created'}
             ]  
             # Add if user is app editor
             if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
@@ -8924,40 +8929,40 @@ class CollectionListView(BasicList):
                 if len(self.order_default) < len(self.order_heads):
                     self.order_default.append("")
             self.filters = [ 
-                {"name": "Collection",             "id": "filter_collection",  "enabled": False},
-                {"name": "Project",                "id": "filter_project",     "enabled": False},
-                {"name": "Authority file...",      "id": "filter_super",    "enabled": False, "head_id": "none"},
-                {"name": "Sermon...",              "id": "filter_sermo",    "enabled": False, "head_id": "none"},
-                {"name": "Manuscript...",          "id": "filter_manu",     "enabled": False, "head_id": "none"},
+                {"name": "Collection",             "id": "filter_collection",     "enabled": False},
+                {"name": "Project",                "id": "filter_project",        "enabled": False},
+                {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},
+                {"name": "Sermon...",              "id": "filter_sermon",         "enabled": False, "head_id": "none"},
+                {"name": "Manuscript...",          "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 # Section SSG
-                {"name": "Author",          "id": "filter_ssgauthor",       "enabled": False, "head_id": "filter_super"},
-                {"name": "Incipit",         "id": "filter_ssgincipit",      "enabled": False, "head_id": "filter_super"},
-                {"name": "Explicit",        "id": "filter_ssgexplicit",     "enabled": False, "head_id": "filter_super"},
-                {"name": "Passim code",     "id": "filter_ssgcode",         "enabled": False, "head_id": "filter_super"},
-                {"name": "Number",          "id": "filter_ssgnumber",       "enabled": False, "head_id": "filter_super"},
-                {"name": "Gryson/Clavis",   "id": "filter_ssgsignature",    "enabled": False, "head_id": "filter_super"},
-                {"name": "Keyword",         "id": "filter_ssgkeyword",      "enabled": False, "head_id": "filter_super"},
-                {"name": "Status",          "id": "filter_ssgstype",        "enabled": False, "head_id": "filter_super"},
+                {"name": "Author",          "id": "filter_ssgauthor",       "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Incipit",         "id": "filter_ssgincipit",      "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Explicit",        "id": "filter_ssgexplicit",     "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Passim code",     "id": "filter_ssgcode",         "enabled": False, "head_id": "filter_authority_file"},
+                #{"name": "Number",          "id": "filter_ssgnumber",       "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Gryson/Clavis/Other code","id": "filter_ssgsignature",    "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Keyword",         "id": "filter_ssgkeyword",      "enabled": False, "head_id": "filter_authority_file"},
+                {"name": "Status",          "id": "filter_ssgstype",        "enabled": False, "head_id": "filter_authority_file"},
                 # Section S
-                {"name": "Gryson or Clavis","id": "filter_sermosignature",  "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Author",          "id": "filter_sermoauthor",     "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Incipit",         "id": "filter_sermoincipit",    "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Explicit",        "id": "filter_sermoexplicit",   "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Keyword",         "id": "filter_sermokeyword",    "enabled": False, "head_id": "filter_sermo"}, 
-                {"name": "Feast",           "id": "filter_sermofeast",      "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Bible reference", "id": "filter_bibref",          "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Note",            "id": "filter_sermonote",       "enabled": False, "head_id": "filter_sermo"},
-                {"name": "Status",          "id": "filter_sermostype",      "enabled": False, "head_id": "filter_sermo"},
+                {"name": "Gryson/Clavis/Other code","id": "filter_sermosignature",  "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Author",          "id": "filter_sermoauthor",     "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Incipit",         "id": "filter_sermoincipit",    "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Explicit",        "id": "filter_sermoexplicit",   "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Keyword",         "id": "filter_sermokeyword",    "enabled": False, "head_id": "filter_sermon"}, 
+                {"name": "Feast",           "id": "filter_sermofeast",      "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Bible reference", "id": "filter_bibref",          "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Note",            "id": "filter_sermonote",       "enabled": False, "head_id": "filter_sermon"},
+                {"name": "Status",          "id": "filter_sermostype",      "enabled": False, "head_id": "filter_sermon"},
                 # Section M
-                {"name": "Shelfmark",       "id": "filter_manuid",          "enabled": False, "head_id": "filter_manu"},
-                {"name": "Country",         "id": "filter_manucountry",     "enabled": False, "head_id": "filter_manu"},
-                {"name": "City",            "id": "filter_manucity",        "enabled": False, "head_id": "filter_manu"},
-                {"name": "Library",         "id": "filter_manulibrary",     "enabled": False, "head_id": "filter_manu"},
-                {"name": "Origin",          "id": "filter_manuorigin",      "enabled": False, "head_id": "filter_manu"},
-                {"name": "Provenance",      "id": "filter_manuprovenance",  "enabled": False, "head_id": "filter_manu"},
-                {"name": "Date range",      "id": "filter_manudaterange",   "enabled": False, "head_id": "filter_manu"},
-                {"name": "Keyword",         "id": "filter_manukeyword",     "enabled": False, "head_id": "filter_manu"},
-                {"name": "Status",          "id": "filter_manustype",       "enabled": False, "head_id": "filter_manu"},
+                {"name": "Shelfmark",       "id": "filter_manuid",          "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Country",         "id": "filter_manucountry",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "City/Location",   "id": "filter_manucity",        "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Library",         "id": "filter_manulibrary",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Origin",          "id": "filter_manuorigin",      "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Provenance",      "id": "filter_manuprovenance",  "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Date range",      "id": "filter_manudaterange",   "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Keyword",         "id": "filter_manukeyword",     "enabled": False, "head_id": "filter_manuscript"},
+                {"name": "Status",          "id": "filter_manustype",       "enabled": False, "head_id": "filter_manuscript"},
                 ]
             self.searches = [
                 {'section': '', 'filterlist': [
@@ -8965,11 +8970,11 @@ class CollectionListView(BasicList):
                     {'filter': 'project',       'fkfield': 'projects', 'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
                     ]},
                 # Section SSG
-                {'section': 'super', 'filterlist': [
+                {'section': 'authority_file', 'filterlist': [
                     {'filter': 'ssgauthor',    'fkfield': 'super_col__super__author',            
                      'keyS': 'ssgauthorname', 'keyFk': 'name', 'keyList': 'ssgauthorlist', 'infield': 'id', 'external': 'gold-authorname' },
                     {'filter': 'ssgincipit',   'dbfield': 'super_col__super__srchincipit',   'keyS': 'ssgincipit'},
-                    {'filter': 'ssgexplicit',  'dbfield': 'super_col__super__srchexplicit',  'keyS': 'ssgexplicit'},
+                    {'filter': 'ssgexplicit',  'dbfield': 'super_col__super__srchexplicit',  'keyS': 'ssgexplicit'},                    
                     {'filter': 'ssgcode',      'fkfield': 'super_col__super', 'keyFk': 'code',           
                      'keyS': 'ssgcode', 'keyList': 'ssgpassimlist', 'infield': 'id'},
                     {'filter': 'ssgnumber',    'dbfield': 'super_col__super__number',       'keyS': 'ssgnumber'},
@@ -8981,11 +8986,11 @@ class CollectionListView(BasicList):
                      'keyList': 'ssgstypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
                     ]},
                 # Section S
-                {'section': 'sermo', 'filterlist': [
+                {'section': 'sermon', 'filterlist': [
                     {'filter': 'sermoincipit',       'dbfield': 'super_col__super__equalgold_sermons__srchincipit',   'keyS': 'sermoincipit'},
                     {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
-                    {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},
-                    {'filter': 'sermofeast',         'dbfield': 'super_col__super__equalgold_sermons__feast',         'keyS': 'sermofeast'},
+                    {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},                    
+                    {'filter': 'sermofeast',         'fkfield': 'super_col__super__equalgold_sermons__feast', 'keyFk': 'name', 'keyList': 'sermofeastlist', 'infield': 'id'},
                     {'filter': 'bibref',             'dbfield': '$dummy',                                             'keyS': 'bibrefbk'},
                     {'filter': 'bibref',             'dbfield': '$dummy',                                             'keyS': 'bibrefchvs'},
                     {'filter': 'sermonote',          'dbfield': 'super_col__super__equalgold_sermons__additional',    'keyS': 'sermonote'},
@@ -8999,9 +9004,11 @@ class CollectionListView(BasicList):
                     {'filter': 'sermostype',         'dbfield': 'super_col__super__equalgold_sermons__stype',             
                      'keyList': 'sermostypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }                    ]},
                 # Section M
-                {'section': 'manu', 'filterlist': [
+                {'section': 'manuscript', 'filterlist': [
                     {'filter': 'manuid',        'fkfield': 'super_col__super__equalgold_sermons__msitem__manu',                   
                      'keyS': 'manuidno',    'keyFk': "idno", 'keyList': 'manuidlist', 'infield': 'id'},
+                    {'filter': 'manucountry',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
+                    {'filter': 'manucity',          'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
                     {'filter': 'manulibrary',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__library',                
                      'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
                     {'filter': 'manukeyword',       'fkfield': 'super_col__super__equalgold_sermons__msitem__manu__keywords',               
@@ -10535,10 +10542,10 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},
         {"name": "Passim code",     "id": "filter_code",             "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
-        {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},
         {"name": "Collection/Dataset...",   "id": "filter_collection",          "enabled": False, "head_id": "none"},
-        {"name": "Gryson or Clavis: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
-        {"name": "Gryson or Clavis: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Sermon...",       "id": "filter_sermon",           "enabled": False, "head_id": "none"},        
+        {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
         {"name": "Bible reference",         "id": "filter_bibref",              "enabled": False, "head_id": "filter_sermon"},
         {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "head_id": "filter_collection"},
@@ -10569,8 +10576,10 @@ class ManuscriptListView(BasicList):
             {'filter': 'project',       'fkfield': 'projects',               'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearstart__gte',         'keyS': 'date_from'},
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearfinish__lte',        'keyS': 'date_until'},
+            
             {'filter': 'code',          'fkfield': 'manuitems__itemsermons__sermondescr_super__super',    'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
+            
             {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'}
             ]},
@@ -11664,9 +11673,11 @@ class SermonGoldListView(BasicList):
              'keyFk': 'name',       'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'signature', 'fkfield': 'goldsignatures',    'keyS': 'signature',    'help': 'signature',
              'keyFk': 'code',       'keyList': 'siglist',   'keyId': 'signatureid', 'infield': 'code' },
+            
             {'filter': 'code',      'fkfield': 'equal',             'keyS': 'codetype',     'help': 'passimcode',      
              'keyFk': 'code',       'keyList': 'passimlist',  'infield': 'code'}, # passimlist
-            {'filter': 'keyword',   'fkfield': 'keywords',    'keyFk': 'name',  'keyList': 'kwlist',   'infield': 'name' },
+            
+             {'filter': 'keyword',   'fkfield': 'keywords',    'keyFk': 'name',  'keyList': 'kwlist',   'infield': 'name' },
             {'filter': 'project',   'fkfield': 'equal__projects',    'keyFk': 'name',  'keyList': 'projlist', 'infield': 'name'}, # view keyword
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' } 
             ]},
@@ -13167,14 +13178,14 @@ class EqualGoldListView(BasicList):
         {"name": "Incipit",         "id": "filter_incipit",           "enabled": False},
         {"name": "Explicit",        "id": "filter_explicit",          "enabled": False},
         {"name": "Passim code",     "id": "filter_code",              "enabled": False},
-        #{"name": "Number",          "id": "filter_number",            "enabled": False},
-        {"name": "Gryson/Clavis",   "id": "filter_signature",         "enabled": False},
+        #{"name": "Number",         "id": "filter_number",            "enabled": False},
+        {"name": "Gryson/Clavis/Other code","id": "filter_signature",         "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
-        {"name": "Sermon count",    "id": "filter_scount",            "enabled": False},
-        {"name": "Relation count",  "id": "filter_ssgcount",          "enabled": False},
+        {"name": "Manifestation count", "id": "filter_scount",        "enabled": False},
+        {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
-        {"name": "Collection...",   "id": "filter_collection",        "enabled": False, "head_id": "none"},
+        {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
@@ -13185,8 +13196,10 @@ class EqualGoldListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',   'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',  'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
+            
             {'filter': 'code',      'dbfield': 'code',              'keyS': 'code',     'help': 'passimcode',
              'keyList': 'passimlist', 'infield': 'id'},
+           
            # {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
            #  'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
             {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},

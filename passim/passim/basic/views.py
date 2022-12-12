@@ -1060,9 +1060,8 @@ class BasicList(ListView):
         for section in self.searches:
             oFsection = {}
             bHasValue = False
-            # Add filter section name
             section_name = section['section']
-            if section_name != "" and section_name not in fsections:
+            if section_name != "" and section_name not in fsections:          
                 oFsection = dict(name=section_name, has_value=False)
                 # fsections.append(dict(name=section_name))
             # Copy the relevant search filter
@@ -1468,7 +1467,6 @@ class BasicList(ListView):
 
     def view_queryset(self, qs):
         return None
-
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             # Do not allow to get a good response
