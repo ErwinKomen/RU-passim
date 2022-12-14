@@ -13808,7 +13808,7 @@ class AuthorEdit(BasicDetails):
     model = Author
     mForm = AuthorEditForm
     prefix = 'author'
-    title = "Author"
+    title = "People"
     mainitems = []
 
     def add_to_context(self, context, instance):
@@ -13845,19 +13845,21 @@ class AuthorListView(BasicList):
     prefix = "auth"
     paginate_by = 20
     delete_line = True
+    sg_name = "People"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
+    plural_name = "People"
     page_function = "ru.passim.seeker.search_paged_start"
     order_cols = ['abbr', 'number', 'name', '', '']
     order_default = ['name', 'abbr', 'number', '', '']
     order_heads = [{'name': 'Abbr',        'order': 'o=1', 'type': 'str', 
                     'title': 'Abbreviation of this name (used in standard literature)', 'field': 'abbr', 'default': ""},
                    {'name': 'Number',      'order': 'o=2', 'type': 'int', 'title': 'Passim author number', 'field': 'number', 'default': 10000, 'align': 'right'},
-                   {'name': 'Author name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
+                   {'name': 'Name', 'order': 'o=3', 'type': 'str', 'field': "name", "default": "", 'main': True, 'linkdetails': True},
                    {'name': 'Links',       'order': '',    'type': 'str', 'title': 'Number of links from Sermon Descriptions and Gold Sermons', 'custom': 'links' },
                    {'name': '',            'order': '',    'type': 'str', 'options': ['delete']}]
-    filters = [ {"name": "Author",  "id": "filter_author",  "enabled": False}]
+    filters = [ {"name": "People",  "id": "filter_people",  "enabled": False}]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'author', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }
+            {'filter': 'people', 'dbfield': 'name', 'keyS': 'author_ta', 'keyList': 'authlist', 'infield': 'name' }
             ]}
         ]
     downloads = [{"label": "Excel", "dtype": "xlsx", "url": 'author_results'},
@@ -13876,12 +13878,18 @@ class AuthorListView(BasicList):
             if number > 0:
                 url = reverse('search_gold')
                 html.append("<span class='badge jumbo-2' title='linked gold sermons'>")
-                html.append(" <a class='nostyle' href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
+                html.append("<a class='nostyle' href='{}?gold-author={}'>{}</a></span>".format(url, instance.id, number))
             number = instance.author_sermons.count()
             if number > 0:
                 url = reverse('sermon_list')
                 html.append("<span class='badge jumbo-1' title='linked sermon descriptions'>")
-                html.append(" <a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))
+                html.append("<a href='{}?sermo-author={}'>{}</a></span>".format(url, instance.id, number))           
+            number = instance.author_equalgolds.count()
+            if number > 0:
+                url = reverse('equalgold_list')
+                html.append("<span class='badge jumbo-4' title='linked authority file descriptions'>")
+                html.append("<a href='{}?ssg-author={}'>{}</a></span>".format(url, instance.id, number))               
+
             # Combine the HTML code
             sBack = "\n".join(html)
         return sBack, sTitle

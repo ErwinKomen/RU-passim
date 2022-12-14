@@ -4848,9 +4848,9 @@ class AuthorEditForm(forms.ModelForm):
 
 class AuthorSearchForm(forms.ModelForm):
     author_ta = forms.CharField(label=_("Author"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author name(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Person name(s)...', 'style': 'width: 100%;'}))
     authlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple persons...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors"]
 
 

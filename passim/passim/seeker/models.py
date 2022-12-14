@@ -6105,7 +6105,7 @@ class Author(models.Model):
 
     def __str__(self):
         return self.name
-
+    
     def find_or_create(sName):
         """Find an author or create it."""
 
