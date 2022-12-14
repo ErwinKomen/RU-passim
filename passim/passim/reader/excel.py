@@ -65,6 +65,7 @@ class ManuscriptUploadExcel(ReaderImport):
             # Get the contents of the imported file
             files = request.FILES.getlist('files_field')
             if files != None:
+                lst_err = []
                 for data_file in files:
                     filename = data_file.name
                     file_list.append(filename)
@@ -99,118 +100,159 @@ class ManuscriptUploadExcel(ReaderImport):
                             sheetnames = wb.sheetnames
                             ws_manu = None
                             ws_sermo = None
+                            lst_ws = []
                             for sname in sheetnames:
                                 if "manu" in sname.lower():
                                     ws_manu = wb[sname]
+                                    lst_ws.append(ws_manu)
                                 elif "sermo" in sname.lower():
                                     ws_sermo = wb[sname]
-                            # Do we have a manuscript worksheet?
-                            if ws_manu != None:
-                                # Process the manuscript-proper details: columns Name and Value
-                                oManu = {}
+                                    lst_ws.append(ws_sermo)
+
+                            # Check the contents of JSON coded cells
+                            err_json = []
+                            for ws in lst_ws:
                                 row_num = 1
-                                if ws_manu.cell(row=row_num, column=1).value.lower() == "field" and \
-                                   ws_manu.cell(row=row_num, column=2).value.lower() == "value":
-                                    # we can skip the first row
+                                for value_tuple in ws.iter_rows():
+                                    # ------------ DEBUGGING -----------------------
+                                    print("File={}, sheet={}, row={}".format(filename, ws.title, row_num))
+                                    # ----------------------------------------------
+                                    col_num = 1
+                                    for cell in value_tuple:
+                                        value = cell.value
+                                        if not value is None and isinstance(value, str) and value[0] == "[":
+                                            # This should be a json list
+                                            try:
+                                                lst_this = json.loads(value)
+                                            except:
+                                                # This one is bad...
+                                                oBad = dict(sheet=ws.title, row=row_num, column=col_num, coordinate=cell.coordinate, value=value)
+                                                err_json.append(oBad)
+                                        col_num += 1
+
                                     row_num += 1
-                                bStop = False
-                                while not bStop:
-                                    k = ws_manu.cell(row=row_num, column=1).value
-                                    v = ws_manu.cell(row=row_num, column=2).value
-                                    if k == "" or k == None:
-                                        bStop = True
-                                    else:
-                                        row_num += 1
-                                        k = k.lower()
-                                        oManu[k] = v
 
-                                params = {}
-                                # We have an object with key/value pairs: process it
-                                manu = Manuscript.custom_add(oManu, params, **kwargs)
+                            if len(err_json) > 0:
+                                # We cannot process this one
+                                html = []
+                                html.append("There were errors in the Excel {}:".format(filename))
+                                html.append("<table><thead><tr><th>Sheet</th><th>Cell</th><th>Value</th></tr></thead><tbody>")
+                                for oBad in err_json:
+                                    html.append("<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+                                        oBad['sheet'], oBad['coordinate'], oBad['value']))
+                                html.append("</tbody></table>")
+                                code = "\n".join(html)
+                                lst_err.append(code)
 
-                                # Now get the codicological unit that has been automatically created and adapt it
-                                codico = manu.manuscriptcodicounits.first()
-                                if codico != None:
-                                    oManu['manuscript'] = manu
-                                    codico = Codico.custom_add(oManu, **kwargs)
-
-                                oResult['count'] += 1
-                                oResult['obj'] = manu
-                                oResult['name'] = manu.idno
-
-                                # Check if there is a "Sermon" worksheet
-                                if ws_sermo != None:
-                                    # Get the column names
+                            else:
+                                # Do we have a manuscript worksheet?
+                                if ws_manu != None:
+                                    # Process the manuscript-proper details: columns Name and Value
+                                    oManu = {}
                                     row_num = 1
-                                    column = 1
-                                    header = []
-                                    v = ws_sermo.cell(row=row_num, column=column).value
-                                    while v != None and v != "" and v != "-":                                        
-                                        header.append(v.lower())
-                                        column += 1
-                                        v = ws_sermo.cell(row=row_num, column=column).value
-                                    # Process the sermons in this sheet
-                                    sermon_list = []
-                                    column = 1
-                                    row_num += 1
-                                    v = ws_sermo.cell(row=row_num, column=column).value
-                                    while v != "" and v != None:
-                                        # ==== DEBUG ====
-                                        oErr.Status("Upload excel row_num={}".format(row_num))
-                                        # ===============
-
-                                        # Create a new sermon object
-                                        oSermon = {}
-                                        # Process this row
-                                        for idx, col_name in enumerate(header):
-                                            column = idx + 1
-                                            oSermon[col_name] = ws_sermo.cell(row=row_num, column=column).value
-                                        # Process this sermon
-                                        order = oSermon['order']
-                                        sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
-
-                                        oResult['sermons'] += 1
-
-                                        # Get parent, firstchild, next
-                                        parent = oSermon['parent']
-                                        firstchild = oSermon['firstchild']
-                                        nextone = oSermon['next']
-                                        # Add to list
-                                        sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
-                                                            'next': nextone, 'sermon': sermon})
-                                        # GO to the next row for the next sermon
+                                    if ws_manu.cell(row=row_num, column=1).value.lower() == "field" and \
+                                        ws_manu.cell(row=row_num, column=2).value.lower() == "value":
+                                        # we can skip the first row
                                         row_num += 1
-                                        column = 1
-                                        v = ws_sermo.cell(row=row_num, column=column).value
+                                    bStop = False
+                                    while not bStop:
+                                        k = ws_manu.cell(row=row_num, column=1).value
+                                        v = ws_manu.cell(row=row_num, column=2).value
+                                        if k == "" or k == None:
+                                            bStop = True
+                                        else:
+                                            row_num += 1
+                                            k = k.lower()
+                                            oManu[k] = v
 
-                                    # Now process the parent/firstchild/next items
-                                    with transaction.atomic():
-                                        for oSermo in sermon_list:
-                                            # Get the p/f/n numbers
-                                            parent_id = oSermo['parent']
-                                            firstchild_id = oSermo['firstchild']
-                                            next_id = oSermo['next']
-                                            # Process parent
-                                            if parent_id != '' and parent_id != None:
-                                                # parent_id = str(parent_id)
-                                                parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
-                                                if not parent is None:
-                                                    oSermo['sermon'].msitem.parent = parent.msitem
-                                                    oSermo['sermon'].msitem.save()
-                                            # Process firstchild
-                                            if firstchild_id != '' and firstchild_id != None:
-                                                # firstchild_id = str(firstchild_id)
-                                                firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
-                                                if not firstchild is None:
-                                                    oSermo['sermon'].msitem.firstchild = firstchild.msitem
-                                                    oSermo['sermon'].msitem.save()
-                                            # Process next
-                                            if next_id != '' and next_id != None:
-                                                # next_id = str(next_id)
-                                                nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
-                                                if not nextone is None:
-                                                    oSermo['sermon'].msitem.next = nextone.msitem
-                                                    oSermo['sermon'].msitem.save()
+                                    params = {}
+                                    # We have an object with key/value pairs: process it
+                                    manu = Manuscript.custom_add(oManu, params, **kwargs)
+
+                                    # Now get the codicological unit that has been automatically created and adapt it
+                                    codico = manu.manuscriptcodicounits.first()
+                                    if codico != None:
+                                        oManu['manuscript'] = manu
+                                        codico = Codico.custom_add(oManu, **kwargs)
+
+                                    oResult['count'] += 1
+                                    oResult['obj'] = manu
+                                    oResult['name'] = manu.idno
+
+                                    # Check if there is a "Sermon" worksheet
+                                    if ws_sermo != None:
+                                        # Get the column names
+                                        row_num = 1
+                                        column = 1
+                                        header = []
+                                        v = ws_sermo.cell(row=row_num, column=column).value
+                                        while v != None and v != "" and v != "-":                                        
+                                            header.append(v.lower())
+                                            column += 1
+                                            v = ws_sermo.cell(row=row_num, column=column).value
+                                        # Process the sermons in this sheet
+                                        sermon_list = []
+                                        column = 1
+
+                                        # Iterate over the rows
+                                        for row in ws_sermo.iter_rows():
+                                            row_values = [x.value for x in row]
+                                            v = row_values[0]
+                                            if row_num > 1 and not v is None and v!= "":
+                                                # ==== DEBUG ====
+                                                oErr.Status("Upload excel row_num={}".format(row_num))
+                                                # ===============
+                                                
+                                                # Create a new sermon object
+                                                oSermon = {}
+                                                # Process this row
+                                                for idx, col_name in enumerate(header):
+                                                    column = idx + 1
+                                                    oSermon[col_name] = row_values[idx]
+                                                # Process this sermon
+                                                order = oSermon['order']
+                                                sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
+
+                                                oResult['sermons'] += 1
+
+                                                # Get parent, firstchild, next
+                                                parent = oSermon['parent']
+                                                firstchild = oSermon['firstchild']
+                                                nextone = oSermon['next']
+                                                # Add to list
+                                                sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
+                                                                    'next': nextone, 'sermon': sermon})
+                                            # GO to the next row for the next sermon
+                                            row_num += 1
+
+                                        # Now process the parent/firstchild/next items
+                                        with transaction.atomic():
+                                            for oSermo in sermon_list:
+                                                # Get the p/f/n numbers
+                                                parent_id = oSermo['parent']
+                                                firstchild_id = oSermo['firstchild']
+                                                next_id = oSermo['next']
+                                                # Process parent
+                                                if parent_id != '' and parent_id != None:
+                                                    # parent_id = str(parent_id)
+                                                    parent = next((obj['sermon'] for obj in sermon_list if obj['order'] == parent_id), None)
+                                                    if not parent is None:
+                                                        oSermo['sermon'].msitem.parent = parent.msitem
+                                                        oSermo['sermon'].msitem.save()
+                                                # Process firstchild
+                                                if firstchild_id != '' and firstchild_id != None:
+                                                    # firstchild_id = str(firstchild_id)
+                                                    firstchild = next((obj['sermon'] for obj in sermon_list if obj['order'] == firstchild_id), None)
+                                                    if not firstchild is None:
+                                                        oSermo['sermon'].msitem.firstchild = firstchild.msitem
+                                                        oSermo['sermon'].msitem.save()
+                                                # Process next
+                                                if next_id != '' and next_id != None:
+                                                    # next_id = str(next_id)
+                                                    nextone = next((obj['sermon'] for obj in sermon_list if obj['order'] == next_id), None)
+                                                    if not nextone is None:
+                                                        oSermo['sermon'].msitem.next = nextone.msitem
+                                                        oSermo['sermon'].msitem.save()
 
 
                         # Create a report and add it to what we return
@@ -223,7 +265,13 @@ class ManuscriptUploadExcel(ReaderImport):
                             self.arErr.append("There was an error. No manuscripts have been added")
                         else:
                             lResults.append(oResult)
-            code = "Imported using the [import_excel] function on this filew: {}".format(", ".join(file_list))
+
+                if len(lst_err) > 0:
+                    # code = json.dumps(lst_err, indent=2)
+                    code = "\n".join(lst_err)
+                    bOkay = False
+            if code == "":
+                code = "Imported using the [import_excel] function on this filew: {}".format(", ".join(file_list))
         except:
             bOkay = False
             code = oErr.get_error_message()
