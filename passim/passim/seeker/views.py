@@ -4549,7 +4549,7 @@ class SermonEdit(BasicDetails):
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
                     # AltPageNumber HIER
-                    {'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
+                    #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
             # IN all cases

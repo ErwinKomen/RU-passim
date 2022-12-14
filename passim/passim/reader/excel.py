@@ -225,36 +225,6 @@ class ManuscriptUploadExcel(ReaderImport):
                                             # GO to the next row for the next sermon
                                             row_num += 1
 
-                                        #v = ws_sermo.cell(row=row_num, column=column).value
-                                        #while v != "" and v != None:
-                                        #    # ==== DEBUG ====
-                                        #    oErr.Status("Upload excel row_num={}".format(row_num))
-                                        #    # ===============
-
-                                        #    # Create a new sermon object
-                                        #    oSermon = {}
-                                        #    # Process this row
-                                        #    for idx, col_name in enumerate(header):
-                                        #        column = idx + 1
-                                        #        oSermon[col_name] = ws_sermo.cell(row=row_num, column=column).value
-                                        #    # Process this sermon
-                                        #    order = oSermon['order']
-                                        #    sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
-
-                                        #    oResult['sermons'] += 1
-
-                                        #    # Get parent, firstchild, next
-                                        #    parent = oSermon['parent']
-                                        #    firstchild = oSermon['firstchild']
-                                        #    nextone = oSermon['next']
-                                        #    # Add to list
-                                        #    sermon_list.append({'order': order, 'parent': parent, 'firstchild': firstchild,
-                                        #                        'next': nextone, 'sermon': sermon})
-                                        #    # GO to the next row for the next sermon
-                                        #    row_num += 1
-                                        #    column = 1
-                                        #    v = ws_sermo.cell(row=row_num, column=column).value
-
                                         # Now process the parent/firstchild/next items
                                         with transaction.atomic():
                                             for oSermo in sermon_list:
