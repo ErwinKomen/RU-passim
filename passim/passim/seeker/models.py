@@ -8873,6 +8873,10 @@ class SermonDescr(models.Model):
                     field_lower = field.lower()
                     if keyfield == "path" and oField.get("type") == "fk_id":
                         field = "{}_id".format(field)
+                    # Make sure we get the field in [oSermo], even if it is lower case
+                    if not field in oSermo:
+                        field = field_lower
+                    # Only now try to get at the value
                     value = oSermo.get(field)
                     readonly = oField.get('readonly', False)
                 
@@ -9011,6 +9015,11 @@ class SermonDescr(models.Model):
             value_lst = []
             if isinstance(value, str):
                 if value[0] == '[':
+                    # One more sanity check
+                    if value != "[]":
+                        if not '"' in value:
+                            # Put everything inside in quotation marks
+                            value = '["{}"]'.format(value[1:-1])
                     # Make list from JSON
                     value_lst = json.loads(value)
                 else:
@@ -9036,7 +9045,10 @@ class SermonDescr(models.Model):
                         collection = Collection.objects.create(name=ds_name, owner=profile, type="sermo", settype="pd")
                     # Add manuscript to collection
                     highest = collection.collections_sermon.all().order_by('-order').first()
-                    order = 1 if higest == None else highest + 1
+                    if highest != None and highest.order >= 0:
+                        order = highest.order + 1
+                    else:
+                        order = 1
                     CollectionSerm.objects.create(collection=collection, sermon=self, order=order)
             elif path == "keywordsU":
                 # Get the list of keywords
