@@ -37,7 +37,7 @@ ABBR_LENGTH = 5
 # ================================ For working with HUWA ==========================
 
 
-class Author(models.Model):
+class SimpleAuthor(models.Model):
     """Simplified author specific for HUWA"""
 
     # [1] The Author's full name
@@ -51,7 +51,7 @@ class Author(models.Model):
         sBack = self.full
 
 
-class Location(models.Model):
+class SimpleLocation(models.Model):
     """Simplified location specific for HUWA"""
 
     # [1] The location's city
@@ -89,10 +89,10 @@ class Edition(models.Model):
     reihekurz = models.TextField("Series short", blank=True, default="")
 
     # [0-1] Link to a location
-    location = models.ForeignKey(Location, on_delete=models.SET_NULL, blank=True, null=True, related_name="locationeditions")
+    slocation = models.ForeignKey(SimpleLocation, on_delete=models.SET_NULL, blank=True, null=True, related_name="locationeditions")
 
     # [0-1] Link to the name of an author
-    author = models.ForeignKey(Author, on_delete=models.SET_NULL, blank=True, null=True, related_name="authoreditions")
+    sauthor = models.ForeignKey(SimpleAuthor, on_delete=models.SET_NULL, blank=True, null=True, related_name="authoreditions")
 
     def __str__(self):
         sName = "-"
@@ -107,6 +107,139 @@ class Edition(models.Model):
         else:
             sName = "edition_{}".format(self.edition)
         return sName
+
+    def set_location(self, oLocation):
+        """Get or create the [simple location] specified in [oLocation] and add a FK in this edition"""
+
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # A location may be:
+            # - plain string => that should be 'city'
+            # - 'city'
+            # - 'country'
+            if not oLocation is None:
+                sCountry = None
+                sCity = None
+                obj = None
+                if isinstance(oLocation, str):
+                    # This is a simple string
+                    sCity = oLocation
+                else:
+                    sCity = oLocation.get("city")
+                    sCountry = oLocation.get("country")
+
+                # Process city and possibly country
+                if not sCity is None:
+                    if sCountry is None:
+                        # Try to find it
+                        obj = SimpleLocation.objects.filter(city__iexact=sCity).first()
+                        if obj is None:
+                            # Create it
+                            obj = SimpleLocation.objects.create(city=sCity)
+                    else:
+                        # Both city and country
+                        obj = SimpleLocation.objects.filter(city__iexact=sCity, country__iexact=sCountry).first()
+                        if obj is None:
+                            # Create it
+                            obj = SimpleLocation.objects.create(city=sCity, country=sCountry)
+                elif not sCountry is None:
+                    # Just the country...
+                    obj = SimpleLocation.objects.filter(country__iexact=sCountry).first()
+                    if obj is None:
+                        # Create it
+                        obj = SimpleLocation.objects.create(country=sCountry)
+
+                # Attach to me
+                if not obj is None:
+                    self.slocation = obj
+                    # (Saving of [self] will be done by the caller)
+
+        except:
+            msg = oErr.DoError()
+            oErr.DoError("set_location")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def set_author(self, oAuthor):
+        """Get or create the [simple author] specified in [oAuthor] and add a FK in this edition"""
+
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # The author must have 'full', and it may have 'name' (last name) and/or 'firstname'
+            if not oAuthor is None:
+                sFull = oAuthor.get("full")
+                sName = oAuthor.get("name")
+                sFirstname = oAuthor.get("firstname")
+                # Try to find it
+                lstQ = []
+                lstQ.append(Q(full__iexact=sFull))
+                if not sName is None:
+                    lstQ.append(Q(name__iexact=sName))
+                if not sFirstname is None:
+                    lstQ.append(Q(firstname__iexact=sFirstname))
+                obj = SimpleAuthor.objects.filter(*lstQ).first()
+                if obj is None:
+                    # Create it
+                    obj = SimpleAuthor.objects.create(full=sFull)
+                    bNeedSaving = False
+                    if not sName is None:
+                        obj.name = sName
+                        bNeedSaving = True
+                    if not sFirstname is None:
+                        obj.firstname = sFirstname
+                        bNeedSaving = True
+                    if bNeedSaving:
+                        obj.save()
+                # Set the link
+                if not obj is None:
+                    self.sauthor = obj
+                    # (Saving of [self] will be done by the caller)
+        except:
+            msg = oErr.DoError()
+            oErr.DoError("set_author")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def add_locus(self, oLocus):
+        """Create the [Locus] specified in [oLocus] and link it with an FK to [self]"""
+
+        oErr = ErrHandle()
+        bResult = True
+        specification = ["cap", "explicit", "incipit"]
+        try:
+            # The locus must have page and line, but may have cap, explicit and incipit
+            if not oLocus is None:
+                sPage = oLocus.get("page")
+                sLine = oLocus.get("line")
+                # See if it is there already
+                obj = Locus.objects.filter(huwaedition=self, page=sPage, line=sLine).first()
+                if obj is None:
+                    # Create it
+                    obj = Locus.objects.create(huwaedition=self, page=sPage, line=sLine)
+
+                    # Add other elements, if specified
+                    bNeedSaving = False
+                    for field in specification:
+                        value = oLocus.get(field)
+                        if not value is None:
+                            setattr(obj, field,value)
+                            bNeedSaving = True
+                    if bNeedSaving:
+                        obj.save()
+        except:
+            msg = oErr.DoError()
+            oErr.DoError("add_locus")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
 
 
 class Locus(models.Model):

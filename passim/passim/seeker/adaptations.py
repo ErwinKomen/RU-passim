@@ -536,6 +536,7 @@ def adapt_huwaeditions():
 
     oErr = ErrHandle()
     bResult = True
+    bDebug = True
     msg = ""
     specification = ['title', 'literaturtitel', 'pp', 'year', 'band', 'reihetitel', 'reihekurz']
 
@@ -549,6 +550,15 @@ def adapt_huwaeditions():
             opera_id = oEdition.get("opera")
             # Sanity check
             if not edition_id is None and not opera_id is None:
+                # ================ DEBUG ==================
+                if edition_id == 82:
+                    iStop = 1
+                # =========================================
+
+                # Show where we are
+                if bDebug:
+                    oErr.Status("Edition {}".format(edition_id))
+
                 # Check if this is not yet processed
                 obj = Edition.objects.filter(edition=edition_id, opera=opera_id).first()
                 if obj is None:
@@ -569,7 +579,7 @@ def adapt_huwaeditions():
                     oAuthor = oEdition.get("author")
                     if not oAuthor is None:
                         # Get the handle to the author
-                        obj.set_author(oLocation)
+                        obj.set_author(oAuthor)
 
                     # Walk through any loci
                     lst_loci = oEdition.get("loci", [])
