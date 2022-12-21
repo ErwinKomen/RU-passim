@@ -3485,7 +3485,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     handschrift_id = str(oFasc.get("handschrift"))
                     if not handschrift_id in oFascHandschrift:
                         oFascHandschrift[handschrift_id] = []
-                    oFascHandschrift[handschrift_id].append(oFasc['fasc_name'])
+                    oFascHandschrift[handschrift_id].append(str(oFasc['fasc_name']))
 
                 # Turn [faszikel] into a dictionary
                 oFaszikels = {str(x['id']): x['faszikel_name'] for x in tables['faszikel']}
@@ -3513,6 +3513,15 @@ class EqualGoldHuwaToJson(BasicPart):
                         oSiglenHandschrift[handschrift_id] = []
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSiglenHandschrift[handschrift_id].append(oSiglen)
+
+                # Process [siglen_edd]
+                oSiglenEddItems = {}
+                for oSiglenEdd in tables['siglen_edd']:
+                    editionen_id = str(oSiglenEdd.get("editionen"))
+                    if not editionen_id in oSiglenEddItems:
+                        oSiglenEddItems[editionen_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
 
                 # Turn [zeilen_bem] into a dictionary
                 oZeilenBemHandschrift = {}
@@ -3687,17 +3696,31 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Possibly add siglen + editionen
                     lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
                     if len(lst_siglen) > 0:
+                        lst_edition = []
                         for oSiglen in lst_siglen:
                             # Get the [editionen] ID
                             sEdi = str(oSiglen['editionen'])
+                            sSigle = oSiglen.get("sigle", "")
                             if sEdi in oEdilitItems:
-                                oSiglen['edilit'] = copy.copy(oEdilitItems[sEdi])
-                            # Use the [editionen] ID to get stuff from [siglen_edd]
-                            if sEdi in oSiglenEddItems:
-                                oSiglen['edd'] = copy.copy( oSiglenEddItems[sEdi])
+                                # Get a coy of this edition
+                                oEdition = copy.copy(oEdilitItems[sEdi])
+                                # Start a list of sigles
+                                lst_sigle = [ sSigle]
+                                # Use the [editionen] ID to get stuff from [siglen_edd]
+                                if sEdi in oSiglenEddItems:
+                                    for oSigle in oSiglenEddItems[sEdi]:
+                                        sSigle = oSigle.get("sigle", "")
+                                        sBem = oSigle.get("bemerkungen", "")
+                                        lit_x = oSigle.get("literatur_x", "")
+                                        if sBem != "":
+                                            sSigle = "{} ({})".format(sSigle, sBem)
+                                        lst_sigle.append(sSigle)
+                                # Add the sigle to this edtion
+                                oEdition['sigle'] = ", ".join(lst_sigle)
+                                lst_edition.append(oEdition)
 
                         # Note: This information should be added to the manuscripts in the form of a note “Used for [edition reference]”.
-                        oManuscript['siglen'] = lst_siglen
+                        oManuscript['editions'] = lst_edition
 
                     # Possibly add Zweitsignatur
                     lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
@@ -3815,21 +3838,21 @@ class EqualGoldHuwaToJson(BasicPart):
                             codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
-                    # Process Siglen into codico_notes
-                    codico_notes = []
-                    oSiglens = oSiglenHandschrift.get(sHandschriftId)
-                    if not oSiglens is None:
-                        for oSiglen in oSiglens:
-                            sBem = oSiglen.get("bemerkungen")
-                            sSigle = oSiglen.get("sigle")
-                            sEdition = XX
+                    ## Process Siglen into codico_notes
+                    #codico_notes = []
+                    #oSiglens = oSiglenHandschrift.get(sHandschriftId)
+                    #if not oSiglens is None:
+                    #    for oSiglen in oSiglens:
+                    #        sBem = oSiglen.get("bemerkungen")
+                    #        sSigle = oSiglen.get("sigle")
+                    #        sEdition = XX
 
-                            lCombi = []
-                            if not sSigle is None:
-                                lCombi.append(sSigle)
-                            if not sBem is None:
-                                lCombi.append("({})".format(sBem))
-                            codico_notes.append(" ".join(lCombi))
+                    #        lCombi = []
+                    #        if not sSigle is None:
+                    #            lCombi.append(sSigle)
+                    #        if not sBem is None:
+                    #            lCombi.append("({})".format(sBem))
+                    #        codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
                     # Get and walk through the contents of this Handschrift
@@ -3983,15 +4006,6 @@ class EqualGoldHuwaToJson(BasicPart):
                 oVerfasser = { str(x['id']):x for x in tables['verfasser']}
                 oIncipit = { str(x['id']):x['incipit_text'] for x in tables['incipit']}
                 oExplicit = { str(x['id']):x['desinit_text'] for x in tables['desinit']}
-
-                # Process [siglen_edd]
-                oSiglenEddItems = {}
-                for oSiglenEdd in tables['siglen_edd']:
-                    editionen_id = str(oSiglenEdd.get("editionen"))
-                    if not editionen_id in oSiglenEddItems:
-                        oSiglenEddItems[editionen_id] = []
-                    # Add the whole object there, with fields @name and @bemerkungen
-                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
 
                 # Start creating a list of edition literature
                 lst_ssg_edi = []
@@ -5125,7 +5139,7 @@ class EqualGoldHuwaToJson(BasicPart):
             with open(edilit_json, "r", encoding="utf-8") as f:
                 lst_edilit = json.load(f)
             # Process the list into a dictionary
-            if not oEdilit is None:
+            if not lst_edilit is None:
                 dict_edilit = {str(x['edition']): x for x in lst_edilit}
         except:
             msg = oErr.get_error_message()

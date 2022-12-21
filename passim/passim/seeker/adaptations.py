@@ -26,12 +26,14 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionProject, EqualGoldProject, OnlineSources, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
+from passim.reader.models import Edition
 
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges'],
+                        'codico_origin', 'import_onlinesources', 'dateranges',
+                        'huwaeditions'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
@@ -508,6 +510,74 @@ def adapt_codico_origin():
                 codico.origin = None
                 codico.save()
  
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def read_huwa_edilit():
+    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+
+    oErr = ErrHandle()
+    try:
+        lst_edilit = None
+        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
+        with open(edilit_json, "r", encoding="utf-8") as f:
+            lst_edilit = json.load(f)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adaptations.read_huwa_edilit")
+    # Return the table that we found
+    return lst_edilit
+
+def adapt_huwaeditions():
+    """See the reader app. This basically loads a JSON into the Huwa [Edition] table"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    specification = ['title', 'literaturtitel', 'pp', 'year', 'band', 'reihetitel', 'reihekurz']
+
+    try:
+        # Read the HUWA edilit
+        lst_edilit = read_huwa_edilit()
+        # Process this table
+        for oEdition in lst_edilit:
+            # Get the obligatory edition id and opera id
+            edition_id = oEdition.get("edition")
+            opera_id = oEdition.get("opera")
+            # Sanity check
+            if not edition_id is None and not opera_id is None:
+                # Check if this is not yet processed
+                obj = Edition.objects.filter(edition=edition_id, opera=opera_id).first()
+                if obj is None:
+                    # This has not been read
+                    obj = Edition.objects.create(edition=edition_id, opera=opera_id)
+                    # Add the other optional elements
+                    for sField in specification:
+                        value = oEdition.get(sField)
+                        if not value is None and value != "":
+                            setattr(obj, sField, value)
+                    # Look for location stuff
+                    oLocation = oEdition.get("location")
+                    if not oLocation is None:
+                        # Get the handle to the location
+                        obj.set_location(oLocation)
+
+                    # Look for author stuff
+                    oAuthor = oEdition.get("author")
+                    if not oAuthor is None:
+                        # Get the handle to the author
+                        obj.set_author(oLocation)
+
+                    # Walk through any loci
+                    lst_loci = oEdition.get("loci", [])
+                    for oLoci in lst_loci:
+                        obj.add_locus(oLoci)
+
+                    # Now make sure to save the adapted object
+                    obj.save()
 
     except:
         bResult = False
