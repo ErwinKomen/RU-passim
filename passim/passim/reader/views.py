@@ -2980,7 +2980,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return author_id, msg
 
-        def get_extent(oHandschrift, oFF):
+        def get_extent(oHandschrift, oFF, oZB):
             """Derive an Extent description of the manuscript"""
 
             sBack = ""
@@ -3022,6 +3022,11 @@ class EqualGoldHuwaToJson(BasicPart):
                 if zeilen != "":
                     if len(html) != 0: html.append(" ")
                     html.append("{} lines per page/column".format(zeilen))
+                    # Check for zeilen bemerkungen
+                    if sId in oZB:
+                        zeilenbem = oZB[sId]
+                        # Append to the above
+                        html.append(" (note: {})".format(zeilenbem))
 
                 # Look for comments
                 if sId in oFF:
@@ -3509,6 +3514,24 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSiglenHandschrift[handschrift_id].append(oSiglen)
 
+                # Turn [zeilen_bem] into a dictionary
+                oZeilenBemHandschrift = {}
+                for oZeilenBem in tables['zeilen_bem']:
+                    handschrift_id = str(oZeilenBem.get("handschrift"))
+                    if not handschrift_id in oZeilenBemHandschrift:
+                        oZeilenBemHandschrift[handschrift_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oZeilenBemHandschrift[handschrift_id].append(oZeilenBem)
+
+                # Turn [zweitsignatur] into a dictionary
+                oZweitSigHandschrift = {}
+                for oZweitSig in tables['zweitsignatur']:
+                    handschrift_id = str(oZweitSig.get("handschrift"))
+                    if not handschrift_id in oZweitSigHandschrift:
+                        oZweitSigHandschrift[handschrift_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oZweitSigHandschrift[handschrift_id].append(oZweitSig)
+
                 # Transform the ff_bem table into a dictionary around [handschrift]
                 oFFbemHandschrift = {}
                 for oBem in tables['ff_bem']:
@@ -3648,7 +3671,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     # (1) Support = material
                     oManuscript['support'] = get_support(oInhaltHandschrift, oSupport, oMatBemHandschrift.get(sHandschriftId))
                     # (2) Extent: use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
-                    oManuscript['extent'] = get_extent(oHandschrift, oFFbemHandschrift)
+                    oManuscript['extent'] = get_extent(oHandschrift, oFFbemHandschrift, oZeilenBemHandschrift)
                     # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
                     oManuscript['format'] = get_format(oHandschrift, oFormatBemHandschrift)
 
@@ -3662,13 +3685,39 @@ class EqualGoldHuwaToJson(BasicPart):
                             oManuscript['notes'] = notes
 
                     # Possibly add siglen + editionen
-                    lst_siglen = oSiglenHandschrift[sHandschriftId]
+                    lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
                     if len(lst_siglen) > 0:
                         for oSiglen in lst_siglen:
+                            # Get the [editionen] ID
                             sEdi = str(oSiglen['editionen'])
                             if sEdi in oEdilitItems:
                                 oSiglen['edilit'] = copy.copy(oEdilitItems[sEdi])
+                            # Use the [editionen] ID to get stuff from [siglen_edd]
+                            if sEdi in oSiglenEddItems:
+                                oSiglen['edd'] = copy.copy( oSiglenEddItems[sEdi])
+
+                        # Note: This information should be added to the manuscripts in the form of a note “Used for [edition reference]”.
                         oManuscript['siglen'] = lst_siglen
+
+                    # Possibly add Zweitsignatur
+                    lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
+                    if len(lst_zweits) > 0:
+                        lst_zwcombi = []
+                        for oZweits in lst_zweits:
+                            # Combine the name and the remark
+                            bem = oZweits.get("bemerkungen", "")
+                            sZweits = oZweits.get("name", "")
+                            if bem == "":
+                                lst_zwcombi.append(sZweits)
+                            else:
+                                lst_zwcombi.append("{} ({})".format(sZweits, bem))
+                        # Combine into a semicolumn separated string
+                        sCombi = "Old shelfmark(s): {}".format("; ".join(lst_zwcombi))
+                        # Add as notes
+                        notes = oManuscript.get("notes")
+                        if not notes is None and notes != "":
+                            notes = "{}; {}".format(notes, sCombi)
+                        oManuscript['notes'] = notes
 
                     # Figure out library and location
                     bibliothek_id = oHandschrift.get("bibliothek")
