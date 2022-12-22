@@ -106,6 +106,48 @@ class Literatur(models.Model):
         sName = "{}.{}".format(self.huwatable, self.huwaid)
         return sName
 
+    def get_view(self):
+        """Get a view of this edition"""
+
+        def do_append(html, field, fk = None):
+            if fk is None:
+                value = getattr(self, field)
+                if not value is None and value != "":
+                    html.append(value)
+            else:
+                obj = getattr(self, fk)
+                if not obj is None:
+                    value = getattr(obj, field)
+                    if not value is None and value != "":
+                        html.append(value)
+            return None
+
+        html = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            do_append(html, "full", "sauthor")
+            do_append(html, "year")
+            do_append(html, "reihekurz")
+            do_append(html, "pp")
+            sTitel = "-"
+            if not self.reihetitel is None and self.reihetitel != "":
+                sTitel = self.reihetitel
+            elif not self.literaturtitel is None and self.literaturtitel != "":
+                sTitel = self.literaturtitel
+            elif not self.title is None and self.title != "":
+                sTitel = self.title
+            html.append(sTitel)
+            do_append(html, "band")
+            do_append(html, "city", "slocation")
+
+            # Get the literature object
+            sBack = ", ".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Literatur/get_view")
+        return sBack
+
     def set_location(self, oLocation):
         """Get or create the [simple location] specified in [oLocation] and add a FK in this edition"""
 
@@ -271,6 +313,12 @@ class Edition(models.Model):
 
         # REturn the result
         return bResult
+
+    def get_edition_view(self):
+        """Get a view of this edition"""
+
+        sBack = self.literatur.get_view()
+        return sBack
 
 
 class Locus(models.Model):

@@ -3444,8 +3444,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
 
-                # (6b) Read the Edilit information
-                oEdilitItems = self.read_huwa_edilit()
+                ## (6b) Read the Edilit information
+                #oEdilitItems = self.read_huwa_edilit()
 
                 # Read other HUWA info: annus = year of 'handschrift'
                 oDates = {}
@@ -3702,9 +3702,14 @@ class EqualGoldHuwaToJson(BasicPart):
                             # Get the [editionen] ID
                             sEdi = str(oSiglen['editionen'])
                             sSigle = oSiglen.get("sigle", "")
-                            if sEdi in oEdilitItems:
-                                # Get a coy of this edition
-                                oEdition = copy.copy(oEdilitItems[sEdi])
+                            sBem = oSiglen.get("bemerkungen")
+                            # Get the 'Edition' object for this
+                            obj_edi = Edition.objects.filter(editionid=sEdi).first()
+                            if not obj_edi is None:
+                                # Create an initial edition object
+                                oEdition = dict(edition=obj_edi.id)
+                                if not sBem is None and sBem != "":
+                                    sSigle = "{} ({})".format(sSigle, sBem)
                                 # Start a list of sigles
                                 lst_sigle = [ sSigle]
                                 # Use the [editionen] ID to get stuff from [siglen_edd]
@@ -5147,24 +5152,24 @@ class EqualGoldHuwaToJson(BasicPart):
         # Return the table that we found
         return dict_operapassim
 
-    def read_huwa_edilit(self):
-        """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+    #def read_huwa_edilit(self):
+    #    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
 
-        oErr = ErrHandle()
-        dict_edilit = {}
-        try:
-            lst_edilit = None
-            edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-            with open(edilit_json, "r", encoding="utf-8") as f:
-                lst_edilit = json.load(f)
-            # Process the list into a dictionary
-            if not lst_edilit is None:
-                dict_edilit = {str(x['edition']): x for x in lst_edilit}
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
-        # Return the table that we found
-        return dict_edilit
+    #    oErr = ErrHandle()
+    #    dict_edilit = {}
+    #    try:
+    #        lst_edilit = None
+    #        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
+    #        with open(edilit_json, "r", encoding="utf-8") as f:
+    #            lst_edilit = json.load(f)
+    #        # Process the list into a dictionary
+    #        if not lst_edilit is None:
+    #            dict_edilit = {str(x['edition']): x for x in lst_edilit}
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
+    #    # Return the table that we found
+    #    return dict_edilit
 
     def read_huwa_conv_sig(self):
         """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""
