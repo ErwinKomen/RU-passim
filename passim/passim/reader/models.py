@@ -64,13 +64,21 @@ class SimpleLocation(models.Model):
         sBack = self.city
 
 
-class Edition(models.Model):
-    """This hosts the gist of HUWA's [editionen] table, as combined with other tables"""
+class Literatur(models.Model):
+    """This hosts the gist of HUWA's [literatur] table, as combined with other tables
+    
+    HUWA: the specific tables that will be in here are:
+        literatur
+        bloomfield
+        shoenberger
+        stegemueller
+        huwa            - this is for intra-HUWA cross-referencing
+    """
 
-    # [1] Should have the original [edition] id field
-    edition = models.IntegerField("Edition ID")
-    # [1] Like the HUWA table, it should always be connected with an [opera] id
-    opera = models.IntegerField("Opera ID")
+    # [1] Should have the original [literatur] id field or [bloomfield] and so forth
+    huwaid = models.IntegerField("Huwa ID")
+    # [1] The external table name from which this literature comes: literatur, bloomfield etc
+    huwatable = models.CharField("Huwa table name", max_length = LONG_STRING)
 
     # [0-1] Title 
     title = models.TextField("Title", blank=True, default="")
@@ -95,17 +103,7 @@ class Edition(models.Model):
     sauthor = models.ForeignKey(SimpleAuthor, on_delete=models.SET_NULL, blank=True, null=True, related_name="authoreditions")
 
     def __str__(self):
-        sName = "-"
-        if not self.title is None and self.title != "":
-            sName = self.title
-        elif not self.literaturtitel is None and self.literaturtitel != "":
-            sName = self.literaturtitel
-        elif not self.reihetitel is None and self.reihetitel != "":
-            sName = self.reihetitel
-        elif not self.reihekurz is None and self.reihekurz != "":
-            sName = self.reihekurz
-        else:
-            sName = "edition_{}".format(self.edition)
+        sName = "{}.{}".format(self.huwatable, self.huwaid)
         return sName
 
     def set_location(self, oLocation):
@@ -206,6 +204,40 @@ class Edition(models.Model):
         # REturn the result
         return bResult
 
+
+class OperaLit(models.Model):
+    """Connection between table [opera] and [literatur] in Huwa
+    
+    This table is used to host Stegmueller, Bloomfield, Schoenberger connections
+    """
+
+    # [1] Like the HUWA table, it should always be connected with an [opera] id
+    operaid = models.IntegerField("Opera ID")
+    # [1] An edition must also connect with something from the [Literatur] table
+    literatur = models.ForeignKey(Literatur, on_delete=models.CASCADE, related_name="literatur_operalits")
+
+    def __str__(self):
+        sName = "{}.{}: {}".format(self.literatur.huwatable, self.literatur.huwaid, self.operaid)
+        return sName
+
+
+class Edition(models.Model):
+    """This hosts the gist of HUWA's [editionen] table, as combined with other tables
+    
+    HUWA: this table links to [literatur] as well as to [opera]
+    """
+
+    # [1] Should have the original [edition] id field
+    editionid = models.IntegerField("Edition ID")
+    # [1] Like the HUWA table, it should always be connected with an [opera] id
+    operaid = models.IntegerField("Opera ID")
+    # [1] An edition must also connect with something from the [Literatur] table
+    literatur = models.ForeignKey(Literatur, on_delete=models.CASCADE, related_name="literatur_editions")
+
+    def __str__(self):
+        sName = "{}".format(self.editionid)
+        return sName
+
     def add_locus(self, oLocus):
         """Create the [Locus] specified in [oLocus] and link it with an FK to [self]"""
 
@@ -241,9 +273,11 @@ class Edition(models.Model):
         return bResult
 
 
-
 class Locus(models.Model):
-    """One locus is a place inside one Edition, optionally specifying an inc, exp or cap"""
+    """One locus is a place inside one Edition, optionally specifying an inc, exp or cap.
+    
+    HUWA: this is table [loci], which links with [editionen]
+    """
 
     # [1] Link to the edition
     huwaedition = models.ForeignKey(Edition, on_delete=models.CASCADE, related_name="editionloci")

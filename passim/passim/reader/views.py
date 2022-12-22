@@ -57,6 +57,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     Collection, CollectionSuper, CollectionGold, LocationRelation, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
+from passim.reader.models import Edition, Literatur
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -4007,6 +4008,16 @@ class EqualGoldHuwaToJson(BasicPart):
                 oIncipit = { str(x['id']):x['incipit_text'] for x in tables['incipit']}
                 oExplicit = { str(x['id']):x['desinit_text'] for x in tables['desinit']}
 
+
+                # Process [siglen_edd]
+                oSiglenEddItems = {}
+                for oSiglenEdd in tables['siglen_edd']:
+                    editionen_id = str(oSiglenEdd.get("editionen"))
+                    if not editionen_id in oSiglenEddItems:
+                        oSiglenEddItems[editionen_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
+
                 # Start creating a list of edition literature
                 lst_ssg_edi = []
 
@@ -4034,6 +4045,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Find corresponding literature
                     literatur_id = edition.get('literatur')
                     if not literatur_id is None and literatur_id > 0:
+                        # Indicate which table is being used
+                        oEdition['huwaid'] = literatur_id
+                        oEdition['huwatable'] = "literatur"
+
+                        # Get the information from the literatur table
                         literatur = oLiteratur.get(str(literatur_id))
                         # If possible get a title from here
                         literaturtitel = literatur.get("titel")
@@ -4130,7 +4146,10 @@ class EqualGoldHuwaToJson(BasicPart):
                             for oItem in tables[table_name]:
                                 if oItem.get('opera') == opera_id:
                                     # Add this one
-                                    oEdition = dict(opera=opera_id, edition=edition_id)
+                                    oEdition = dict(opera=opera_id)
+                                    # Indicate which table is being used
+                                    oEdition['huwaid'] = oItem.get("id")
+                                    oEdition['huwatable'] = table_name
                                     # Fill in the details from the [oItem]
                                     name_field = oItem.get("name")
                                     oEdition[pp_field] = name_field
