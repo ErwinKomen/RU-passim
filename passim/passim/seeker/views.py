@@ -7381,9 +7381,9 @@ class CollAnyEdit(BasicDetails):
         else:
             size_value = instance.get_size_markdown()
         
-        # Always add Created and Size
-        context['mainitems'].append( {'type': 'plain', 'label': "Created:",     'value': instance.get_created2})
-        context['mainitems'].append( {'type': 'line',  'label': "Size:",        'value': size_value})
+        # Always add Created (with name of the creator) and Size                
+        context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
+        context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
 
         # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
         if instance.settype == "hc" and context['is_app_editor']:
