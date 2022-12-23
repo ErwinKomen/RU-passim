@@ -57,6 +57,7 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     Collection, CollectionSuper, CollectionGold, LocationRelation, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
+from passim.reader.models import Edition, Literatur
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, BasicPart
@@ -2980,7 +2981,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
             return author_id, msg
 
-        def get_extent(oHandschrift, oFF):
+        def get_extent(oHandschrift, oFF, oZB):
             """Derive an Extent description of the manuscript"""
 
             sBack = ""
@@ -3022,6 +3023,11 @@ class EqualGoldHuwaToJson(BasicPart):
                 if zeilen != "":
                     if len(html) != 0: html.append(" ")
                     html.append("{} lines per page/column".format(zeilen))
+                    # Check for zeilen bemerkungen
+                    if sId in oZB:
+                        zeilenbem = oZB[sId]
+                        # Append to the above
+                        html.append(" (note: {})".format(zeilenbem))
 
                 # Look for comments
                 if sId in oFF:
@@ -3438,8 +3444,8 @@ class EqualGoldHuwaToJson(BasicPart):
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
 
-                # (6b) Read the Edilit information
-                oEdilitItems = self.read_huwa_edilit()
+                ## (6b) Read the Edilit information
+                #oEdilitItems = self.read_huwa_edilit()
 
                 # Read other HUWA info: annus = year of 'handschrift'
                 oDates = {}
@@ -3480,7 +3486,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     handschrift_id = str(oFasc.get("handschrift"))
                     if not handschrift_id in oFascHandschrift:
                         oFascHandschrift[handschrift_id] = []
-                    oFascHandschrift[handschrift_id].append(oFasc['fasc_name'])
+                    oFascHandschrift[handschrift_id].append(str(oFasc['fasc_name']))
 
                 # Turn [faszikel] into a dictionary
                 oFaszikels = {str(x['id']): x['faszikel_name'] for x in tables['faszikel']}
@@ -3508,6 +3514,33 @@ class EqualGoldHuwaToJson(BasicPart):
                         oSiglenHandschrift[handschrift_id] = []
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSiglenHandschrift[handschrift_id].append(oSiglen)
+
+                # Process [siglen_edd]
+                oSiglenEddItems = {}
+                for oSiglenEdd in tables['siglen_edd']:
+                    editionen_id = str(oSiglenEdd.get("editionen"))
+                    if not editionen_id in oSiglenEddItems:
+                        oSiglenEddItems[editionen_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
+
+                # Turn [zeilen_bem] into a dictionary
+                oZeilenBemHandschrift = {}
+                for oZeilenBem in tables['zeilen_bem']:
+                    handschrift_id = str(oZeilenBem.get("handschrift"))
+                    if not handschrift_id in oZeilenBemHandschrift:
+                        oZeilenBemHandschrift[handschrift_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oZeilenBemHandschrift[handschrift_id].append(oZeilenBem)
+
+                # Turn [zweitsignatur] into a dictionary
+                oZweitSigHandschrift = {}
+                for oZweitSig in tables['zweitsignatur']:
+                    handschrift_id = str(oZweitSig.get("handschrift"))
+                    if not handschrift_id in oZweitSigHandschrift:
+                        oZweitSigHandschrift[handschrift_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen
+                    oZweitSigHandschrift[handschrift_id].append(oZweitSig)
 
                 # Transform the ff_bem table into a dictionary around [handschrift]
                 oFFbemHandschrift = {}
@@ -3648,7 +3681,7 @@ class EqualGoldHuwaToJson(BasicPart):
                     # (1) Support = material
                     oManuscript['support'] = get_support(oInhaltHandschrift, oSupport, oMatBemHandschrift.get(sHandschriftId))
                     # (2) Extent: use fields fol_pag, folbl, vors_vorne, vors_hinten, col, col_breite, zeilen
-                    oManuscript['extent'] = get_extent(oHandschrift, oFFbemHandschrift)
+                    oManuscript['extent'] = get_extent(oHandschrift, oFFbemHandschrift, oZeilenBemHandschrift)
                     # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
                     oManuscript['format'] = get_format(oHandschrift, oFormatBemHandschrift)
 
@@ -3662,13 +3695,58 @@ class EqualGoldHuwaToJson(BasicPart):
                             oManuscript['notes'] = notes
 
                     # Possibly add siglen + editionen
-                    lst_siglen = oSiglenHandschrift[sHandschriftId]
+                    lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
                     if len(lst_siglen) > 0:
+                        lst_edition = []
                         for oSiglen in lst_siglen:
+                            # Get the [editionen] ID
                             sEdi = str(oSiglen['editionen'])
-                            if sEdi in oEdilitItems:
-                                oSiglen['edilit'] = copy.copy(oEdilitItems[sEdi])
-                        oManuscript['siglen'] = lst_siglen
+                            sSigle = oSiglen.get("sigle", "")
+                            sBem = oSiglen.get("bemerkungen")
+                            # Get the 'Edition' object for this
+                            obj_edi = Edition.objects.filter(editionid=sEdi).first()
+                            if not obj_edi is None:
+                                # Create an initial edition object
+                                oEdition = dict(edition=obj_edi.id)
+                                if not sBem is None and sBem != "":
+                                    sSigle = "{} ({})".format(sSigle, sBem)
+                                # Start a list of sigles
+                                lst_sigle = [ sSigle]
+                                # Use the [editionen] ID to get stuff from [siglen_edd]
+                                if sEdi in oSiglenEddItems:
+                                    for oSigle in oSiglenEddItems[sEdi]:
+                                        sSigle = oSigle.get("sigle", "")
+                                        sBem = oSigle.get("bemerkungen", "")
+                                        lit_x = oSigle.get("literatur_x", "")
+                                        if sBem != "":
+                                            sSigle = "{} ({})".format(sSigle, sBem)
+                                        lst_sigle.append(sSigle)
+                                # Add the sigle to this edtion
+                                oEdition['sigle'] = ", ".join(lst_sigle)
+                                lst_edition.append(oEdition)
+
+                        # Note: This information should be added to the manuscripts in the form of a note “Used for [edition reference]”.
+                        oManuscript['editions'] = lst_edition
+
+                    # Possibly add Zweitsignatur
+                    lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
+                    if len(lst_zweits) > 0:
+                        lst_zwcombi = []
+                        for oZweits in lst_zweits:
+                            # Combine the name and the remark
+                            bem = oZweits.get("bemerkungen", "")
+                            sZweits = oZweits.get("name", "")
+                            if bem == "":
+                                lst_zwcombi.append(sZweits)
+                            else:
+                                lst_zwcombi.append("{} ({})".format(sZweits, bem))
+                        # Combine into a semicolumn separated string
+                        sCombi = "Old shelfmark(s): {}".format("; ".join(lst_zwcombi))
+                        # Add as notes
+                        notes = oManuscript.get("notes")
+                        if not notes is None and notes != "":
+                            notes = "{}; {}".format(notes, sCombi)
+                        oManuscript['notes'] = notes
 
                     # Figure out library and location
                     bibliothek_id = oHandschrift.get("bibliothek")
@@ -3766,21 +3844,21 @@ class EqualGoldHuwaToJson(BasicPart):
                             codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
-                    # Process Siglen into codico_notes
-                    codico_notes = []
-                    oSiglens = oSiglenHandschrift.get(sHandschriftId)
-                    if not oSiglens is None:
-                        for oSiglen in oSiglens:
-                            sBem = oSiglen.get("bemerkungen")
-                            sSigle = oSiglen.get("sigle")
-                            sEdition = XX
+                    ## Process Siglen into codico_notes
+                    #codico_notes = []
+                    #oSiglens = oSiglenHandschrift.get(sHandschriftId)
+                    #if not oSiglens is None:
+                    #    for oSiglen in oSiglens:
+                    #        sBem = oSiglen.get("bemerkungen")
+                    #        sSigle = oSiglen.get("sigle")
+                    #        sEdition = XX
 
-                            lCombi = []
-                            if not sSigle is None:
-                                lCombi.append(sSigle)
-                            if not sBem is None:
-                                lCombi.append("({})".format(sBem))
-                            codico_notes.append(" ".join(lCombi))
+                    #        lCombi = []
+                    #        if not sSigle is None:
+                    #            lCombi.append(sSigle)
+                    #        if not sBem is None:
+                    #            lCombi.append("({})".format(sBem))
+                    #        codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
                     # Get and walk through the contents of this Handschrift
@@ -3935,6 +4013,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 oIncipit = { str(x['id']):x['incipit_text'] for x in tables['incipit']}
                 oExplicit = { str(x['id']):x['desinit_text'] for x in tables['desinit']}
 
+
                 # Process [siglen_edd]
                 oSiglenEddItems = {}
                 for oSiglenEdd in tables['siglen_edd']:
@@ -3971,6 +4050,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Find corresponding literature
                     literatur_id = edition.get('literatur')
                     if not literatur_id is None and literatur_id > 0:
+                        # Indicate which table is being used
+                        oEdition['huwaid'] = literatur_id
+                        oEdition['huwatable'] = "literatur"
+
+                        # Get the information from the literatur table
                         literatur = oLiteratur.get(str(literatur_id))
                         # If possible get a title from here
                         literaturtitel = literatur.get("titel")
@@ -4067,7 +4151,10 @@ class EqualGoldHuwaToJson(BasicPart):
                             for oItem in tables[table_name]:
                                 if oItem.get('opera') == opera_id:
                                     # Add this one
-                                    oEdition = dict(opera=opera_id, edition=edition_id)
+                                    oEdition = dict(opera=opera_id)
+                                    # Indicate which table is being used
+                                    oEdition['huwaid'] = oItem.get("id")
+                                    oEdition['huwatable'] = table_name
                                     # Fill in the details from the [oItem]
                                     name_field = oItem.get("name")
                                     oEdition[pp_field] = name_field
@@ -5065,24 +5152,24 @@ class EqualGoldHuwaToJson(BasicPart):
         # Return the table that we found
         return dict_operapassim
 
-    def read_huwa_edilit(self):
-        """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+    #def read_huwa_edilit(self):
+    #    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
 
-        oErr = ErrHandle()
-        dict_edilit = {}
-        try:
-            lst_edilit = None
-            edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-            with open(edilit_json, "r", encoding="utf-8") as f:
-                lst_edilit = json.load(f)
-            # Process the list into a dictionary
-            if not oEdilit is None:
-                dict_edilit = {str(x['edition']): x for x in lst_edilit}
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
-        # Return the table that we found
-        return dict_edilit
+    #    oErr = ErrHandle()
+    #    dict_edilit = {}
+    #    try:
+    #        lst_edilit = None
+    #        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
+    #        with open(edilit_json, "r", encoding="utf-8") as f:
+    #            lst_edilit = json.load(f)
+    #        # Process the list into a dictionary
+    #        if not lst_edilit is None:
+    #            dict_edilit = {str(x['edition']): x for x in lst_edilit}
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
+    #    # Return the table that we found
+    #    return dict_edilit
 
     def read_huwa_conv_sig(self):
         """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""

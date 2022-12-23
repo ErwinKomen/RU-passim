@@ -26,12 +26,13 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionProject, EqualGoldProject, OnlineSources, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
+from passim.reader.models import Edition, Literatur, OperaLit
 
 
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges'],
+                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
@@ -509,6 +510,109 @@ def adapt_codico_origin():
                 codico.save()
  
 
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def read_huwa_edilit():
+    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
+
+    oErr = ErrHandle()
+    try:
+        lst_edilit = None
+        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
+        with open(edilit_json, "r", encoding="utf-8") as f:
+            lst_edilit = json.load(f)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adaptations.read_huwa_edilit")
+    # Return the table that we found
+    return lst_edilit
+
+def adapt_huwaeditions():
+    """See the reader app. This basically loads a JSON into the Huwa [Edition] and [Literatur] tables"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    specification = ['title', 'literaturtitel', 'pp', 'year', 'band', 'reihetitel', 'reihekurz']
+
+    try:
+        # Read the HUWA edilit
+        lst_edilit = read_huwa_edilit()
+        # Process this table
+        for oEdition in lst_edilit:
+            # Get the obligatory opera id and then the huwatable and huwaid
+            opera_id = oEdition.get("opera")        # This is for table [Edition]
+            huwatable = oEdition.get("huwatable")   # This is for table [Literatur]
+            huwaid = oEdition.get("huwaid")         # This is for table [Literatur]
+
+            # Get the optional edition id
+            edition_id = oEdition.get("edition")    # This is for table [Edition]
+
+            # Sanity check
+            if not huwaid is None and not opera_id is None:
+                # ================ DEBUG ==================
+                if not edition_id is None and edition_id == 82:
+                    iStop = 1
+                # Show where we are
+                if bDebug:
+                    oErr.Status("HuwaTable {} Id {}".format(huwatable, huwaid))
+                # =========================================
+
+                # First check for the entry into [Literatur] - has that already been processed?
+                lit = Literatur.objects.filter(huwaid=huwaid, huwatable=huwatable).first()
+                if lit is None:
+                    # It needs to be created
+                    lit = Literatur.objects.create(huwaid=huwaid, huwatable=huwatable)
+                    # Add the other optional elements
+                    for sField in specification:
+                        value = oEdition.get(sField)
+                        if not value is None and value != "":
+                            setattr(lit, sField, value)
+                    # Look for location stuff
+                    oLocation = oEdition.get("location")
+                    if not oLocation is None:
+                        # Get the handle to the location
+                        lit.set_location(oLocation)
+
+                    # Look for author stuff
+                    oAuthor = oEdition.get("author")
+                    if not oAuthor is None:
+                        # Get the handle to the author
+                        lit.set_author(oAuthor)
+
+                    # Now make sure to save the adapted object
+                    lit.save()
+
+                # Further action depends on whether this is an [edition] or not
+                if edition_id is None:
+                    # This is not an edition, but bloomfield, stegmueller etc
+                    operalit = OperaLit.objects.filter(operaid=opera_id, literatur=lit).first()
+                    if operalit is None:
+                        # It should be created
+                        operalit = OperaLit.objects.create(operaid=opera_id, literatur=lit)
+                else:
+                    # This is an edition, so it should be processed into Edition
+
+                    # Check if this is not yet processed
+                    edition = Edition.objects.filter(editionid=edition_id, operaid=opera_id, literatur=lit).first()
+                    if edition is None:
+                        # This has not been read
+                        edition = Edition.objects.create(editionid=edition_id, operaid=opera_id, literatur=lit)
+
+                        # Walk through any loci
+                        lst_loci = oEdition.get("loci", [])
+                        for oLoci in lst_loci:
+                            # Add this locus to the edition
+                            edition.add_locus(oLoci)
+            else:
+                # This is a bad entry. Double check
+                bDoubleCheck = True
+        # We have now processed all elements in [edilit]
+        msg = "ok"
     except:
         bResult = False
         msg = oErr.get_error_message()
