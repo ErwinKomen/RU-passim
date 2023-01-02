@@ -4047,6 +4047,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     pp = get_edipp(edition)
                     if not pp is None and pp != "":
                         oEdition['pp'] = pp
+                    # Also get all separate parts
+                    oPages = dict(seiten=edition.get("seiten"), seitenattr=edition.get("seitenattr"),
+                                  bis=edition.get("bis"), bisattr=edition.get("bisattr"),
+                                  titel=edition.get("titel"))
+                    oEdition['pages'] = oPages
                     # Find corresponding literature
                     literatur_id = edition.get('literatur')
                     if not literatur_id is None and literatur_id > 0:
@@ -5151,25 +5156,6 @@ class EqualGoldHuwaToJson(BasicPart):
             oErr.DoError("HuwaEqualGoldToJson/read_opera_passim")
         # Return the table that we found
         return dict_operapassim
-
-    #def read_huwa_edilit(self):
-    #    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
-
-    #    oErr = ErrHandle()
-    #    dict_edilit = {}
-    #    try:
-    #        lst_edilit = None
-    #        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-    #        with open(edilit_json, "r", encoding="utf-8") as f:
-    #            lst_edilit = json.load(f)
-    #        # Process the list into a dictionary
-    #        if not lst_edilit is None:
-    #            dict_edilit = {str(x['edition']): x for x in lst_edilit}
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
-    #    # Return the table that we found
-    #    return dict_edilit
 
     def read_huwa_conv_sig(self):
         """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""

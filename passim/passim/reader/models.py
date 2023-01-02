@@ -276,6 +276,17 @@ class Edition(models.Model):
     # [1] An edition must also connect with something from the [Literatur] table
     literatur = models.ForeignKey(Literatur, on_delete=models.CASCADE, related_name="literatur_editions")
 
+    # [0-1] The HUWA 'seiten' attribute = starting page
+    seiten = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'seitenattr' attribute = what precedes the starting page
+    seitenattr = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'bis' attribute = ending page
+    bis = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'bisattr' attribute = what precedes the ending page
+    bisattr = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'titel' attribute = title of this piece of info?
+    titel = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+
     def __str__(self):
         sName = "{}".format(self.editionid)
         return sName
@@ -320,6 +331,48 @@ class Edition(models.Model):
         sBack = self.literatur.get_view()
         return sBack
 
+    def get_pp(self):
+        """Get a from until page range from table [editionen]"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Initialisations
+            seiten = None
+            bis = None
+            von_rv = ""
+            bis_rv = ""
+            html = []
+
+            # Collection of basic data
+            if not self.seiten is None: seiten = self.seiten.split('.')[0]
+            if not self.bis is None: bis = self.bis.split('.')[0]
+            if not self.seitenattr is None: von_rv = self.seitenattr
+            if not self.bisattr is None: bis_rv = self.bisattr
+
+            # Calculate from
+            lst_from = []
+            if von_rv != "": lst_from.append(von_rv)
+            if not seiten is None: lst_from.append(seiten)
+            sFrom = "".join(lst_from)
+
+            # Calculate until
+            lst_until = []
+            if bis_rv != "": lst_until.append(bis_rv)
+            if not bis is None: lst_until.append(bis)
+            sUntil = "".join(lst_until)
+
+            # Combine the two
+            if sFrom == sUntil:
+                sBack = sFrom
+            else:
+                sBack = "{}-{}".format(sFrom, sUntil)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_pp")
+
+        return sBack
 
 class Locus(models.Model):
     """One locus is a place inside one Edition, optionally specifying an inc, exp or cap.

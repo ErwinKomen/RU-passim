@@ -538,6 +538,7 @@ def adapt_huwaeditions():
     bDebug = False
     msg = ""
     specification = ['title', 'literaturtitel', 'pp', 'year', 'band', 'reihetitel', 'reihekurz']
+    attrs = ['seiten', 'seitenattr', 'bis', 'bisattr', 'titel']
 
     try:
         # Read the HUWA edilit
@@ -551,6 +552,9 @@ def adapt_huwaeditions():
 
             # Get the optional edition id
             edition_id = oEdition.get("edition")    # This is for table [Edition]
+
+            # Other stuff for table [Edition]
+            oPages = oEdition.get("pages")
 
             # Sanity check
             if not huwaid is None and not opera_id is None:
@@ -608,6 +612,11 @@ def adapt_huwaeditions():
                         for oLoci in lst_loci:
                             # Add this locus to the edition
                             edition.add_locus(oLoci)
+                    # Check for 'seiten' etc
+                    for k,v in oPages.items():
+                        if getattr(edition, k) is None and not v is None:
+                            setattr(edition, k, v)
+                    edition.save()
             else:
                 # This is a bad entry. Double check
                 bDoubleCheck = True
