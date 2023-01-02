@@ -106,8 +106,11 @@ class Literatur(models.Model):
         sName = "{}.{}".format(self.huwatable, self.huwaid)
         return sName
 
-    def get_view(self):
-        """Get a view of this edition"""
+    def get_view(self, pp=None):
+        """Get a view of this edition
+        
+        Note: possibly add one's own PP, if that is passed on
+        """
 
         def do_append(html, field, fk = None):
             if fk is None:
@@ -129,7 +132,10 @@ class Literatur(models.Model):
             do_append(html, "full", "sauthor")
             do_append(html, "year")
             do_append(html, "reihekurz")
-            do_append(html, "pp")
+            if pp is None:
+                do_append(html, "pp")
+            else:
+                html.append(pp)
             sTitel = "-"
             if not self.reihetitel is None and self.reihetitel != "":
                 sTitel = self.reihetitel
@@ -326,9 +332,10 @@ class Edition(models.Model):
         return bResult
 
     def get_edition_view(self):
-        """Get a view of this edition"""
+        """Get a view of this edition, using my own defined PP"""
 
-        sBack = self.literatur.get_view()
+        pp = self.get_pp()
+        sBack = self.literatur.get_view(pp)
         return sBack
 
     def get_pp(self):

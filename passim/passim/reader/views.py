@@ -3696,6 +3696,7 @@ class EqualGoldHuwaToJson(BasicPart):
 
                     # Possibly add siglen + editionen
                     lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
+                    oOperaSiglen = {}
                     if len(lst_siglen) > 0:
                         lst_edition = []
                         for oSiglen in lst_siglen:
@@ -3707,7 +3708,7 @@ class EqualGoldHuwaToJson(BasicPart):
                             obj_edi = Edition.objects.filter(editionid=sEdi).first()
                             if not obj_edi is None:
                                 # Create an initial edition object
-                                oEdition = dict(edition=obj_edi.id)
+                                oEdition = dict(huwaid=sEdi, huwatable="editionen") # edition=obj_edi.id)
                                 if not sBem is None and sBem != "":
                                     sSigle = "{} ({})".format(sSigle, sBem)
                                 # Start a list of sigles
@@ -3723,7 +3724,19 @@ class EqualGoldHuwaToJson(BasicPart):
                                         lst_sigle.append(sSigle)
                                 # Add the sigle to this edtion
                                 oEdition['sigle'] = ", ".join(lst_sigle)
-                                lst_edition.append(oEdition)
+
+                                # NOTE: the 'opera' id and the 'pp' are all contained inside the Edition object
+                                #       so the following is not needed:
+                                # oEdition['opera'] = obj_edi.operaid
+                                # oEdition['pp'] = obj_edi.get_pp()
+
+                                # lst_edition.append(oEdition)
+
+                                # Alternative: add the Edition object to the particular opera
+                                sOperaId = str(obj_edi.operaid)
+                                if not sOperaId in oOperaSiglen:
+                                    oOperaSiglen[sOperaId] = []
+                                oOperaSiglen[sOperaId].append(oEdition)
 
                         # Note: This information should be added to the manuscripts in the form of a note “Used for [edition reference]”.
                         oManuscript['editions'] = lst_edition
@@ -3882,6 +3895,9 @@ class EqualGoldHuwaToJson(BasicPart):
                             note = oInhalt.get("bemerkungen", "")
                             postscriptum = oInfines.get(str(inhalt_id), None)
 
+                            # Get a possible list of editions + siglen
+                            lst_sigle = oOperaSiglen.get(sOperaId, [])
+
                             # Convert locus information into a Passim locus string
                             locus = get_locus(oInhalt)
                             # Getting the author also works differently
@@ -3914,6 +3930,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 title = title, incipit = incipit, explicit = explicit,
                                 note = note, keywords = ['HUWA'], datasets = ['HUWA_sermons'],
                                 signaturesA = signaturesA, manu_count=manu_count,
+                                siglen = lst_sigle,
                                 externals=[dict(externalid=opera_id, externaltype="huwop")],
                                 )
                             if bAddUnusedSermonFields:
