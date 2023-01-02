@@ -1052,16 +1052,16 @@ var ru = (function ($, ru) {
           if (el === undefined ) { return; }
           // Get the column number
           offset = parseInt($(el).attr("offset"), 10);
-          colnum = offset;
-          elTable = $("#tab_list").find("table").first();
+          colnum = offset - 1;
+          elTable = $("#tab_list").find("table.table").first();
           // Determine what to do
           if ($(el).hasClass(onclass)) {
             // Need to switch off this column
             $(el).removeClass(onclass);
-            $(elTable).find("thead tr th").eq(colnum).addClass("hidden");
+            $(elTable).find("thead tr th[scope=col]").eq(colnum).addClass("hidden");
             // Process all rows
             $(elTable).find("tbody tr").each(function (idx, elThis) {
-              $(elThis).find("td").eq(colnum).addClass("hidden");
+              $(elThis).find("td[scope=col]").eq(colnum).addClass("hidden");
             });
             // TODO: make this known to the server
             private_methods.colwrap_switch(colnum, true);
@@ -1069,10 +1069,10 @@ var ru = (function ($, ru) {
             // Need to switch on this column
             $(el).addClass(onclass);
             // Process header
-            $(elTable).find("thead tr th").eq(colnum).removeClass("hidden");
+            $(elTable).find("thead tr th[scope=col]").eq(colnum).removeClass("hidden");
             // Process all rows
             $(elTable).find("tbody tr").each(function (idx, elThis) {
-              $(elThis).find("td").eq(colnum).removeClass("hidden");
+              $(elThis).find("td[scope=col]").eq(colnum).removeClass("hidden");
             });
             // TODO: make this known to the server
             private_methods.colwrap_switch(colnum, false);

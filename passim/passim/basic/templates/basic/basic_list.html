@@ -499,6 +499,7 @@
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
                           <td class="{{field.classes}}  {% if field.colwrap or field.autohide == "on" %}hidden{% endif %}" 
+                              scope="col"
                               style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} 
                               {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}
