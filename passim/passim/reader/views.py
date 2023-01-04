@@ -3506,23 +3506,23 @@ class EqualGoldHuwaToJson(BasicPart):
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSaecBemHandschrift[handschrift_id].append(oSaecBem)
 
-                # Turn [siglen] into a dictionary
-                oSiglenHandschrift = {}
-                for oSiglen in tables['siglen']:
-                    handschrift_id = str(oSiglen.get("handschrift"))
-                    if not handschrift_id in oSiglenHandschrift:
-                        oSiglenHandschrift[handschrift_id] = []
-                    # Add the whole object there, with fields @name and @bemerkungen
-                    oSiglenHandschrift[handschrift_id].append(oSiglen)
+                ## Turn [siglen] into a dictionary
+                #oSiglenHandschrift = {}
+                #for oSiglen in tables['siglen']:
+                #    handschrift_id = str(oSiglen.get("handschrift"))
+                #    if not handschrift_id in oSiglenHandschrift:
+                #        oSiglenHandschrift[handschrift_id] = []
+                #    # Add the whole object there, with fields @name and @bemerkungen
+                #    oSiglenHandschrift[handschrift_id].append(oSiglen)
 
-                # Process [siglen_edd]
-                oSiglenEddItems = {}
-                for oSiglenEdd in tables['siglen_edd']:
-                    editionen_id = str(oSiglenEdd.get("editionen"))
-                    if not editionen_id in oSiglenEddItems:
-                        oSiglenEddItems[editionen_id] = []
-                    # Add the whole object there, with fields @name and @bemerkungen
-                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
+                ## Process [siglen_edd]
+                #oSiglenEddItems = {}
+                #for oSiglenEdd in tables['siglen_edd']:
+                #    editionen_id = str(oSiglenEdd.get("editionen"))
+                #    if not editionen_id in oSiglenEddItems:
+                #        oSiglenEddItems[editionen_id] = []
+                #    # Add the whole object there, with fields @name and @bemerkungen
+                #    oSiglenEddItems[editionen_id].append(oSiglenEdd)
 
                 # Turn [zeilen_bem] into a dictionary
                 oZeilenBemHandschrift = {}
@@ -3694,64 +3694,64 @@ class EqualGoldHuwaToJson(BasicPart):
                                 notes = "{}; {}".format(notes, notiz)
                             oManuscript['notes'] = notes
 
-                    # Calculate siglen + editionen for sermons within this manuscript
-                    lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
-                    oOperaSiglen = {}
-                    if len(lst_siglen) > 0:
-                        for oSiglen in lst_siglen:
-                            # Get the [editionen] ID
-                            sEdi = str(oSiglen['editionen'])
-                            sSigle = oSiglen.get("sigle", "")
-                            sBem = oSiglen.get("bemerkungen")
-                            # Get the 'Edition' object for this
-                            obj_edi = Edition.objects.filter(editionid=sEdi).first()
-                            if not obj_edi is None:
-                                # Create an initial edition object
-                                oEdition = dict(huwaid=sEdi, huwatable="editionen") # edition=obj_edi.id)
+                    ## Calculate siglen + editionen for sermons within this manuscript
+                    #lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
+                    #oOperaSiglen = {}
+                    #if len(lst_siglen) > 0:
+                    #    for oSiglen in lst_siglen:
+                    #        # Get the [editionen] ID
+                    #        sEdi = str(oSiglen['editionen'])
+                    #        sSigle = oSiglen.get("sigle", "")
+                    #        sBem = oSiglen.get("bemerkungen")
+                    #        # Get the 'Edition' object for this
+                    #        obj_edi = Edition.objects.filter(editionid=sEdi).first()
+                    #        if not obj_edi is None:
+                    #            # Create an initial edition object
+                    #            oEdition = dict(huwaid=sEdi, huwatable="editionen") # edition=obj_edi.id)
 
-                                lst_sigle = []
+                    #            lst_sigle = []
 
-                                if not sSigle is None or sSigle == "":
-                                    # Make sure we have a Sigle object
-                                    oSigle = dict(sigle=sSigle)
+                    #            if not sSigle is None or sSigle == "":
+                    #                # Make sure we have a Sigle object
+                    #                oSigle = dict(sigle=sSigle)
 
-                                    if not sBem is None and sBem != "":
-                                        #sSigle = "{} ({})".format(sSigle, sBem)
-                                        oSigle['bem'] = sBem
-                                    # Add to the list of sigles
-                                    # lst_sigle = [ sSigle]
-                                    lst_sigle.append(oSigle)
-                                # Use the [editionen] ID to get stuff from [siglen_edd]
-                                if sEdi in oSiglenEddItems:
-                                    for oSigle in oSiglenEddItems[sEdi]:
-                                        sSigle = oSigle.get("sigle", "")
-                                        sBem = oSigle.get("bemerkungen", "")
-                                        lit_x = oSigle.get("literatur_x", "")
-                                        if not sSigle is None and sSigle != "":
-                                            oSigle = dict(sigle=sSigle)
-                                            if sBem != "":
-                                                # sSigle = "{} ({})".format(sSigle, sBem)
-                                                oSigle['bem'] = sBem
-                                            # lst_sigle.append(sSigle)
-                                            lst_sigle.append(oSigle)
-                                # Add the sigle to this edtion
-                                # oEdition['sigle'] = ", ".join(lst_sigle)
-                                oEdition['siglelist'] = lst_sigle
+                    #                if not sBem is None and sBem != "":
+                    #                    #sSigle = "{} ({})".format(sSigle, sBem)
+                    #                    oSigle['bem'] = sBem
+                    #                # Add to the list of sigles
+                    #                # lst_sigle = [ sSigle]
+                    #                lst_sigle.append(oSigle)
+                    #            # Use the [editionen] ID to get stuff from [siglen_edd]
+                    #            if sEdi in oSiglenEddItems:
+                    #                for oSigle in oSiglenEddItems[sEdi]:
+                    #                    sSigle = oSigle.get("sigle", "")
+                    #                    sBem = oSigle.get("bemerkungen", "")
+                    #                    lit_x = oSigle.get("literatur_x", "")
+                    #                    if not sSigle is None and sSigle != "":
+                    #                        oSigle = dict(sigle=sSigle)
+                    #                        if sBem != "":
+                    #                            # sSigle = "{} ({})".format(sSigle, sBem)
+                    #                            oSigle['bem'] = sBem
+                    #                        # lst_sigle.append(sSigle)
+                    #                        lst_sigle.append(oSigle)
+                    #            # Add the sigle to this edtion
+                    #            # oEdition['sigle'] = ", ".join(lst_sigle)
+                    #            oEdition['siglelist'] = lst_sigle
 
-                                # NOTE: the 'opera' id and the 'pp' are all contained inside the Edition object
-                                #       so the following is not needed:
-                                # oEdition['opera'] = obj_edi.operaid
-                                # oEdition['pp'] = obj_edi.get_pp()
+                    #            # NOTE: the 'opera' id and the 'pp' are all contained inside the Edition object
+                    #            #       so the following is not needed:
+                    #            # oEdition['opera'] = obj_edi.operaid
+                    #            # oEdition['pp'] = obj_edi.get_pp()
 
-                                # Add the Edition object to the particular opera
-                                sOperaId = str(obj_edi.operaid)
-                                if not sOperaId in oOperaSiglen:
-                                    oOperaSiglen[sOperaId] = []
-                                oOperaSiglen[sOperaId].append(oEdition)
+                    #            # Add the Edition object to the particular opera
+                    #            sOperaId = str(obj_edi.operaid)
+                    #            if not sOperaId in oOperaSiglen:
+                    #                oOperaSiglen[sOperaId] = []
+                    #            oOperaSiglen[sOperaId].append(oEdition)
 
-                        # Note: This information originally was to be added to the manuscripts in the form of a note “Used for [edition reference]”.
-                        #       But now it is specific a combination of Edition+Sermon.
-                        #       So it will be made available at the Edition-Sermon-level
+                    #    # Note: This information originally was to be added to the manuscripts in the form of a note “Used for [edition reference]”.
+                    #    #       But now it is specific a combination of Edition+Sermon.
+                    #    #       So it will be made available at the Edition-Sermon-level
 
                     # Possibly add Zweitsignatur
                     lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
@@ -3907,8 +3907,8 @@ class EqualGoldHuwaToJson(BasicPart):
                             note = oInhalt.get("bemerkungen", "")
                             postscriptum = oInfines.get(str(inhalt_id), None)
 
-                            # Get a possible list of editions + siglen
-                            lst_sigle = oOperaSiglen.get(sOperaId, [])
+                            ## Get a possible list of editions + siglen
+                            #lst_sigle = oOperaSiglen.get(sOperaId, [])
 
                             # Convert locus information into a Passim locus string
                             locus = get_locus(oInhalt)
@@ -3942,7 +3942,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 title = title, incipit = incipit, explicit = explicit,
                                 note = note, keywords = ['HUWA'], datasets = ['HUWA_sermons'],
                                 signaturesA = signaturesA, manu_count=manu_count,
-                                siglen = lst_sigle,
+                                # siglen = lst_sigle,
                                 externals=[dict(externalid=opera_id, externaltype="huwop")],
                                 )
                             if bAddUnusedSermonFields:
