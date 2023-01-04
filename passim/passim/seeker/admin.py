@@ -3,6 +3,7 @@ from django.contrib.admin.models import LogEntry, DELETION
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 from django.urls import reverse
+from django.utils.html import escape
 
 from passim.seeker.models import *
 from passim.seeker.forms import *
