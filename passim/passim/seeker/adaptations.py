@@ -612,6 +612,19 @@ def adapt_huwaeditions():
                         for oLoci in lst_loci:
                             # Add this locus to the edition
                             edition.add_locus(oLoci)
+
+                    # Walk through any [siglen]
+                    lst_siglen = oEdition.get("siglen", [])
+                    for oSiglen in lst_siglen:
+                        # Add this siglen to the edition
+                        edition.add_siglen(oSiglen)
+
+                    # Walk through any [siglen_edd]
+                    lst_siglen_edd = oEdition.get("siglen_edd", [])
+                    for oSiglenEdd in lst_siglen_edd:
+                        # Add this siglen to the edition
+                        edition.add_siglen_edd(oSiglenEdd)
+
                     # Check for 'seiten' etc
                     for k,v in oPages.items():
                         if getattr(edition, k) is None and not v is None:

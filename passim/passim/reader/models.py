@@ -106,8 +106,8 @@ class Literatur(models.Model):
         sName = "{}.{}".format(self.huwatable, self.huwaid)
         return sName
 
-    def get_view(self, pp=None):
-        """Get a view of this edition
+    def get_parts(self, pp=None, bAll=False):
+        """Get the parts of this literature reference
         
         Note: possibly add one's own PP, if that is passed on
         """
@@ -117,16 +117,21 @@ class Literatur(models.Model):
                 value = getattr(self, field)
                 if not value is None and value != "":
                     html.append(value)
+                elif bAll:
+                    html.append("")
             else:
                 obj = getattr(self, fk)
                 if not obj is None:
                     value = getattr(obj, field)
                     if not value is None and value != "":
                         html.append(value)
+                    elif bAll:
+                        html.append("")
+                elif bAll:
+                    html.append("")
             return None
 
         html = []
-        sBack = ""
         oErr = ErrHandle()
         try:
             do_append(html, "full", "sauthor")
@@ -146,6 +151,23 @@ class Literatur(models.Model):
             html.append(sTitel)
             do_append(html, "band")
             do_append(html, "city", "slocation")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Literatur/get_parts")
+        return html
+
+    def get_view(self, pp=None):
+        """Get a view of this edition
+        
+        Note: possibly add one's own PP, if that is passed on
+        """
+
+        html = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the parts from [get_parts()]
+            html = self.get_parts(pp)
 
             # Get the literature object
             sBack = ", ".join(html)
@@ -331,12 +353,108 @@ class Edition(models.Model):
         # REturn the result
         return bResult
 
-    def get_edition_view(self):
+    def add_siglen(self, oSiglen):
+        """Create the [Siglen] specified in [oSiglen] and link it with an FK to [self]"""
+
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # The siglen must have page and line, but may have cap, explicit and incipit
+            if not oSiglen is None:
+                iHandschrift = oSiglen.get("handschrift")
+                sSigle = oSiglen.get("sigle")
+                # See if it is there already
+                obj = Siglen.objects.filter(huwaedition=self, huwahandschrift=iHandschrift, sigle=sSigle).first()
+                if obj is None:
+                    # Create it
+                    obj = Siglen.objects.create(huwaedition=self, huwahandschrift=iHandschrift, sigle=sSigle)
+
+                    # Add other elements, if specified
+                    note = oSiglen.get("bem")
+                    if not note is None and note != "":
+                        obj.note = note
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_siglen")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def add_siglen_edd(self, oSiglenEdd):
+        """Create the [SiglenEdd] specified in [oSiglen] and link it with an FK to [self]"""
+
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # The siglen must have page and line, but may have cap, explicit and incipit
+            if not oSiglenEdd is None:
+                iLiteratur = oSiglenEdd.get("literatur")
+                sSigle = oSiglenEdd.get("sigle")
+                # See if it is there already
+                obj = SiglenEdd.objects.filter(huwaedition=self, huwaliteratur=iLiteratur, sigle=sSigle).first()
+                if obj is None:
+                    # Create it
+                    obj = SiglenEdd.objects.create(huwaedition=self, huwaliteratur=iLiteratur, sigle=sSigle)
+
+                    # Add other elements, if specified
+                    note = oSiglenEdd.get("bem")
+                    if not note is None and note != "":
+                        obj.note = note
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_siglen_edd")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def get_edition_view(self, bParts = False):
         """Get a view of this edition, using my own defined PP"""
 
         pp = self.get_pp()
-        sBack = self.literatur.get_view(pp)
-        return sBack
+        oBack = self.literatur.get_parts(pp, bParts)
+        if not bParts:
+            oBack = ", ".join(oBack)
+        return oBack
+
+    def get_opera_literature(opera_id, handschrift_id=None):
+        """Look for all literature related to [operaid]"""
+
+        oErr = ErrHandle()
+        lBack = []
+        try:
+            # (1) look in the table [Edition]
+            qs = Edition.objects.filter(operaid=opera_id)
+            for obj in qs:
+                lst_part = obj.get_edition_view(True)
+
+                # Does this one have a siglen?
+                sSigle = obj.get_siglen(handschrift_id)
+                lst_part.append(sSigle)
+                # Add it to the output list
+                lBack.append(lst_part)
+
+                # Does this have any siglen_edds?
+                for obj_edd in SiglenEdd.objects.filter(huwaedition=obj):
+                    obj_lit = Literatur.objects.filter().first()
+                    if not obj_lit is None:
+                        lst_edd_part = obj_lit.get_parts(bAll=True)
+                        lst_edd_part.append(obj_edd.get_sigle())
+                        # Add it to the output list
+                        lBack.append(lst_edd_part)
+
+            # (2) Look in the table [OperaLit]
+            qs = OperaLit.objects.filter(operaid=opera_id)
+            for obj in qs:
+                # Add it to the output list
+                lBack.append(obj.literatur.get_parts(bAll=True))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_opera_literature")
+        return lBack
 
     def get_pp(self):
         """Get a from until page range from table [editionen]"""
@@ -381,6 +499,39 @@ class Edition(models.Model):
 
         return sBack
 
+    def get_siglen(self, handschrift_id):
+        """Search in [Siglen] to see if there is anything"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Take the first one that is matching
+            obj = Siglen.objects.filter(huwaedition=self, huwahandschrift=handschrift_id).first()
+            if not obj is None:
+                # Get the sigle from it
+                sBack = obj.get_sigle()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_siglen")
+        return sBack
+
+    def get_siglen_edd(self, literatur_id):
+        """Search in [SiglenEdd] to see if there is anything"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Take the first one that is matching
+            obj = SiglenEdd.objects.filter(huwaedition=self, huwaliteratur=literatur_id).first()
+            if not obj is None:
+                # Get the sigle from it
+                sBack = obj.get_sigle(handschrift_id)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_siglen_edd")
+        return sBack
+
+
 class Locus(models.Model):
     """One locus is a place inside one Edition, optionally specifying an inc, exp or cap.
     
@@ -411,6 +562,76 @@ class Locus(models.Model):
             html.append("line {}".format(self.line))
         if len(html) > 0:
             sBack = " ".join(html)
+        return sBack
+
+
+class Siglen(models.Model):
+    """One siglen is a reading sign for one edition, as it pertains to one manuscript (handschrift)
+
+    HUWA: this is table [siglen], which links with [editionen]
+    """
+
+    # [1] Link to the edition
+    huwaedition = models.ForeignKey(Edition, on_delete=models.CASCADE, related_name="editionsiglens")
+    # [1] Link to the handschrift
+    huwahandschrift = models.IntegerField("HUWA Handschrift")
+
+    # [0-1] The optional 'sigle' element
+    sigle = models.CharField("Sigle", max_length = LONG_STRING, blank=True, null=True)
+
+    # [0-1] The optional 'bemerkungen' element
+    note = models.CharField("Remark", max_length = LONG_STRING, blank=True, null=True)
+
+    def __str__(self):
+        sBack = "-"
+        html = []
+        # Should at least add the handschrift
+        html.append("handschr {}".format(self.huwahandschrift))
+        if not self.sigle is None and self.sigle != "":
+            html.append("sigle {}".format(self.sigle))
+        if len(html) > 0:
+            sBack = " ".join(html)
+        return sBack
+
+    def get_sigle(self):
+        sBack = self.sigle
+        if not self.note is None:
+            sBack = "{} ({})".format(sBack, self.note)
+        return sBack
+
+
+class SiglenEdd(models.Model):
+    """One SiglenEdd is a reading sign for one edition, as it pertains to one literatur item
+
+    HUWA: this is table [siglen_edd], which links with [editionen]
+    """
+
+    # [1] Link to the edition
+    huwaedition = models.ForeignKey(Edition, on_delete=models.CASCADE, related_name="editionsiglenedds")
+    # [1] Link to the literatur
+    huwaliteratur = models.IntegerField("HUWA Literatur")
+
+    # [0-1] The optional 'sigle' element
+    sigle = models.CharField("Sigle", max_length = LONG_STRING, blank=True, null=True)
+
+    # [0-1] The optional 'bemerkungen' element
+    note = models.CharField("Remark", max_length = LONG_STRING, blank=True, null=True)
+
+    def __str__(self):
+        sBack = "-"
+        html = []
+        # Should at least add the handschrift
+        html.append("lit {}".format(self.huwaliteratur))
+        if not self.sigle is None and self.sigle != "":
+            html.append("sigle {}".format(self.sigle))
+        if len(html) > 0:
+            sBack = " ".join(html)
+        return sBack
+
+    def get_sigle(self):
+        sBack = self.sigle
+        if not self.note is None:
+            sBack = "{} ({})".format(sBack, self.note)
         return sBack
 
 
