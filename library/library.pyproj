@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>fe44b9d4-3a09-4292-8d93-21bc9e3e4757</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>interche.py</StartupFile>
+    <StartupFile>huwalib.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -14,7 +14,7 @@
     <RootNamespace>library</RootNamespace>
     <InterpreterId>{c850f0da-b556-4eff-b6ee-df7ce36720c5}</InterpreterId>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29P.xml"</CommandLineArguments>
+    <CommandLineArguments> -i "D:/Data Files/TG/Passim/external/huwa/passim_Library_20220707 .xlsx" -o "D:/Data Files/TG/Passim/external/huwa/passim_huwa_library.json"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
@@ -30,11 +30,15 @@
     <Compile Include="authnames.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="huwasig.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="interche.py" />
     <Compile Include="latinbats.py" />
     <Compile Include="cs_to_xlsx.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="huwalib.py" />
     <Compile Include="library.py" />
     <Compile Include="utils.py">
       <SubType>Code</SubType>
