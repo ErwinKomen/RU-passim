@@ -13999,7 +13999,8 @@ class LibraryListView(BasicList):
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'library_results'},
                  {"label": None},
                  {"label": "json", "dtype": "json", "url": 'library_results'}]
-    uploads = [{"title": "huwa", "label": "Huwa", "url": "library_upload_excel", "type": "multiple", 
+    uploads = [
+        {"title": "huwa", "label": "Huwa (Excel)", "url": "library_upload_excel", "type": "multiple", 
                 "msg": "Upload Huwa library Excel files"}]
 
     def initializations(self):

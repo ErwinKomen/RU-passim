@@ -54,7 +54,7 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, LocationRelation, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
@@ -2857,9 +2857,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
                 if obj_city is None:
                     # Add the city and the country it is in
-                    obj_city = Location.objects.create(name=lib_city, loctype__name="city")
-                    # Create a relation that the city is in the specified country
-                    obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                    loctype = LocationType.objects.filter(name="city").first()
+                    if not loctype is None:
+                        obj_city = Location.objects.create(name=lib_city, loctype=loctype)
+                        # Create a relation that the city is in the specified country
+                        obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
                             
                 # Try to get it
                 obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
@@ -3443,6 +3445,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 oLibraryInfo = self.read_libraries()
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
+                oLibHuwaConv = oLibraryInfo.get("conversion")
 
                 ## (6b) Read the Edilit information
                 #oEdilitItems = self.read_huwa_edilit()
@@ -3505,24 +3508,6 @@ class EqualGoldHuwaToJson(BasicPart):
                         oSaecBemHandschrift[handschrift_id] = []
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSaecBemHandschrift[handschrift_id].append(oSaecBem)
-
-                ## Turn [siglen] into a dictionary
-                #oSiglenHandschrift = {}
-                #for oSiglen in tables['siglen']:
-                #    handschrift_id = str(oSiglen.get("handschrift"))
-                #    if not handschrift_id in oSiglenHandschrift:
-                #        oSiglenHandschrift[handschrift_id] = []
-                #    # Add the whole object there, with fields @name and @bemerkungen
-                #    oSiglenHandschrift[handschrift_id].append(oSiglen)
-
-                ## Process [siglen_edd]
-                #oSiglenEddItems = {}
-                #for oSiglenEdd in tables['siglen_edd']:
-                #    editionen_id = str(oSiglenEdd.get("editionen"))
-                #    if not editionen_id in oSiglenEddItems:
-                #        oSiglenEddItems[editionen_id] = []
-                #    # Add the whole object there, with fields @name and @bemerkungen
-                #    oSiglenEddItems[editionen_id].append(oSiglenEdd)
 
                 # Turn [zeilen_bem] into a dictionary
                 oZeilenBemHandschrift = {}
@@ -3694,65 +3679,6 @@ class EqualGoldHuwaToJson(BasicPart):
                                 notes = "{}; {}".format(notes, notiz)
                             oManuscript['notes'] = notes
 
-                    ## Calculate siglen + editionen for sermons within this manuscript
-                    #lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
-                    #oOperaSiglen = {}
-                    #if len(lst_siglen) > 0:
-                    #    for oSiglen in lst_siglen:
-                    #        # Get the [editionen] ID
-                    #        sEdi = str(oSiglen['editionen'])
-                    #        sSigle = oSiglen.get("sigle", "")
-                    #        sBem = oSiglen.get("bemerkungen")
-                    #        # Get the 'Edition' object for this
-                    #        obj_edi = Edition.objects.filter(editionid=sEdi).first()
-                    #        if not obj_edi is None:
-                    #            # Create an initial edition object
-                    #            oEdition = dict(huwaid=sEdi, huwatable="editionen") # edition=obj_edi.id)
-
-                    #            lst_sigle = []
-
-                    #            if not sSigle is None or sSigle == "":
-                    #                # Make sure we have a Sigle object
-                    #                oSigle = dict(sigle=sSigle)
-
-                    #                if not sBem is None and sBem != "":
-                    #                    #sSigle = "{} ({})".format(sSigle, sBem)
-                    #                    oSigle['bem'] = sBem
-                    #                # Add to the list of sigles
-                    #                # lst_sigle = [ sSigle]
-                    #                lst_sigle.append(oSigle)
-                    #            # Use the [editionen] ID to get stuff from [siglen_edd]
-                    #            if sEdi in oSiglenEddItems:
-                    #                for oSigle in oSiglenEddItems[sEdi]:
-                    #                    sSigle = oSigle.get("sigle", "")
-                    #                    sBem = oSigle.get("bemerkungen", "")
-                    #                    lit_x = oSigle.get("literatur_x", "")
-                    #                    if not sSigle is None and sSigle != "":
-                    #                        oSigle = dict(sigle=sSigle)
-                    #                        if sBem != "":
-                    #                            # sSigle = "{} ({})".format(sSigle, sBem)
-                    #                            oSigle['bem'] = sBem
-                    #                        # lst_sigle.append(sSigle)
-                    #                        lst_sigle.append(oSigle)
-                    #            # Add the sigle to this edtion
-                    #            # oEdition['sigle'] = ", ".join(lst_sigle)
-                    #            oEdition['siglelist'] = lst_sigle
-
-                    #            # NOTE: the 'opera' id and the 'pp' are all contained inside the Edition object
-                    #            #       so the following is not needed:
-                    #            # oEdition['opera'] = obj_edi.operaid
-                    #            # oEdition['pp'] = obj_edi.get_pp()
-
-                    #            # Add the Edition object to the particular opera
-                    #            sOperaId = str(obj_edi.operaid)
-                    #            if not sOperaId in oOperaSiglen:
-                    #                oOperaSiglen[sOperaId] = []
-                    #            oOperaSiglen[sOperaId].append(oEdition)
-
-                    #    # Note: This information originally was to be added to the manuscripts in the form of a note “Used for [edition reference]”.
-                    #    #       But now it is specific a combination of Edition+Sermon.
-                    #    #       So it will be made available at the Edition-Sermon-level
-
                     # Possibly add Zweitsignatur
                     lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
                     if len(lst_zweits) > 0:
@@ -3778,8 +3704,10 @@ class EqualGoldHuwaToJson(BasicPart):
                     if not bibliothek_id is None:
                         lib_id = None
 
+                        sBibliothekId = str(bibliothek_id)
+
                         # A library has been specified for this manuscript
-                        if bibliothek_id in oLibHuwaPassim:
+                        if sBibliothekId in oLibHuwaPassim:
                             library_id = oLibHuwaPassim[str(bibliothek_id)]
                             library = Library.objects.filter(id=library_id).first()
                             lib_name = ""
@@ -3792,11 +3720,11 @@ class EqualGoldHuwaToJson(BasicPart):
                                 if not library.lcountry is None:
                                     lib_country = library.lcountry.name
                                 lib_id = library.id
-                        elif bibliothek_id in oLibHuwaOnly:
+                        elif sBibliothekId in oLibHuwaOnly:
                             # This library is known in HUWA, but not in Passim: try to add it
-                            oLibrary = oLibHuwaOnly[bibliothek_id]
+                            oLibrary = oLibHuwaOnly[sBibliothekId]
                             # Always get the pre-defined details
-                            lib_name = oLibrary.get("name", "")
+                            lib_name = oLibrary.get("library", "")
                             lib_city = oLibrary.get("city", "")
                             lib_country = oLibrary.get("country", "")
 
@@ -3812,6 +3740,29 @@ class EqualGoldHuwaToJson(BasicPart):
                             if lib_country != "" and lib_country in oHuwaLand:
                                 lib_country = oHuwaLand[lib_country]
 
+                            # Check whether there is a conversion attempt in "lib_huwa_new-jan2023"
+                            if lib_name != "" and lib_city != "" and lib_country != "":
+                                for oConvert in oLibHuwaConv:
+                                    # Get the passim data
+                                    oPassim = oConvert.get("passim")
+                                    pas_lib = oPassim.get("library")
+                                    pas_country = oPassim.get("country")
+                                    pas_city = oPassim.get("city")
+                                    # Get the huwa data
+                                    oHuwa = oConvert.get("huwa")
+                                    huwa_lib = oHuwa.get("library")
+                                    huwa_country = oHuwa.get("country")
+                                    huwa_city = oHuwa.get("city")
+                                    # Apply Possible corrections
+                                    if not pas_lib is None: huwa_lib = pas_lib
+                                    if not pas_country is None: huwa_country = pas_country
+                                    if not pas_city is None: huwa_city = pas_city
+
+                                    if huwa_lib == lib_name and huwa_country == lib_country and huwa_city == lib_city:
+                                        # We found a correction to look up in passim
+                                        lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
+
+
                             # NOTE: do *NOT* attempt to add this library.
                             #       it requires manual correction
 
@@ -3820,6 +3771,10 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['library'] = lib_name
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
+
+                        # Possibly process the correspondence between a HUWA library id and a Passim library id
+                        if not lib_id is None:
+                            pass
 
                     # Possibly add provenance
                     oManuscript['provenance'] = get_provenance(oHandschrift, oHerkunftBesitzer)
