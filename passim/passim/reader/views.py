@@ -3743,11 +3743,21 @@ class EqualGoldHuwaToJson(BasicPart):
                             # Check whether there is a conversion attempt in "lib_huwa_new-jan2023"
                             if lib_name != "" and lib_city != "" and lib_country != "":
                                 for oConvert in oLibHuwaConv:
+                                    # Get the passim data
                                     oPassim = oConvert.get("passim")
+                                    pas_lib = oPassim.get("library")
+                                    pas_country = oPassim.get("country")
+                                    pas_city = oPassim.get("city")
+                                    # Get the huwa data
                                     oHuwa = oConvert.get("huwa")
-                                    huwa_lib = oHuwa.get("library", oPassim.get("library"))
-                                    huwa_country = oHuwa.get("country", oPassim.get("country"))
-                                    huwa_city = oHuwa.get("city", oPassim.get("city"))
+                                    huwa_lib = oHuwa.get("library")
+                                    huwa_country = oHuwa.get("country")
+                                    huwa_city = oHuwa.get("city")
+                                    # Apply Possible corrections
+                                    if not pas_lib is None: huwa_lib = pas_lib
+                                    if not pas_country is None: huwa_country = pas_country
+                                    if not pas_city is None: huwa_city = pas_city
+
                                     if huwa_lib == lib_name and huwa_country == lib_country and huwa_city == lib_city:
                                         # We found a correction to look up in passim
                                         lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
