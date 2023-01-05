@@ -54,7 +54,7 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, LocationRelation, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
@@ -2857,9 +2857,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
                 if obj_city is None:
                     # Add the city and the country it is in
-                    obj_city = Location.objects.create(name=lib_city, loctype__name="city")
-                    # Create a relation that the city is in the specified country
-                    obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                    loctype = LocationType.objects.filter(name="city").first()
+                    if not loctype is None:
+                        obj_city = Location.objects.create(name=lib_city, loctype=loctype)
+                        # Create a relation that the city is in the specified country
+                        obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
                             
                 # Try to get it
                 obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
@@ -3778,8 +3780,10 @@ class EqualGoldHuwaToJson(BasicPart):
                     if not bibliothek_id is None:
                         lib_id = None
 
+                        sBibliothekId = str(bibliothek_id)
+
                         # A library has been specified for this manuscript
-                        if bibliothek_id in oLibHuwaPassim:
+                        if sBibliothekId in oLibHuwaPassim:
                             library_id = oLibHuwaPassim[str(bibliothek_id)]
                             library = Library.objects.filter(id=library_id).first()
                             lib_name = ""
@@ -3792,11 +3796,11 @@ class EqualGoldHuwaToJson(BasicPart):
                                 if not library.lcountry is None:
                                     lib_country = library.lcountry.name
                                 lib_id = library.id
-                        elif bibliothek_id in oLibHuwaOnly:
+                        elif sBibliothekId in oLibHuwaOnly:
                             # This library is known in HUWA, but not in Passim: try to add it
-                            oLibrary = oLibHuwaOnly[bibliothek_id]
+                            oLibrary = oLibHuwaOnly[sBibliothekId]
                             # Always get the pre-defined details
-                            lib_name = oLibrary.get("name", "")
+                            lib_name = oLibrary.get("library", "")
                             lib_city = oLibrary.get("city", "")
                             lib_country = oLibrary.get("country", "")
 
