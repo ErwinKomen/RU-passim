@@ -88,7 +88,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads
+from passim.reader.views import reader_uploads, get_huwa_opera_literature
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -4559,6 +4559,32 @@ class SermonEdit(BasicDetails):
             context['mainitems'].append(mainitems_SSG)
             # Notes:
             # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
+
+            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            if not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # THis is the HUWA 'opera_id'
+                        opera_id = externalid
+                        # Now we need to get the handschrift_id from the manuscript
+                        manu = instance.get_manuscript()
+                        obj = ManuscriptExternal.objects.filter(manu=manu).first()
+                        if not obj is None:
+                            handschrift_id = obj.externalid
+                            # Let's see if there is any editor information
+                            lst_edilit = get_huwa_opera_literature(opera_id, handschrift_id)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
+
+
+
 
             # Add a button back to the Manuscript
             topleftlist = []

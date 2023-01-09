@@ -2056,6 +2056,10 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     # Return the object that has been created
     return oBack
 
+def get_huwa_opera_literature(opera_id, handschrift_id):
+    lBack = Edition.get_opera_literature(opera_id, handschrift_id)
+    return lBack
+
 
 class ReaderImport(View):
     # Initialisations
@@ -3347,6 +3351,17 @@ class EqualGoldHuwaToJson(BasicPart):
                 oErr.DoError("get_support")
             return sBack
 
+        def lib_match(sHuwa, sLib):
+            """"""
+            bResult = False
+            if sHuwa is None:
+                bResult = (not sLib is None)
+            elif sLib is None:
+                bResult = False
+            else:
+                bResult = (sHuwa == sLib)
+            return bResult
+
         # Initialize
         oHuwaLand = { "Algerien": "Algeria", "Australien": "Australia", "Belgien": "Belgium",
             "Deutschland": "Germany", "Dänemark": "Denmark", "Finnland": "Finland", "Frankreich": "France",
@@ -3670,6 +3685,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
                     oManuscript['format'] = get_format(oHandschrift, oFormatBemHandschrift)
 
+                    # Start adding notes to Hanschrift
+                    sNotes = oHandschrift.get("bemerkungen", "")
+                    if sNotes != "": 
+                        oManuscript['notes'] = sNotes
+
                     # Possibly add to the manuscript notes
                     if sHandschriftId in oNotizHandschrift:
                         notiz = oNotizHandschrift[sHandschriftId]
@@ -3677,7 +3697,18 @@ class EqualGoldHuwaToJson(BasicPart):
                             notes = oManuscript.get("notes")
                             if not notes is None and notes != "":
                                 notes = "{}; {}".format(notes, notiz)
+                            else:
+                                notes = notiz
                             oManuscript['notes'] = notes
+
+                    # See if we can do something with the dating
+                    iSaeculum = oHandschrift.get("saeculum", -1)
+                    if iSaeculum > 0:
+                        # Get the date and do something with it
+                        iYearStart = iSaeculum * 100
+                        iYearEnd = iYearStart + 99
+                        sDateRange = "{}-{}".format(iYearStart, iYearEnd)
+                        oManuscript['date'] = sDateRange
 
                     # Possibly add Zweitsignatur
                     lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
@@ -3697,6 +3728,8 @@ class EqualGoldHuwaToJson(BasicPart):
                         notes = oManuscript.get("notes")
                         if not notes is None and notes != "":
                             notes = "{}; {}".format(notes, sCombi)
+                        else:
+                            notes = sCombi
                         oManuscript['notes'] = notes
 
                     # Figure out library and location
@@ -3753,25 +3786,19 @@ class EqualGoldHuwaToJson(BasicPart):
                                     huwa_lib = oHuwa.get("library")
                                     huwa_country = oHuwa.get("country")
                                     huwa_city = oHuwa.get("city")
-                                    # Apply Possible corrections
-                                    if not pas_lib is None: huwa_lib = pas_lib
-                                    if not pas_country is None: huwa_country = pas_country
-                                    if not pas_city is None: huwa_city = pas_city
 
-                                    if lib_country == "":
-                                        # HUWA  misses the country name
-                                        if huwa_lib == lib_name and huwa_city == lib_city and not huwa_country is None:
+                                    if lib_match(huwa_lib, lib_name) and lib_match(huwa_country, lib_country) and lib_match(huwa_city, lib_city):
+
+                                        # Apply Possible corrections
+                                        if not pas_lib is None: huwa_lib = pas_lib
+                                        if not pas_country is None: huwa_country = pas_country
+                                        if not pas_city is None: huwa_city = pas_city
+
+                                        # Make sure we have a 'full match':
+                                        if not huwa_lib is None and not huwa_country is None and not huwa_city is None:
                                             # We found a correction to look up in passim
                                             lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, huwa_country)
-                                        else:
-                                            # Couldn't find the right combination
-                                            iStop = 1
-                                    else:
-                                        if huwa_lib == lib_name and huwa_country == lib_country and huwa_city == lib_city:
-                                            # We found a correction to look up in passim
-                                            lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
-
-
+                                            break
 
                             # NOTE: do *NOT* attempt to add this library.
                             #       it requires manual correction

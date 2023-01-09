@@ -156,6 +156,15 @@ class Literatur(models.Model):
             oErr.DoError("Literatur/get_parts")
         return html
 
+    def get_parts_obj(self, pp=None):
+        """Get the parts as an object"""
+
+        lParts = self.get_parts(pp, bAll=True)
+        oItem = dict(author=lParts[0], year=lParts[1], reihekurz=lParts[2],
+                     pp=lParts[3], title=lParts[4], band=lParts[5], 
+                     city=lParts[6])
+        return oItem
+
     def get_view(self, pp=None):
         """Get a view of this edition
         
@@ -429,28 +438,41 @@ class Edition(models.Model):
             # (1) look in the table [Edition]
             qs = Edition.objects.filter(operaid=opera_id)
             for obj in qs:
-                lst_part = obj.get_edition_view(True)
+                # Get the parts
+                pp = obj.get_pp()
+                oItem = self.literatur.get_parts_obj(pp)
+
+                #lst_part = obj.get_edition_view(True)
 
                 # Does this one have a siglen?
                 sSigle = obj.get_siglen(handschrift_id)
-                lst_part.append(sSigle)
+                #lst_part.append(sSigle)
+                oItem['sigle'] = [ sSigle ]
                 # Add it to the output list
-                lBack.append(lst_part)
+                #lBack.append(lst_part)
+                lBack.append(oItem)
 
                 # Does this have any siglen_edds?
                 for obj_edd in SiglenEdd.objects.filter(huwaedition=obj):
                     obj_lit = Literatur.objects.filter().first()
                     if not obj_lit is None:
-                        lst_edd_part = obj_lit.get_parts(bAll=True)
-                        lst_edd_part.append(obj_edd.get_sigle())
+                        #lst_edd_part = obj_lit.get_parts(bAll=True)
+                        #lst_edd_part.append(obj_edd.get_sigle())
+
+                        oItem = obj_lit.get_parts_obj()
+                        oItem['sigle'] = obj_edd.get_sigle()
+
                         # Add it to the output list
-                        lBack.append(lst_edd_part)
+                        # lBack.append(lst_edd_part)
+                        lBack.append(oItem)
 
             # (2) Look in the table [OperaLit]
             qs = OperaLit.objects.filter(operaid=opera_id)
             for obj in qs:
                 # Add it to the output list
-                lBack.append(obj.literatur.get_parts(bAll=True))
+                # lBack.append(obj.literatur.get_parts(bAll=True))
+                oItem = obj.literatur.get_parts_obj()
+                lBack.append(oItem)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Edition/get_opera_literature")

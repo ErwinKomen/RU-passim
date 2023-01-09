@@ -3633,11 +3633,13 @@ class Manuscript(models.Model):
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
+
             # Need to have external information
             externals = oManu.get("externals")
             externalid = None
             if not externals is None and len(externals) > 0: 
                 externalid = externals[0].get("externalid")
+
             # First get the shelf mark
             idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
@@ -3727,7 +3729,7 @@ class Manuscript(models.Model):
                             field = "{}_id".format(field)
                         value = oManu.get(field)
                         readonly = oField.get('readonly', False)
-                        if value != None and value != "" and not readonly:
+                        if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
                             path = oField.get("path")
                             if "target" in oField:
                                 path = oField.get("target")
@@ -3904,6 +3906,7 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            sourcetype = kwargs.get("sourcetype")
             value_lst = []
             if isinstance(value, str) and value[0] != '[':
                 value_lst = value.split(",")
@@ -3920,6 +3923,18 @@ class Manuscript(models.Model):
                     if keyword != None:
                         # Add this keyword to the manuscript for this user
                         UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
+                # Ready
+            elif path == "keywords" and sourcetype == "huwa":
+                # Get the list of keywords
+                real_keywords = value_lst #  json.loads(value)
+                for kw in real_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the manuscript for this user
+                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manu=self)
+                        if obj is None:
+                            obj = ManuscriptKeyword.objects.create(keyword=keyword, manu=self)
                 # Ready
             elif path == "datasets":
                 # Walk the personal datasets
@@ -8833,6 +8848,7 @@ class SermonDescr(models.Model):
             # Understand where we are coming from
             keyfield = kwargs.get("keyfield", "name")
             profile = kwargs.get("profile")
+            sourcetype = kwargs.get("sourcetype")
 
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
@@ -8881,7 +8897,7 @@ class SermonDescr(models.Model):
                     value = oSermo.get(field)
                     readonly = oField.get('readonly', False)
                 
-                    if value != None and value != "" and not readonly:
+                    if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
                         type = oField.get("type")
                         path = oField.get("path")
                         if type == "field":
@@ -8898,7 +8914,7 @@ class SermonDescr(models.Model):
                                     setattr(obj, path, instance)
                         elif type == "func":
                             # Set the KV in a special way
-                            obj.custom_set(path, value)
+                            obj.custom_set(path, value, **kwargs)
 
             # Make sure the update the object
             obj.save()
@@ -9013,6 +9029,7 @@ class SermonDescr(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            sourcetype = kwargs.get("sourcetype")
             value_lst = []
             if isinstance(value, str):
                 if value[0] == '[':
@@ -9027,6 +9044,8 @@ class SermonDescr(models.Model):
                     value_lst = value.split(",")
                     for idx, item in enumerate(value_lst):
                         value_lst[idx] = value_lst[idx].strip()
+            elif isinstance(value, list):
+                value_lst = value
             # Note: we skip a number of fields that are determined automatically
             #       [ stype ]
             if path == "brefs":
@@ -9060,6 +9079,18 @@ class SermonDescr(models.Model):
                     if keyword != None:
                         # Add this keyword to the sermon for this user
                         UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
+            elif path == "keywords" and sourcetype == "huwa":
+                # Get the list of keywords
+                real_keywords = value_lst #  json.loads(value)
+                for kw in real_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    if keyword != None:
+                        # Add this keyword to the sermondescr for this user
+                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, manu=self)
+                        if obj is None:
+                            obj = SermonDescrKeyword.objects.create(keyword=keyword, manu=self)
+                # Ready
             elif path == "literature":
                 # NOTE: a SermonDescr does *NOT* have its own literature
                 pass
@@ -9137,10 +9168,10 @@ class SermonDescr(models.Model):
                     externaltype = oExternal.get("externaltype")
                     if not externalid is None and not externaltype is None:
                         # Process it
-                        obj = SermonDescrExternal.objects.filter(manu=self, externalid=externalid, externaltype=externaltype).first()
+                        obj = SermonDescrExternal.objects.filter(sermon=self, externalid=externalid, externaltype=externaltype).first()
                         if obj is None:
                             # Add it
-                            obj = SermonDescrExternal.objects.create(manu=self, externalid=externalid, externaltype=externaltype)
+                            obj = SermonDescrExternal.objects.create(sermon=self, externalid=externalid, externaltype=externaltype)
             else:
                 # Figure out what to do in this case
                 pass
