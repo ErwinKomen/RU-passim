@@ -3741,7 +3741,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 lib_country = oHuwaLand[lib_country]
 
                             # Check whether there is a conversion attempt in "lib_huwa_new-jan2023"
-                            if lib_name != "" and lib_city != "" and lib_country != "":
+                            if lib_name != "" and lib_city != "":
                                 for oConvert in oLibHuwaConv:
                                     # Get the passim data
                                     oPassim = oConvert.get("passim")
@@ -3758,9 +3758,19 @@ class EqualGoldHuwaToJson(BasicPart):
                                     if not pas_country is None: huwa_country = pas_country
                                     if not pas_city is None: huwa_city = pas_city
 
-                                    if huwa_lib == lib_name and huwa_country == lib_country and huwa_city == lib_city:
-                                        # We found a correction to look up in passim
-                                        lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
+                                    if lib_country == "":
+                                        # HUWA  misses the country name
+                                        if huwa_lib == lib_name and huwa_city == lib_city and not huwa_country is None:
+                                            # We found a correction to look up in passim
+                                            lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, huwa_country)
+                                        else:
+                                            # Couldn't find the right combination
+                                            iStop = 1
+                                    else:
+                                        if huwa_lib == lib_name and huwa_country == lib_country and huwa_city == lib_city:
+                                            # We found a correction to look up in passim
+                                            lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, lib_country)
+
 
 
                             # NOTE: do *NOT* attempt to add this library.
