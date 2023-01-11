@@ -3810,6 +3810,8 @@ class Manuscript(models.Model):
                                 codico.name = title
                         else:
                             codico.name = codico_name
+                        # Make sure to write the CODICO now
+                        codico.save()
 
                     # Make sure we have a copy of the RAW json data for this manuscript
                     obj.raw = json.dumps(oManu, indent=2)
