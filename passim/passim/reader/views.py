@@ -3861,23 +3861,6 @@ class EqualGoldHuwaToJson(BasicPart):
                             codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
-                    ## Process Siglen into codico_notes
-                    #codico_notes = []
-                    #oSiglens = oSiglenHandschrift.get(sHandschriftId)
-                    #if not oSiglens is None:
-                    #    for oSiglen in oSiglens:
-                    #        sBem = oSiglen.get("bemerkungen")
-                    #        sSigle = oSiglen.get("sigle")
-                    #        sEdition = XX
-
-                    #        lCombi = []
-                    #        if not sSigle is None:
-                    #            lCombi.append(sSigle)
-                    #        if not sBem is None:
-                    #            lCombi.append("({})".format(sBem))
-                    #        codico_notes.append(" ".join(lCombi))
-                        oManuscript['codico_notes'] = "; ".join(codico_notes)
-
                     # Get and walk through the contents of this Handschrift
                     lst_inhalt = oInhaltHandschrift.get(sHandschriftId, [])
 
@@ -3906,6 +3889,21 @@ class EqualGoldHuwaToJson(BasicPart):
                             locus = get_locus(oInhalt)
                             # Getting the author also works differently
                             author_id, author_name = get_author(oInhalt, tables, lst_authors)
+                            # If this is none, try 'autor_opera'
+                            if author_id is None:
+                                huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
+                                if huwa_autor_id != "": 
+
+                                    # ================== DEBUGGING =========================
+                                    if huwa_autor_id == 3:
+                                        iStop = 1
+                                    # ======================================================
+
+                                    passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
+                                    if not passim_author is None:
+                                        author_id = passim_author.id
+                                        author_name = passim_author.name
+
                             # Get the incipit
                             # incipit = get_table_field(tables['inc'], inhalt_id, "inc_text", sIdField="inhalt")
                             incipit = oInhaltInc.get(str(inhalt_id), "")
@@ -5301,9 +5299,13 @@ class EqualGoldHuwaToJson(BasicPart):
         passim = None
         try:
             shuwa_id = str(huwa_id)
+            if isinstance(huwa_id, str):
+                ihuwa_id = int(huwa_id)
+            else:
+                ihuwa_id = huwa_id
             passim_id = None
             for item in lst_authors:
-                if item['huwa_id'] == shuwa_id:
+                if item['huwa_id'] == ihuwa_id:  # shuwa_id:
                     # Found it!
                     passim_id = item['passim_id']
                     break

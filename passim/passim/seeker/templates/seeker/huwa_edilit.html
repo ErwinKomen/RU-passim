@@ -3,7 +3,9 @@
     <table class="func-view" style="width: 100%;">
       <thead>
         <tr>
-          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th><th>Title (series/literature)</th><th>Vol</th><th>Location</th>
+          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th>
+          <th>Title (series/literature)</th><th>Vol</th><th>Location</th>
+          <th title="sigle (if existing, only for an edition)">S</th>
         </tr>
       </thead>
       <tbody>
@@ -29,6 +31,9 @@
             <td valign="top">
               {{edilit.location.city}}
               {% if edilit.location.country %}, {{edilit.location.country}}{% endif %}
+            </td>
+            <td valign="top" class="tdnowrap">
+              {% if edilit.sigle %}{{edilit.sigle}}{% endif %}
             </td>
           </tr>
         {% endfor %}

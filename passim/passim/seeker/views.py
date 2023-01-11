@@ -4516,7 +4516,7 @@ class SermonEdit(BasicDetails):
                 context['mainitems'].append(mainitems_CodNotes)
 
             mainitems_more =[
-                {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
+                {'type': 'line', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
                 ]
             for item in mainitems_more: context['mainitems'].append(item)
 

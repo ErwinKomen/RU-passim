@@ -139,6 +139,8 @@ class Literatur(models.Model):
             do_append(html, "reihekurz")
             if pp is None:
                 do_append(html, "pp")
+            elif pp == "0":
+                html.append("")
             else:
                 html.append(pp)
             sTitel = "-"
@@ -151,6 +153,7 @@ class Literatur(models.Model):
             html.append(sTitel)
             do_append(html, "band")
             do_append(html, "city", "slocation")
+            do_append(html, "country", "slocation")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Literatur/get_parts")
@@ -160,9 +163,17 @@ class Literatur(models.Model):
         """Get the parts as an object"""
 
         lParts = self.get_parts(pp, bAll=True)
-        oItem = dict(author=lParts[0], year=lParts[1], reihekurz=lParts[2],
-                     pp=lParts[3], title=lParts[4], band=lParts[5], 
-                     city=lParts[6])
+        oItem = dict(
+            edition = None,
+            author=dict(full=lParts[0]), 
+            year=lParts[1], 
+            reihekurz=lParts[2],
+            pp=lParts[3], 
+            reihetitel = None,
+            literaturtitel = None,
+            title=lParts[4], 
+            band=lParts[5], 
+            location = dict(city=lParts[6], country=lParts[7])  )
         return oItem
 
     def get_view(self, pp=None):
@@ -440,38 +451,33 @@ class Edition(models.Model):
             for obj in qs:
                 # Get the parts
                 pp = obj.get_pp()
-                oItem = self.literatur.get_parts_obj(pp)
-
-                #lst_part = obj.get_edition_view(True)
+                oItem = obj.literatur.get_parts_obj(pp)
+                oItem['edition'] = obj.editionid
 
                 # Does this one have a siglen?
                 sSigle = obj.get_siglen(handschrift_id)
-                #lst_part.append(sSigle)
-                oItem['sigle'] = [ sSigle ]
+                oItem['sigle'] = sSigle     # [ sSigle ]
                 # Add it to the output list
-                #lBack.append(lst_part)
                 lBack.append(oItem)
 
                 # Does this have any siglen_edds?
                 for obj_edd in SiglenEdd.objects.filter(huwaedition=obj):
                     obj_lit = Literatur.objects.filter().first()
                     if not obj_lit is None:
-                        #lst_edd_part = obj_lit.get_parts(bAll=True)
-                        #lst_edd_part.append(obj_edd.get_sigle())
-
                         oItem = obj_lit.get_parts_obj()
-                        oItem['sigle'] = obj_edd.get_sigle()
+                        oItem['edition'] = obj.editionid
+                        oItem['sigle'] = ", ".join(obj_edd.get_sigle())
 
                         # Add it to the output list
-                        # lBack.append(lst_edd_part)
                         lBack.append(oItem)
 
             # (2) Look in the table [OperaLit]
             qs = OperaLit.objects.filter(operaid=opera_id)
             for obj in qs:
                 # Add it to the output list
-                # lBack.append(obj.literatur.get_parts(bAll=True))
                 oItem = obj.literatur.get_parts_obj()
+                oItem['edition'] = ""
+                oItem['sigle'] = ""
                 lBack.append(oItem)
         except:
             msg = oErr.get_error_message()

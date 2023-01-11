@@ -3930,11 +3930,14 @@ class Manuscript(models.Model):
                 for kw in real_keywords:
                     # Find the keyword
                     keyword = Keyword.objects.filter(name__iexact=kw).first()
-                    if keyword != None:
+                    # Since this is HUWA< the keyword must be created if needed
+                    if keyword is None:
+                        keyword = Keyword.objects.create(name=kw)
+                    if not keyword is None:
                         # Add this keyword to the manuscript for this user
-                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manu=self)
+                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manuscript=self)
                         if obj is None:
-                            obj = ManuscriptKeyword.objects.create(keyword=keyword, manu=self)
+                            obj = ManuscriptKeyword.objects.create(keyword=keyword, manuscript=self)
                 # Ready
             elif path == "datasets":
                 # Walk the personal datasets
@@ -4798,7 +4801,7 @@ class Manuscript(models.Model):
                     # Walk the SSG links tied with sermon_src
                     for eq in sermon_src.equalgolds.all():
                         # Add it to the destination sermon
-                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, manu = sermon_dst.msitem.codico.manuscript, super=eq, linktype=LINK_UNSPECIFIED)
 
                     # Issue #315: adapt Bible reference(s) linking based on copied field
                     if mtype == "man":
@@ -8443,7 +8446,7 @@ class Collection(models.Model):
                     explicit=ssg.explicit, srchexplicit=ssg.srchexplicit,
                     stype="imp", mtype=mtype)
                 # Create a link from the S to this SSG
-                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, super=ssg, linktype=LINK_UNSPECIFIED)
+                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, manu = sermon.msitem.codico.manuscript, super=ssg, linktype=LINK_UNSPECIFIED)
 
         # Now walk and repair the links
         with transaction.atomic():
@@ -8709,14 +8712,16 @@ class SermonDescr(models.Model):
         {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
-        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
+        {'name': 'Attributed author',   'type': 'func',  'path': 'author_id'},
+        {'name': 'Attributed author',   'type': 'func',  'path': 'author'},
         {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
         {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
         {'name': 'Title',               'type': 'field', 'path': 'title'},
         {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
         {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
         {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
-        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name', 'model': 'Feast'},
         {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
         {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
         {'name': 'Note',                'type': 'field', 'path': 'note'},
@@ -8944,6 +8949,9 @@ class SermonDescr(models.Model):
                 for obj in qs:
                     dates.append(obj.__str__())
                 sBack = json.dumps(dates)
+            elif path == "author":
+                # Get the author name
+                sBack = self.get_author()
             elif path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
@@ -9019,7 +9027,7 @@ class SermonDescr(models.Model):
             if note_now is None:
                 srm.note = sNote
             else:
-                srm.note = "{}\\n{}".format(note_now, sNote)
+                srm.note = "{}\n{}".format(note_now, sNote)
 
 
         bResult = True
@@ -9053,6 +9061,16 @@ class SermonDescr(models.Model):
                 self.bibleref = value
                 # Turn this into BibRange
                 self.do_ranges()
+            elif path == "author":
+                # Get the (attributed) author either from author_id or from author (as name)
+                if self.author is None:
+                    # Set it according to the id
+                    self.author = Author.objects.filter(name__iexact=value).first()
+            elif path == "author_id":
+                # Get the (attributed) author either from author_id or from author (as name)
+                if self.author is None:
+                    # Set it according to the id
+                    self.author = Author.objects.filter(id=value).first()
             elif path == "datasets":
                 # Walk the personal datasets
                 datasets = value_lst #  get_json_list(value)
@@ -9085,11 +9103,14 @@ class SermonDescr(models.Model):
                 for kw in real_keywords:
                     # Find the keyword
                     keyword = Keyword.objects.filter(name__iexact=kw).first()
-                    if keyword != None:
+                    # Since this is HUWA< the keyword must be created if needed
+                    if keyword is None:
+                        keyword = Keyword.objects.create(name=kw)
+                    if not keyword is None:
                         # Add this keyword to the sermondescr for this user
-                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, manu=self)
+                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, sermon=self)
                         if obj is None:
-                            obj = SermonDescrKeyword.objects.create(keyword=keyword, manu=self)
+                            obj = SermonDescrKeyword.objects.create(keyword=keyword, sermon=self)
                 # Ready
             elif path == "literature":
                 # NOTE: a SermonDescr does *NOT* have its own literature
@@ -9098,8 +9119,11 @@ class SermonDescr(models.Model):
             elif path == "ssglinks":
                 ssglink_names = value_lst #  get_json_list(value)
                 for ssg_code in ssglink_names:
-                    # Get this SSG
-                    ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+                    # Get this SSG - depending on whether we have a string code or a SSG id
+                    if isinstance(ssg_code,str):
+                        ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+                    else:
+                        ssg = EqualGold.objects.filter(id=ssg_code).first()
 
                     if ssg == None:
                         # Indicate that we didn't find it in the notes
@@ -9109,7 +9133,9 @@ class SermonDescr(models.Model):
                         self.save()
                     else:
                         # Make link between SSG and SermonDescr
-                        SermonDescrEqual.objects.create(sermon=self, super=ssg, linktype="eqs")
+                        obj = SermonDescrEqual.objects.filter(sermon=self, manu = self.msitem.codico.manuscript, super=ssg).first()
+                        if obj is None:
+                            obj = SermonDescrEqual.objects.create(sermon=self, manu = self.msitem.codico.manuscript, super=ssg, linktype=LINK_UNSPECIFIED)
                 # Ready
             elif path == "signaturesM":
                 signatureM_names = value_lst #  get_json_list(value)
@@ -9130,10 +9156,16 @@ class SermonDescr(models.Model):
             elif path == "signaturesA":
                 signatureA_names = value_lst
                 # Walk all signatures
-                for code in signatureA_names:
+                for oCode in signatureA_names:
                     # Find the appropriate SG with this signature
-                    # Issue #533: changed to exact matching
-                    signature = Signature.objects.filter(code=code).first()
+                    if isinstance(oCode, dict):
+                        code = oCode.get("code")
+                        editype = oCode.get("editype")
+                        signature = Signature.objects.filter(code__iexact=code, editype=editype).first()
+                    else:
+                        # Issue #533: changed to exact matching
+                        code = oCode
+                        signature = Signature.objects.filter(code__iexact=code).first()
                     if signature is None:
                         # Show what is happening
                         if bDebug: oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
@@ -9153,13 +9185,16 @@ class SermonDescr(models.Model):
                                 if bDebug: oErr.Status("Reading signaturesA: empty SSG for signature [{}]".format(code))
                                 add_note(self, "[C] Link this sermon to: [{}]".format(code))
                             else:
-                                # Make the connection from the Sermon to the SSG
-                                obj = SermonDescrEqual.objects.create(
-                                    sermon = self,
-                                    manu = self.msitem.manu,
-                                    super = ssg)
-                                # Log what has happened
-                                if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
+                                obj = SermonDescrEqual.objects.filter(sermon = self,manu = self.msitem.codico.manuscript,super = ssg).first()
+                                if obj is None:
+                                    # Make the connection from the Sermon to the SSG
+                                    obj = SermonDescrEqual.objects.create(
+                                        sermon = self,
+                                        manu = self.msitem.codico.manuscript,
+                                        linktype=LINK_UNSPECIFIED,
+                                        super = ssg)
+                                    # Log what has happened
+                                    if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
             elif path == "externals":
                 # These are external IDs like for HUWA
                 externals = value_lst
