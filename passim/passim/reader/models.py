@@ -49,6 +49,7 @@ class SimpleAuthor(models.Model):
 
     def __str__(self):
         sBack = self.full
+        return sBack
 
 
 class SimpleLocation(models.Model):
@@ -62,6 +63,7 @@ class SimpleLocation(models.Model):
 
     def __str__(self):
         sBack = self.city
+        return sBack
 
 
 class Literatur(models.Model):

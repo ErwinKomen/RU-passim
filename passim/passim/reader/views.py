@@ -3884,9 +3884,17 @@ class EqualGoldHuwaToJson(BasicPart):
                         if opera_id in opera_passim:
                             oOpera = opera_passim[opera_id]
                             lst_notes = []
+
                             # Get all the necessary information of this Sermon Manifestation
-                            title = oOpera.get("opera_langname", "")
-                            note = oInhalt.get("bemerkungen", "")
+                            lst_note = []
+                            lst_note.append(oOpera.get("abk", ""))
+                            lst_note.append(oOpera.get("opera_langname", ""))
+
+                            lst_note.append(oInhalt.get("bemerkungen", ""))
+                            lst_note.append(oOpera.get("bemerkungen", ""))
+                            note = "\n".join([x for x in lst_note if x != ""])
+                            # note = "\n".join(lst_note)
+
                             postscriptum = oInfines.get(str(inhalt_id), None)
 
                             ## Get a possible list of editions + siglen
@@ -3925,11 +3933,11 @@ class EqualGoldHuwaToJson(BasicPart):
                             manu_count = oInhaltOpera.get(str(opera_id), 0)   
                             
                             # Get possible title
-                            if title == "":
-                                # Look at the inhalt_id
-                                sInhaltId = str(inhalt_id)
-                                if sInhaltId in oTitles:
-                                    title = oTitles[sInhaltId]                         
+                            title = ""
+                            # Look at the inhalt_id
+                            sInhaltId = str(inhalt_id)
+                            if sInhaltId in oTitles:
+                                title = oTitles[sInhaltId]
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON
