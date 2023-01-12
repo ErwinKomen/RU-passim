@@ -3937,7 +3937,7 @@ class Manuscript(models.Model):
                         keyword = Keyword.objects.create(name=kw)
                     if not keyword is None:
                         # Add this keyword to the manuscript for this user
-                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manuscript=self)
+                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manuscript=self).first()
                         if obj is None:
                             obj = ManuscriptKeyword.objects.create(keyword=keyword, manuscript=self)
                 # Ready
@@ -9110,7 +9110,7 @@ class SermonDescr(models.Model):
                         keyword = Keyword.objects.create(name=kw)
                     if not keyword is None:
                         # Add this keyword to the sermondescr for this user
-                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, sermon=self)
+                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, sermon=self).first()
                         if obj is None:
                             obj = SermonDescrKeyword.objects.create(keyword=keyword, sermon=self)
                 # Ready

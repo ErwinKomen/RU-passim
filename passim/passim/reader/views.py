@@ -3702,12 +3702,19 @@ class EqualGoldHuwaToJson(BasicPart):
                             oManuscript['notes'] = notes
 
                     # See if we can do something with the dating
-                    iSaeculum = oHandschrift.get("saeculum", -1)
-                    if iSaeculum > 0:
-                        # Get the date and do something with it
-                        iYearStart = iSaeculum * 100
-                        iYearEnd = iYearStart + 99
-                        sDateRange = "{}-{}".format(iYearStart, iYearEnd)
+                    sDateRange = None
+                    if sHandschriftId in oDates:
+                        # Get the (more exact) date from this place
+                        sDateRange = oDates.get(sHandschriftId).strip()
+                    if sDateRange is None or sDateRange == "":
+                        iSaeculum = oHandschrift.get("saeculum", -1)
+                        if iSaeculum > 0:
+                            # Get the date and do something with it
+                            iYearStart = iSaeculum * 100
+                            iYearEnd = iYearStart + 99
+                            sDateRange = "{}-{}".format(iYearStart, iYearEnd)
+                            # oManuscript['date'] = sDateRange
+                    if not sDateRange is None and sDateRange != "":
                         oManuscript['date'] = sDateRange
 
                     # Possibly add Zweitsignatur
