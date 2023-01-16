@@ -519,11 +519,15 @@ def read_huwa_edilit():
     """Load the JSON that specifies the inter-SSG relations according to Opera id's """
 
     oErr = ErrHandle()
+    lst_edilit = []
     try:
-        lst_edilit = None
         edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-        with open(edilit_json, "r", encoding="utf-8") as f:
-            lst_edilit = json.load(f)
+        if os.path.exists(edilit_json):
+            with open(edilit_json, "r", encoding="utf-8") as f:
+                lst_edilit = json.load(f)
+        else:
+            # Just issue a warning
+            oErr.Status("WARNING: cannot find file {}".format(edilit_json))
     except:
         msg = oErr.get_error_message()
         oErr.DoError("adaptations.read_huwa_edilit")
