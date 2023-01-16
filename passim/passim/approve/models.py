@@ -170,21 +170,22 @@ class EqualChange(models.Model):
                 iCount = self.changeapprovals.exclude(atype="acc").count()
             elif method == "per_project":
                 # Need at least one person per project
-                # First: get a list of projects linked to the SSG
-                project_ids = [x.id for x in self.super.projects.all()]
+                # First: get a list of projects linked to the SSG that need approval
+                project_ids = {str(x.id): False for x in self.super.projects.all()}
                 # Then count the number of projects linked to it
                 iTotal = len(project_ids)
                 # Now go through all approvals and see which projects have already made an approval
-                project_acc = []
                 for obj in self.changeapprovals.filter(atype="acc"):
                     # check out which projects this approver has rights for
                     approver_project_ids = [x.id for x in obj.profile.projects.all()]
                     for prj_id in approver_project_ids:
-                        if not prj_id in project_acc:
-                            project_acc.append(prj_id)
+                        sPrjId = str(prj_id)
+                        if sPrjId in project_ids:
+                            project_ids[sPrjId] = True
                 # The [project_acc] now contains the id's of all projects for which the SSG has been approved
                 #   (We want to know how many projects there are *left*)
-                iCount = iTotal - len(project_acc)
+                iApproved = len([{k:v} for k,v in project_ids.items() if v==True])
+                iCount = iTotal - iApproved
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChange/get_approval_count")
@@ -235,6 +236,21 @@ class EqualChange(models.Model):
             if self.field == oItem['tofld']:
                 sBack = oItem['display']
                 break
+        return sBack
+
+    def get_proposer(self):
+        """Provide details of the person who proposed this change and when"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            sBack = self.profile.user.username
+            #sWhen = self.get_saved()
+            #sBack = "{} (on {})".format(sName, sWhen)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_proposer")
+
         return sBack
 
     def get_review_list(profile, all=False):
