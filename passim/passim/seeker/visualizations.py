@@ -163,6 +163,11 @@ class EqualGoldOverlap(BasicPart):
         graph_template = 'seeker/super_graph_hist.html'
 
         try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
             # Define the linktype and spectype
             for obj in FieldChoice.objects.filter(field="seeker.spectype"):
                 spec_dict[obj.abbr]= obj.english_name
@@ -369,6 +374,11 @@ class EqualGoldTrans(BasicPart):
                     
         oErr = ErrHandle()
         try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
             # Need to figure out who I am
             profile = Profile.get_user_profile(self.request.user.username)
             instance = self.obj
@@ -574,6 +584,11 @@ class EqualGoldGraph(BasicPart):
                     
         oErr = ErrHandle()
         try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
             if self.isRelevant:
                 # Need to figure out who I am
                 profile = Profile.get_user_profile(self.request.user.username)
@@ -830,6 +845,11 @@ class EqualGoldPca(BasicPart):
                     
         oErr = ErrHandle()
         try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
             # Need to figure out who I am
             profile = Profile.get_user_profile(self.request.user.username)
             instance = self.obj

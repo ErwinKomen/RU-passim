@@ -3,6 +3,7 @@ Definition of forms.
 """
 
 from django import forms
+from django.core import validators
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
@@ -12,6 +13,8 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 from passim.seeker.models import *
 from passim.basic.widgets import RangeSlider
 from passim.dct.models import ResearchSet
+
+import re
 
 def init_choices(obj, sFieldName, sSet, use_helptext=True, maybe_empty=False, bUseAbbr=False, exclude=None):
     if (obj.fields != None and sFieldName in obj.fields):
@@ -42,6 +45,14 @@ SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less t
 
 
 # =================== HELPER FUNCTIONS ==========================
+
+slug_safe_re = re.compile(r'^[-\w\s]+\Z')
+validate_safe_charinput = validators.RegexValidator(
+    slug_safe_re,
+    _("Enter a valid 'string' (letters, spaces, numbers, underscores, or hyphens)."),
+    'invalid'
+)
+
 
 def order_search(qs, term):
     """Given a query and a search term, provide better ordered results"""
@@ -1435,6 +1446,13 @@ class SignUpForm(UserCreationForm):
     class Meta:
         model = User
         fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2', )
+
+    def __init__(self, *args, **kwargs):
+        super(SignUpForm, self).__init__(*args, **kwargs)
+        first_name = self.fields['first_name']
+        last_name = self.fields['last_name']
+        first_name.validators.append(validate_safe_charinput)
+        last_name.validators.append(validate_safe_charinput)
 
 
 class SearchSermonForm(forms.Form):

@@ -719,6 +719,11 @@ class SavedItemApply(BasicPart):
         data = dict(status="ok")
        
         try:
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
+
             # We already know who we are
             profile = self.obj
 
@@ -789,6 +794,11 @@ class SelectItemApply(BasicPart):
         try:
             # We already know who we are
             profile = self.obj
+
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
 
             # Retrieve necessary parameters
             selitemtype = self.qd.get("selitemtype")
@@ -1796,48 +1806,58 @@ class SetDefData(BasicPart):
         # Gather all necessary data
         data = {}
 
-        # Get the SetDef object
-        setdef = self.obj
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
 
-        # Find out what we are doing here
-        mode = self.qd.get("save_mode", "")
-        params = self.qd.get("params")
-        if mode == "save":
-            # Simple saving of current object
-            if params != None:
-                setdef.contents = params
-                setdef.save()
-                data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef.id})
-        elif mode == "savenew":
-            # Save as a new item and open that one
-            setdef_new = SetDef.objects.create(
-                researchset=setdef.researchset,
-                contents=params)
-            data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef_new.id})
+            # Get the SetDef object
+            setdef = self.obj
 
-        else:
-            # Get to the setdef object
-            contents = setdef.get_contents()
-            do_calc_pm = ('recalc' in contents['params'])
+            # Find out what we are doing here
+            mode = self.qd.get("save_mode", "")
+            params = self.qd.get("params")
+            if mode == "save":
+                # Simple saving of current object
+                if params != None:
+                    setdef.contents = params
+                    setdef.save()
+                    data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef.id})
+            elif mode == "savenew":
+                # Save as a new item and open that one
+                setdef_new = SetDef.objects.create(
+                    researchset=setdef.researchset,
+                    contents=params)
+                data['targeturl'] = reverse('setdef_details', kwargs={'pk': setdef_new.id})
 
-            # Set the pivot row to the default value, if it is not yet defined
-            if not 'pivot_col' in contents['params']:
-                contents['params']['pivot_col'] = 0
-                do_calc_pm = True
+            else:
+                # Get to the setdef object
+                contents = setdef.get_contents()
+                do_calc_pm = ('recalc' in contents['params'])
 
-            if do_calc_pm:
-                # We need to calculate (or re-calculate) the PM based on the whole research set
-                pivot_col = setdef.researchset.calculate_pm()
-                contents['params']['pivot_col'] = pivot_col
-                # Make sure to also save this
-                contents['params'].pop("recalc", "")
-                setdef.contents = json.dumps(contents['params'])
-                setdef.save()
+                # Set the pivot row to the default value, if it is not yet defined
+                if not 'pivot_col' in contents['params']:
+                    contents['params']['pivot_col'] = 0
+                    do_calc_pm = True
 
-            # REturn the contents
-            data['contents'] = contents
-        # FIll in the [data] part of the context with all necessary information
-        context['data'] = data
+                if do_calc_pm:
+                    # We need to calculate (or re-calculate) the PM based on the whole research set
+                    pivot_col = setdef.researchset.calculate_pm()
+                    contents['params']['pivot_col'] = pivot_col
+                    # Make sure to also save this
+                    contents['params'].pop("recalc", "")
+                    setdef.contents = json.dumps(contents['params'])
+                    setdef.save()
+
+                # REturn the contents
+                data['contents'] = contents
+            # FIll in the [data] part of the context with all necessary information
+            context['data'] = data
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDefData")
         return context
 
 

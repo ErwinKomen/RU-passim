@@ -7356,157 +7356,162 @@ class CollAnyEdit(BasicDetails):
         prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
         prefix_elevate = ['any', 'super', 'priv', 'publ']
 
-        # Need to know who this is
-        profile = Profile.get_user_profile(self.request.user.username)
+        oErr = ErrHandle()
+        try:
 
-        # Prepare saveditem handling
-        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
-        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
+            # Need to know who this is
+            profile = Profile.get_user_profile(self.request.user.username)
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
-            {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
-            {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-            {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
-            ]
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
 
-        # Optionally add Scope: but only for the actual *owner* of this one
-        if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+                {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
+                {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+                {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
+                ]
+
+            # Optionally add Scope: but only for the actual *owner* of this one
+            if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+                context['mainitems'].append(
+                {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
+
+            # Always add Type, but its value may not be changed
             context['mainitems'].append(
-            {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
+                {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
 
-        # Always add Type, but its value may not be changed
-        context['mainitems'].append(
-            {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
+            # Always add project label(s)
+            #context['mainitems'].append(
+            #    {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown(), 'field_key': 'project'})
 
-        # Always add project label(s)
-        #context['mainitems'].append(
-        #    {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown(), 'field_key': 'project'})
+            # Optionally add Readonly
+            if self.prefix in prefix_readonly:
+                context['mainitems'].append(
+                {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
 
-        # Optionally add Readonly
-        if self.prefix in prefix_readonly:
-            context['mainitems'].append(
-            {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
-
-        # This is only for private PDs:
-        if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
-            name_choice = dict(
-                manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
-                sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
-                gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
-                super=dict(sg_name="Authority file", pl_name="Authority files")
-                )
-            # Add a button + text
-            context['datasettype'] = instance.type
-            context['sg_name'] = name_choice[instance.type]['sg_name']
-            context['pl_name'] = name_choice[instance.type]['pl_name']
-            
-            context['size'] = instance.get_size_markdown()
-            size_value = render_to_string("seeker/collpriv.html", context, self.request)
-        else:
-            size_value = instance.get_size_markdown()
-        
-        # Always add Created (with name of the creator) and Size                
-        context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
-        context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
-
-        # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
-        if instance.settype == "hc" and context['is_app_editor']:
-            # If 'manu' is set, then this procedure is called from 'collhist_compare'
-            if self.manu == None:
-                context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
-        # Historical collections may have literature references
-        if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
-            oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
-            if context['is_app_editor']:
-                oLitref['multiple'] = True
-                oLitref['field_list'] = 'litlist'
-                oLitref['fso'] = self.formset_objects[0]
-                oLitref['template_selection'] = 'ru.passim.litref_template'
-            context['mainitems'].append(oLitref)        
-        
-        # Historical collections have a project assigned to them
-        if instance.settype == "hc":
-            oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
-            if may_edit_project(self.request, profile, instance):
-                oProject['field_list'] = 'projlist'
-            context['mainitems'].append(oProject)        
-
-        # Add comment modal stuff
-        if instance.settype == "hc":
-            initial = dict(otype="hc", objid=instance.id, profile=profile)
-            context['commentForm'] = CommentForm(initial=initial, prefix="com")
-            context['comment_list'] = get_usercomments('hc', instance, profile)            
-            lhtml = []
-            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
-            context['comment_count'] = instance.comments.count()
-
-            # Also add the saved item form
-            lhtml.append(saveditem_form)
-
-            # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)    
-        else:
-            lhtml = []                    
-            # Also add the saved item form
-            lhtml.append(saveditem_form)
-
-            # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)    
-
-        # Any dataset may optionally be elevated to a historical collection
-        # BUT: only if a person has permission
-        if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
-            context['authenticated'] and context['is_app_editor']:
-            context['mainitems'].append(
-                {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
-                )
-        # Buttons to switch to a listview of M/S/SG/SSG based on this collection
-        context['mainitems'].append(
-                {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
-                 'title': 'Open a listview that is filtered on this dataset'}
-                )
-        # For HC: buttons to switch between related listviews
-        if instance.settype == "hc" and context['is_app_editor'] and self.manu == None and self.codico == None:
-            context['mainitems'].append(
-                    {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
-                     'title': 'Optionally show and edit the Authority files in this collection'}
+            # This is only for private PDs:
+            if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
+                name_choice = dict(
+                    manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
+                    sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
+                    gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
+                    super=dict(sg_name="Authority file", pl_name="Authority files")
                     )
-
-
-        # Signal that we have select2
-        context['has_select2'] = True
-
-        
-
-
-        # Determine what the permission level is of this collection for the current user
-        # (1) Is this user a different one than the one who created the collection?
-        profile_owner = instance.owner
-        profile_user = Profile.get_user_profile(self.request.user.username)
-        # (2) Set default permission
-        permission = ""
-        if profile_owner.id == profile_user.id:
-            # (3) Any creator of the collection may write it
-            permission = "write"
-        else:
-            # (4) permission for different users
-            if context['is_app_editor']:
-                # (5) what if the user is an app_editor?
-                if instance.scope == "publ":
-                    # Editors may read/write collections with 'public' scope
-                    permission = "write"
-                elif instance.scope == "team":
-                    # Editors may read collections with 'team' scope
-                    permission = "read"
+                # Add a button + text
+                context['datasettype'] = instance.type
+                context['sg_name'] = name_choice[instance.type]['sg_name']
+                context['pl_name'] = name_choice[instance.type]['pl_name']
+            
+                context['size'] = instance.get_size_markdown()
+                size_value = render_to_string("seeker/collpriv.html", context, self.request)
             else:
-                # (5) any other users
-                if instance.scope == "publ":
-                    # All users may read collections with 'public' scope
-                    permission = "read"
+                size_value = instance.get_size_markdown()
+        
+            # Always add Created (with name of the creator) and Size                
+            context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
+            context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
 
-        context['permission'] = permission
+            # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
+            if instance.settype == "hc" and context['is_app_editor']:
+                # If 'manu' is set, then this procedure is called from 'collhist_compare'
+                if self.manu == None:
+                    context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
+            # Historical collections may have literature references
+            if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
+                oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
+                if context['is_app_editor']:
+                    oLitref['multiple'] = True
+                    oLitref['field_list'] = 'litlist'
+                    oLitref['fso'] = self.formset_objects[0]
+                    oLitref['template_selection'] = 'ru.passim.litref_template'
+                context['mainitems'].append(oLitref)        
+        
+            # Historical collections have a project assigned to them
+            if instance.settype == "hc":
+                oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
+                if may_edit_project(self.request, profile, instance):
+                    oProject['field_list'] = 'projlist'
+                context['mainitems'].append(oProject)        
+
+            # Add comment modal stuff
+            if instance.settype == "hc":
+                initial = dict(otype="hc", objid=instance.id, profile=profile)
+                context['commentForm'] = CommentForm(initial=initial, prefix="com")
+                context['comment_list'] = get_usercomments('hc', instance, profile)            
+                lhtml = []
+                lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+                context['comment_count'] = instance.comments.count()
+
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
+                # Store the after_details in the context
+                context['after_details'] = "\n".join(lhtml)    
+            else:
+                lhtml = []                    
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
+                # Store the after_details in the context
+                context['after_details'] = "\n".join(lhtml)    
+
+            # Any dataset may optionally be elevated to a historical collection
+            # BUT: only if a person has permission
+            if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
+                context['authenticated'] and context['is_app_editor']:
+                context['mainitems'].append(
+                    {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
+                    )
+            # Buttons to switch to a listview of M/S/SG/SSG based on this collection
+            context['mainitems'].append(
+                    {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
+                     'title': 'Open a listview that is filtered on this dataset'}
+                    )
+            # For HC: buttons to switch between related listviews
+            if instance.settype == "hc" and context['is_app_editor'] and self.manu == None and self.codico == None:
+                context['mainitems'].append(
+                        {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
+                         'title': 'Optionally show and edit the Authority files in this collection'}
+                        )
+
+            # Signal that we have select2
+            context['has_select2'] = True
+
+            # Determine what the permission level is of this collection for the current user
+            # (1) Is this user a different one than the one who created the collection?
+            profile_owner = instance.owner
+            profile_user = Profile.get_user_profile(self.request.user.username)
+            # (2) Set default permission
+            permission = ""
+            if self.may_edit():
+                if profile_owner.id == profile_user.id:
+                    # (3) Any creator of the collection may write it
+                    permission = "write"
+                else:
+                    # (4) permission for different users
+                    if context['is_app_editor']:
+                        # (5) what if the user is an app_editor?
+                        if instance.scope == "publ":
+                            # Editors may read/write collections with 'public' scope
+                            permission = "write"
+                        elif instance.scope == "team":
+                            # Editors may read collections with 'team' scope
+                            permission = "read"
+                    else:
+                        # (5) any other users
+                        if instance.scope == "publ":
+                            # All users may read collections with 'public' scope
+                            permission = "read"
+            else:
+                permission = "readonly"
+
+            context['permission'] = permission
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/add_to_context")
           
         # Return the context we have made
         return context    
@@ -9309,41 +9314,50 @@ class CommentSend(BasicPart):
                 obj = Collection.objects.filter(id=objid).first()
             return obj
 
-        if self.add:
-            # Get the form
-            form = CommentForm(self.qd, prefix="com")
-            if form.is_valid():
-                cleaned = form.cleaned_data
-                # Yes, we are adding something new - check what we have
-                profile = cleaned.get("profile")
-                otype = cleaned.get("otype")
-                objid = cleaned.get("objid")
-                content = cleaned.get("content")
-                if content != None and content != "":
-                    # Yes, there is a remark
-                    comment = Comment.objects.create(profile=profile, content=content, otype=otype)
-                    obj = get_object(otype, objid)
-                    # Add a new object for this user 
-                    obj.comments.add(comment) 
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
 
-                    # Send this comment by email
-                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id}) # HIER GAAT HET MIS
-                    context['objurl'] = self.request.build_absolute_uri(objurl)
-                    context['objname'] = obj_names[otype]
-                    context['comdate'] = comment.get_created()
-                    context['user'] = profile.user
-                    context['objcontent'] = content
-                    contents = render_to_string('seeker/comment_mail.html', context, self.request)
-                    comment.send_by_email(contents)
+            if self.add:
+                # Get the form
+                form = CommentForm(self.qd, prefix="com")
+                if form.is_valid():
+                    cleaned = form.cleaned_data
+                    # Yes, we are adding something new - check what we have
+                    profile = cleaned.get("profile")
+                    otype = cleaned.get("otype")
+                    objid = cleaned.get("objid")
+                    content = cleaned.get("content")
+                    if content != None and content != "":
+                        # Yes, there is a remark
+                        comment = Comment.objects.create(profile=profile, content=content, otype=otype)
+                        obj = get_object(otype, objid)
+                        # Add a new object for this user 
+                        obj.comments.add(comment) 
 
-                    # Get a list of comments by this user for this item
-                    context['comment_list'] = get_usercomments(otype, obj, profile)
-                    # Translate this list into a valid string
-                    comment_list = render_to_string('seeker/comment_list.html', context, self.request)
-                    # And then pass on this string in the 'data' part of the POST response
-                    #  (this is done using the BasicPart POST handling)
-                    context['data'] = dict(comment_list=comment_list)
+                        # Send this comment by email
+                        objurl = reverse(url_names[otype], kwargs={'pk': obj.id}) # HIER GAAT HET MIS
+                        context['objurl'] = self.request.build_absolute_uri(objurl)
+                        context['objname'] = obj_names[otype]
+                        context['comdate'] = comment.get_created()
+                        context['user'] = profile.user
+                        context['objcontent'] = content
+                        contents = render_to_string('seeker/comment_mail.html', context, self.request)
+                        comment.send_by_email(contents)
 
+                        # Get a list of comments by this user for this item
+                        context['comment_list'] = get_usercomments(otype, obj, profile)
+                        # Translate this list into a valid string
+                        comment_list = render_to_string('seeker/comment_list.html', context, self.request)
+                        # And then pass on this string in the 'data' part of the POST response
+                        #  (this is done using the BasicPart POST handling)
+                        context['data'] = dict(comment_list=comment_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentSend")
 
         # Send the result
         return context
@@ -14789,260 +14803,275 @@ class BasketUpdate(BasicPart):
     form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def add_to_context(self, context):
-        # Reset the redirect page
-        self.redirectpage = ""
 
-        method = "use_profile_search_id_list"
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                context['basketsize'] = 0
+                context['basketuser'] = "no_user"
+                context['basketwarning'] = "Sorry, only Passim users are allowed to use the baskets"
+                return context
 
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
+            # Reset the redirect page
+            self.redirectpage = ""
 
-        username=self.request.user.username
-        team_group=app_editor
+            method = "use_profile_search_id_list"
 
-        # Note: only operations in either of these two lists will be executed
-        lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Obligatory initialization
-            rset = None
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
-
-            # Action depends on operations
-            if operation in lst_basket_target:
-                if method == "use_profile_search_id_list":
-                    # Get the latest search results
-                    search_s = getattr(profile, "search_{}".format(self.colltype))
-                    search_id = []
-                    if search_s != None and search_s != "" and search_s[0] == "[":
-                        search_id = json.loads(search_s)
-                    search_count = len(search_id)
-
-                    kwargs = {'profile': profile}
-
-                    # NOTE PROBLEM - we don't have the [oFields] at this point...
-
-                    # Action depends on the operation specified
-                    if search_count > 0 and operation == "create":
-                        # Remove anything there
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif search_count > 0  and operation == "add":
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                obj = self.clsBasket.objects.filter(**kwargs).first()
-                                if obj == None:
-                                    self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif search_count > 0  and operation == "remove":
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.filter(**kwargs).delete()
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif operation == "reset":
-                        # Remove everything from our basket
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Reset the history for this one
-                        profile.history(operation, self.colltype)
-
-                else:
-                    
-                    kwargs = {'profile': profile}
-
-                    # Action depends on the operation specified
-                    if qs and operation == "create":
-                        # Remove anything there
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif qs and operation == "add":
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif qs and operation == "remove":
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.filter(**kwargs).delete()
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif operation == "reset":
-                        # Remove everything from our basket
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Reset the history for this one
-                        profile.history(operation, self.colltype)
-
-            elif operation in lst_basket_source:
-                # Queryset: the basket contents
-                qs = self.clsBasket.objects.filter(profile=profile)
-
-                # Get the history string
-                history = getattr(profile, "history{}".format(self.colltype))
-
-                # New collection or existing one?
-                coll = None
-                bChanged = False
-                if operation == "collcreate":
-                    # Save the current basket as a collection that needs to receive a name
-                    # Note: this assumes [scope='priv'] default
-                    if self.colltype != "super":
-                        coll = Collection.objects.create(path=history, settype="pd",
-                                descrip="Created from a {} listview basket".format(self.colltype), 
-                                owner=profile, type=self.colltype)
-                    else:
-                        coll = Collection.objects.create(path=history, settype="pd",
-                                descrip="Created from a Authority file listview basket", 
-                                owner=profile, type=self.colltype)
-                    # Assign it a name based on its ID number and the owner
-                    if self.colltype != "super":
-                        name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)                         
-                    else:
-                        name = "{}_{}_{}".format(profile.user.username, coll.id, "af")
-                    coll.name = name
-                    coll.save()
-                elif operation == "rsetcreate":
-                    # Save the current basket as a research-set that needs to receive a name
-                    rset = ResearchSet.objects.create(
-                        name="tijdelijk",
-                        notes="Created from a {} listview basket".format(self.colltype),
-                        profile=profile)
-                    # Assign it a name based on its ID number and the owner
-                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
-                    rset.name = name
-                    rset.save()
-                elif operation == "dctlaunch":
-                    # Save the current basket as a research-set that needs to receive a name
-                    rset = ResearchSet.objects.create(
-                        name="tijdelijk",
-                        notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
-                        profile=profile)
-                    # Assign it a name based on its ID number and the owner
-                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
-                    rset.name = name
-                    rset.save()
-                elif oFields['collone']:
-                    coll = oFields['collone']
-
-                # Process the basket elements into the ResearchSet or into the Collection
-                if rset != None:
-                    with transaction.atomic():
-                        for idx, item in enumerate(qs):
-                            # Check if it doesn't exist yet
-                            obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
-                            if obj == None:
-                                # Create this
-                                order = idx + 1
-                                SetList.objects.create(researchset=rset, 
-                                                       order = order,
-                                                       setlisttype="manu",
-                                                       manuscript=item.manu)
-
-                    # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
-                    if operation == "rsetcreate":
-                        self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
-                    elif operation == "dctlaunch":
-                        # Get the default DCT for this ad-hoc ResearchSet
-                        dct = rset.researchset_setdefs.first()
-                        self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
-                elif coll == None:
-                    # TODO: provide some kind of error??
-                    pass
-                else:
-                    # Link the collection with the correct model
-                    kwargs = {'collection': coll}
-                    if self.colltype == "sermo":
-                        clsColl = CollectionSerm
-                        field = "sermon"
-                    elif self.colltype == "gold":
-                        clsColl = CollectionGold
-                        field = "gold"
-                    elif self.colltype == "manu":
-                        clsColl = CollectionMan
-                        field = "manuscript"
-                    elif self.colltype == "super":
-                        clsColl = CollectionSuper
-                        field = "super"
-
-                    # THis is only needed for collections
-                    with transaction.atomic():
-                        for item in qs:
-                            kwargs[field] = getattr( item, self.s_field)
-                            # Check if it doesn't exist yet
-                            obj = clsColl.objects.filter(**kwargs).first()
-                            if obj == None:
-                                clsColl.objects.create(**kwargs)
-                                # Note that some changes have been made
-                                bChanged = True
-
-                    # Make sure to redirect to this instance -- but only for COLLCREATE
-                    if operation == "collcreate":
-                        self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
-                    else:
-                        # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
-                        if coll.settype == "pd":
-                            if coll.scope == "publ":
-                                # Public dataset
-                                urltype = "publ"
-                            else:
-                                # Team or Priv
-                                urltype = "priv"
-                        elif coll.settype == "hc":
-                            urltype = "hist"
-                        collurl = reverse('coll{}_details'.format(urltype), kwargs={'pk': coll.id})
-                        collname = coll.name
-                        context['data'] = dict(collurl=collurl, collname=collname)
-                        # Have changes been made?
-                        if bChanged:
-                            # Add the current basket history to the collection's path
-                            lst_history_basket = json.loads(history)
-                            lst_history_coll = json.loads(coll.path)
-                            for item in lst_history_basket:
-                                lst_history_coll.append(item)
-                            coll.path = json.dumps(lst_history_coll)
-                            coll.save()
-
-            # Adapt the basket size
-            context['basketsize'] = self.get_basketsize(profile)
-
-            # Set the other context parameters
-            if self.colltype == "sermo":
-                context['basket_show'] = reverse('basket_show' )
-                context['basket_update'] = reverse('basket_update')
+            # Get the operation
+            if 'operation' in self.qd:
+                operation = self.qd['operation']
             else:
-                context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
-                context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
-            context['colltype'] = self.colltype
+                return context
+
+            username=self.request.user.username
+            team_group=app_editor
+
+            # Note: only operations in either of these two lists will be executed
+            lst_basket_target = ["create", "add", "remove", "reset"]
+            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
+
+            # Get our profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            if profile != None:
+
+                # Obligatory initialization
+                rset = None
+
+                # Get the queryset
+                self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
+
+                # Action depends on operations
+                if operation in lst_basket_target:
+                    if method == "use_profile_search_id_list":
+                        # Get the latest search results
+                        search_s = getattr(profile, "search_{}".format(self.colltype))
+                        search_id = []
+                        if search_s != None and search_s != "" and search_s[0] == "[":
+                            search_id = json.loads(search_s)
+                        search_count = len(search_id)
+
+                        kwargs = {'profile': profile}
+
+                        # NOTE PROBLEM - we don't have the [oFields] at this point...
+
+                        # Action depends on the operation specified
+                        if search_count > 0 and operation == "create":
+                            # Remove anything there
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "add":
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    obj = self.clsBasket.objects.filter(**kwargs).first()
+                                    if obj == None:
+                                        self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "remove":
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif operation == "reset":
+                            # Remove everything from our basket
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Reset the history for this one
+                            profile.history(operation, self.colltype)
+
+                    else:
+                    
+                        kwargs = {'profile': profile}
+
+                        # Action depends on the operation specified
+                        if qs and operation == "create":
+                            # Remove anything there
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif qs and operation == "add":
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif qs and operation == "remove":
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif operation == "reset":
+                            # Remove everything from our basket
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Reset the history for this one
+                            profile.history(operation, self.colltype)
+
+                elif operation in lst_basket_source:
+                    # Queryset: the basket contents
+                    qs = self.clsBasket.objects.filter(profile=profile)
+
+                    # Get the history string
+                    history = getattr(profile, "history{}".format(self.colltype))
+
+                    # New collection or existing one?
+                    coll = None
+                    bChanged = False
+                    if operation == "collcreate":
+                        # Save the current basket as a collection that needs to receive a name
+                        # Note: this assumes [scope='priv'] default
+                        if self.colltype != "super":
+                            coll = Collection.objects.create(path=history, settype="pd",
+                                    descrip="Created from a {} listview basket".format(self.colltype), 
+                                    owner=profile, type=self.colltype)
+                        else:
+                            coll = Collection.objects.create(path=history, settype="pd",
+                                    descrip="Created from a Authority file listview basket", 
+                                    owner=profile, type=self.colltype)
+                        # Assign it a name based on its ID number and the owner
+                        if self.colltype != "super":
+                            name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)                         
+                        else:
+                            name = "{}_{}_{}".format(profile.user.username, coll.id, "af")
+                        coll.name = name
+                        coll.save()
+                    elif operation == "rsetcreate":
+                        # Save the current basket as a research-set that needs to receive a name
+                        rset = ResearchSet.objects.create(
+                            name="tijdelijk",
+                            notes="Created from a {} listview basket".format(self.colltype),
+                            profile=profile)
+                        # Assign it a name based on its ID number and the owner
+                        name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                        rset.name = name
+                        rset.save()
+                    elif operation == "dctlaunch":
+                        # Save the current basket as a research-set that needs to receive a name
+                        rset = ResearchSet.objects.create(
+                            name="tijdelijk",
+                            notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
+                            profile=profile)
+                        # Assign it a name based on its ID number and the owner
+                        name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                        rset.name = name
+                        rset.save()
+                    elif oFields['collone']:
+                        coll = oFields['collone']
+
+                    # Process the basket elements into the ResearchSet or into the Collection
+                    if rset != None:
+                        with transaction.atomic():
+                            for idx, item in enumerate(qs):
+                                # Check if it doesn't exist yet
+                                obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
+                                if obj == None:
+                                    # Create this
+                                    order = idx + 1
+                                    SetList.objects.create(researchset=rset, 
+                                                           order = order,
+                                                           setlisttype="manu",
+                                                           manuscript=item.manu)
+
+                        # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
+                        if operation == "rsetcreate":
+                            self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                        elif operation == "dctlaunch":
+                            # Get the default DCT for this ad-hoc ResearchSet
+                            dct = rset.researchset_setdefs.first()
+                            self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
+                    elif coll == None:
+                        # TODO: provide some kind of error??
+                        pass
+                    else:
+                        # Link the collection with the correct model
+                        kwargs = {'collection': coll}
+                        if self.colltype == "sermo":
+                            clsColl = CollectionSerm
+                            field = "sermon"
+                        elif self.colltype == "gold":
+                            clsColl = CollectionGold
+                            field = "gold"
+                        elif self.colltype == "manu":
+                            clsColl = CollectionMan
+                            field = "manuscript"
+                        elif self.colltype == "super":
+                            clsColl = CollectionSuper
+                            field = "super"
+
+                        # THis is only needed for collections
+                        with transaction.atomic():
+                            for item in qs:
+                                kwargs[field] = getattr( item, self.s_field)
+                                # Check if it doesn't exist yet
+                                obj = clsColl.objects.filter(**kwargs).first()
+                                if obj == None:
+                                    clsColl.objects.create(**kwargs)
+                                    # Note that some changes have been made
+                                    bChanged = True
+
+                        # Make sure to redirect to this instance -- but only for COLLCREATE
+                        if operation == "collcreate":
+                            self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
+                        else:
+                            # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
+                            if coll.settype == "pd":
+                                if coll.scope == "publ":
+                                    # Public dataset
+                                    urltype = "publ"
+                                else:
+                                    # Team or Priv
+                                    urltype = "priv"
+                            elif coll.settype == "hc":
+                                urltype = "hist"
+                            collurl = reverse('coll{}_details'.format(urltype), kwargs={'pk': coll.id})
+                            collname = coll.name
+                            context['data'] = dict(collurl=collurl, collname=collname)
+                            # Have changes been made?
+                            if bChanged:
+                                # Add the current basket history to the collection's path
+                                lst_history_basket = json.loads(history)
+                                lst_history_coll = json.loads(coll.path)
+                                for item in lst_history_basket:
+                                    lst_history_coll.append(item)
+                                coll.path = json.dumps(lst_history_coll)
+                                coll.save()
+
+                # Adapt the basket size
+                context['basketsize'] = self.get_basketsize(profile)
+
+                # Set the other context parameters
+                if self.colltype == "sermo":
+                    context['basket_show'] = reverse('basket_show' )
+                    context['basket_update'] = reverse('basket_update')
+                else:
+                    context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
+                    context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
+                context['colltype'] = self.colltype
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasketUpdate")
 
         # Return the updated context
         return context
