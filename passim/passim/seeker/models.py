@@ -5500,8 +5500,10 @@ class Codico(models.Model):
                 yearstart = years[0]
                 if len(years) == 0:
                     yearfinish = yearstart
-                else:
+                elif len(years) > 1:
                     yearfinish = years[1]
+                else:
+                    yearfinish = yearstart
             else:
                 # Check for question mark dates
                 if "?" in yearfinish:
@@ -6433,6 +6435,9 @@ class EqualGold(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+    # [0-1] Stemmatology full plain text (all in Latin)
+    fulltext = models.TextField("Full text", null=True, blank=True)
+    srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
@@ -6486,13 +6491,16 @@ class EqualGold(models.Model):
 
         oErr = ErrHandle()
         try:
-            # Adapt the incipit and explicit - if necessary
+            # Adapt the incipit, explicit and fulltext - if necessary
             srchincipit = get_searchable(self.incipit)
             if self.srchincipit != srchincipit:
                 self.srchincipit = srchincipit
             srchexplicit = get_searchable(self.explicit)
             if self.srchexplicit != srchexplicit:
                 self.srchexplicit = srchexplicit
+            srchfulltext = get_searchable(self.fulltext)
+            if self.srchfulltext != srchfulltext:
+                self.srchfulltext = srchfulltext
 
             # Double check the number and the code
             if self != None and self.author_id != None and self.author != None:
@@ -6682,6 +6690,19 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         elif incexp_type == "search":
             sBack = adapt_markdown(self.srchexplicit)
+        return sBack
+
+    def get_fulltext_markdown(self, incexp_type = "actual"):
+        """Get the contents of the fulltext field using markdown"""
+
+        if incexp_type == "both":
+            parsed = adapt_markdown(self.fulltext)
+            search = self.srchfulltext
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        elif incexp_type == "actual":
+            sBack = adapt_markdown(self.fulltext)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchfulltext)
         return sBack
 
     def get_hclist_markdown(self):
@@ -8615,6 +8636,11 @@ class SermonDescr(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+
+    # [0-1] Stemmatology full plain text (all in Latin)
+    fulltext = models.TextField("Full text", null=True, blank=True)
+    srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
+
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
@@ -9604,6 +9630,14 @@ class SermonDescr(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
+    def get_fulltext(self):
+        """Return the *searchable* fulltext, without any additional formatting"""
+        return self.fulltext
+
+    def get_fulltext_markdown(self):
+        """Get the contents of the fulltext field using markdown"""
+        return adapt_markdown(self.fulltext)
+
     def get_goldlinks_markdown(self):
         """Return all the gold links = type + gold"""
 
@@ -10005,34 +10039,48 @@ class SermonDescr(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        if self.incipit: 
-            srchincipit = get_searchable(self.incipit)
-            if self.srchincipit != srchincipit:
-                self.srchincipit = srchincipit
-        if self.explicit: 
-            srchexplicit = get_searchable(self.explicit)
-            if self.srchexplicit != srchexplicit:
-                self.srchexplicit = srchexplicit
-        # Preliminary saving, before accessing m2m fields
-        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
-        # Process signatures
-        lSign = []
-        bCheckSave = False
-        for item in self.sermonsignatures.all():
-            lSign.append(item.short())
-            bCheckSave = True
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Brush up incipit
+            if self.incipit: 
+                srchincipit = get_searchable(self.incipit)
+                if self.srchincipit != srchincipit:
+                    self.srchincipit = srchincipit
+            # Brush up explicit
+            if self.explicit: 
+                srchexplicit = get_searchable(self.explicit)
+                if self.srchexplicit != srchexplicit:
+                    self.srchexplicit = srchexplicit
+            # Brush up fulltext
+            if self.fulltext: 
+                srchfulltext = get_searchable(self.fulltext)
+                if self.srchfulltext != srchfulltext:
+                    self.srchfulltext = srchfulltext
 
-        # =========== DEBUGGING ================
-        # self.do_ranges(force = True)
-        # ======================================
+            # Preliminary saving, before accessing m2m fields
+            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+            # Process signatures
+            lSign = []
+            bCheckSave = False
+            for item in self.sermonsignatures.all():
+                lSign.append(item.short())
+                bCheckSave = True
 
-        # Make sure to save the siglist too
-        if bCheckSave: 
-            siglist_new = json.dumps(lSign)
-            if siglist_new != self.siglist:
-                self.siglist = siglist_new
-                # Only now do the actual saving...
-                response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+            # =========== DEBUGGING ================
+            # self.do_ranges(force = True)
+            # ======================================
+
+            # Make sure to save the siglist too
+            if bCheckSave: 
+                siglist_new = json.dumps(lSign)
+                if siglist_new != self.siglist:
+                    self.siglist = siglist_new
+                    # Only now do the actual saving...
+                    response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/save")
         return response
 
     def set_projects(self, projects):
