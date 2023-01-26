@@ -3682,9 +3682,9 @@ class Manuscript(models.Model):
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                     if not source is None:
                         obj.source = source
-                    obj.idno = "{} (huwa={})".format(idno,externalid)
+                    obj.idno = "{}\thuwa={}".format(idno,externalid)
                     # We are adding one that is already there
-                    msg = "Adding double shelfmark: {} manu={}".format(obj.idno, obj.id)
+                    msg = "Adding double shelfmark:\t{}\tmanu={}".format(obj.idno, obj.id)
                     oErr.Status(msg)
                     oParams['msg'] = msg
                 else:
@@ -5496,7 +5496,7 @@ class Codico(models.Model):
             # Double check the lengths
             if len(yearstart) > 4 or len(yearfinish) > 4:
                 # We need to do better
-                years = re.findall(r'\d{4}', value)
+                years = re.findall(r'\d{4}', sDateItem)
                 yearstart = years[0]
                 if len(years) == 0:
                     yearfinish = yearstart
