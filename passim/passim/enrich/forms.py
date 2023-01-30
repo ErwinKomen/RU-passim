@@ -8,10 +8,12 @@ from django.utils.translation import ugettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django.db.models import F
+
 from passim.enrich.models import *
+from passim.basic.forms import BasicModelForm, BasicSimpleForm
 
 
-class SpeakerForm(forms.ModelForm):
+class SpeakerForm(BasicModelForm):
 
     class Meta:
         model = Speaker
@@ -20,7 +22,7 @@ class SpeakerForm(forms.ModelForm):
                                                    'placeholder': 'Name or number (code) of speaker used in filename...'})}
 
 
-class SentenceForm(forms.ModelForm):
+class SentenceForm(BasicModelForm):
 
     class Meta:
         model = Sentence
@@ -29,14 +31,14 @@ class SentenceForm(forms.ModelForm):
                                                    'placeholder': 'Name or code of sentence used in filename...'})}
 
 
-class TestunitForm(forms.ModelForm):
+class TestunitForm(BasicModelForm):
 
     class Meta:
         model = Testunit
         fields = ['speaker', 'sentence', 'ntype']
 
 
-class TestsetForm(forms.ModelForm):
+class TestsetForm(BasicModelForm):
 
     class Meta:
         model = Testset

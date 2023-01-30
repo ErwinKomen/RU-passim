@@ -1,22 +1,17 @@
 """
-Definition of forms.
+Definition of forms for the BASIC app.
 """
 
 from django import forms
-from django.forms.widgets import *
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2TagWidget, ModelSelect2Widget, HeavySelect2Widget
-
-from passim.basic.forms import BasicModelForm, BasicSimpleForm
 
 
-class UploadFileForm(BasicSimpleForm):
-    """This is for uploading just one file"""
+# =============== My own form classes ==========================
 
-    file_source = forms.FileField(label="Specify which file should be loaded")
+class BasicModelForm(forms.ModelForm):
 
     def is_valid(self):
         # Do default is valid
-        valid = super(UploadFileForm, self).is_valid()
+        valid = super(BasicModelForm, self).is_valid()
 
         # If it's False, return
         if valid: 
@@ -35,15 +30,11 @@ class UploadFileForm(BasicSimpleForm):
         return valid
 
 
-class UploadFilesForm(BasicSimpleForm):
-    """This is for uploading multiple files"""
-
-    files_field = forms.FileField(label="Specify which file(s) should be loaded",
-                                  widget=forms.ClearableFileInput(attrs={'multiple': True}))
+class BasicSimpleForm(forms.Form):
 
     def is_valid(self):
         # Do default is valid
-        valid = super(UploadFilesForm, self).is_valid()
+        valid = super(BasicSimpleForm, self).is_valid()
 
         # If it's False, return
         if valid: 

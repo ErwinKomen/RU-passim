@@ -12,6 +12,7 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 
 # From my own application
 from passim.utils import ErrHandle
+from passim.basic.forms import BasicModelForm, BasicSimpleForm
 from passim.dct.models import *
 from passim.seeker.models import Profile
 
@@ -75,7 +76,7 @@ class ProfileWidget(ModelSelect2MultipleWidget):
 
 # ================ FORMS ================================================
 
-class ResearchSetForm(forms.ModelForm):
+class ResearchSetForm(BasicModelForm):
     profileid = forms.CharField(required=False)
     manulist = ModelChoiceField(queryset=None, required=False,
             widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
@@ -152,7 +153,7 @@ class ResearchSetForm(forms.ModelForm):
         return None
 
 
-class SetDefForm(forms.ModelForm):
+class SetDefForm(BasicModelForm):
     """Used for listview and details view of SetDef"""
 
     manulist = ModelChoiceField(queryset=None, required=False,

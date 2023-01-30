@@ -12,6 +12,7 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 
 # From my own application
 from passim.utils import ErrHandle
+from passim.basic.forms import BasicModelForm, BasicSimpleForm
 from passim.approve.models import *
 from passim.seeker.models import Profile, FieldChoice
 
@@ -71,7 +72,7 @@ class ProfileWidget(ModelSelect2MultipleWidget):
 
 
 # ================ FORMS ================================================
-class EqualAddForm(forms.ModelForm):
+class EqualAddForm(BasicModelForm):
     """Form to list and to edit EqualAdd items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -117,7 +118,7 @@ class EqualAddForm(forms.ModelForm):
         return None
 
 
-class EqualAddApprovalForm(forms.ModelForm):
+class EqualAddApprovalForm(BasicModelForm):
     """Form to list and to edit EqualAddApproval items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -167,7 +168,7 @@ class EqualAddApprovalForm(forms.ModelForm):
         return None
 
 
-class EqualChangeForm(forms.ModelForm):
+class EqualChangeForm(BasicModelForm):
     """Form to list and to edit EqualChange items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -215,7 +216,7 @@ class EqualChangeForm(forms.ModelForm):
         return None
 
 
-class EqualApprovalForm(forms.ModelForm):
+class EqualApprovalForm(BasicModelForm):
     """Form to list and to edit EqualApproval items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 

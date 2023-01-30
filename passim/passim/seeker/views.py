@@ -61,7 +61,7 @@ from reportlab.rl_config import defaultPageSize
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
     SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
@@ -7242,6 +7242,7 @@ class CollAnyEdit(BasicDetails):
     codico = None
     datasettype = ""
     use_team_group = True
+    max_items = 500            # Maximum number of items shown in details view
     mainitems = []
     hlistitems = [
         {'type': 'manu',    'clsColl': CollectionMan,   'field': 'manuscript'},
@@ -7857,7 +7858,6 @@ class CollPrivDetails(CollAnyEdit):
             self.check_hlist(instance)
         return None
 
-
     def add_to_context(self, context, instance):
         # Perform the standard initializations:
         context = super(CollPrivDetails, self).add_to_context(context, instance)
@@ -7907,9 +7907,13 @@ class CollPrivDetails(CollAnyEdit):
                         'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
                 check_order(qs_manu)
 
-                for obj in qs_manu:
+                for idx, obj in enumberate(qs_manu):
                     rel_item = []
                     item = obj.manuscript
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # S: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right", draggable=True)
@@ -7964,9 +7968,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.sermon
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # S: Order in Sermon
                     #add_one_item(rel_item, index, False, align="right")
@@ -8018,9 +8026,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.gold
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # G: Order in Gold
                     #add_one_item(rel_item, index, False, align="right")
@@ -8072,9 +8084,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.super
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # SSG: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right")
@@ -8290,9 +8306,13 @@ class CollHistDetails(CollHistEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.super
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # SSG: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right")
@@ -8349,8 +8369,12 @@ class CollHistDetails(CollHistEdit):
                         'id').distinct().order_by('manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
 
                     rel_list =[]
-                    for item in qs_codi:
+                    for idx, item in enumerate(qs_codi):
                         rel_item = []
+
+                        # Leave if this is too much
+                        if idx > self.max_items:
+                            break
 
                         # Shelfmark = IDNO
                         add_one_item(rel_item,  self.get_field_value("codicos", item, "manuscript"), False, title=item.manuscript.idno, main=True, 
@@ -8400,8 +8424,12 @@ class CollHistDetails(CollHistEdit):
                         'id').distinct().order_by('lcity__name', 'library__name', 'idno')
 
                     rel_list =[]
-                    for item in qs_manu:
+                    for idx, item in enumerate(qs_manu):
                         rel_item = []
+
+                        # Leave if this is too much
+                        if idx > self.max_items:
+                            break
 
                         # Get the codico's for this manuscript
                         codico_lst = item.manuscriptcodicounits.all().order_by('order')
@@ -8498,9 +8526,14 @@ class CollHistDetails(CollHistEdit):
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
-                for item in qs_ssg:
+                for idx, item in enumerate(qs_ssg):
                     rel_item = []
                     equal = item
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # S: Order in Manuscript
                     rel_item.append({'value': "-", 'initial': 'small'})
 
@@ -8551,8 +8584,13 @@ class CollHistDetails(CollHistEdit):
                 rel_list =[]
                 equal_list = []
                 index = 1
-                for item in qs_s:
+                for idx, item in enumerate(qs_s):
                     rel_item = []
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # Determine the matching SSG from the Historical Collection
                     equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
                     # List of SSGs that have been dealt with already
@@ -8600,9 +8638,14 @@ class CollHistDetails(CollHistEdit):
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
-                for item in qs_ssg:
+                for idx, item in enumerate(qs_ssg):
                     rel_item = []
                     equal = item
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # S: Order in Manuscript
                     rel_item.append({'value': "-", 'initial': 'small'})
 

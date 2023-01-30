@@ -83,9 +83,9 @@ def user_is_authenticated(request):
 
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
-    username = request.user.username
-    user = User.objects.filter(username=username).first()
-    # glist = user.groups.values_list('name', flat=True)
+    #username = request.user.username
+    #user = User.objects.filter(username=username).first()
+    user = request.user
 
     # Only look at group if the user is known
     if user == None:
@@ -2744,10 +2744,13 @@ class BasicPart(View):
             # First step: authentication
             if user_is_authenticated(self.request):
                 # Second step: app_user
-                if user_is_ingroup(self.request, app_user):
+                is_moderator = user_is_ingroup(self.request, app_moderator)
+                is_app_user = is_moderator or user_is_ingroup(self.request, app_user)
+                is_app_editor = is_moderator or user_is_ingroup(self.request, app_editor)
+                if is_app_user or is_app_editor:
                     # Any more checking needed?
                     if sType == "w":
-                        bResult = user_is_ingroup(self.request, app_editor)
+                        bResult = is_app_editor
                     else:
                         bResult = True
             # Otherwise: no permissions!
