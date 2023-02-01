@@ -13346,6 +13346,7 @@ class EqualGoldListView(BasicList):
             # Possibly add to 'uploads'
             bHasJson = False
             bHasEdilit = False
+            bHasTrans = False
             for item in self.uploads:
                 if item['title'] == "huwajson":
                     bHasJson = True
@@ -13370,6 +13371,15 @@ class EqualGoldListView(BasicList):
                 oJson = dict(title="huwaedilit", label="HUWA edilit",
                               url=reverse('equalgold_upload_edilit'),
                               type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
+            if not bHasTrans:
+                # Add a reference to the XML transcription upload method
+                html = []
+                msg = "Upload sermon transcription(s) from TEI-P5 xml file(s)"
+                oJson = dict(title="xtranseqg", label="XML transcription", 
+                             url = reverse('import_trans_eqg'),
+                             type='multiple', msg=msg)
                 self.uploads.append(oJson)
 
 

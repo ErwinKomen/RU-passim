@@ -38,6 +38,10 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
+# import xmltodict
+# import passim.reader.xmltodict
+from passim.reader import xmltodict
+import lxml.etree as ET
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -2056,6 +2060,115 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     # Return the object that has been created
     return oBack
 
+def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
+    """Import the sermon transcription part of an XML in TEI-P5 format
+        
+    This approach makes use of xmltodict
+    """
+
+    def process_para(item, html):
+        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
+
+        oErr = ErrHandle()
+        bResult = True
+        local = []
+        try:
+            # Walk all elements
+            if not item is None:
+                for element in item.xpath("./child::*"):
+                    tag = element.tag
+                    attrib = element.attrib
+                    if tag == "w":
+                        # This is a word 
+                        local.append(element.text)
+                    elif tag == "quote":
+                        # This is a quote: get the @source attribute and the @n
+                        quote_n = attrib['n']
+                        quote_source = attrib['source']
+                        quote = []
+                        for quote_el in element.xpath("./child::*"):
+                            if quote_el.tag == "w":
+                                quote.append(quote_el.text)
+                        sQuoteBody = " ".join(quote)
+                        sQuote = "<span class='fullquote' title='{}. {}: {}'>{}</span>".format(
+                            quote_n, quote_source, sQuoteBody, quote_n )
+                        local.append(sQuote)
+                sPara = " ".join(local)
+                html.append(sPara)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_para")
+            bResult = False
+        return bResult
+
+    oErr = ErrHandle()
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username, 'lst_obj': []}
+    try:
+        # Read the XML file, transforming it into a Python dict
+        if xmldoc is None:
+            # Read and parse the data into a DOM element
+            xmldoc = ET.parse(data_file)  
+            
+        # Get the root
+        root = xmldoc.getroot()
+
+        # Clean up the namespace
+        for elem in root.getiterator():
+            if not (isinstance(elem, ET._Comment) or isinstance(elem, ET._ProcessingInstruction)):
+                elem.tag = ET.QName(elem).localname
+        ET.cleanup_namespaces(root)
+
+        # Get the titles
+        title_passim = None
+        titles = root.xpath("//title[@type='passim']")
+        if len(titles)>0:
+            title_passim = titles[0].text
+            # Get the list of sermon elements
+            html = []
+            sermon_items = root.xpath("//div[@type='sermon']/child::*")
+            for sermon_item in sermon_items:
+                tag = sermon_item.tag
+                attrib = sermon_item.attrib
+                if tag == "head":
+                    # This is one head at this moment
+                    headtype = attrib.get('type', '')
+                    level = "##" if headtype == "title" else "###"
+                    html.append("{} {}".format(level, sermon_item.text))
+                elif tag == "div" and attrib.get("type", "") == "paragraph":
+                    # Paragraph: add a newline
+                    html.append("")
+                    # This is a paragraph, that contains <head> and <p>
+                    for subitem in sermon_item.xpath("./child::*"):
+                        if subitem.tag == "head":
+                            # This is another level head
+                            html.append("#### {}".format(subitem.text))
+                        elif subitem.tag == "p":
+                            # This is a paragraph containing words and quotes
+                            process_para(subitem, html)
+
+            # Okay, we found all the elements, now store them.
+            text_sermon = "\n".join(html)
+
+            oBack['count'] = oBack['count'] + 1
+            oBack['tsize'] = len(text_sermon)
+            oBack['code'] = title_passim
+
+            # Can we continue?
+            if not title_passim is None and not text_sermon is None:
+                eqg = EqualGold.objects.filter(code__iexact=title_passim).first()
+                if not eqg is None:
+                    # We now have the right object: Set the text
+                    eqg.fulltext = text_sermon
+                    eqg.save()
+    except:
+        sError = oErr.get_error_message()
+        oBack['filename'] = filename
+        oBack['status'] = 'error'
+        oBack['msg'] = sError
+
+    # Return the object that has been created
+    return oBack
+
 def get_huwa_opera_literature(opera_id, handschrift_id):
     lBack = Edition.get_opera_literature(opera_id, handschrift_id)
     return lBack
@@ -2501,6 +2614,91 @@ class ReaderEad(ReaderImport):
         except: 
             bOkay = False
             code = oErr.get_error_message()
+        return bOkay, code
+
+
+class ReaderTransEqgImport(ReaderImport):
+    """Read a transcription for a Passim SSG/AF into the appropriate field"""
+
+
+    import_type = "xtranseqg"
+    sourceinfo_url = "https://github.com/glsch"
+    template_name = "reader/import_transeqg.html"
+
+    def process_files(self, request, source, lResults, lHeader):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        try:
+            # Make sure we have the username
+            username = self.username
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = read_trans_eqg(username, data_file, filename, self.arErr, source=source)
+
+                            if oResult == None or oResult['status'] == "error":
+                                # Add to [lstRead]
+                                oTranscription = dict(code="error", tsize=0, filename=filename, msg = oResult['msg'])
+                                lst_read.append(oTranscription)
+                            else:
+                                # Get the results from oResult
+                                code = oResult.get("code")
+                                tsize = oResult.get("tsize")
+                                oResult['filename'] = filename
+
+                                if not code is None:
+                                    obj = EqualGold.objects.filter(code__iexact=code).first()
+                                    if not obj is None:
+                                        url = reverse("equalgold_details", kwargs={'pk': obj.id})
+                                        oResult['code'] = "<span><a class='nostyle' href='{}'>{}</a></span>".format(
+                                            url, code)
+
+
+                                # Add to [lstRead]
+                                oTranscription = dict(code=code, tsize=tsize, filename=filename)
+                                lst_read.append(oTranscription)
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "itreqg", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No transcriptions have been added to a SSG")
+                        else:
+                            lResults.append(oResult)
+            code = "Imported using the [import_trans_eqg] function on these XML files: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+            oErr.DoError("")
         return bOkay, code
 
 

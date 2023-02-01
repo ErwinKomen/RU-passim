@@ -1366,8 +1366,7 @@ class Report(models.Model):
     # [1] And a date: the date of saving this report
     created = models.DateTimeField(default=get_current_datetime)
     # [1] A report should have a type to know what we are reporting about
-    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), 
-                            max_length=5)
+    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), max_length=5)
     # [0-1] A report should have some contents: stringified JSON
     contents = models.TextField("Contents", default="{}")
 

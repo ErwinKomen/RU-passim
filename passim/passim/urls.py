@@ -354,6 +354,7 @@ urlpatterns = [
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
+    url(r'^reader/import/trans/ssg/$', ReaderTransEqgImport.as_view(), name='import_trans_eqg'),
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================
