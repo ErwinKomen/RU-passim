@@ -31,7 +31,6 @@ from pyzotero import zotero
 
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
-# import xmltodict
 from xml.dom import minidom
 
 # From this own application

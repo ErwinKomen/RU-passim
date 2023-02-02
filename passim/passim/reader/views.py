@@ -38,9 +38,6 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
-# import xmltodict
-# import passim.reader.xmltodict
-from passim.reader import xmltodict
 import lxml.etree as ET
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
@@ -2063,7 +2060,7 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
 def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
     """Import the sermon transcription part of an XML in TEI-P5 format
         
-    This approach makes use of xmltodict
+    This approach makes use of *lxml*
     """
 
     def process_para(item, html):
