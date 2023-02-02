@@ -2087,7 +2087,7 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
                             if quote_el.tag == "w":
                                 quote.append(quote_el.text)
                         sQuoteBody = " ".join(quote)
-                        sQuote = "<span class='fullquote' title='{}. {}: {}'>{}</span>".format(
+                        sQuote = '<span class="fullquote" title="{}. {}: {}" >{}</span>'.format(
                             quote_n, quote_source, sQuoteBody, quote_n )
                         local.append(sQuote)
                 sPara = " ".join(local)
@@ -2673,7 +2673,7 @@ class ReaderTransEqgImport(ReaderImport):
                                     obj = EqualGold.objects.filter(code__iexact=code).first()
                                     if not obj is None:
                                         url = reverse("equalgold_details", kwargs={'pk': obj.id})
-                                        oResult['code'] = "<span><a class='nostyle' href='{}'>{}</a></span>".format(
+                                        oResult['code'] = '<span><a class="nostyle" href="{}">{}</a></span>'.format(
                                             url, code)
 
 

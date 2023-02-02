@@ -3068,6 +3068,9 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
+    newfulltext = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
+                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
     signature = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
@@ -3123,15 +3126,18 @@ class SuperSermonGoldForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGold
-        fields = ['author', 'incipit', 'explicit', 'code', 'number', 'stype']
-        widgets={# 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
-                                                       'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
-                 'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
-                 'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-                 'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
-                 'stype':       forms.Select(attrs={'style': 'width: 100%;'})
-                 }
+        fields = ['author', 'incipit', 'explicit', 'fulltext', 'code', 'number', 'stype']
+        widgets={
+            # 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
+            'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
+                                'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
+            'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
+            'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+            'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+            'fulltext':    forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
+                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}),
+            'stype':       forms.Select(attrs={'style': 'width: 100%;'})
+            }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -3218,6 +3224,7 @@ class SuperSermonGoldForm(PassimModelForm):
                     self.fields['newauthor'].widget.initial = instance.author.id
                 self.fields['newincipit'].initial = instance.incipit
                 self.fields['newexplicit'].initial = instance.explicit
+                self.fields['newfulltext'].initial = instance.fulltext
                 self.fields['collist_ssg'].initial = [x.pk for x in instance.collections.filter(settype="pd").order_by('name')]
                 self.fields['collist_hist'].initial = [x.pk for x in instance.collections.filter(settype="hc").order_by('name')]
                 self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
@@ -3241,52 +3248,6 @@ class SuperSermonGoldForm(PassimModelForm):
             oErr.DoError("SuperSermonGoldForm-init")
         # We are okay
         return None
-
-    # =====================================================================================
-    # EK: Leave this outcommented code, until the project issues are working fully and well
-    # =====================================================================================
-    #def clean_author(self):
-    #    """Possibly determine the author if not known"""
-
-    #    oErr = ErrHandle()
-    #    author = None
-    #    try:
-    #        do_remove = False
-        
-    #        #author = self.cleaned_data.get("author", None)
-    #        #if not author:
-    #        #    authorname = self.cleaned_data.get("authorname", None)
-    #        #    if authorname:
-    #        #        # Figure out what the author is
-    #        #        author = Author.objects.filter(name=authorname).first()
-
-
-    #        #if self.instance and self.instance.author and author:
-    #        #    # How many projects does this SSG belong to?
-    #        #    count_project = self.instance.projects.count()
-
-    #        #    # If this SSG belongs to more than one project, it may not process the author change yet
-    #        #    if count_project <= 1:
-    #        #        authornameLC = self.instance.author.name.lower()
-    #        #        if self.instance.author.id != author.id:
-    #        #            if do_remove:
-    #        #                # Need to remove all SSG that have me as 'moved
-    #        #                qs = EqualGold.objects.filter(moved=self.instance)
-    #        #                qs.delete()
-    #        #            # Determine what to do in terms of 'moved'.
-    #        #            if authornameLC != "undecided":
-    #        #                # Create a copy of the object I used to be
-    #        #                moved = EqualGold.create_moved(self.instance)
-    #        #                # NOTE: no need to move all Gold Sermons that were pointing to me -- they stay with the 'new' me
-    #        #            else:
-    #        #                # We are moving from "undecided" to another name
-    #        #                # NOTE: not yet implemented. Is this needed??
-    #        #                pass
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("SuperSermonGoldForm/clean_author")
-
-    #    return author
 
 
 class EqualGoldLinkForm(BasicModelForm):

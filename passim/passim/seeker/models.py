@@ -31,6 +31,7 @@ from pyzotero import zotero
 
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
+import lxml.html
 from xml.dom import minidom
 
 # From this own application
@@ -379,6 +380,14 @@ def getText(nodeStart):
             rc.append(getText(node))
     return ' '.join(rc)
 
+def striphtmlre(data):
+    p = re.compile(r'<.*?>')
+    return p.sub('', data)
+
+def striphtml(data):
+    sBack = lxml.html.document_fromstring(data).text_content()
+    return sBack
+
 def get_searchable(sText):
     sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
 
@@ -389,6 +398,9 @@ def get_searchable(sText):
 
         # Move to lower case
         sText = sText.lower()
+
+        # Strip html
+        sText = striphtml(sText)
 
         # Remove punctuation with nothing
         sText = re.sub(sRemove, "", sText)
@@ -6690,17 +6702,17 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.srchexplicit)
         return sBack
 
-    def get_fulltext_markdown(self, incexp_type = "actual"):
+    def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
         """Get the contents of the fulltext field using markdown"""
 
         if incexp_type == "both":
-            parsed = adapt_markdown(self.fulltext)
+            parsed = adapt_markdown(self.fulltext, lowercase)
             search = self.srchfulltext
             sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
         elif incexp_type == "actual":
-            sBack = adapt_markdown(self.fulltext)
+            sBack = adapt_markdown(self.fulltext, lowercase)
         elif incexp_type == "search":
-            sBack = adapt_markdown(self.srchfulltext)
+            sBack = adapt_markdown(self.srchfulltext, lowercase)
         return sBack
 
     def get_hclist_markdown(self):

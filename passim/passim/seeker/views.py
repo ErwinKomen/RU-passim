@@ -12302,7 +12302,7 @@ class EqualGoldEdit(BasicDetails):
         ]
 
     # Note: do not include [code] in here
-    stype_edi_fields = ['author', 'number', 'incipit', 'explicit',
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit', 'fulltext',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
@@ -12338,6 +12338,7 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
                 {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
                 {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
+                {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
 
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -12348,6 +12349,8 @@ class EqualGoldEdit(BasicDetails):
                  'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
                 {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
                  'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                 'field_key': 'newfulltext'}, 
                 # Hier project    
     
 
@@ -12474,6 +12477,26 @@ class EqualGoldEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_transcription(self, instance):
+        """Make a good visualization of a transcription, which includes a show/hide button"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the text
+            if not instance.fulltext is None and instance.fulltext != "":
+                sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Combine with button click + default hidden
+                html = []
+                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
+                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_transcription")
+        return sBack
 
     def get_goldset_html(goldlist):
         context = {}
@@ -12675,6 +12698,7 @@ class EqualGoldEdit(BasicDetails):
         transfer_changes = [
             {'src': 'newincipit',  'dst': 'incipit',  'type': 'text'},
             {'src': 'newexplicit', 'dst': 'explicit', 'type': 'text'},
+            {'src': 'newfulltext', 'dst': 'fulltext', 'type': 'text'},
             {'src': 'newauthor',   'dst': 'author',   'type': 'fk'},
             ]
         try:

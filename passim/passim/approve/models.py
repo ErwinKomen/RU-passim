@@ -53,6 +53,7 @@ class EqualChange(models.Model):
         {'field': 'newauthor',          'tofld': 'author',   'type': 'fk', 'display': 'Author'},
         {'field': 'newincipit',         'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
         {'field': 'newexplicit',        'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+        {'field': 'newfulltext',        'tofld': 'fulltext', 'type': 'string', 'display': 'Transcription'},
         {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
         {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
          'lstQ': [Q(settype="hc")],  
