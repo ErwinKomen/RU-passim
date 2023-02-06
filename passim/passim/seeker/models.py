@@ -385,31 +385,39 @@ def striphtmlre(data):
     return p.sub('', data)
 
 def striphtml(data):
-    sBack = lxml.html.document_fromstring(data).text_content()
+    sBack = data
+    if not data is None and data != "":
+        xml = lxml.html.document_fromstring(data)
+        if not xml is None:
+            sBack = xml.text_content()
     return sBack
 
 def get_searchable(sText):
     sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
 
-    # Validate
-    if sText == None:
-        sText = ""
-    else:
+    oErr = ErrHandle()
+    try:
+        # Validate
+        if sText == None:
+            sText = ""
+        else:
 
-        # Move to lower case
-        sText = sText.lower()
+            # Move to lower case
+            sText = sText.lower()
 
-        # Strip html
-        sText = striphtml(sText)
+            # Strip html
+            sText = striphtml(sText)
 
-        # Remove punctuation with nothing
-        sText = re.sub(sRemove, "", sText)
-        #sText = sText.replace("<", "")
-        #sText = sText.replace(">", "")
-        #sText = sText.replace("_", "")
+            # Remove punctuation with nothing
+            #   note: this doesn't completely work for the < and > signs, 
+            #         but that is handled by the striphtml
+            sText = re.sub(sRemove, "", sText)
 
-        # Make sure to TRIM the text
-        sText = sText.strip()
+            # Make sure to TRIM the text
+            sText = sText.strip()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("seeker/get_searchable")
     return sText
 
 def get_comments(stype, usercomment=False, count=-1):
