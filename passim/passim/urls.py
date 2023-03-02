@@ -62,7 +62,7 @@ urlpatterns = [
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^guide', passim.seeker.views.guide, name='guide'),
-    url(r'^mypassim$', passim.dct.views.mypassim, name='mypassim'),
+    # url(r'^mypassim$', passim.dct.views.mypassim, name='mypassim'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
@@ -396,5 +396,6 @@ urlpatterns = [
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', admin.site.urls, name='admin_base'),
+    url(r'^accounts/', include('django.contrib.auth.urls')),
 ]
 

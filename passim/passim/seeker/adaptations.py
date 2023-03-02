@@ -24,6 +24,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, OnlineSources, \
+    ProjectApprover, ProjectEditor, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur, OperaLit
@@ -40,6 +41,7 @@ adaptation_list = {
         'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
         'huwa_edilit_remove'],
+    'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
@@ -1328,3 +1330,28 @@ def adapt_import_onlinesources():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+
+# ========== Part of profile_list ======================
+def adapt_projecteditors():
+    """Make sure that project approvers are also in the list of project editors"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Check if there are any editors already
+        count = ProjectEditor.objects.count()
+        if count == 0:
+            # There are no editors yet: copy them from ProjectApprover
+            for obj in ProjectApprover.objects.all():
+                project = obj.project
+                profile = obj.profile
+                editor = ProjectEditor.objects.create(project=project, profile=profile)
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+

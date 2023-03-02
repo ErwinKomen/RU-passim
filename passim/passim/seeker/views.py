@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
@@ -306,7 +306,8 @@ def project_dependant_delete(request, to_be_deleted):
         # Find out who this is
         profile = Profile.get_user_profile(request.user.username)
         # Get the editing rights for this person
-        project_id = [x['id'] for x in profile.projects.all().values("id")]
+        # project_id = [x['id'] for x in profile.projects.all().values("id")]
+        project_id = [x.id for x in profile.get_myprojects()]
 
         # CHeck all deletables
         delete = []
@@ -339,7 +340,8 @@ def get_non_editable_projects(profile, projects):
     try:
         id_list = []
         current_project_ids = [x['id'] for x in projects.values('id')]
-        profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        # profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        profile_project_ids = [x.id for x in profile.get_myprojects()]
         # Walk all the projects I need to evaluate
         for prj_id in current_project_ids:
             if not prj_id in profile_project_ids:
@@ -362,7 +364,8 @@ def evaluate_projlist(profile, instance, projlist, sText):
             non_editable_projects = get_non_editable_projects(profile, instance.projects.all())
             if non_editable_projects == 0:
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() != 1:
                     # We cannot assign the default project
                     bBack = False
@@ -6826,7 +6829,7 @@ class UserEdit(BasicDetails):
     def custom_init(self, instance):
 
         # Set the LISTVIEW to the MyPassim page
-        self.listview = reverse('mypassim')
+        self.listview = reverse('mypassim_details')
         self.listviewtitle = "My Passim"
 
         # Return nothing
@@ -6897,7 +6900,8 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
             {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
-            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
+            {'type': 'line',  'label': "Project editing rights:", 'value': instance.get_editor_projects_markdown(),     'field_list': 'editlist'},
+            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'}
             ]
 
         # Adapt the permission, if this is the actual user that is logged in
@@ -6951,9 +6955,14 @@ class ProfileEdit(BasicDetails):
             if bSaveUser:
                 instance.user.save()
 
-            # (6) 'projects'
+            # (6) 'projects' - approver
             projlist = form.cleaned_data['projlist']
             adapt_m2m(ProjectApprover, instance, "profile", projlist, "project")
+
+            # (7) 'projects' - editor
+            editlist = form.cleaned_data['editlist']
+            adapt_m2m(ProjectEditor, instance, "profile", editlist, "project")
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileEdit/after_save")
@@ -6988,29 +6997,40 @@ class ProfileListView(BasicList):
         {'name': 'Project Approver',    'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
 
+    def initializations(self):
+        # Make sure possible adaptations are executed
+        listview_adaptations("profile_list")
+        # We are not returning anything        
+        return None
+
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "name":
-            sBack = instance.user.username
-        elif custom == "email":
-            sBack = instance.user.email
-        elif custom == "status":
-            sBack = instance.get_ptype_display()
-        elif custom == "affiliation":
-            sBack = "-" if instance.affiliation == None else instance.affiliation
-        elif custom == "projects":
-            lHtml = []
-            for g in instance.projects.all():
-                name = g.name
-                lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
-            sBack = ", ".join(lHtml)
-        elif custom == "groups":
-            lHtml = []
-            for g in instance.user.groups.all():
-                name = g.name.replace("passim_", "")
-                lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
-            sBack = ", ".join(lHtml)
+        oErr = ErrHandle()
+        try:
+            if custom == "name":
+                sBack = instance.user.username
+            elif custom == "email":
+                sBack = instance.user.email
+            elif custom == "status":
+                sBack = instance.get_ptype_display()
+            elif custom == "affiliation":
+                sBack = "-" if instance.affiliation == None else instance.affiliation
+            elif custom == "projects":
+                lHtml = []
+                for g in instance.projects.all():
+                    name = g.name
+                    lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
+                sBack = ", ".join(lHtml)
+            elif custom == "groups":
+                lHtml = []
+                for g in instance.user.groups.all():
+                    name = g.name.replace("passim_", "")
+                    lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileListView/get_field_value")
         return sBack, sTitle
 
 
@@ -7029,7 +7049,7 @@ class DefaultEdit(BasicDetails):
     mainitems = []
 
     def custom_init(self, instance):
-        self.listview = reverse('mypassim')
+        self.listview = reverse('mypassim_details')
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7037,8 +7057,9 @@ class DefaultEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "User",              'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
-            {'type': 'plain', 'label': "Username:",         'value': instance.user.username, },
-            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_projects_markdown()},
+            {'type': 'plain', 'label': "Username:",         'value': instance.user.username,                    },
+            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_editor_projects_markdown()    },
+            {'type': 'line',  'label': "Approver rights:",  'value': instance.get_approver_projects_markdown()  },
             {'type': 'line',  'label': 'Default projects:', 'value': instance.get_defaults_markdown(), 'field_list': 'deflist'}
             ]
         # Return the context we have made
@@ -7773,9 +7794,10 @@ class CollHistEdit(CollAnyEdit):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() == 1:
-                    project = profile.projects.first()
+                    project = user_projects.first()
                     CollectionProject.objects.create(collection=instance, project=project)
         except:
             msg = oErr.get_error_message()
@@ -10110,9 +10132,10 @@ class ManuscriptEdit(BasicDetails):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() == 1:
-                    project = profile.projects.first()
+                    project = user_projects.first()
                     ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
@@ -12951,11 +12974,24 @@ class EqualGoldEdit(BasicDetails):
                 # The user has not selected a project (yet): try default assignment
                 user_projects = profile.project_approver.filter(status="incl")
                 if user_projects.count() == 1:
-                    project = user_projects.first()
+                    obj = user_projects.first()
+                    project = obj.project
+                    # project = user_projects.first()
                     EqualGoldProject.objects.create(equal=instance, project=project)
                     # Make sure the atype is set correctly
                     instance.atype = "acc"
                     instance.save()
+                else:
+                    # Look for projects where I am editor of
+                    editor_projects = profile.get_editor_projects()
+                    if editor_projects.count() == 1:
+                        # Get this project
+                        project = editor_projects.first()
+                        # Assign the project to this SSG/AF
+                        EqualGoldProject.objects.create(equal=instance, project=project)
+                        # Make sure the atype is set correctly
+                        instance.atype = "acc"
+                        instance.save()
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG

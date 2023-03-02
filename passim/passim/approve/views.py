@@ -1178,7 +1178,7 @@ class EqualAddDetails(EqualAddEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status
@@ -1263,7 +1263,7 @@ class EqualChangeDetails(EqualChangeEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status
@@ -1761,7 +1761,7 @@ class EqualApprovalDetails(EqualApprovalEdit):
                     add_rel_item(rel_item, approver, False, main=False, link=url)
 
                     # Which project(s) does this person have?
-                    projects_md = item.profile.get_projects_markdown()
+                    projects_md = item.profile.get_approver_projects_markdown()
                     add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                     # Approval status
@@ -2012,7 +2012,7 @@ class EqualAddApprovalDetails(EqualAddApprovalEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status

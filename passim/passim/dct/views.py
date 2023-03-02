@@ -65,17 +65,20 @@ def sermones_reset(request):
         # Make sure this is a HTTP request
         assert isinstance(request, HttpRequest)
 
-        # Find the project that we need to 'cancel'
-        project = Project2.objects.filter(name__icontains="luc de coninck").first()
-        if not project is None:
-            # Find all the manuscripts that need removing
-            qs = Manuscript.objects.filter(manuscript_proj__project=project, stype=stype, mtype=mtype)
+        # Double check who this is
+        if user_is_superuser(request):
 
-            # Remove them
-            qs.delete()
+            # Find the project that we need to 'cancel'
+            project = Project2.objects.filter(name__icontains="luc de coninck").first()
+            if not project is None:
+                # Find all the manuscripts that need removing
+                qs = Manuscript.objects.filter(manuscript_proj__project=project, stype=stype, mtype=mtype)
+
+                # Remove them
+                qs.delete()
 
         # Render and return the page
-        return redirect('mypassim')
+        return redirect('mypassim_details')
     except:
         msg = oErr.get_error_message()
         oErr.DoError("sermones_reset")
@@ -219,111 +222,6 @@ def dct_manulist(lst_manu, bDebug=False):
 
 
 
-
-# =================== MY OWN DCT pages ===============
-def mypassim(request):
-    """Renders the MyPassim page (=PRE, Personal Research Environment)."""
-    
-    oErr = ErrHandle()
-    try:
-        # Get the request right
-        assert isinstance(request, HttpRequest)
-
-        # Double check: the person must have been logged-in
-        if not user_is_authenticated(request):
-            # Indicate that use must log in
-            return nlogin(request)
-
-        # Specify the template
-        template_name = 'mypassim.html'
-        context =  {'title':'My PASSIM',
-                    'year':get_current_datetime().year,
-                    'pfx': APP_PREFIX,
-                    'site_url': admin.site.site_url}
-        context = get_application_context(request, context)
-
-        profile = Profile.get_user_profile(request.user.username)
-        context['profile'] = profile
-        context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
-        context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
-        context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
-
-        # COunting table sizes for the super user
-        if user_is_superuser(request):
-            table_infos = []
-            tables = [
-                {'app': 'seeker',
-                 'models': ['Collection', 'Profile', 'Manuscript', 'SermonDescr', 'SermonHead', 'SermonGold', 
-                      'Codico', 'MsItem', 'Author', 'Keyword', 'Library', 'Origin', 'Provenance', 'SourceInfo', 'Signature',
-                      'SermonDescrEqual']},
-                {'app': 'dct', 
-                 'models': ['ResearchSet', 'SetList', 'SetDef'] }
-                      ]
-            for oApp in tables:
-                app_name = oApp['app']
-                models = oApp['models']
-                models.sort()
-                for model in models:
-                    cls = apps.app_configs[app_name].get_model(model)
-                    count = cls.objects.count()
-                    oInfo = dict(app_name=app_name, model_name=model, count=count)
-                    table_infos.append(oInfo)
-            context['table_infos'] = table_infos
-
-        # Figure out any editing rights
-        qs = profile.projects.all()
-        context['edit_projects'] = "(none)"
-        if context['is_app_editor'] and qs.count() > 0:
-            html = []
-            for obj in qs:
-                url = reverse('project2_details', kwargs={'pk': obj.id})
-                html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
-            context['edit_projects'] = ",".join(html)
-
-        # Figure out which projects this editor may handle
-        if context['is_app_editor']:
-            qs = profile.project_approver.filter(status="incl")
-            if qs.count() == 0:
-                sDefault = "(none)"
-            else:
-                html = []
-                for obj in qs:
-                    project = obj.project
-                    url = reverse('project2_details', kwargs={'pk': project.id})
-                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
-                sDefault = ", ".join(html)
-            context['default_projects'] = sDefault
-
-        # Make sure to check (and possibly create) EqualApprove items for this user
-        iCount = EqualChange.check_projects(profile)
-
-        # What about the field changes that I have suggested?
-        context['count_fchange_all'] = profile.profileproposals.count()
-        context['count_fchange_open'] = profile.profileproposals.filter(atype="def").count()
-
-        # How many do I need to approve?    
-        context['count_approve_all'] = profile.profileapprovals.count()
-        context['count_approve_task'] = profile.profileapprovals.filter(atype="def").count()
-
-        # What about the SSG/AFs that I have suggested?
-        context['count_afadd_all'] = profile.profileaddings.count()
-        context['count_afadd_open'] = profile.profileaddings.filter(atype="def").count()
-
-        # How many SSG/AFs do I need to approve?    
-        context['count_afaddapprove_all'] = profile.profileaddapprovals.count()
-        context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
-
-        # How many do I need to approve?
-
-        # Process this visit
-        context['breadcrumbs'] = get_breadcrumbs(request, "My PASSIM", True)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("mypassim")
-
-    return render(request,template_name, context)
-
-
 # =================== MyPassim as model view attempt ======
 class MyPassimEdit(BasicDetails):
     model = Profile
@@ -344,13 +242,36 @@ class MyPassimEdit(BasicDetails):
         return None
 
     def add_to_context(self, context, instance):
+
+        def get_project_list(qs):
+            sBack = "(none)"
+            oErr = ErrHandle()
+            try:
+                if qs.count() > 0:
+                    html = []
+                    for obj in qs:
+                        if obj.__class__.__name__ == "Project2":
+                            project = obj
+                        else:
+                            project = obj.project
+                        url = reverse('project2_details', kwargs={'pk': project.id})
+                        html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                    sBack = ",".join(html)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_project_list")
+
+            return sBack
+
         oErr = ErrHandle()
+        bAllowSermonesReset = False
         try:
             profile = self.object
             context['profile'] = profile
             context['rset_count'] = ResearchSet.objects.filter(profile=profile).count()
             context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
             context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
+            context['sermones_allow'] = bAllowSermonesReset
 
             # COunting table sizes for the super user
             if user_is_superuser(self.request):
@@ -374,29 +295,16 @@ class MyPassimEdit(BasicDetails):
                         table_infos.append(oInfo)
                 context['table_infos'] = table_infos
 
-            # Figure out any editing rights
-            qs = profile.projects.all()
-            context['edit_projects'] = "(none)"
-            if context['is_app_editor'] and qs.count() > 0:
-                html = []
-                for obj in qs:
-                    url = reverse('project2_details', kwargs={'pk': obj.id})
-                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, obj.name))
-                context['edit_projects'] = ",".join(html)
-
             # Figure out which projects this editor may handle
             if context['is_app_editor']:
-                qs = profile.project_approver.filter(status="incl")
-                if qs.count() == 0:
-                    sDefault = "(none)"
-                else:
-                    html = []
-                    for obj in qs:
-                        project = obj.project
-                        url = reverse('project2_details', kwargs={'pk': project.id})
-                        html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
-                    sDefault = ", ".join(html)
-                context['default_projects'] = sDefault
+                # Figure out any editing rights
+                context['edit_projects'] = get_project_list(profile.get_editor_projects())
+
+                # Approver for project(s)
+                context['approve_projects'] = get_project_list(profile.project_approver.all())
+
+                # Default project(s)
+                context['default_projects'] = get_project_list(profile.project_approver.filter(status="incl"))
 
             # Make sure to check (and possibly create) EqualApprove items for this user
             iCount = EqualChange.check_projects(profile)

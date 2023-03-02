@@ -32,7 +32,7 @@
           <a href="{% url 'equalapprovaluser_details' oItem.id %}" class="nostyle">{{oItem.profile.user.username}}</a> 
         </td>
         <td class="tdnowrap clickable">
-          {{oItem.profile.get_projects_markdown|safe}}
+          {{oItem.profile.get_approver_projects_markdown|safe}}
         </td>
         <td class="clickable">
           <a href="{% url 'equalapprovaluser_details' oItem.id %}" class="nostyle">{{oItem.get_atype_display}}</a> 

@@ -1922,9 +1922,8 @@ class SermonForm(PassimModelForm):
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
-            # self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -2256,6 +2255,8 @@ class ProfileForm(BasicModelForm):
 
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    editlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     
@@ -2292,6 +2293,7 @@ class ProfileForm(BasicModelForm):
             self.fields['affiliation'].required = False
 
             # Initialize a queryset for projlist and deflist
+            self.fields['editlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['deflist'].queryset = Project2.objects.all().order_by('name')
 
@@ -2307,6 +2309,7 @@ class ProfileForm(BasicModelForm):
                 self.fields['deflist'].queryset = instance.projects.all().order_by('name')
                 self.fields['deflist'].widget.queryset = self.fields['deflist'].queryset
 
+                self.fields['editlist'].initial = [x.project.pk for x in instance.project_editor.all().order_by('project__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
                 self.fields['deflist'].initial = [x.project.pk for x in instance.project_approver.filter(status="incl").order_by('project__name')]
@@ -2528,7 +2531,8 @@ class CollectionForm(PassimModelForm):
         if profile is None:
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
         else:
-            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.get_myprojects()
         self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
         # SSG section
@@ -3167,7 +3171,8 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
 
-            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             current_proj_ids = [x.id for x in self.fields['projlist'].queryset]
@@ -4340,8 +4345,8 @@ class ManuscriptForm(PassimModelForm):
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-            self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            self.fields['projlist'] = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # Set the dependent fields for [lcity]

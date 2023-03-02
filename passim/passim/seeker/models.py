@@ -1579,27 +1579,80 @@ class Profile(models.Model):
             oErr.DoError("defaults_update")
         return bBack
 
+    def get_approver_projects_markdown(self):
+        """List of projects to which this user (profile) has APPROVING rights"""
+
+        lHtml = []
+        # Visit all approving projects
+        for project in self.projects.all().order_by('name'):
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_defaults(self):
-        """List of projects to which this user (profile) has editing rights"""
+        """List of projects to which this user (profile) has APPROVER rights"""
+
+        bUseEditorProjects = False
 
         # Get a list of project id's that are my default
         lst_id = [x['project__id'] for x in self.project_approver.filter(status="incl").values('project__id')]
         # Select all the relevant projects
         if len(lst_id) == 0:
-            # Try to at least include the PASSIM project as a default
-            qs = Project2.objects.filter(name__icontains="passim").first()
+            if bUseEditorProjects:
+                # Look for projects to which I have EDITING rights
+                qs = self.get_editor_projects()
+                if qs.count() == 0:
+                    # Try to at least include the PASSIM project as a default
+                    # qs = Project2.objects.filter(name__icontains="passim").first()
+                    qs = Project2.objects.filter(name__icontains="passim")
+            else:
+                qs = Project2.objects.filter(name__icontains="passim")
         else:
             qs = Project2.objects.filter(id__in=lst_id)
         # Return the list
         return qs
 
     def get_defaults_markdown(self):
-        """List of projects to which this user (profile) has editing rights"""
+        """List of projects to which this user (profile) has APPROVER rights"""
 
         lHtml = []
         # Visit all keywords
         for obj in self.project_approver.filter(status="incl").order_by('project__name'):
             project = obj.project
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_editor_projects(self):
+        """Get a queryset of projects to which I am editor"""
+
+        qs = []
+        oErr = ErrHandle()
+        try:
+            ids = [x['project__id'] for x in self.project_editor.values("project__id") ]
+            qs = Project2.objects.filter(id__in=ids).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_editor_projects")
+
+        return qs
+
+    def get_editor_projects_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all editing projects
+        for project in self.get_editor_projects():
             # Find the URL of the related project
             url = reverse('project2_details', kwargs={'pk': project.id})
             # Create a display for this topic
@@ -1623,6 +1676,40 @@ class Profile(models.Model):
 
         # Return the rights level that was found
         return rights
+
+    def get_groups_markdown(self):
+        """Get all the groups this user is member of"""
+
+        lHtml = []
+        # Visit all keywords
+        for group in self.user.groups.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_myprojects(self):
+        """Get a queryset of projects to which I am editor or approver"""
+
+        qs = []
+        oErr = ErrHandle()
+        try:
+            ids_edit = [x['project__id'] for x in self.project_editor.values("project__id") ]
+            ids_appr = [x['project__id'] for x in self.project_approver.values("project__id") ]
+            ids = list( set( ids_edit + ids_appr ) )
+            qs = Project2.objects.filter(id__in=ids).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_myprojects")
+
+        return qs
+
+    def get_project_ids(self):
+        """List of id's this person had editing rights for"""
+
+        id_list = [x['id'] for x in self.projects.all().values('id')]
+        return id_list
 
     def get_stack(username):
         """Get the stack as a list from the current user"""
@@ -1655,39 +1742,6 @@ class Profile(models.Model):
         # Get to the profile of this user
         profile = Profile.objects.filter(user=user).first()
         return profile
-
-    def get_groups_markdown(self):
-        """Get all the groups this user is member of"""
-
-        lHtml = []
-        # Visit all keywords
-        for group in self.user.groups.all().order_by('name'):
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
-
-        sBack = ", ".join(lHtml)
-        return sBack
-
-    def get_projects_markdown(self):
-        """List of projects to which this user (profile) has editing rights"""
-
-        lHtml = []
-        # Visit all keywords
-        for project in self.projects.all().order_by('name'):
-            # Find the URL of the related project
-            url = reverse('project2_details', kwargs={'pk': project.id})
-            # Create a display for this topic
-            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
-                url, project.name))
-
-        sBack = ", ".join(lHtml)
-        return sBack
-
-    def get_project_ids(self):
-        """List of id's this person had editing rights for"""
-
-        id_list = [x['id'] for x in self.projects.all().values('id')]
-        return id_list
 
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
@@ -11544,6 +11598,22 @@ class ProjectApprover(models.Model):
         sBack = "{}-{}".format(self.profile.user.username, self.project.name)
         return sBack
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        oErr = ErrHandle()
+        # Perform the saving
+        response = super(ProjectApprover, self).save(force_insert, force_update, using, update_fields)
+        try:
+            # Check for an equivalent ProjectEditor entry
+            obj = ProjectEditor.objects.filter(profile=self.profile, project=self.project).first()
+            if obj is None:
+                # Add it
+                obj = ProjectEditor.objects.create(profile=self.profile, project=self.project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectApprover/save")
+        # Return the result of the saving
+        return response
+
 
 class ProjectEditor(models.Model):
     """Relation between a Profile (=person) and a Project
@@ -11563,6 +11633,21 @@ class ProjectEditor(models.Model):
     def __str__(self):
         sBack = "{}-{}".format(self.profile.user.username, self.project.name)
         return sBack
+
+    def delete(self, using = None, keep_parents = False):
+        # First delete the person as editor for the indicated project
+        response = super(ProjectEditor, self).delete(using, keep_parents)
+        try:
+            # Check for an equivalent ProjectApprover entry
+            obj = ProjectApprover.objects.filter(profile=self.profile, project=self.project).first()
+            if not obj is None:
+                # Remove it
+                obj.delete()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectEditor/save")
+        # Return the result of the saving
+        return response
 
 
 class Template(models.Model):
