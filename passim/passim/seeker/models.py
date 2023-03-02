@@ -9706,9 +9706,22 @@ class SermonDescr(models.Model):
         """Return the *searchable* fulltext, without any additional formatting"""
         return self.fulltext
 
-    def get_fulltext_markdown(self):
+    #def get_fulltext_markdown(self):
+    #    """Get the contents of the fulltext field using markdown"""
+    #    return adapt_markdown(self.fulltext)
+
+    def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
         """Get the contents of the fulltext field using markdown"""
-        return adapt_markdown(self.fulltext)
+
+        if incexp_type == "both":
+            parsed = adapt_markdown(self.fulltext, lowercase)
+            search = self.srchfulltext
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        elif incexp_type == "actual":
+            sBack = adapt_markdown(self.fulltext, lowercase)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchfulltext, lowercase)
+        return sBack
 
     def get_goldlinks_markdown(self):
         """Return all the gold links = type + gold"""
@@ -9926,17 +9939,6 @@ class SermonDescr(models.Model):
             lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
         sBack = ", ".join(lHtml)
         return sBack
-
-    #def get_altpage_markdown(self): # of via Keywords?
-    #    lHtml = []
-    #    # Visit all project items
-    #    for altpage in self.pages.all().order_by('name'):
-    #        # Determine where clicking should lead to
-    #        url = "{}?sermo-projlist={}".format(reverse('sermon_list'), project2.id) 
-    #        # Create a display for this topic            
-    #        lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
-    #    sBack = ", ".join(lHtml)
-    #    return sBack
 
     def get_passimcode_markdown(self):
         """Get the Passim code (and a link to it)"""

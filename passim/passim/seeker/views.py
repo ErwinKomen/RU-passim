@@ -4395,8 +4395,8 @@ class SermonEdit(BasicDetails):
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
 
-    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'postscriptum', 'quote', 
-                                'bibnotes', 'feast', 'bibleref', 'additional', 'note',
+    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'fulltext',
+                        'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
                         #'kwlist',
                         'SermonSignature', 'siglist',
                         #'CollectionSerm', 'collist_s',
@@ -4495,6 +4495,8 @@ class SermonEdit(BasicDetails):
                  'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
                 {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown(),
                  'field_key': 'postscriptum'}, 
+                {'type': 'safe',  'label': "Transcription:",        'value': self.get_transcription(instance),
+                 'field_key': 'fulltext'}, 
                 # Issue #23: delete bibliographic notes
                 {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
                  'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
@@ -4655,6 +4657,26 @@ class SermonEdit(BasicDetails):
             context['object_id'] = instance.id
             # Calculate with the template
             sBack = render_to_string(template_name, context)
+        return sBack
+
+    def get_transcription(self, instance):
+        """Make a good visualization of a transcription, which includes a show/hide button"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the text
+            if not instance.fulltext is None and instance.fulltext != "":
+                sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Combine with button click + default hidden
+                html = []
+                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
+                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonEdit/get_transcription")
         return sBack
 
     def after_new(self, form, instance):

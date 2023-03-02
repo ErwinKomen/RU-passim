@@ -1871,7 +1871,8 @@ class SermonForm(PassimModelForm):
 
         model = SermonDescr
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',  #  'feast', 
-                 'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum']       # , 'bibleref'
+                 'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum',
+                 'fulltext']       # , 'bibleref'
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1885,6 +1886,8 @@ class SermonForm(PassimModelForm):
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+                 'fulltext':    forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
+                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
