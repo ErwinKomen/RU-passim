@@ -2309,7 +2309,7 @@ class ProfileForm(BasicModelForm):
 
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
-                self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
+                self.fields['deflist'].initial = [x.project.pk for x in instance.project_approver.filter(status="incl").order_by('project__name')]
 
                 # Fill in the user informatino
                 self.fields['newusername'].initial = instance.user.username

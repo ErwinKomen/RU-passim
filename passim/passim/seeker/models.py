@@ -1497,7 +1497,7 @@ class Profile(models.Model):
     basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
 
     # Many-to-many field that links this person/profile with particular projects
-    projects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="projects_profile")
+    projects = models.ManyToManyField("Project2", through="ProjectApprover", related_name="projects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -1567,7 +1567,7 @@ class Profile(models.Model):
         try:
             if not deflist is None:
                 with transaction.atomic():
-                    for obj in self.project_editor.all():
+                    for obj in self.project_approver.all():
                         project = obj.project
                         if project in deflist:
                             obj.status = "incl"
@@ -1583,7 +1583,7 @@ class Profile(models.Model):
         """List of projects to which this user (profile) has editing rights"""
 
         # Get a list of project id's that are my default
-        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
+        lst_id = [x['project__id'] for x in self.project_approver.filter(status="incl").values('project__id')]
         # Select all the relevant projects
         if len(lst_id) == 0:
             # Try to at least include the PASSIM project as a default
@@ -1598,7 +1598,7 @@ class Profile(models.Model):
 
         lHtml = []
         # Visit all keywords
-        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
+        for obj in self.project_approver.filter(status="incl").order_by('project__name'):
             project = obj.project
             # Find the URL of the related project
             url = reverse('project2_details', kwargs={'pk': project.id})
@@ -1616,7 +1616,7 @@ class Profile(models.Model):
         rights = ""
         if is_editor or is_developer or is_moderator or is_superuser:
             # Check the rights level for the particular project
-            obj = ProjectEditor.objects.filter(project=project, profile=self).first()
+            obj = ProjectApprover.objects.filter(project=project, profile=self).first()
             if not obj is None:
                 # Some relationship exists...
                 rights = obj.rights
@@ -1769,7 +1769,7 @@ class Profile(models.Model):
         oErr = ErrHandle()
         try:
             prj = Project2.objects.filter(name__icontains=sProject).first()
-            edi = ProjectEditor.objects.filter(profile=self, project=prj).first()
+            edi = ProjectApprover.objects.filter(profile=self, project=prj).first()
             bResult = (not edi is None)
         except:
             msg = oErr.get_error_message()
@@ -11518,19 +11518,43 @@ class CollectionProject(models.Model):
         return response
 
 
-class ProjectEditor(models.Model):
-    """Relation between a Profile (=person) and a Project"""
+class ProjectApprover(models.Model):
+    """Relation between a Profile (=person) and a Project
+    
+    The Profile (person) is an approver
+    The 'rights' are not really used, but the status is
+    """
 
     # [1] The link is between a Profile instance ...
-    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    profile = models.ForeignKey(Profile, related_name="project_approver", on_delete=models.CASCADE)
     # [1] ...and a project instance
-    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+    project = models.ForeignKey(Project2, related_name="project_approver", on_delete=models.CASCADE)
 
     # [1] The rights for this person. Right now that is by default "edi" = editing
     rights = models.CharField("Rights", choices=build_abbr_list(RIGHTS_TYPE), max_length=5, default="edi")
 
     # [1] Whether this project is to be included ('incl') or not ('excl') by default project assignment
     status = models.CharField("Default assignment", choices=build_abbr_list(PROJ_DEFAULT), max_length=5, default="incl")
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.profile.user.username, self.project.name)
+        return sBack
+
+
+class ProjectEditor(models.Model):
+    """Relation between a Profile (=person) and a Project
+    
+    The Profile (person) is an editor for the project
+    """
+
+    # [1] The link is between a Profile instance ...
+    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
 
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)

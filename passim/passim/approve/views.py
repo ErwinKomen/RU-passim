@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectEditor
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectApprover
 from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
@@ -443,7 +443,7 @@ def approval_parse_adding(profile, qs_projlist, super, allow_adding = None):
                     # (1) status of the current user
                     is_approver = profile.projects.filter(id=prj.id).exists()
                     # (2) number of approvers for this project
-                    num_approvers = prj.project_editor.count()
+                    num_approvers = prj.project_approver.count()
 
                     if is_approver and num_approvers == 1:
                         # There is no need to ask for approval: the project may be added right away
@@ -484,7 +484,7 @@ def approval_parse_removing(profile, qs_projlist, super, allow_removing = None):
                     # (2) status of the current user
                     is_approver = profile.projects.filter(id=prj.id).exists()
                     # (3) number of approvers for this project
-                    num_approvers = prj.project_editor.count()
+                    num_approvers = prj.project_approver.count()
 
                     if count_projects > 1 and is_approver and num_approvers == 1:
                         # There is no need to ask for approval: the project may be removed right away
@@ -519,7 +519,7 @@ def approval_parse_deleting(profile, qs_projlist, super):
             proj_all_ids = [x.id for x in super.projects.all()]
             # (2) Figur out all projects to which [profile] has editor access
             proj_profile_ids = [x.id for x in profile.projects.all()]
-            # proj_profile_ids = [x.project.id for x in ProjectEditor.objects.filter(profile=profile, status="incl")]
+            # proj_profile_ids = [x.project.id for x in ProjectApprover.objects.filter(profile=profile, status="incl")]
             # (3) get the list of projects for which consent is needed
             proj_need_ids = []
             for prj_id in proj_all_ids:

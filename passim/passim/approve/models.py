@@ -19,7 +19,7 @@ from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, \
     APPROVAL_TYPE, ACTION_TYPE, \
-    EqualGold, Profile, Project2, ProjectEditor
+    EqualGold, Profile, Project2, ProjectApprover
 
 STANDARD_LENGTH=255
 LONG_STRING=255
@@ -208,7 +208,7 @@ class EqualChange(models.Model):
             # Note: only SSGs that belong to more than one project need to be reviewed
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
-                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
+                lst_profile_id = [x['profile_id'] for x in ProjectApprover.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
                 if len(lst_profile_id) > 0:
                     if excl == None:
                         lstBack = Profile.objects.filter(id__in=lst_profile_id)
@@ -557,7 +557,7 @@ class EqualAdd(models.Model):
             # Note: only SSGs that belong to more than one project need to be reviewed 
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
-                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
+                lst_profile_id = [x['profile_id'] for x in ProjectApprover.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
                 if len(lst_profile_id) > 0:
                     if excl == None:
                         lstBack = Profile.objects.filter(id__in=lst_profile_id)

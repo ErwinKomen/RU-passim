@@ -84,7 +84,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
@@ -4456,7 +4456,7 @@ class SermonEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = SermonDescrExternal.objects.filter(sermon=instance).first()
@@ -4560,7 +4560,7 @@ class SermonEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = SermonDescrExternal.objects.filter(sermon=instance).first()
@@ -4669,7 +4669,7 @@ class SermonEdit(BasicDetails):
             # Need to know who is 'talking'...
             username = self.request.user.username
             profile = Profile.get_user_profile(username)
-            profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
+            profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
             project_count = instance.projects.count()
 
@@ -4683,7 +4683,7 @@ class SermonEdit(BasicDetails):
                     instance.projects.add(project)
                 elif profile_projects.count() == 1:
                     # This editor is only editor for one project
-                    # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                    # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
                     project = profile_projects.first().project
                     instance.projects.add(project)
 
@@ -4851,7 +4851,7 @@ class SermonEdit(BasicDetails):
                     # Need to know who is 'talking'...
                     username = self.request.user.username
                     profile = Profile.get_user_profile(username)
-                    profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
+                    profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
                     # Always get the project list
                     projlist = form.cleaned_data.get("projlist")
@@ -4880,7 +4880,7 @@ class SermonEdit(BasicDetails):
                             bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
                     elif profile_projects.count() == 1:
                         # This editor is only editor for one project
-                        # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                        # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
                         project = profile_projects.first().project
                         instance.projects.add(project)
                     else:
@@ -6953,7 +6953,7 @@ class ProfileEdit(BasicDetails):
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
+            adapt_m2m(ProjectApprover, instance, "profile", projlist, "project")
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileEdit/after_save")
@@ -9682,7 +9682,7 @@ class ManuscriptEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = ManuscriptExternal.objects.filter(manu=instance).first()
@@ -12009,7 +12009,7 @@ class SermonGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = SermonGoldExternal.objects.filter(gold=instance).first()
@@ -12379,7 +12379,7 @@ class EqualGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = EqualGoldExternal.objects.filter(equal=instance).first()
@@ -12949,7 +12949,7 @@ class EqualGoldEdit(BasicDetails):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.project_editor.filter(status="incl")
+                user_projects = profile.project_approver.filter(status="incl")
                 if user_projects.count() == 1:
                     project = user_projects.first()
                     EqualGoldProject.objects.create(equal=instance, project=project)
@@ -13229,7 +13229,7 @@ class EqualGoldDetails(EqualGoldEdit):
             if self.isnew:
                 # Try default project assignment
                 profile = Profile.get_user_profile(self.request.user.username)
-                qs = profile.project_editor.filter(status="incl")
+                qs = profile.project_approver.filter(status="incl")
                 for obj in qs:
                     EqualGoldProject.objects.create(project=obj.project, equal=instance)
                 # is it just one project?

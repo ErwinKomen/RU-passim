@@ -282,7 +282,7 @@ def mypassim(request):
 
         # Figure out which projects this editor may handle
         if context['is_app_editor']:
-            qs = profile.project_editor.filter(status="incl")
+            qs = profile.project_approver.filter(status="incl")
             if qs.count() == 0:
                 sDefault = "(none)"
             else:
@@ -386,7 +386,7 @@ class MyPassimEdit(BasicDetails):
 
             # Figure out which projects this editor may handle
             if context['is_app_editor']:
-                qs = profile.project_editor.filter(status="incl")
+                qs = profile.project_approver.filter(status="incl")
                 if qs.count() == 0:
                     sDefault = "(none)"
                 else:
