@@ -1770,6 +1770,8 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    manuone = ModelChoiceField(queryset=None, required=False,
+                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
@@ -1923,6 +1925,7 @@ class SermonForm(PassimModelForm):
 
             self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['manuone'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
             # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
@@ -4349,7 +4352,7 @@ class ManuscriptForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
-            self.fields['projlist'] = profile.get_myprojects()
+            self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # Set the dependent fields for [lcity]

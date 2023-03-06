@@ -8653,6 +8653,95 @@ class MsItem(models.Model):
 
         return self.sermon_parent.all().order_by("order")
 
+    def move_codico(self, dst_codico):
+        """Move this [MsItem] from the current codico to a new codico"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            # Get the current codico
+            src_codico = self.codico
+
+            # Make sure the ordering of the source manuscript is correct
+            manu = src_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+            # Check if I have a preceding one
+            prec_msitem = self.codico.codicoitems.filter(next = self).first()
+            # Determine what the next one of [preciding MsItem] was before the move
+            prec_next = None
+            if not prec_msitem is None:
+                prec_next = prec_msitem.next
+
+            # Do I have a first child?
+            child_msitem = self.firstchild
+            # Determine what the new 'next msitem' will be for the preceding one
+            if not child_msitem is None:
+                # I have a first child: then this one moves up, becoming the new 'next msitem'
+                new_next = child_msitem
+                # Get all my children and set their new parent
+                for child in MsItem.objects.filter(parent=self).order_by('order'):
+                    child.parent = self.parent
+                    child.save()
+                    last_child = child
+                # Make sure its parent is set correctly
+                new_next.parent = self.parent
+                # Is there a value for preceding MsItem
+                if not prec_next is None:
+                    # Let it point to the last_child
+                    prec_next.next = last_child
+                    prec_next.save()
+                # Save the changed new_next
+                new_next.save()
+                # adapt the next of the last child
+                if not last_child is None:
+                    last_child.next = self.next
+                    last_child.save()
+            else:
+                new_next = self.next
+            # If needed, set the [next] for the preceding msitem
+            if not prec_msitem is None:
+                prec_msitem.next = new_next
+                prec_msitem.save()
+
+            # Look at the destination codico
+            # (1) what is the last root-MsItem there
+            dst_last_root_item = dst_codico.codicoitems.filter(parent=None).order_by('-order').first()
+            # (2) Get the number of items
+            last_item = dst_codico.codicoitems.all().order_by('-order').first()
+            dst_items = 0
+            if not last_item is None:
+                dst_items = last_item.order
+
+            # Reset my own parent, firstchild, next
+            self.parent = None
+            self.firstchild = None
+            self.next = None
+            self.codico = dst_codico
+            self.order = dst_items + 1
+            self.save()
+
+            # (2) set the 'next' item to me
+            if not dst_last_root_item is None:
+                dst_last_root_item.next = self
+                dst_last_root_item.save()
+
+            # Re-arrange the [child] feature, if applicable
+            manu = dst_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+            # Also review the order of the manuscript I was under
+            manu = src_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MsItem/move_codico")
+        return bResult
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""

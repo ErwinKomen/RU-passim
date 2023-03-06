@@ -5613,6 +5613,25 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * sermo_move
+       *   Call the right stuff to start moving a sermon to a new location
+       *
+       */
+      sermo_move: function (elStart) {
+        var elForm = null;
+
+        try {
+          // Get to the form
+          elForm = $(elStart).closest("form").first();
+          // Submit it
+          $(elForm).submit();
+
+        } catch (ex) {
+          private_methods.errMsg("sermo_move", ex);
+        }
+      },
+
+      /**
        * do_sermones
        *    Open or close [elStart]
        *

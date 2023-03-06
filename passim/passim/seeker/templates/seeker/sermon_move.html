@@ -1,0 +1,44 @@
+
+<div id="sermon-move" class="panel panel-default panel-plain" >
+
+  <div class="panel-body codico-list" >
+    <table style='width: 100%;' >
+      <thead></thead>
+      <tbody>
+        <!-- Row with the right button -->
+        <tr class="">
+          <td valign="top" class='tdnowrap' style="min-width: 100px;">Action:</td>
+          <td valign="top" class='hoverable' style="width: 100%;" >
+            <div class="view-mode">
+              <!-- Button to MOVE this S to the selected M -->
+              <a role="button" class="btn btn-xs jumbo-1"
+                 data-target="#move_sermon_continue"
+                 data-toggle="collapse"
+                 title="Toggle the move manifestation dialogue">Move this manifestation...</a>
+            </div>
+
+            <!-- Standard way to confirm moving -->
+            <div id="move_sermon_continue" class="collapse">
+              <form action="{% url 'sermon_move' instance.id %}" method="post">
+                <div class="hidden">
+                  {% csrf_token %}
+                  <input type="text" name="sermo-dstmanu" value="">
+                </div>
+                Select the <b>manuscript</b> to which this manifestation should be moved
+                {{sermoForm.manuone}}
+                <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.sermo_move(this);"
+                   title="Actually move the manifestation to the selected manuscript (if any)">Move manifestation</a>
+              </form>
+
+
+            </div>
+          </td>
+        </tr>
+
+ 
+      </tbody>
+    </table>
+
+  </div>
+
+</div>

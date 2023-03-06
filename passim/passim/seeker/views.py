@@ -4626,11 +4626,16 @@ class SermonEdit(BasicDetails):
             # Signal that we have select2
             context['has_select2'] = True
 
+            # Start making room for AfterDetails
+            lhtml = []
+
+            # Add all needed information for moving a sermon
+            lhtml.append(render_to_string("seeker/sermon_move.html", context, self.request))
+
             # Add comment modal stuff
             initial = dict(otype="sermo", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('sermo', instance, profile)
-            lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
 
@@ -5094,6 +5099,41 @@ class SermonDetails(SermonEdit):
 
     def after_save(self, form, instance):
         return True, ""
+
+
+class SermonMove(SermonDetails):
+    # newRedirect = True
+
+    def custom_init(self, instance):
+        errHandle = ErrHandle()
+
+        # Note: use [errHandle]
+        try:
+            # Find the right parameter
+            manu_id = self.qd.get("sermo-manuone")
+            if not manu_id is None and manu_id != "":
+                dst_manu = Manuscript.objects.filter(id=manu_id).first()
+                if not dst_manu is None:
+                    # Yes, a destination manuscript has been identified
+                    # Find out what the last codico-unit is
+                    lastcodico = dst_manu.manuscriptcodicounits.all().order_by('-order').first()
+                    if not lastcodico is None:
+                        # Get the msitem of the sermon
+                        msitem = instance.msitem
+                        # Move the MsItem to a different Codico
+                        msitem.move_codico(lastcodico)
+
+                    # Make sure to set the correct redirect page: the manuscript to which it has been moved
+                    if instance:
+                        self.redirectpage = reverse("manuscript_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            return True
+        except:
+            msg = errHandle.get_error_message()
+            errHandle.DoError("SermonMove")
+            return False
 
 
 class SermonListView(BasicList):

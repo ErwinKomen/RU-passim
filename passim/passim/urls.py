@@ -178,9 +178,10 @@ urlpatterns = [
     url(r'^ssglink/details(?:/(?P<pk>\d+))?/$', EqualGoldLinkDetails.as_view(), name='equalgoldlink_details'),
     url(r'^ssglink/edit(?:/(?P<pk>\d+))?/$', EqualGoldLinkEdit.as_view(), name='equalgoldlink_edit'),
     
+    url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
-    url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
+    url(r'^sermon/move(?:/(?P<pk>\d+))?/$', SermonMove.as_view(), name='sermon_move'),
         
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
     url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),  
@@ -396,6 +397,5 @@ urlpatterns = [
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', admin.site.urls, name='admin_base'),
-    url(r'^accounts/', include('django.contrib.auth.urls')),
 ]
 
