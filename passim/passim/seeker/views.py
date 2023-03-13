@@ -5768,33 +5768,38 @@ class KeywordListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "links":
-            html = []
-            # Get the HTML code for the links of this instance
-            number = instance.freqsermo()
-            if number > 0:
-                url = reverse('sermon_list')
-                html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
-            number = instance.freqgold()
-            if number > 0:
-                url = reverse('search_gold')
-                html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
-            number = instance.freqmanu()
-            if number > 0:
-                url = reverse('search_manuscript')
-                html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
-            number = instance.freqsuper()
-            if number > 0:
-                url = reverse('equalgold_list')
-                html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
-            # Combine the HTML code
-            sBack = "\n".join(html)
-        elif custom == "visibility":
-            sBack = instance.get_visibility_display()
+        oErr = ErrHandle()
+        try:
+            if custom == "links":
+                html = []
+                # Get the HTML code for the links of this instance
+                number = instance.freqsermo()
+                if number > 0:
+                    url = reverse('sermon_list')
+                    html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+                number = instance.freqgold()
+                if number > 0:
+                    url = reverse('search_gold')
+                    html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+                number = instance.freqmanu()
+                if number > 0:
+                    url = reverse('search_manuscript')
+                    html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+                number = instance.freqsuper()
+                if number > 0:
+                    url = reverse('equalgold_list')
+                    html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
+                # Combine the HTML code
+                sBack = "\n".join(html)
+            elif custom == "visibility":
+                sBack = instance.get_visibility_display()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("KeywordListView/get_field_value")
         return sBack, sTitle
 
     def adapt_search(self, fields):
@@ -6695,16 +6700,30 @@ class FeastListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "sermon":
-            html = []
-            for sermon in instance.feastsermons.all().order_by('feast__name'):
-                # find the shelfmark
-                manu = sermon.msitem.manu
-                url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-                html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
-            sBack = ", ".join(html)
-        elif custom == "sermons":
-            sBack = "{}".format(instance.feastsermons.count())
+        oErr = ErrHandle()
+        try:
+            if custom == "sermon":
+                html = []
+                for sermon in instance.feastsermons.all().order_by('feast__name'):
+                    # find the shelfmark
+                    manu = sermon.msitem.manu
+                    url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
+                sBack = ", ".join(html)
+            elif custom == "sermons":
+                # sBack = "{}".format(instance.feastsermons.count())
+                html = []
+                # Get the HTML code for the links of this instance
+                number = instance.feastsermons.count()
+                if number > 0:
+                    url = reverse('sermon_list')
+                    html.append("<a href='{}?sermo-feastlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+                sBack = "\n".join(html)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("FeastListView/get_field_value")
         return sBack, sTitle
 
 
