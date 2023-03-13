@@ -6582,66 +6582,73 @@ class FeastDetails(FeastEdit):
         # First get the 'standard' context from TestsetEdit
         context = super(FeastDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        oErr = ErrHandle()
+        try:
+            context['sections'] = []
 
-        # Lists of related objects
-        related_objects = []
-        resizable = True
-        index = 1
-        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_end = '</span>'
+            # Lists of related objects
+            related_objects = []
+            resizable = True
+            index = 1
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
 
-        # List of Sermons that link to this feast (with an FK)
-        sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
-        if resizable: sermons['gridclass'] = "resizable"
+            # List of Sermons that link to this feast (with an FK)
+            sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
+            if resizable: sermons['gridclass'] = "resizable"
 
-        rel_list =[]
-        qs = instance.feastsermons.all().order_by('msitem__manu__idno', 'locus')
-        for item in qs:
-            manu = item.msitem.manu
-            url = reverse('sermon_details', kwargs={'pk': item.id})
-            url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
-            rel_item = []
+            rel_list =[]
+            qs = instance.feastsermons.all().order_by('msitem__manu__idno', 'locus')
+            for item in qs:
+                manu = item.msitem.manu
+                url = reverse('sermon_details', kwargs={'pk': item.id})
+                url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
+                rel_item = []
 
-            # S: Order number for this sermon
-            add_rel_item(rel_item, index, False, align="right")
-            index += 1
+                # S: Order number for this sermon
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
 
-            # Manuscript
-            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
-            add_rel_item(rel_item, manu_full, False, main=True, link=url_m)
+                # Manuscript
+                # manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
+                manu_full = manu.get_full_name(plain=False)
+                add_rel_item(rel_item, manu_full, False, main=True, link=url_m)
 
-            # Locus
-            locus = "(none)" if item.locus == None or item.locus == "" else item.locus
-            add_rel_item(rel_item, locus, False, main=True, link=url, 
-                         title="Locus within the manuscript (links to the sermon)")
+                # Locus
+                locus = "(none)" if item.locus == None or item.locus == "" else item.locus
+                add_rel_item(rel_item, locus, False, main=True, link=url, 
+                             title="Locus within the manuscript (links to the sermon)")
 
-            # Origin/provenance
-            or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
-            add_rel_item(rel_item, or_prov, False, main=True, 
-                         title="Origin (if known), followed by provenances (between brackets)")
+                # Origin/provenance
+                or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
+                add_rel_item(rel_item, or_prov, False, main=True, nowrap=False, 
+                             title="Origin (if known), followed by provenances (between brackets)")
 
-            # Date
-            daterange = "{}-{}".format(manu.yearstart, manu.yearfinish)
-            add_rel_item(rel_item, daterange, False, link=url_m, align="right")
+                # Date
+                daterange = "{}-{}".format(manu.yearstart, manu.yearfinish)
+                add_rel_item(rel_item, daterange, False, link=url_m, align="right")
 
-            # Add this line to the list
-            rel_list.append(dict(id=item.id, cols=rel_item))
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
 
-        sermons['rel_list'] = rel_list
+            sermons['rel_list'] = rel_list
 
-        sermons['columns'] = [
-            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
-            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
-            '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
-            '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
-            '{}<span>date</span>{}'.format(sort_start_int, sort_end)
-            ]
-        related_objects.append(sermons)
+            sermons['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
+                '{}<span>date</span>{}'.format(sort_start_int, sort_end)
+                ]
+            related_objects.append(sermons)
 
-        # Add all related objects to the context
-        context['related_objects'] = related_objects
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("FeastDetails/add_to_context")
 
         # Return the context we have made
         return context

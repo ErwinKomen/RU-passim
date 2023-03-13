@@ -4315,7 +4315,7 @@ class Manuscript(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_full_name(self):
+    def get_full_name(self, plain=True):
         lhtml = []
         # (1) City
         if self.lcity != None:
@@ -4327,7 +4327,10 @@ class Manuscript(models.Model):
             lhtml.append(self.library.name)
         # (3) Idno
         if self.idno != None:
-            lhtml.append(self.idno)
+            if plain:
+                lhtml.append(self.idno)
+            else:
+                lhtml.append("<span class='signature'>{}</span>".format(self.idno))
 
         # What if we don't have anything?
         if len(lhtml) == 0:
@@ -4490,54 +4493,67 @@ class Manuscript(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_provenance_markdown(self, plain=False, table=True):
+    def get_provenance_markdown(self, plain=False, table=False):
         lHtml = []
         # Visit all literature references
         # Issue #289: this was self.provenances.all()
         #             now back to self.provenances.all()
         order = 0
-        if not plain: 
-            if table: lHtml.append("<table><tbody>")
-        # for prov in self.provenances.all().order_by('name'):
-        for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
-            order += 1
-            # Get the URL
-            prov = mprov.provenance
-            url = reverse("provenance_details", kwargs = {'pk': prov.id})
-            sNote = mprov.note
-            if sNote == None: sNote = ""
+        oErr = ErrHandle()
+        try:
+            if not plain: 
+                if table: lHtml.append("<table><tbody>")
+            # for prov in self.provenances.all().order_by('name'):
+            for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
+                order += 1
+                # Get the URL
+                prov = mprov.provenance
+                url = reverse("provenance_details", kwargs = {'pk': prov.id})
+                sNote = mprov.note
+                if sNote == None: sNote = ""
+
+                if not plain: 
+                    if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+                sLocName = "" 
+                sLocPlain = ""
+                if prov.location!=None:
+                    sLocPlain = prov.location.name
+                    if plain:
+                        sLocName = sLocPlain
+                    else:
+                        sLocName = " ({})".format(sLocPlain)
+                sName = "-" if prov.name == "" else prov.name
+                if sLocPlain == sName:
+                    sLoc = sName
+                else:
+                    sLoc = "{} {}".format(sName, sLocName)
+
+                if plain:
+                    sMprov = dict(prov=prov.name, location=sLocName)
+                else:
+                    sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                    if table:
+                        #sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        #    sProvLink, sNote)
+                        sMprov = "<td valign='top'>{}: {}</td></tr>".format(
+                            sProvLink, sNote)
+                    else:
+                        sMprov = sProvLink
+
+                lHtml.append(sMprov)
 
             if not plain: 
-                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
-
-            sLocName = "" 
-            if prov.location!=None:
-                if plain:
-                    sLocName = prov.location.name
-                else:
-                    sLocName = " ({})".format(prov.location.name)
-            sName = "-" if prov.name == "" else prov.name
-            sLoc = "{} {}".format(sName, sLocName)
-
+                if table: lHtml.append("</tbody></table>")
             if plain:
-                sMprov = dict(prov=prov.name, location=sLocName)
+                sBack = json.dumps(lHtml)
             else:
-                sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
-                if table:
-                    sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
-                        sProvLink, sNote)
-                else:
-                    sMprov = sProvLink
+                # sBack = ", ".join(lHtml)
+                sBack = "".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_provenance_markdown")
 
-            lHtml.append(sMprov)
-
-        if not plain: 
-            if table: lHtml.append("</tbody></table>")
-        if plain:
-            sBack = json.dumps(lHtml)
-        else:
-            # sBack = ", ".join(lHtml)
-            sBack = "".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
