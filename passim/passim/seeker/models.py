@@ -10072,6 +10072,12 @@ class SermonDescr(models.Model):
         for item in scount_lst: scount += item['scount']
         return scount
 
+    def get_sectiontitle(self):
+        sBack = "-"
+        if not self.sectiontitle is None:
+            sBack = self.sectiontitle
+        return sBack
+
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
 
@@ -10125,6 +10131,12 @@ class SermonDescr(models.Model):
             count = self.comments.count()
             print(count)
         sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
+        return sBack
+
+    def get_title(self):
+        sBack = "-"
+        if not self.title is None:
+            sBack = self.title
         return sBack
 
     def get_comments(self, usercomment=False): # Ok, hij komt hier, niet met Sermons

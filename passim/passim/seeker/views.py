@@ -6599,7 +6599,8 @@ class FeastDetails(FeastEdit):
             if resizable: sermons['gridclass'] = "resizable"
 
             rel_list =[]
-            qs = instance.feastsermons.all().order_by('msitem__manu__idno', 'locus')
+            # Note: default sort order according to issue #632
+            qs = instance.feastsermons.all().order_by('msitem__manu__lcity__name', 'msitem__manu__library__name', 'msitem__manu__idno', 'locus')
             for item in qs:
                 manu = item.msitem.manu
                 url = reverse('sermon_details', kwargs={'pk': item.id})
@@ -6611,18 +6612,32 @@ class FeastDetails(FeastEdit):
                 index += 1
 
                 # Manuscript
-                # manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
                 manu_full = manu.get_full_name(plain=False)
-                add_rel_item(rel_item, manu_full, False, main=True, link=url_m)
+                add_rel_item(rel_item, manu_full, False, main=False, nowrap=False, link=url_m)
 
                 # Locus
                 locus = "(none)" if item.locus == None or item.locus == "" else item.locus
-                add_rel_item(rel_item, locus, False, main=True, link=url, 
-                             title="Locus within the manuscript (links to the sermon)")
+                add_rel_item(rel_item, locus, False, main=False, nowrap=False, link=url, 
+                             title="Locus within the manuscript (links to the manifestation)")
+
+                # Title
+                title = item.get_title()
+                add_rel_item(rel_item, title, False, main=False, nowrap=False, link=url, 
+                             title="Manifestation's title (links to the manifestation)")
+
+                # Section title
+                section_title = item.get_sectiontitle()
+                add_rel_item(rel_item, section_title, False, main=False, nowrap=False, link=url, 
+                             title="Manifestation's section title (links to the manifestation)")
+
+                # Signature (Gryson/Clavis/Other)
+                sig_text = item.signature_auto_string()
+                add_rel_item(rel_item, sig_text, False, main=False, nowrap=False, link=url, 
+                             title="Gryson/Clavis/Other of associated Authority File (links to the manifestation)")
 
                 # Origin/provenance
                 or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
-                add_rel_item(rel_item, or_prov, False, main=True, nowrap=False, 
+                add_rel_item(rel_item, or_prov, False, main=False, nowrap=False, 
                              title="Origin (if known), followed by provenances (between brackets)")
 
                 # Date
@@ -6638,6 +6653,10 @@ class FeastDetails(FeastEdit):
                 '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
                 '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
                 '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Manifestation title (links to the manifestation)">Title</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Manifestation section title (links to the manifestation)">Section</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Gryson/Clavis/Other of associated Authority File (links to the manifestation)">Gr./Cl.</span>{}'.format(
+                    sort_start, sort_end), 
                 '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
                 '{}<span>date</span>{}'.format(sort_start_int, sort_end)
                 ]
