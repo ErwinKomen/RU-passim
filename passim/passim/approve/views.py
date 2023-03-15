@@ -172,6 +172,11 @@ def equalchange_json_to_html(instance, type, profile=None):
                     explicit = oItem.get("text")
                     # Add to html
                     html.append(explicit)
+                elif field == "fulltext":
+                    # Process fulltext string
+                    fulltext = oItem.get("text")
+                    # Add to html
+                    html.append(fulltext)
                 elif field == "keywords":
                     # Process list of FK-to-keyword
                     kwlist = oItem.get('kwlist')
