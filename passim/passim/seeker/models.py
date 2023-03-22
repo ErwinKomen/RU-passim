@@ -71,6 +71,7 @@ YESNO_TYPE = "seeker.yesno"
 RIGHTS_TYPE = "seeker.rights"
 PROJ_DEFAULT = "seeker.prjdeftype"
 VISIBILITY_TYPE = "seeker.visibility"
+KEYWORD_CATEGORY = "seeker.kwcat"
 
 # All the linktypes that are actually used
 LINK_EQUAL = 'eqs'
@@ -3313,6 +3314,8 @@ class Keyword(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
+    # [1] Every keyword has a visibility - default is 'all'
+    category = models.CharField("Category", choices=build_abbr_list(KEYWORD_CATEGORY), max_length=5, default="con")
     # [0-1] Further details are perhaps required too
     description = models.TextField("Description", blank=True, null=True)
 
