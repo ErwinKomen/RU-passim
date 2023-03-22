@@ -5648,6 +5648,8 @@ var ru = (function ($, ru) {
         }
       },
 
+
+
       /**
        * manu_edit
        *   Switch between edit modes on this <tr>

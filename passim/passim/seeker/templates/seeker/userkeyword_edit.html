@@ -1,0 +1,36 @@
+{% load i18n %}
+
+<!-- The buttons that show at the left hand side -->
+<div class="buttons ukw editable">
+  <!-- The part of the form that actually allows adding keywords -->
+  <span class="view-mode">
+    <!-- what the user normall sees in view mode-->
+    {{userkeywords|safe}}
+    <span>&nbsp;&nbsp;</span>
+
+  </span>
+
+  <!-- Edit button -->
+  <a mode="edit" class="view-mode btn btn-xs jumbo-1">
+    <span class="glyphicon glyphicon-pencil" title="Edit these data"></span>
+  </a>
+  <!-- Cancel button -->
+  <a mode="cancel" class="edit-mode btn btn-xs jumbo-2 hidden">
+    <span class="glyphicon glyphicon-arrow-left" title="Cancel (do *NOT* save)"></span>
+  </a>
+  <!-- Waiting symbol-->
+  <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+  <!-- Save button -->
+  <a mode="save" class="edit-mode btn btn-xs jumbo-1 hidden" targetid="" targeturl="{{ukwupdate}}">
+    <span class="glyphicon glyphicon-ok" title="Save these data">&nbsp;Save</span>
+  </a>              
+
+  <span class="edit-mode hidden">
+    <!-- The form for entering / deleting user keywords -->
+    {{ukwform.ukwlist}}
+  </span>
+
+</div>
+
+
+

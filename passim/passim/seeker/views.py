@@ -2568,6 +2568,22 @@ def passim_get_history(instance):
     sBack = "\n".join(lhtml)
     return sBack
 
+def get_userkeyword_interface(request, context):
+    """Get HTML stuff providing a user-keyword edit interface for non-editing users"""
+
+    template_name = "seeker/userkeyword_select.html"
+    sBack = ""
+    oErr = ErrHandle()
+    try:
+
+        pass
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_userkeyword_interface")
+    return sBack
+
+
+
 
 
 # ============== NOTE: superseded by the READER app ===================
@@ -4532,7 +4548,7 @@ class SermonEdit(BasicDetails):
                     {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                      # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
                      'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                    {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                      'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
                      'title': 'Keywords attached to the Authority file(s)'},
@@ -4682,6 +4698,31 @@ class SermonEdit(BasicDetails):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
+        return sBack
+
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('sermon_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
         return sBack
 
     def after_new(self, form, instance):
@@ -5100,6 +5141,38 @@ class SermonDetails(SermonEdit):
     def after_save(self, form, instance):
         return True, ""
 
+
+class SermonUserKeyword(SermonDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("sermon_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonUserKeyword/custom_init")
+    
 
 class SermonMove(SermonDetails):
     # newRedirect = True
@@ -5901,6 +5974,32 @@ class UserKeywordDetails(UserKeywordEdit):
     """Like UserKeyword Edit, but then html output"""
     rtype = "html"
     
+
+class UserKeywordSubmit(UserKeywordDetails):
+    """Submit an adapted range of user keywords and return to the details page"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        """"""
+
+        # Note: use [oErr]
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("userkeyword_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+  
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("UserKeywordSubmit")
+            return False
+
+
 
 class UserKeywordListView(BasicList):
     """Search and list keywords"""
@@ -9843,8 +9942,10 @@ class ManuscriptEdit(BasicDetails):
                 team_group = app_editor
                 mainitems_m2m = [
                     {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
-                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-                     'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    {'type': 'line', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   
+                     'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    #{'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                    # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                         'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[0] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
@@ -10068,6 +10169,31 @@ class ManuscriptEdit(BasicDetails):
         sBack = render_to_string("seeker/manu_provs.html", context, self.request)
         return sBack
 
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['manuForm']
+                context['ukwupdate'] = reverse('manuscript_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def process_formset(self, prefix, request, formset):
         errors = []
         bResult = True
@@ -10280,7 +10406,7 @@ class ManuscriptEdit(BasicDetails):
 
     def get_history(self, instance):
         return passim_get_history(instance)
-    
+
 
 class ManuscriptDetails(ManuscriptEdit):
     rtype = "html"
@@ -10383,6 +10509,38 @@ class ManuscriptDetails(ManuscriptEdit):
                 instance.set_projects(projects)
         return True, ""
 
+
+class ManuscriptUserKeyword(ManuscriptDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("manuscript_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'manu'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptUserKeyword/custom_init")
+    
 
 class ManuscriptHierarchy(ManuscriptDetails):
     newRedirect = True
@@ -12119,7 +12277,7 @@ class SermonGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Bibliography:",         'value': instance.get_bibliography_markdown(),  'field_key': 'bibliography'},
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                  'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                 {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
                  'title': 'Keywords attached to the Authority file of which this Sermon Gold is part'},
@@ -12352,6 +12510,31 @@ class SermonGoldEdit(BasicDetails):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
 
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('gold_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def get_history(self, instance):
         return passim_get_history(instance)
 
@@ -12394,6 +12577,38 @@ class SermonGoldDetails(SermonGoldEdit):
     def after_save(self, form, instance):
         return True, ""
 
+
+class SermonGoldUserKeyword(SermonGoldDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("gold_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'gold'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonGoldUserKeyword/custom_init")
+    
 
 # ================= EQUALGOLD =============================
 
@@ -12485,7 +12700,7 @@ class EqualGoldEdit(BasicDetails):
     
 
                 {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                 {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
                 {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
@@ -12791,6 +13006,31 @@ class EqualGoldEdit(BasicDetails):
             oErr.DoError("EqualGoldEdit/get_prj_submitted")
             bBack = ""
 
+        return sBack
+
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('equalgold_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
         return sBack
 
     def before_delete(self, instance):
@@ -13386,6 +13626,38 @@ class EqualGoldDetails(EqualGoldEdit):
             bBack = False
         return bBack, msg
 
+
+class EqualGoldUserKeyword(EqualGoldDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("equalgold_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'super'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldUserKeyword/custom_init")
+    
 
 class EqualGoldListView(BasicList):
     """List super sermon gold instances"""

@@ -4270,6 +4270,37 @@ class CodicoForm(PassimModelForm):
         return None
 
 
+class UserKwForm(BasicSimpleForm):
+    ukwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(UserKwForm, self).__init__(*args, **kwargs)
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+
+            self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+
+            if user_is_in_team(username, team_group):
+                self.fields['ukwlist'].widget.is_team = True
+            else:
+                self.fields['ukwlist'].widget.is_team = False
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("UserKwForm")
+        return None
+
+
+
 class ManuscriptForm(PassimModelForm):
     country_ta  = forms.CharField(label=_("Country"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
