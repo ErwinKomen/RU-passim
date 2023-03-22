@@ -5882,7 +5882,8 @@ class KeywordListView(BasicList):
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        if not self.in_team:
+        # if not self.in_team:
+        if not user_is_ingroup(self.request, app_editor):
             # restrict access to "all" marked ons
             fields['visibility'] = "all"
 
