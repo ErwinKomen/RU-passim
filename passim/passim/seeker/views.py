@@ -5795,7 +5795,9 @@ class KeywordListView(BasicList):
                    {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
                    {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-                {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
+                # See issue #628 -- keep the following commented for now 
+                # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
+                ]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
@@ -5814,7 +5816,9 @@ class KeywordListView(BasicList):
                 {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
                 {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
             self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-                             {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
+                            # See issue #628 -- keep the following commented for now 
+                            # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
+                            ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
