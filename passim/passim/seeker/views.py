@@ -5758,6 +5758,7 @@ class KeywordEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",       'value': instance.name,                     'field_key': 'name'},
             {'type': 'plain', 'label': "Visibility:", 'value': instance.get_visibility_display(), 'field_key': 'visibility'},
+            {'type': 'plain', 'label': "Category:",   'value': instance.get_category_display(),   'field_key': 'category'},
             {'type': 'plain', 'label': "Description:",'value': instance.description,              'field_key': 'description'}
             ]
         # Return the context we have made
@@ -5789,11 +5790,13 @@ class KeywordListView(BasicList):
     sg_name = "Keyword"     
     plural_name = "Keywords"
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', 'visibility', '']
+    order_cols = ['name', 'visibility', 'category', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
-                   {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
-                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
+    order_heads = [
+        {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+        {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
+        {'name': 'Category',   'order': 'o=3', 'type': 'str', 'custom': 'category'},
+        {'name': 'Frequency',  'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
                 # See issue #628 -- keep the following commented for now 
                 # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
@@ -5805,36 +5808,51 @@ class KeywordListView(BasicList):
         ]
 
     def initializations(self):
+        # Make sure possible adaptations are executed
+        listview_adaptations("keyword_list")
+
         # Check out who I am
         in_team = user_is_in_team(self.request)
         self.in_team = in_team
         if in_team:
-            self.order_cols = ['name', 'visibility', '']
+            self.order_cols = ['name', 'visibility', 'category', '']
             self.order_default = self.order_cols
             self.order_heads = [
                 {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
                 {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
-                {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
-            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-                            # See issue #628 -- keep the following commented for now 
-                            # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
-                            ]
+                {'name': 'Category',   'order': 'o=3', 'type': 'str', 'custom': 'category'},
+                {'name': 'Frequency',  'order': '',    'type': 'str', 'custom': 'links'}]
+            self.filters = [ 
+                {"name": "Keyword",       "id": "filter_keyword",     "enabled": False},
+                {"name": "Category",      "id": "filter_category",    "enabled": False}
+                # See issue #628 -- keep the following commented for now 
+                # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
-                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }]}
+                    # {'filter': 'category',   'dbfield': 'category',     'keyS': 'category',   'keyList': 'kwcatlist', 'infield': 'english_name'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
+                    ]}
                 ]
             self.bUseFilter = False
         else:
-            self.order_cols = ['name', '']
+            self.order_cols = ['name', 'category', '']
             self.order_default = self.order_cols
             self.order_heads = [
                 {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                {'name': 'Category',   'order': 'o=2', 'type': 'str', 'custom': 'category'},
                 {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
-            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+            self.filters = [ 
+                {"name": "Keyword",       "id": "filter_keyword",     "enabled": False},
+                {"name": "Category",      "id": "filter_category",    "enabled": False}
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
-                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]},
+                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
                     ]}
@@ -5874,6 +5892,8 @@ class KeywordListView(BasicList):
                 sBack = "\n".join(html)
             elif custom == "visibility":
                 sBack = instance.get_visibility_display()
+            elif custom == "category":
+                sBack = instance.get_category_display()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("KeywordListView/get_field_value")

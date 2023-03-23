@@ -649,6 +649,17 @@ class KeywordOneWidget(ModelSelect2Widget):
         return qs
 
 
+class KeywordCategoryWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=KEYWORD_CATEGORY).order_by("english_name")
+
+
 class LitrefWidget(ModelSelect2Widget):
     model = Litref
     search_fields = [ 'full__icontains' ]
@@ -2075,15 +2086,18 @@ class KeywordForm(BasicModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwcatlist    = forms.ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordCategoryWidget(attrs={'data-placeholder': 'Select multiple categories...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["keywords"]
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Keyword
-        fields = ['name', 'visibility', 'description']
+        fields = ['name', 'visibility', 'category', 'description']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'visibility':  forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Visibility type...',  'style': 'width: 100%;'}),
+                 'category':    forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Category...',  'style': 'width: 100%;'}),
                  'description': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
                                                       'class': 'searching', 'placeholder': 'Comments on this keyword...'})
                  }
@@ -2091,17 +2105,27 @@ class KeywordForm(BasicModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(KeywordForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['name'].required = False
-        self.fields['visibility'].required = False
-        self.fields['description'].required = False
-        self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
-        # Initialize choices for linktype
-        init_choices(self, 'vistype', VISIBILITY_TYPE, bUseAbbr=True, use_helptext=False)
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            self.fields['visibility'].initial = instance.visibility
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['visibility'].required = False
+            self.fields['category'].required = False
+            self.fields['description'].required = False
+            self.fields['kwlist'].queryset = Keyword.objects.all().order_by('name')
+
+            self.fields['kwcatlist'].queryset = FieldChoice.objects.filter(field=KEYWORD_CATEGORY).order_by("english_name")
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['visibility'].initial = instance.visibility
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("KeywordForm")
+
+        return None
 
 
 class UserKeywordForm(BasicModelForm):

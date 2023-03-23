@@ -2170,6 +2170,22 @@ def get_huwa_opera_literature(opera_id, handschrift_id):
     lBack = Edition.get_opera_literature(opera_id, handschrift_id)
     return lBack
 
+def read_kwcategories():
+    """Load the JSON that specifies the keyword categories"""
+
+    oErr = ErrHandle()
+    lst_kwcat = {}
+    try:
+        kwcat_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "passim_kwcat.json"))
+        with open(kwcat_json, "r", encoding="utf-8") as f:
+            lst_kwcat = json.load(f)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("read_kwcategories")
+    # Return the table that we found
+    return lst_kwcat
+
+
 
 class ReaderImport(View):
     # Initialisations

@@ -28,6 +28,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur, OperaLit
+from passim.reader.views import read_kwcategories
 
 
 adaptation_list = {
@@ -43,6 +44,7 @@ adaptation_list = {
         'huwa_edilit_remove'],
     'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
+    'keyword_list': ['kwcategories'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
 
@@ -1349,6 +1351,73 @@ def adapt_projecteditors():
                 project = obj.project
                 profile = obj.profile
                 editor = ProjectEditor.objects.create(project=project, profile=profile)
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+
+
+# ========== Part of keyword_list ======================
+def adapt_kwcategories():
+    """Make sure each keyword gets put into the correct category"""
+
+    def get_kw_cat(lst_kwcat, sKeyword):
+        sBack = None
+
+        # Look at the LC variant
+        lower_kw = sKeyword.lower()
+        # Get the category of the keyword
+        for oItem in lst_kwcat:
+            # Get the keyword
+            item_kw = oItem.get("Keyword").lower()
+            # Check if this is a :* kw or not
+            if ":*" in item_kw:
+                # Check the matching part
+                kw_length = len(item_kw) - 1
+                if item_kw[:kw_length] == lower_kw[:kw_length]:
+                    # Found it: get the category
+                    sBack = oItem.get("kwcat")
+                    break
+            else:
+                # expecting coincidence
+                if item_kw == lower_kw:
+                    # Found it: get the category
+                    sBack = oItem.get("kwcat")
+                    break
+        # DOuble check
+        if sBack is None:
+            iStop = 1
+        # Return what we found
+        return sBack
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Read the kwcat JSON
+        lst_kwcat = read_kwcategories()
+        lst_missed = []
+
+        # Check if there are any editors already
+        qs = Keyword.objects.all()
+        for obj in qs:
+            # Get the current keyword and its category
+            sKeyword = obj.name
+            sCurrentCat = obj.category
+            # Get the category that this should have
+            sFutureCat = get_kw_cat(lst_kwcat, sKeyword)
+            if sFutureCat is None:
+                # Add the kw to the dictionary with missed keywords
+                lst_missed.append(sKeyword)
+            elif sCurrentCat != sFutureCat:
+                # CHange it
+                obj.category = sFutureCat
+                obj.save()
+        # Show all the keywords that were missed
+        oErr.Status("Missed keywords: {}".format(lst_missed))
     except:
         bResult = False
         msg = oErr.get_error_message()
