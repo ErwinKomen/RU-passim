@@ -139,7 +139,8 @@
                       <h4>
                       {% for filter in filters %}
                         {% if not filter.head_id or filter.head_id == "none" %}
-                          <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                          <span class="badge filter {% if filter.enabled %} jumbo-3 on {% else %} jumbo-1 {% endif %} 
+                                "targetid="{{filter.id}}" targetaddid="{{filter.include_id}}" >{{filter.name}}</span>
                         {% endif %}
                       {% endfor %}
                       </h4>
@@ -156,9 +157,10 @@
                       <div><h5>{{titlesg}} filters: </h5></div>
 
                       <!-- Show the different filters in the list -->
-                      {% for filter in filters %}
-                        {% if not filter.head_id  %}
-                          <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
+                      {% for filter in filters %}                        
+                        {% if not filter.head_id or filter.head_id == "hidden" %}
+                          <div id="{{filter.id}}" class="{% if filter.hasvalue %} {% else %}hidden {% endif %}"
+                               addview="{% if filter.include_id %}{{filter.include_id}}{% endif %}">
                             <table style="width: 100%;">
                               <tr class="form-row">
                                 <td style="min-width: 130px;" valign="top">
@@ -221,8 +223,9 @@
                         <!-- Sub filters from this section -->
                         <div>
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name %}
-                              <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " targetid="{{filter.id}}" >{{filter.name}}</span>
+                            {% if filter.head_id == "filter_"|add:section.name or filter.head_id == "none" %}
+                              <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " 
+                                    targetid="{{filter.id}}" targetaddid="{{filter.include_id}}">{{filter.name}}</span>
                             {% endif %}
                           {% endfor %}
                         </div>
@@ -241,13 +244,25 @@
 
                           <!-- Show the different filters in the list -->
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name   %}
-                              <div id="{{filter.id}}" class="{% if not filter.hasvalue %}hidden{% endif %}">
+                            {% if filter.head_id == "filter_"|add:section.name or filter.head_id == "hidden" %}
+                              <div id="{{filter.id}}" class="{% if filter.hasvalue %} {% else %}hidden {% endif %}"
+                               addview="{% if filter.include_id %}{{filter.include_id}}{% endif %}">
                                 <table style="width: 100%;">
                                   <tr class="form-row">
                                     <td style="min-width: 130px;" valign="top" 
-                                        {% if filter.title %}title="{{filter.title}}"{% endif %}>{{filter.name}}</td>
+                                      {% if filter.title %}title="{{filter.title}}"{% endif %}>{{filter.name}}                                      
+                                      {% if filter.help != "" and filter.helptext != "" %}
+                                        <a role="button" data-toggle="collapse" data-target="#basic_h_{{filter.help}}">
+                                          <span class="glyphicon glyphicon-question-sign" style="color: blue;"></span>
+                                        </a>
+                                      {% endif %}
+                                    </td>                                                                        
                                     <td style="width: 100%;">
+                                      {% if filter.help != "" and filter.helptext != "" %}
+                                        <div id="basic_h_{{filter.help}}" class="collapse">
+                                          {{filter.helptext|safe}}
+                                        </div>
+                                      {% endif %}
                                       {% for fitem in filter.fitems %}
                                         {% if fitem.dbfield %}<span class="keyword-key hidden">{{fitem.dbfield}}</span>{% endif %}
                                         {% if fitem.keyS %}

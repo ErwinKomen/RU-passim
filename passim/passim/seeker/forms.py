@@ -1537,13 +1537,10 @@ class SearchManuForm(PassimModelForm):
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
-
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     title_ta = forms.CharField(label=_("Codico_title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching codico_titles input-sm', 'placeholder': 'Title...', 'style': 'width: 100%;'}))
-
-
     country     = forms.CharField(required=False)
     country_ta  = forms.CharField(label=_("Country"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -1561,20 +1558,28 @@ class SearchManuForm(PassimModelForm):
                                      widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                                      widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    
     signature   = forms.CharField(label=_("Signature"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 
                                                           'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    # KAN WEG na afronden issue # 658 
     signaturea  = forms.CharField(label=_("Signature"), required=False,
                             widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 
                                                           'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
+    
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
-    signatureaid = forms.CharField(label=_("Signature ID"), required=False)
+    
+    # KAN WEG na afronden issue # 658 
+    signatureaid = forms.CharField(label=_("Signature ID"), required=False) 
+       
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
                                                           'style': 'width: 100%;', 'class': 'searching'}))
+    # KAN WEG na afronden issue # 658 
     siglist_a   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...',
                                                           'style': 'width: 100%;', 'class': 'searching'}))
+
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1613,7 +1618,35 @@ class SearchManuForm(PassimModelForm):
     collone     = ModelChoiceField(queryset=None, required=False) 
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
-                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'}))
+                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'})) # , 'value':'100'
+    
+    # SERMON-specific  
+    sermo_authorname = forms.CharField(label=_("Author"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
+    sermo_authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))    
+    authortype  = forms.ChoiceField(label=_("Author type"), required=False, 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Author...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))    
+    sermo_incipit  = forms.CharField(label=_("Incipit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))    
+    sermo_explicit = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))    
+    sermo_feast  = forms.CharField(label=_("Feast"), required=False,
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))    
+    sermo_feastlist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
+    # SSG-specific
+    ssg_authorname = forms.CharField(label=_("Author"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))    
+    ssg_authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+    ssg_incipit  = forms.CharField(label=_("Incipit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
+    ssg_explicit = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
+
+    
     typeaheads = ["countries", "cities", "libraries", "origins", "locations", "signatures", "keywords", "collections", 
                   "manuidnos", "gldsiggrysons", "gldsigclavises", "codico_titles"]
 
@@ -1642,10 +1675,16 @@ class SearchManuForm(PassimModelForm):
             self.fields['stype'].required = False
             self.fields['name'].required = False
 
+            # for Sermon part of issue    
+
+            # workings autype part not yet clear...                   
+            self.fields['authortype'].required = False                       
+            self.fields['authortype'].choices = AUTHOR_TYPE
+
             self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
-            self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code')
+            self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code') # KAN LATER WEG
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
@@ -1653,6 +1692,10 @@ class SearchManuForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
             self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
+            self.fields['ssg_authorlist'].queryset = Author.objects.all().order_by('name')             
+            
+            self.fields['sermo_authorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['sermo_feastlist'].queryset = Feast.objects.all().order_by('name')
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
@@ -2495,7 +2538,7 @@ class CollectionForm(PassimModelForm):
         self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
         self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
         self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') # Gaat ok lijkt het
+        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
         self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
         # S section

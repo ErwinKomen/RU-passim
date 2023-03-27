@@ -181,7 +181,7 @@ class HelpChoice(models.Model):
                 sBack = markdown(sBack)
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("get_help")
+            oErr.DoError("get_help")       
         return sBack
 
 

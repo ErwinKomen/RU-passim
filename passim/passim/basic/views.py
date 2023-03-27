@@ -228,15 +228,20 @@ def adapt_search(val, regex_function=None):
 def make_search_list(filters, oFields, search_list, qd, lstExclude):
     """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
 
-    def enable_filter(filter_id, head_id=None): # filter_id = of title of sectiontitle
-        for item in filters:        
+    def enable_filter(filter_id, head_id=None): 
+        full_filter_id = "filter_{}".format(filter_id)
+        for item in filters:
+            if filter_id in item['id'] or full_filter_id == item['include_id']:
+                item['enabled'] = True
+                # Break from my loop
+                break
             # first create two strings in order to compare the selected filters and the hidden columns (title and sectiontitle) with each other 
-            temp_filter_id = str("filter_" + filter_id)
-            temp_item_id = str(item['id'])                  
+            #temp_filter_id = str("filter_" + filter_id)
+            #temp_item_id = str(item['id'])                  
             # If the selected filter(s) match(es) one or two of the hidden columns 
             # enabled should be given a True
-            if temp_filter_id == temp_item_id:    
-                item['enabled'] = True            
+            #if temp_filter_id == temp_item_id:    
+            #    item['enabled'] = True            
                 # Break from my loop (deleted)
                 # break 
         # Check if this one has a head
@@ -1103,10 +1108,28 @@ class BasicList(ListView):
                             filteritem['help'] = ""
                             # Possibly add help
                             if 'help' in item:
-                                filteritem['helptext'] = self.get_helptext(item['help'])
+                                filteritem['helptext'] = self.get_helptext(item['help']) 
                                 filteritem['help'] = item['help']
                             # Make sure we indicate that there is a value
-                            if  bHasItemValue: filteritem['hasvalue'] = True
+                            if bHasItemValue: filteritem['hasvalue'] = True                            
+
+                             # If this is a hidden one, then set 'hasvalue' at the *FIRST* appropriate one TH: hier gaat het niet goed
+                            if bHasItemValue:                                 
+                                filterinclude = filteritem.get('include_id', "")
+                                if filteritem.get('head_id', '') == "hidden":
+                                    # Find the first appropriate one including me
+                                    for fi in self.filters:
+                                        if fi.get("include_id", "") == id:
+                                            # We have the first one
+                                            fi['hasvalue'] = True
+                                            # fi['enabled'] = True
+                                            # Now leave the for-loop
+                                            break
+                                elif filterinclude != "":
+                                    # Make sure to enable the include, even though it may not have a value
+                                    for fi in self.filters:
+                                        if fi.get('id', '') == filterinclude:
+                                            fi['hasvalue'] = True
                             break
                         except:
                             sMsg = oErr.get_error_message()
