@@ -12,7 +12,7 @@
     <OutputPath>.</OutputPath>
     <Name>library</Name>
     <RootNamespace>library</RootNamespace>
-    <InterpreterId>{c850f0da-b556-4eff-b6ee-df7ce36720c5}</InterpreterId>
+    <InterpreterId>MSBuild|{c850f0da-b556-4eff-b6ee-df7ce36720c5}|$(MSBuildProjectFullPath)</InterpreterId>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29P.xml"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
