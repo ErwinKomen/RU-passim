@@ -562,6 +562,11 @@ class ManuscriptUploadJson(ReaderImport):
                             # Possibly show messages
                             if len(lst_msg) > 0:
                                 oErr.Status("Messages:\n{}".format(json.dumps(lst_msg, indent=2)))
+                                # And write it to a dump file
+                                sFile = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "manuscriptuploadjson.json"))
+                                with open(sFile, "w", encoding="utf-8") as f:
+                                    json.dump(lst_msg, f, indent=2)
+                                oErr.Status("   See file: {}".format(sFile))
 
                         # Create a report and add it to what we return                        
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read, 'msg': lst_msg}

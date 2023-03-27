@@ -24,9 +24,11 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, OnlineSources, \
+    ProjectApprover, ProjectEditor, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur, OperaLit
+from passim.reader.views import read_kwcategories
 
 
 adaptation_list = {
@@ -40,7 +42,9 @@ adaptation_list = {
         'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
         'huwa_edilit_remove'],
+    'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
+    'keyword_list': ['kwcategories'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
     }
 
@@ -519,11 +523,15 @@ def read_huwa_edilit():
     """Load the JSON that specifies the inter-SSG relations according to Opera id's """
 
     oErr = ErrHandle()
+    lst_edilit = []
     try:
-        lst_edilit = None
         edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-        with open(edilit_json, "r", encoding="utf-8") as f:
-            lst_edilit = json.load(f)
+        if os.path.exists(edilit_json):
+            with open(edilit_json, "r", encoding="utf-8") as f:
+                lst_edilit = json.load(f)
+        else:
+            # Just issue a warning
+            oErr.Status("WARNING: cannot find file {}".format(edilit_json))
     except:
         msg = oErr.get_error_message()
         oErr.DoError("adaptations.read_huwa_edilit")
@@ -538,6 +546,7 @@ def adapt_huwaeditions():
     bDebug = False
     msg = ""
     specification = ['title', 'literaturtitel', 'pp', 'year', 'band', 'reihetitel', 'reihekurz']
+    attrs = ['seiten', 'seitenattr', 'bis', 'bisattr', 'titel']
 
     try:
         # Read the HUWA edilit
@@ -551,6 +560,9 @@ def adapt_huwaeditions():
 
             # Get the optional edition id
             edition_id = oEdition.get("edition")    # This is for table [Edition]
+
+            # Other stuff for table [Edition]
+            oPages = oEdition.get("pages")
 
             # Sanity check
             if not huwaid is None and not opera_id is None:
@@ -608,6 +620,24 @@ def adapt_huwaeditions():
                         for oLoci in lst_loci:
                             # Add this locus to the edition
                             edition.add_locus(oLoci)
+
+                    # Walk through any [siglen]
+                    lst_siglen = oEdition.get("siglen", [])
+                    for oSiglen in lst_siglen:
+                        # Add this siglen to the edition
+                        edition.add_siglen(oSiglen)
+
+                    # Walk through any [siglen_edd]
+                    lst_siglen_edd = oEdition.get("siglen_edd", [])
+                    for oSiglenEdd in lst_siglen_edd:
+                        # Add this siglen to the edition
+                        edition.add_siglen_edd(oSiglenEdd)
+
+                    # Check for 'seiten' etc
+                    for k,v in oPages.items():
+                        if getattr(edition, k) is None and not v is None:
+                            setattr(edition, k, v)
+                    edition.save()
             else:
                 # This is a bad entry. Double check
                 bDoubleCheck = True
@@ -1302,3 +1332,95 @@ def adapt_import_onlinesources():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+
+# ========== Part of profile_list ======================
+def adapt_projecteditors():
+    """Make sure that project approvers are also in the list of project editors"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Check if there are any editors already
+        count = ProjectEditor.objects.count()
+        if count == 0:
+            # There are no editors yet: copy them from ProjectApprover
+            for obj in ProjectApprover.objects.all():
+                project = obj.project
+                profile = obj.profile
+                editor = ProjectEditor.objects.create(project=project, profile=profile)
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+
+
+# ========== Part of keyword_list ======================
+def adapt_kwcategories():
+    """Make sure each keyword gets put into the correct category"""
+
+    def get_kw_cat(lst_kwcat, sKeyword):
+        sBack = None
+
+        # Look at the LC variant
+        lower_kw = sKeyword.lower()
+        # Get the category of the keyword
+        for oItem in lst_kwcat:
+            # Get the keyword
+            item_kw = oItem.get("Keyword").lower()
+            # Check if this is a :* kw or not
+            if ":*" in item_kw:
+                # Check the matching part
+                kw_length = len(item_kw) - 1
+                if item_kw[:kw_length] == lower_kw[:kw_length]:
+                    # Found it: get the category
+                    sBack = oItem.get("kwcat")
+                    break
+            else:
+                # expecting coincidence
+                if item_kw == lower_kw:
+                    # Found it: get the category
+                    sBack = oItem.get("kwcat")
+                    break
+        # DOuble check
+        if sBack is None:
+            iStop = 1
+        # Return what we found
+        return sBack
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Read the kwcat JSON
+        lst_kwcat = read_kwcategories()
+        lst_missed = []
+
+        # Check if there are any editors already
+        qs = Keyword.objects.all()
+        for obj in qs:
+            # Get the current keyword and its category
+            sKeyword = obj.name
+            sCurrentCat = obj.category
+            # Get the category that this should have
+            sFutureCat = get_kw_cat(lst_kwcat, sKeyword)
+            if sFutureCat is None:
+                # Add the kw to the dictionary with missed keywords
+                lst_missed.append(sKeyword)
+            elif sCurrentCat != sFutureCat:
+                # CHange it
+                obj.category = sFutureCat
+                obj.save()
+        # Show all the keywords that were missed
+        oErr.Status("Missed keywords: {}".format(lst_missed))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+

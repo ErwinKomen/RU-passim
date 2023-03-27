@@ -31,7 +31,7 @@ from pyzotero import zotero
 
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
-# import xmltodict
+import lxml.html
 from xml.dom import minidom
 
 # From this own application
@@ -71,6 +71,7 @@ YESNO_TYPE = "seeker.yesno"
 RIGHTS_TYPE = "seeker.rights"
 PROJ_DEFAULT = "seeker.prjdeftype"
 VISIBILITY_TYPE = "seeker.visibility"
+KEYWORD_CATEGORY = "seeker.kwcat"
 
 # All the linktypes that are actually used
 LINK_EQUAL = 'eqs'
@@ -380,25 +381,44 @@ def getText(nodeStart):
             rc.append(getText(node))
     return ' '.join(rc)
 
+def striphtmlre(data):
+    p = re.compile(r'<.*?>')
+    return p.sub('', data)
+
+def striphtml(data):
+    sBack = data
+    if not data is None and data != "":
+        xml = lxml.html.document_fromstring(data)
+        if not xml is None:
+            sBack = xml.text_content()
+    return sBack
+
 def get_searchable(sText):
     sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
 
-    # Validate
-    if sText == None:
-        sText = ""
-    else:
+    oErr = ErrHandle()
+    try:
+        # Validate
+        if sText == None:
+            sText = ""
+        else:
 
-        # Move to lower case
-        sText = sText.lower()
+            # Move to lower case
+            sText = sText.lower()
 
-        # Remove punctuation with nothing
-        sText = re.sub(sRemove, "", sText)
-        #sText = sText.replace("<", "")
-        #sText = sText.replace(">", "")
-        #sText = sText.replace("_", "")
+            # Strip html
+            sText = striphtml(sText)
 
-        # Make sure to TRIM the text
-        sText = sText.strip()
+            # Remove punctuation with nothing
+            #   note: this doesn't completely work for the < and > signs, 
+            #         but that is handled by the striphtml
+            sText = re.sub(sRemove, "", sText)
+
+            # Make sure to TRIM the text
+            sText = sText.strip()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("seeker/get_searchable")
     return sText
 
 def get_comments(stype, usercomment=False, count=-1):
@@ -1366,8 +1386,7 @@ class Report(models.Model):
     # [1] And a date: the date of saving this report
     created = models.DateTimeField(default=get_current_datetime)
     # [1] A report should have a type to know what we are reporting about
-    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), 
-                            max_length=5)
+    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), max_length=5)
     # [0-1] A report should have some contents: stringified JSON
     contents = models.TextField("Contents", default="{}")
 
@@ -1479,7 +1498,7 @@ class Profile(models.Model):
     basketitems_super = models.ManyToManyField("EqualGold", through="BasketSuper", related_name="basketitems_user_super")
 
     # Many-to-many field that links this person/profile with particular projects
-    projects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="projects_profile")
+    projects = models.ManyToManyField("Project2", through="ProjectApprover", related_name="projects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -1549,7 +1568,7 @@ class Profile(models.Model):
         try:
             if not deflist is None:
                 with transaction.atomic():
-                    for obj in self.project_editor.all():
+                    for obj in self.project_approver.all():
                         project = obj.project
                         if project in deflist:
                             obj.status = "incl"
@@ -1561,27 +1580,80 @@ class Profile(models.Model):
             oErr.DoError("defaults_update")
         return bBack
 
+    def get_approver_projects_markdown(self):
+        """List of projects to which this user (profile) has APPROVING rights"""
+
+        lHtml = []
+        # Visit all approving projects
+        for project in self.projects.all().order_by('name'):
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
     def get_defaults(self):
-        """List of projects to which this user (profile) has editing rights"""
+        """List of projects to which this user (profile) has APPROVER rights"""
+
+        bUseEditorProjects = False
 
         # Get a list of project id's that are my default
-        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
+        lst_id = [x['project__id'] for x in self.project_approver.filter(status="incl").values('project__id')]
         # Select all the relevant projects
         if len(lst_id) == 0:
-            # Try to at least include the PASSIM project as a default
-            qs = Project2.objects.filter(name__icontains="passim").first()
+            if bUseEditorProjects:
+                # Look for projects to which I have EDITING rights
+                qs = self.get_editor_projects()
+                if qs.count() == 0:
+                    # Try to at least include the PASSIM project as a default
+                    # qs = Project2.objects.filter(name__icontains="passim").first()
+                    qs = Project2.objects.filter(name__icontains="passim")
+            else:
+                qs = Project2.objects.filter(name__icontains="passim")
         else:
             qs = Project2.objects.filter(id__in=lst_id)
         # Return the list
         return qs
 
     def get_defaults_markdown(self):
-        """List of projects to which this user (profile) has editing rights"""
+        """List of projects to which this user (profile) has APPROVER rights"""
 
         lHtml = []
         # Visit all keywords
-        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
+        for obj in self.project_approver.filter(status="incl").order_by('project__name'):
             project = obj.project
+            # Find the URL of the related project
+            url = reverse('project2_details', kwargs={'pk': project.id})
+            # Create a display for this topic
+            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
+                url, project.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_editor_projects(self):
+        """Get a queryset of projects to which I am editor"""
+
+        qs = []
+        oErr = ErrHandle()
+        try:
+            ids = [x['project__id'] for x in self.project_editor.values("project__id") ]
+            qs = Project2.objects.filter(id__in=ids).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_editor_projects")
+
+        return qs
+
+    def get_editor_projects_markdown(self):
+        """List of projects to which this user (profile) has editing rights"""
+
+        lHtml = []
+        # Visit all editing projects
+        for project in self.get_editor_projects():
             # Find the URL of the related project
             url = reverse('project2_details', kwargs={'pk': project.id})
             # Create a display for this topic
@@ -1598,13 +1670,47 @@ class Profile(models.Model):
         rights = ""
         if is_editor or is_developer or is_moderator or is_superuser:
             # Check the rights level for the particular project
-            obj = ProjectEditor.objects.filter(project=project, profile=self).first()
+            obj = ProjectApprover.objects.filter(project=project, profile=self).first()
             if not obj is None:
                 # Some relationship exists...
                 rights = obj.rights
 
         # Return the rights level that was found
         return rights
+
+    def get_groups_markdown(self):
+        """Get all the groups this user is member of"""
+
+        lHtml = []
+        # Visit all keywords
+        for group in self.user.groups.all().order_by('name'):
+            # Create a display for this topic
+            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
+
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_myprojects(self):
+        """Get a queryset of projects to which I am editor or approver"""
+
+        qs = []
+        oErr = ErrHandle()
+        try:
+            ids_edit = [x['project__id'] for x in self.project_editor.values("project__id") ]
+            ids_appr = [x['project__id'] for x in self.project_approver.values("project__id") ]
+            ids = list( set( ids_edit + ids_appr ) )
+            qs = Project2.objects.filter(id__in=ids).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_myprojects")
+
+        return qs
+
+    def get_project_ids(self):
+        """List of id's this person had editing rights for"""
+
+        id_list = [x['id'] for x in self.projects.all().values('id')]
+        return id_list
 
     def get_stack(username):
         """Get the stack as a list from the current user"""
@@ -1637,39 +1743,6 @@ class Profile(models.Model):
         # Get to the profile of this user
         profile = Profile.objects.filter(user=user).first()
         return profile
-
-    def get_groups_markdown(self):
-        """Get all the groups this user is member of"""
-
-        lHtml = []
-        # Visit all keywords
-        for group in self.user.groups.all().order_by('name'):
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'>{}</span>".format(group.name))
-
-        sBack = ", ".join(lHtml)
-        return sBack
-
-    def get_projects_markdown(self):
-        """List of projects to which this user (profile) has editing rights"""
-
-        lHtml = []
-        # Visit all keywords
-        for project in self.projects.all().order_by('name'):
-            # Find the URL of the related project
-            url = reverse('project2_details', kwargs={'pk': project.id})
-            # Create a display for this topic
-            lHtml.append("<span class='clickable'><a href='{}' class='nostyle'><span class='badge signature gr'>{}</a></span></span>".format(
-                url, project.name))
-
-        sBack = ", ".join(lHtml)
-        return sBack
-
-    def get_project_ids(self):
-        """List of id's this person had editing rights for"""
-
-        id_list = [x['id'] for x in self.projects.all().values('id')]
-        return id_list
 
     def history(self, action, type, oFields = None):
         """Perform [action] on the history of [type]"""
@@ -1751,7 +1824,7 @@ class Profile(models.Model):
         oErr = ErrHandle()
         try:
             prj = Project2.objects.filter(name__icontains=sProject).first()
-            edi = ProjectEditor.objects.filter(profile=self, project=prj).first()
+            edi = ProjectApprover.objects.filter(profile=self, project=prj).first()
             bResult = (not edi is None)
         except:
             msg = oErr.get_error_message()
@@ -3241,6 +3314,8 @@ class Keyword(models.Model):
     name = models.CharField("Name", max_length=LONG_STRING)
     # [1] Every keyword has a visibility - default is 'all'
     visibility = models.CharField("Visibility", choices=build_abbr_list(VISIBILITY_TYPE), max_length=5, default="all")
+    # [1] Every keyword has a visibility - default is 'all'
+    category = models.CharField("Category", choices=build_abbr_list(KEYWORD_CATEGORY), max_length=5, default="con")
     # [0-1] Further details are perhaps required too
     description = models.TextField("Description", blank=True, null=True)
 
@@ -3633,11 +3708,13 @@ class Manuscript(models.Model):
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
+
             # Need to have external information
             externals = oManu.get("externals")
             externalid = None
             if not externals is None and len(externals) > 0: 
                 externalid = externals[0].get("externalid")
+
             # First get the shelf mark
             idno = oManu.get('shelf mark') if keyfield == "name" else oManu.get("idno")
             if idno == None:
@@ -3680,9 +3757,9 @@ class Manuscript(models.Model):
                     obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                     if not source is None:
                         obj.source = source
-                    obj.idno = "{} (huwa={})".format(idno,externalid)
+                    obj.idno = "{}\thuwa={}".format(idno,externalid)
                     # We are adding one that is already there
-                    msg = "Adding double shelfmark: {} manu={}".format(obj.idno, obj.id)
+                    msg = "Adding double shelfmark:\t{}\tmanu={}".format(obj.idno, obj.id)
                     oErr.Status(msg)
                     oParams['msg'] = msg
                 else:
@@ -3727,7 +3804,7 @@ class Manuscript(models.Model):
                             field = "{}_id".format(field)
                         value = oManu.get(field)
                         readonly = oField.get('readonly', False)
-                        if value != None and value != "" and not readonly:
+                        if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
                             path = oField.get("path")
                             if "target" in oField:
                                 path = oField.get("target")
@@ -3808,6 +3885,8 @@ class Manuscript(models.Model):
                                 codico.name = title
                         else:
                             codico.name = codico_name
+                        # Make sure to write the CODICO now
+                        codico.save()
 
                     # Make sure we have a copy of the RAW json data for this manuscript
                     obj.raw = json.dumps(oManu, indent=2)
@@ -3904,6 +3983,7 @@ class Manuscript(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            sourcetype = kwargs.get("sourcetype")
             value_lst = []
             if isinstance(value, str) and value[0] != '[':
                 value_lst = value.split(",")
@@ -3920,6 +4000,21 @@ class Manuscript(models.Model):
                     if keyword != None:
                         # Add this keyword to the manuscript for this user
                         UserKeyword.objects.create(keyword=keyword, profile=profile, manu=self)
+                # Ready
+            elif path == "keywords" and sourcetype == "huwa":
+                # Get the list of keywords
+                real_keywords = value_lst #  json.loads(value)
+                for kw in real_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    # Since this is HUWA< the keyword must be created if needed
+                    if keyword is None:
+                        keyword = Keyword.objects.create(name=kw)
+                    if not keyword is None:
+                        # Add this keyword to the manuscript for this user
+                        obj = ManuscriptKeyword.objects.filter(keyword=keyword, manuscript=self).first()
+                        if obj is None:
+                            obj = ManuscriptKeyword.objects.create(keyword=keyword, manuscript=self)
                 # Ready
             elif path == "datasets":
                 # Walk the personal datasets
@@ -4223,7 +4318,7 @@ class Manuscript(models.Model):
             sBack = ", ".join(lHtml)
         return sBack
 
-    def get_full_name(self):
+    def get_full_name(self, plain=True):
         lhtml = []
         # (1) City
         if self.lcity != None:
@@ -4235,7 +4330,10 @@ class Manuscript(models.Model):
             lhtml.append(self.library.name)
         # (3) Idno
         if self.idno != None:
-            lhtml.append(self.idno)
+            if plain:
+                lhtml.append(self.idno)
+            else:
+                lhtml.append("<span class='signature'>{}</span>".format(self.idno))
 
         # What if we don't have anything?
         if len(lhtml) == 0:
@@ -4398,54 +4496,67 @@ class Manuscript(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_provenance_markdown(self, plain=False, table=True):
+    def get_provenance_markdown(self, plain=False, table=False):
         lHtml = []
         # Visit all literature references
         # Issue #289: this was self.provenances.all()
         #             now back to self.provenances.all()
         order = 0
-        if not plain: 
-            if table: lHtml.append("<table><tbody>")
-        # for prov in self.provenances.all().order_by('name'):
-        for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
-            order += 1
-            # Get the URL
-            prov = mprov.provenance
-            url = reverse("provenance_details", kwargs = {'pk': prov.id})
-            sNote = mprov.note
-            if sNote == None: sNote = ""
+        oErr = ErrHandle()
+        try:
+            if not plain: 
+                if table: lHtml.append("<table><tbody>")
+            # for prov in self.provenances.all().order_by('name'):
+            for mprov in self.manuscripts_provenances.all().order_by('provenance__name'):
+                order += 1
+                # Get the URL
+                prov = mprov.provenance
+                url = reverse("provenance_details", kwargs = {'pk': prov.id})
+                sNote = mprov.note
+                if sNote == None: sNote = ""
+
+                if not plain: 
+                    if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
+
+                sLocName = "" 
+                sLocPlain = ""
+                if prov.location!=None:
+                    sLocPlain = prov.location.name
+                    if plain:
+                        sLocName = sLocPlain
+                    else:
+                        sLocName = " ({})".format(sLocPlain)
+                sName = "-" if prov.name == "" else prov.name
+                if sLocPlain == sName:
+                    sLoc = sName
+                else:
+                    sLoc = "{} {}".format(sName, sLocName)
+
+                if plain:
+                    sMprov = dict(prov=prov.name, location=sLocName)
+                else:
+                    sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
+                    if table:
+                        #sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
+                        #    sProvLink, sNote)
+                        sMprov = "<td valign='top'>{}: {}</td></tr>".format(
+                            sProvLink, sNote)
+                    else:
+                        sMprov = sProvLink
+
+                lHtml.append(sMprov)
 
             if not plain: 
-                if table: lHtml.append("<tr><td valign='top'>{}</td>".format(order))
-
-            sLocName = "" 
-            if prov.location!=None:
-                if plain:
-                    sLocName = prov.location.name
-                else:
-                    sLocName = " ({})".format(prov.location.name)
-            sName = "-" if prov.name == "" else prov.name
-            sLoc = "{} {}".format(sName, sLocName)
-
+                if table: lHtml.append("</tbody></table>")
             if plain:
-                sMprov = dict(prov=prov.name, location=sLocName)
+                sBack = json.dumps(lHtml)
             else:
-                sProvLink = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLoc)
-                if table:
-                    sMprov = "<td class='tdnowrap nostyle' valign='top'>{}</td><td valign='top'>{}</td></tr>".format(
-                        sProvLink, sNote)
-                else:
-                    sMprov = sProvLink
+                # sBack = ", ".join(lHtml)
+                sBack = "".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_provenance_markdown")
 
-            lHtml.append(sMprov)
-
-        if not plain: 
-            if table: lHtml.append("</tbody></table>")
-        if plain:
-            sBack = json.dumps(lHtml)
-        else:
-            # sBack = ", ".join(lHtml)
-            sBack = "".join(lHtml)
         return sBack
 
     def get_sermon_count(self):
@@ -4783,7 +4894,7 @@ class Manuscript(models.Model):
                     # Walk the SSG links tied with sermon_src
                     for eq in sermon_src.equalgolds.all():
                         # Add it to the destination sermon
-                        SermonDescrEqual.objects.create(sermon=sermon_dst, super=eq, linktype=LINK_UNSPECIFIED)
+                        SermonDescrEqual.objects.create(sermon=sermon_dst, manu = sermon_dst.msitem.codico.manuscript, super=eq, linktype=LINK_UNSPECIFIED)
 
                     # Issue #315: adapt Bible reference(s) linking based on copied field
                     if mtype == "man":
@@ -5476,12 +5587,14 @@ class Codico(models.Model):
             # Double check the lengths
             if len(yearstart) > 4 or len(yearfinish) > 4:
                 # We need to do better
-                years = re.findall(r'\d{4}', value)
+                years = re.findall(r'\d{4}', sDateItem)
                 yearstart = years[0]
                 if len(years) == 0:
                     yearfinish = yearstart
-                else:
+                elif len(years) > 1:
                     yearfinish = years[1]
+                else:
+                    yearfinish = yearstart
             else:
                 # Check for question mark dates
                 if "?" in yearfinish:
@@ -6413,6 +6526,9 @@ class EqualGold(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+    # [0-1] Stemmatology full plain text (all in Latin)
+    fulltext = models.TextField("Full text", null=True, blank=True)
+    srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
@@ -6466,13 +6582,16 @@ class EqualGold(models.Model):
 
         oErr = ErrHandle()
         try:
-            # Adapt the incipit and explicit - if necessary
+            # Adapt the incipit, explicit and fulltext - if necessary
             srchincipit = get_searchable(self.incipit)
             if self.srchincipit != srchincipit:
                 self.srchincipit = srchincipit
             srchexplicit = get_searchable(self.explicit)
             if self.srchexplicit != srchexplicit:
                 self.srchexplicit = srchexplicit
+            srchfulltext = get_searchable(self.fulltext)
+            if self.srchfulltext != srchfulltext:
+                self.srchfulltext = srchfulltext
 
             # Double check the number and the code
             if self != None and self.author_id != None and self.author != None:
@@ -6662,6 +6781,19 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.explicit)
         elif incexp_type == "search":
             sBack = adapt_markdown(self.srchexplicit)
+        return sBack
+
+    def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
+        """Get the contents of the fulltext field using markdown"""
+
+        if incexp_type == "both":
+            parsed = adapt_markdown(self.fulltext, lowercase)
+            search = self.srchfulltext
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        elif incexp_type == "actual":
+            sBack = adapt_markdown(self.fulltext, lowercase)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchfulltext, lowercase)
         return sBack
 
     def get_hclist_markdown(self):
@@ -8428,7 +8560,7 @@ class Collection(models.Model):
                     explicit=ssg.explicit, srchexplicit=ssg.srchexplicit,
                     stype="imp", mtype=mtype)
                 # Create a link from the S to this SSG
-                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, super=ssg, linktype=LINK_UNSPECIFIED)
+                ssg_link = SermonDescrEqual.objects.create(sermon=sermon, manu = sermon.msitem.codico.manuscript, super=ssg, linktype=LINK_UNSPECIFIED)
 
         # Now walk and repair the links
         with transaction.atomic():
@@ -8540,6 +8672,95 @@ class MsItem(models.Model):
 
         return self.sermon_parent.all().order_by("order")
 
+    def move_codico(self, dst_codico):
+        """Move this [MsItem] from the current codico to a new codico"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            # Get the current codico
+            src_codico = self.codico
+
+            # Make sure the ordering of the source manuscript is correct
+            manu = src_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+            # Check if I have a preceding one
+            prec_msitem = self.codico.codicoitems.filter(next = self).first()
+            # Determine what the next one of [preciding MsItem] was before the move
+            prec_next = None
+            if not prec_msitem is None:
+                prec_next = prec_msitem.next
+
+            # Do I have a first child?
+            child_msitem = self.firstchild
+            # Determine what the new 'next msitem' will be for the preceding one
+            if not child_msitem is None:
+                # I have a first child: then this one moves up, becoming the new 'next msitem'
+                new_next = child_msitem
+                # Get all my children and set their new parent
+                for child in MsItem.objects.filter(parent=self).order_by('order'):
+                    child.parent = self.parent
+                    child.save()
+                    last_child = child
+                # Make sure its parent is set correctly
+                new_next.parent = self.parent
+                # Is there a value for preceding MsItem
+                if not prec_next is None:
+                    # Let it point to the last_child
+                    prec_next.next = last_child
+                    prec_next.save()
+                # Save the changed new_next
+                new_next.save()
+                # adapt the next of the last child
+                if not last_child is None:
+                    last_child.next = self.next
+                    last_child.save()
+            else:
+                new_next = self.next
+            # If needed, set the [next] for the preceding msitem
+            if not prec_msitem is None:
+                prec_msitem.next = new_next
+                prec_msitem.save()
+
+            # Look at the destination codico
+            # (1) what is the last root-MsItem there
+            dst_last_root_item = dst_codico.codicoitems.filter(parent=None).order_by('-order').first()
+            # (2) Get the number of items
+            last_item = dst_codico.codicoitems.all().order_by('-order').first()
+            dst_items = 0
+            if not last_item is None:
+                dst_items = last_item.order
+
+            # Reset my own parent, firstchild, next
+            self.parent = None
+            self.firstchild = None
+            self.next = None
+            self.codico = dst_codico
+            self.order = dst_items + 1
+            self.save()
+
+            # (2) set the 'next' item to me
+            if not dst_last_root_item is None:
+                dst_last_root_item.next = self
+                dst_last_root_item.save()
+
+            # Re-arrange the [child] feature, if applicable
+            manu = dst_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+            # Also review the order of the manuscript I was under
+            manu = src_codico.manuscript
+            if not manu is None:
+                manu.order_calculate()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("MsItem/move_codico")
+        return bResult
+
 
 class SermonHead(models.Model):
     """A hierarchical element in the manuscript structure"""
@@ -8595,6 +8816,11 @@ class SermonDescr(models.Model):
     # [0-1] We would like to know the EXPLICIT (last line in Latin)
     explicit = models.TextField("Explicit", null=True, blank=True)
     srchexplicit = models.TextField("Explicit (searchable)", null=True, blank=True)
+
+    # [0-1] Stemmatology full plain text (all in Latin)
+    fulltext = models.TextField("Full text", null=True, blank=True)
+    srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
+
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
     # [0-1] If there is a QUOTE, we would like to know the QUOTE (in Latin)
@@ -8694,14 +8920,16 @@ class SermonDescr(models.Model):
         {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
-        {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name'},
+        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
+        {'name': 'Attributed author',   'type': 'func',  'path': 'author_id'},
+        {'name': 'Attributed author',   'type': 'func',  'path': 'author'},
         {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
         {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
         {'name': 'Title',               'type': 'field', 'path': 'title'},
         {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
         {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
         {'name': 'Postscriptum',        'type': 'field', 'path': 'postscriptum'},
-        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name'},
+        {'name': 'Feast',               'type': 'fk',    'path': 'feast', 'fkfield': 'name', 'model': 'Feast'},
         {'name': 'Bible reference(s)',  'type': 'func',  'path': 'brefs'},
         {'name': 'Cod. notes',          'type': 'field', 'path': 'additional'},
         {'name': 'Note',                'type': 'field', 'path': 'note'},
@@ -8833,6 +9061,7 @@ class SermonDescr(models.Model):
             # Understand where we are coming from
             keyfield = kwargs.get("keyfield", "name")
             profile = kwargs.get("profile")
+            sourcetype = kwargs.get("sourcetype")
 
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
@@ -8881,7 +9110,7 @@ class SermonDescr(models.Model):
                     value = oSermo.get(field)
                     readonly = oField.get('readonly', False)
                 
-                    if value != None and value != "" and not readonly:
+                    if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
                         type = oField.get("type")
                         path = oField.get("path")
                         if type == "field":
@@ -8898,7 +9127,7 @@ class SermonDescr(models.Model):
                                     setattr(obj, path, instance)
                         elif type == "func":
                             # Set the KV in a special way
-                            obj.custom_set(path, value)
+                            obj.custom_set(path, value, **kwargs)
 
             # Make sure the update the object
             obj.save()
@@ -8928,6 +9157,9 @@ class SermonDescr(models.Model):
                 for obj in qs:
                     dates.append(obj.__str__())
                 sBack = json.dumps(dates)
+            elif path == "author":
+                # Get the author name
+                sBack = self.get_author()
             elif path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
@@ -9003,7 +9235,7 @@ class SermonDescr(models.Model):
             if note_now is None:
                 srm.note = sNote
             else:
-                srm.note = "{}\\n{}".format(note_now, sNote)
+                srm.note = "{}\n{}".format(note_now, sNote)
 
 
         bResult = True
@@ -9013,6 +9245,7 @@ class SermonDescr(models.Model):
             profile = kwargs.get("profile")
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
+            sourcetype = kwargs.get("sourcetype")
             value_lst = []
             if isinstance(value, str):
                 if value[0] == '[':
@@ -9027,6 +9260,8 @@ class SermonDescr(models.Model):
                     value_lst = value.split(",")
                     for idx, item in enumerate(value_lst):
                         value_lst[idx] = value_lst[idx].strip()
+            elif isinstance(value, list):
+                value_lst = value
             # Note: we skip a number of fields that are determined automatically
             #       [ stype ]
             if path == "brefs":
@@ -9034,6 +9269,16 @@ class SermonDescr(models.Model):
                 self.bibleref = value
                 # Turn this into BibRange
                 self.do_ranges()
+            elif path == "author":
+                # Get the (attributed) author either from author_id or from author (as name)
+                if self.author is None:
+                    # Set it according to the id
+                    self.author = Author.objects.filter(name__iexact=value).first()
+            elif path == "author_id":
+                # Get the (attributed) author either from author_id or from author (as name)
+                if self.author is None:
+                    # Set it according to the id
+                    self.author = Author.objects.filter(id=value).first()
             elif path == "datasets":
                 # Walk the personal datasets
                 datasets = value_lst #  get_json_list(value)
@@ -9060,6 +9305,21 @@ class SermonDescr(models.Model):
                     if keyword != None:
                         # Add this keyword to the sermon for this user
                         UserKeyword.objects.create(keyword=keyword, profile=profile, sermo=self)
+            elif path == "keywords" and sourcetype == "huwa":
+                # Get the list of keywords
+                real_keywords = value_lst #  json.loads(value)
+                for kw in real_keywords:
+                    # Find the keyword
+                    keyword = Keyword.objects.filter(name__iexact=kw).first()
+                    # Since this is HUWA< the keyword must be created if needed
+                    if keyword is None:
+                        keyword = Keyword.objects.create(name=kw)
+                    if not keyword is None:
+                        # Add this keyword to the sermondescr for this user
+                        obj = SermonDescrKeyword.objects.filter(keyword=keyword, sermon=self).first()
+                        if obj is None:
+                            obj = SermonDescrKeyword.objects.create(keyword=keyword, sermon=self)
+                # Ready
             elif path == "literature":
                 # NOTE: a SermonDescr does *NOT* have its own literature
                 pass
@@ -9067,8 +9327,11 @@ class SermonDescr(models.Model):
             elif path == "ssglinks":
                 ssglink_names = value_lst #  get_json_list(value)
                 for ssg_code in ssglink_names:
-                    # Get this SSG
-                    ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+                    # Get this SSG - depending on whether we have a string code or a SSG id
+                    if isinstance(ssg_code,str):
+                        ssg = EqualGold.objects.filter(code__iexact=ssg_code).first()
+                    else:
+                        ssg = EqualGold.objects.filter(id=ssg_code).first()
 
                     if ssg == None:
                         # Indicate that we didn't find it in the notes
@@ -9078,7 +9341,9 @@ class SermonDescr(models.Model):
                         self.save()
                     else:
                         # Make link between SSG and SermonDescr
-                        SermonDescrEqual.objects.create(sermon=self, super=ssg, linktype="eqs")
+                        obj = SermonDescrEqual.objects.filter(sermon=self, manu = self.msitem.codico.manuscript, super=ssg).first()
+                        if obj is None:
+                            obj = SermonDescrEqual.objects.create(sermon=self, manu = self.msitem.codico.manuscript, super=ssg, linktype=LINK_UNSPECIFIED)
                 # Ready
             elif path == "signaturesM":
                 signatureM_names = value_lst #  get_json_list(value)
@@ -9099,10 +9364,16 @@ class SermonDescr(models.Model):
             elif path == "signaturesA":
                 signatureA_names = value_lst
                 # Walk all signatures
-                for code in signatureA_names:
+                for oCode in signatureA_names:
                     # Find the appropriate SG with this signature
-                    # Issue #533: changed to exact matching
-                    signature = Signature.objects.filter(code=code).first()
+                    if isinstance(oCode, dict):
+                        code = oCode.get("code")
+                        editype = oCode.get("editype")
+                        signature = Signature.objects.filter(code__iexact=code, editype=editype).first()
+                    else:
+                        # Issue #533: changed to exact matching
+                        code = oCode
+                        signature = Signature.objects.filter(code__iexact=code).first()
                     if signature is None:
                         # Show what is happening
                         if bDebug: oErr.Status("Reading signaturesA: Could not find signature: [{}]".format(code))
@@ -9122,13 +9393,16 @@ class SermonDescr(models.Model):
                                 if bDebug: oErr.Status("Reading signaturesA: empty SSG for signature [{}]".format(code))
                                 add_note(self, "[C] Link this sermon to: [{}]".format(code))
                             else:
-                                # Make the connection from the Sermon to the SSG
-                                obj = SermonDescrEqual.objects.create(
-                                    sermon = self,
-                                    manu = self.msitem.manu,
-                                    super = ssg)
-                                # Log what has happened
-                                if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
+                                obj = SermonDescrEqual.objects.filter(sermon = self,manu = self.msitem.codico.manuscript,super = ssg).first()
+                                if obj is None:
+                                    # Make the connection from the Sermon to the SSG
+                                    obj = SermonDescrEqual.objects.create(
+                                        sermon = self,
+                                        manu = self.msitem.codico.manuscript,
+                                        linktype=LINK_UNSPECIFIED,
+                                        super = ssg)
+                                    # Log what has happened
+                                    if bDebug: oErr.Status("Linked sermon from signature [{}] to SSG [{}]".format(code, ssg.get_code()))
             elif path == "externals":
                 # These are external IDs like for HUWA
                 externals = value_lst
@@ -9137,10 +9411,10 @@ class SermonDescr(models.Model):
                     externaltype = oExternal.get("externaltype")
                     if not externalid is None and not externaltype is None:
                         # Process it
-                        obj = SermonDescrExternal.objects.filter(manu=self, externalid=externalid, externaltype=externaltype).first()
+                        obj = SermonDescrExternal.objects.filter(sermon=self, externalid=externalid, externaltype=externaltype).first()
                         if obj is None:
                             # Add it
-                            obj = SermonDescrExternal.objects.create(manu=self, externalid=externalid, externaltype=externaltype)
+                            obj = SermonDescrExternal.objects.create(sermon=self, externalid=externalid, externaltype=externaltype)
             else:
                 # Figure out what to do in this case
                 pass
@@ -9536,6 +9810,27 @@ class SermonDescr(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
+    def get_fulltext(self):
+        """Return the *searchable* fulltext, without any additional formatting"""
+        return self.fulltext
+
+    #def get_fulltext_markdown(self):
+    #    """Get the contents of the fulltext field using markdown"""
+    #    return adapt_markdown(self.fulltext)
+
+    def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
+        """Get the contents of the fulltext field using markdown"""
+
+        if incexp_type == "both":
+            parsed = adapt_markdown(self.fulltext, lowercase)
+            search = self.srchfulltext
+            sBack = "<div>{}</div><div class='searchincexp'>{}</div>".format(parsed, search)
+        elif incexp_type == "actual":
+            sBack = adapt_markdown(self.fulltext, lowercase)
+        elif incexp_type == "search":
+            sBack = adapt_markdown(self.srchfulltext, lowercase)
+        return sBack
+
     def get_goldlinks_markdown(self):
         """Return all the gold links = type + gold"""
 
@@ -9753,17 +10048,6 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    #def get_altpage_markdown(self): # of via Keywords?
-    #    lHtml = []
-    #    # Visit all project items
-    #    for altpage in self.pages.all().order_by('name'):
-    #        # Determine where clicking should lead to
-    #        url = "{}?sermo-projlist={}".format(reverse('sermon_list'), project2.id) 
-    #        # Create a display for this topic            
-    #        lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name)) 
-    #    sBack = ", ".join(lHtml)
-    #    return sBack
-
     def get_passimcode_markdown(self):
         """Get the Passim code (and a link to it)"""
 
@@ -9790,6 +10074,12 @@ class SermonDescr(models.Model):
         scount_lst = self.equalgolds.values('scount')
         for item in scount_lst: scount += item['scount']
         return scount
+
+    def get_sectiontitle(self):
+        sBack = "-"
+        if not self.sectiontitle is None:
+            sBack = self.sectiontitle
+        return sBack
 
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
@@ -9844,6 +10134,12 @@ class SermonDescr(models.Model):
             count = self.comments.count()
             print(count)
         sBack = get_stype_light(self.stype, add=add, usercomment=usercomment, count=count)
+        return sBack
+
+    def get_title(self):
+        sBack = "-"
+        if not self.title is None:
+            sBack = self.title
         return sBack
 
     def get_comments(self, usercomment=False): # Ok, hij komt hier, niet met Sermons
@@ -9937,34 +10233,48 @@ class SermonDescr(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the incipit and explicit
         istop = 1
-        if self.incipit: 
-            srchincipit = get_searchable(self.incipit)
-            if self.srchincipit != srchincipit:
-                self.srchincipit = srchincipit
-        if self.explicit: 
-            srchexplicit = get_searchable(self.explicit)
-            if self.srchexplicit != srchexplicit:
-                self.srchexplicit = srchexplicit
-        # Preliminary saving, before accessing m2m fields
-        response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
-        # Process signatures
-        lSign = []
-        bCheckSave = False
-        for item in self.sermonsignatures.all():
-            lSign.append(item.short())
-            bCheckSave = True
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Brush up incipit
+            if self.incipit: 
+                srchincipit = get_searchable(self.incipit)
+                if self.srchincipit != srchincipit:
+                    self.srchincipit = srchincipit
+            # Brush up explicit
+            if self.explicit: 
+                srchexplicit = get_searchable(self.explicit)
+                if self.srchexplicit != srchexplicit:
+                    self.srchexplicit = srchexplicit
+            # Brush up fulltext
+            if self.fulltext: 
+                srchfulltext = get_searchable(self.fulltext)
+                if self.srchfulltext != srchfulltext:
+                    self.srchfulltext = srchfulltext
 
-        # =========== DEBUGGING ================
-        # self.do_ranges(force = True)
-        # ======================================
+            # Preliminary saving, before accessing m2m fields
+            response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+            # Process signatures
+            lSign = []
+            bCheckSave = False
+            for item in self.sermonsignatures.all():
+                lSign.append(item.short())
+                bCheckSave = True
 
-        # Make sure to save the siglist too
-        if bCheckSave: 
-            siglist_new = json.dumps(lSign)
-            if siglist_new != self.siglist:
-                self.siglist = siglist_new
-                # Only now do the actual saving...
-                response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+            # =========== DEBUGGING ================
+            # self.do_ranges(force = True)
+            # ======================================
+
+            # Make sure to save the siglist too
+            if bCheckSave: 
+                siglist_new = json.dumps(lSign)
+                if siglist_new != self.siglist:
+                    self.siglist = siglist_new
+                    # Only now do the actual saving...
+                    response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/save")
         return response
 
     def set_projects(self, projects):
@@ -11384,13 +11694,17 @@ class CollectionProject(models.Model):
         return response
 
 
-class ProjectEditor(models.Model):
-    """Relation between a Profile (=person) and a Project"""
+class ProjectApprover(models.Model):
+    """Relation between a Profile (=person) and a Project
+    
+    The Profile (person) is an approver
+    The 'rights' are not really used, but the status is
+    """
 
     # [1] The link is between a Profile instance ...
-    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    profile = models.ForeignKey(Profile, related_name="project_approver", on_delete=models.CASCADE)
     # [1] ...and a project instance
-    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+    project = models.ForeignKey(Project2, related_name="project_approver", on_delete=models.CASCADE)
 
     # [1] The rights for this person. Right now that is by default "edi" = editing
     rights = models.CharField("Rights", choices=build_abbr_list(RIGHTS_TYPE), max_length=5, default="edi")
@@ -11405,6 +11719,57 @@ class ProjectEditor(models.Model):
     def __str__(self):
         sBack = "{}-{}".format(self.profile.user.username, self.project.name)
         return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        oErr = ErrHandle()
+        # Perform the saving
+        response = super(ProjectApprover, self).save(force_insert, force_update, using, update_fields)
+        try:
+            # Check for an equivalent ProjectEditor entry
+            obj = ProjectEditor.objects.filter(profile=self.profile, project=self.project).first()
+            if obj is None:
+                # Add it
+                obj = ProjectEditor.objects.create(profile=self.profile, project=self.project)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectApprover/save")
+        # Return the result of the saving
+        return response
+
+
+class ProjectEditor(models.Model):
+    """Relation between a Profile (=person) and a Project
+    
+    The Profile (person) is an editor for the project
+    """
+
+    # [1] The link is between a Profile instance ...
+    profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
+    # [1] ...and a project instance
+    project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+
+    # [1] And a date: the date of saving this relation
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.profile.user.username, self.project.name)
+        return sBack
+
+    def delete(self, using = None, keep_parents = False):
+        # First delete the person as editor for the indicated project
+        response = super(ProjectEditor, self).delete(using, keep_parents)
+        try:
+            # Check for an equivalent ProjectApprover entry
+            obj = ProjectApprover.objects.filter(profile=self.profile, project=self.project).first()
+            if not obj is None:
+                # Remove it
+                obj.delete()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectEditor/save")
+        # Return the result of the saving
+        return response
 
 
 class Template(models.Model):

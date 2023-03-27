@@ -2,6 +2,10 @@
 
 <div >
 
+  {% if basketuser == "no_user" %}
+    <span title="Sorry, only Passim users may use the basket system">(no basket)</span>
+  {% else %}
+
   <a id="basketmenu" class="btn jumbo-1 btn-sm dropdown-toggle" role="button" data-toggle="dropdown" 
           aria-haspopup="true" aria-expanded="false">
     <span class="glyphicon glyphicon-shopping-cart"></span>
@@ -93,7 +97,7 @@
     {% endif %}
   </ul>
 
-
+  {% endif %}
 </div>
 
 

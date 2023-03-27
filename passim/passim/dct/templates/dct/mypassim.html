@@ -83,17 +83,21 @@
           </h3>
           <div id="admin-area" class="collapse-indicator collapse">
             <p>Size of a number of tables for administrative purposes.
-              <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', true);">
-                Reset Sermones
-              </a>
+              {% if sermones_allow %}
+                <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', true);">
+                  Reset Sermones
+                </a>
+              {% endif %}
             </p>
-            <div id="sermones_confirmation" class="row hidden" >
-              <div class="col-md-6">Do you really want to reset SERMONES?</div>
-              <div class="col-md-6">
-                <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', false);">Cancel</a>
-                <a class="btn btn-xs jumbo-4" href="{% url 'sermones_reset' %}">Yes</a>
+            {% if sermones_allow %}
+              <div id="sermones_confirmation" class="row hidden" >
+                <div class="col-md-6">Do you really want to reset SERMONES?</div>
+                <div class="col-md-6">
+                  <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.do_sermones('#sermones_confirmation', false);">Cancel</a>
+                  <a class="btn btn-xs jumbo-4" href="{% url 'sermones_reset' %}">Yes</a>
+                </div>
               </div>
-            </div>
+            {% endif %}
             <table class="func-view table-hover" style="width: 100%;">
               <thead>
                 <tr><th>No.</th><th>App</th><th>Table</th><th>Count</th></tr>
@@ -144,6 +148,16 @@
             </tr>
             <tr>
               <td valign="top" colspan="2">{% spaceless %}{{edit_projects|safe}}{% endspaceless %}</td>
+              <td></td>
+            </tr>
+
+            <!-- Approver privileges-->
+            <tr>
+              <td valign="top" colspan="2" class="hangingindent">You are an approver within Passim for these projects:</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td valign="top" colspan="2">{% spaceless %}{{approve_projects|safe}}{% endspaceless %}</td>
               <td></td>
             </tr>
 

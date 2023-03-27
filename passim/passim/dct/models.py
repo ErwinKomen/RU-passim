@@ -874,7 +874,13 @@ class SavedItem(models.Model):
     collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_saveditems")
 
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.sitemtype)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedItem")
         return sBack
 
     def get_saveditem(item, profile, sitemtype):

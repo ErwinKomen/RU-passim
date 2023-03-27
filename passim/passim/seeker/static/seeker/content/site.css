@@ -1987,3 +1987,10 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     cursor: pointer;
 }
 
+/* Stemmatology */
+.fullquote {
+    color: red;
+    font-size: smaller;
+    vertical-align: super;
+}
+

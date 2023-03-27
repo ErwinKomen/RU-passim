@@ -1,0 +1,46 @@
+<h4>Approvals</h4>
+
+<table class="func-view compact-simple resizable" style="width: 100%;">
+  <thead>
+    <tr>
+      <th class="tdnowrap">
+        <span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;<span>#</span></span>
+      </th>
+      <th class="tdnowrap">
+        <span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;<span>Approver</span></span>
+        <div style="top: 0px; right: 0px; width: 5px; position: absolute; cursor: col-resize; user-select: none; height: 156px;" colidx="1"></div>
+      </th>
+      <th class="tdnowrap">
+        <span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;<span>Project(s)</span></span>
+        <div style="top: 0px; right: 0px; width: 5px; position: absolute; cursor: col-resize; user-select: none; height: 156px;" colidx="2"></div>
+      </th>
+      <th class="tdnowrap">
+        <span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;<span>Approval status</span></span>
+        <div style="top: 0px; right: 0px; width: 5px; position: absolute; cursor: col-resize; user-select: none; height: 156px;" colidx="3"></div>
+      </th>
+      <th class="tdnowrap" style="width: 100%;">
+        <span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;<span>Note</span></span>
+        <div style="top: 0px; right: 0px; width: 5px; position: absolute; cursor: col-resize; user-select: none; height: 156px;" colidx="4"></div>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for oItem in changeapprovals %}
+      <tr>
+        <td class="tdnowrap" align="right">{{forloop.counter}}</td>
+        <td class="tdnowrap clickable">
+          <a href="{% url 'equalapprovaluser_details' oItem.id %}" class="nostyle">{{oItem.profile.user.username}}</a> 
+        </td>
+        <td class="tdnowrap clickable">
+          {{oItem.profile.get_approver_projects_markdown|safe}}
+        </td>
+        <td class="clickable">
+          <a href="{% url 'equalapprovaluser_details' oItem.id %}" class="nostyle">{{oItem.get_atype_display}}</a> 
+        </td>
+        <td style="width: 100%;"  class="clickable">
+          <a href="{% url 'equalapprovaluser_details' oItem.id %}" class="nostyle">{{oItem.get_comment_html|safe}}</a>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

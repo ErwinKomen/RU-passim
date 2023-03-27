@@ -64,6 +64,7 @@ def get_application_name():
 # Provide application-specific information
 PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_user = "{}_user".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
@@ -82,9 +83,9 @@ def user_is_authenticated(request):
 
 def user_is_ingroup(request, sGroup):
     # Is this user part of the indicated group?
-    username = request.user.username
-    user = User.objects.filter(username=username).first()
-    # glist = user.groups.values_list('name', flat=True)
+    #username = request.user.username
+    #user = User.objects.filter(username=username).first()
+    user = request.user
 
     # Only look at group if the user is known
     if user == None:
@@ -1153,6 +1154,7 @@ class BasicList(ListView):
         context['is_authenticated'] = user_is_authenticated(self.request)
         context['authenticated'] = context['is_authenticated'] 
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
+        context['is_app_user'] = user_is_ingroup(self.request, app_user)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
         context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
         context['is_app_moderator'] = user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)
@@ -1721,6 +1723,24 @@ class BasicDetails(DetailView):
         """Add to the existing context"""
         return context
 
+    def may_edit(self, context = {}):
+        """Is this a user who may edit?"""
+
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            # First step: authentication
+            if user_is_authenticated(self.request):
+                # Second step: app_user
+                if context.get("is_app_user", False):
+                    bEditor = context.get("is_app_editor", False)
+                    bModerator = context.get("is_app_moderator", False)
+                    bResult = (bEditor or bModerator)
+            # Otherwise: no permissions!
+        except:
+            oErr.DoError("BasicPart/userpermissions")
+        return bResult
+
     def process_formset(self, prefix, request, formset):
         return None
 
@@ -1744,6 +1764,7 @@ class BasicDetails(DetailView):
         context['authenticated'] = user_is_authenticated(self.request)
         context['is_app_uploader'] = user_is_ingroup(self.request, app_uploader)
         context['is_app_editor'] = user_is_ingroup(self.request, app_editor)
+        context['is_app_user'] = user_is_ingroup(self.request, app_user)
         context['is_app_userplus'] = user_is_ingroup(self.request, app_userplus)
         context['is_app_moderator'] = user_is_superuser(self.request) or user_is_ingroup(self.request, app_moderator)
         # context['prevpage'] = get_previous_page(self.request) # self.previous
@@ -2292,6 +2313,8 @@ class BasicPart(View):
             context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
             context['is_app_editor'] = user_is_ingroup(request, app_editor)
 
+            write_permission = self.userpermissions("w")
+
             # Action depends on 'action' value
             if self.action == "":
                 if self.bDebug: self.oErr.Status("ResearchPart: action=(empty)")
@@ -2483,7 +2506,7 @@ class BasicPart(View):
                             lst_typeahead.append(item)
                     # Add the formset to the context
                     context[prefix + "_formset"] = formset
-            elif self.action == "download":
+            elif self.action == "download" and write_permission:
                 # We are being asked to download something
                 if self.dtype != "":
                     plain_type = ["xlsx", "csv", "excel"]
@@ -2559,7 +2582,7 @@ class BasicPart(View):
                         
                     # return gzip_middleware.process_response(request, response)
                     return response
-            elif self.action == "delete":
+            elif self.action == "delete" and write_permission:
                 # The user requests this to be deleted
                 if self.before_delete():
                     # Log the delete action
@@ -2645,90 +2668,118 @@ class BasicPart(View):
         # Initialize typeahead list
         lst_typeahead = []
 
-        # Continue if authorized
-        if self.checkAuthentication(request):
-            context = dict(object_id = pk, savedate=None)
-            context['prevpage'] = self.previous
-            context['authenticated'] = user_is_authenticated(request)
-            context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-            context['is_app_editor'] = user_is_ingroup(request, app_editor)
-            # Walk all the form objects
-            for formObj in self.form_objects:        
-                # Used to populate a NEW research project
-                # - CREATE a NEW research form, populating it with any initial data in the request
-                initial = dict(request.GET.items())
-                if self.add:
-                    # Create a new form
-                    formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
-                else:
-                    # Used to show EXISTING information
-                    instance = self.get_instance(formObj['prefix'])
-                    # We should show the data belonging to the current Research [obj]
-                    formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
-                # Add instance to the context object
-                context[formObj['prefix'] + "Form"] = formObj['forminstance']
-                # Get any possible typeahead parameters
-                lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
-                if lst_form_ta != None:
-                    for item in lst_form_ta:
-                        lst_typeahead.append(item)
-            # Walk all the formset objects
-            for formsetObj in self.formset_objects:
-                formsetClass = formsetObj['formsetClass']
-                prefix  = formsetObj['prefix']
-                form_kwargs = self.get_form_kwargs(prefix)
-                if self.add:
-                    # - CREATE a NEW formset, populating it with any initial data in the request
+        oErr = ErrHandle()
+        try:
+            # Continue if authorized
+            if self.checkAuthentication(request):
+                context = dict(object_id = pk, savedate=None)
+                context['prevpage'] = self.previous
+                context['authenticated'] = user_is_authenticated(request)
+                context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+                context['is_app_editor'] = user_is_ingroup(request, app_editor)
+                # Walk all the form objects
+                for formObj in self.form_objects:        
+                    # Used to populate a NEW research project
+                    # - CREATE a NEW research form, populating it with any initial data in the request
                     initial = dict(request.GET.items())
-                    # Saving a NEW item
-                    formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
-                else:
-                    # Possibly initial (default) values
-                    if 'initial' in formsetObj:
-                        initial = formsetObj['initial']
+                    if self.add:
+                        # Create a new form
+                        formObj['forminstance'] = formObj['form'](initial=initial, prefix=formObj['prefix'])
                     else:
-                        initial = None
-                    # show the data belonging to the current [obj]
-                    instance = self.get_instance(prefix)
-                    qs = self.get_queryset(prefix)
-                    if qs == None:
-                        formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                        # Used to show EXISTING information
+                        instance = self.get_instance(formObj['prefix'])
+                        # We should show the data belonging to the current Research [obj]
+                        formObj['forminstance'] = formObj['form'](instance=instance, prefix=formObj['prefix'])
+                    # Add instance to the context object
+                    context[formObj['prefix'] + "Form"] = formObj['forminstance']
+                    # Get any possible typeahead parameters
+                    lst_form_ta = getattr(formObj['forminstance'], "typeaheads", None)
+                    if lst_form_ta != None:
+                        for item in lst_form_ta:
+                            lst_typeahead.append(item)
+                # Walk all the formset objects
+                for formsetObj in self.formset_objects:
+                    formsetClass = formsetObj['formsetClass']
+                    prefix  = formsetObj['prefix']
+                    form_kwargs = self.get_form_kwargs(prefix)
+                    if self.add:
+                        # - CREATE a NEW formset, populating it with any initial data in the request
+                        initial = dict(request.GET.items())
+                        # Saving a NEW item
+                        formset = formsetClass(initial=initial, prefix=prefix, form_kwargs=form_kwargs)
                     else:
-                        formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
-                # Get any possible typeahead parameters
-                lst_formset_ta = getattr(formset.form, "typeaheads", None)
-                if lst_formset_ta != None:
-                    for item in lst_formset_ta:
-                        lst_typeahead.append(item)
-                # Process all the forms in the formset
-                ordered_forms = self.process_formset(prefix, request, formset)
-                if ordered_forms:
-                    context[prefix + "_ordered"] = ordered_forms
-                # Store the instance
-                formsetObj['formsetinstance'] = formset
-                # Add the formset to the context
-                context[prefix + "_formset"] = formset
-            # Allow user to add to the context
-            context = self.add_to_context(context)
-            # Make sure we have a list of any errors
-            error_list = [str(item) for item in self.arErr]
-            context['error_list'] = error_list
-            context['errors'] = self.arErr
-            # Standard: add request user to context
-            context['requestuser'] = request.user
+                        # Possibly initial (default) values
+                        if 'initial' in formsetObj:
+                            initial = formsetObj['initial']
+                        else:
+                            initial = None
+                        # show the data belonging to the current [obj]
+                        instance = self.get_instance(prefix)
+                        qs = self.get_queryset(prefix)
+                        if qs == None:
+                            formset = formsetClass(prefix=prefix, instance=instance, form_kwargs=form_kwargs)
+                        else:
+                            formset = formsetClass(prefix=prefix, instance=instance, queryset=qs, initial=initial, form_kwargs=form_kwargs)
+                    # Get any possible typeahead parameters
+                    lst_formset_ta = getattr(formset.form, "typeaheads", None)
+                    if lst_formset_ta != None:
+                        for item in lst_formset_ta:
+                            lst_typeahead.append(item)
+                    # Process all the forms in the formset
+                    ordered_forms = self.process_formset(prefix, request, formset)
+                    if ordered_forms:
+                        context[prefix + "_ordered"] = ordered_forms
+                    # Store the instance
+                    formsetObj['formsetinstance'] = formset
+                    # Add the formset to the context
+                    context[prefix + "_formset"] = formset
+                # Allow user to add to the context
+                context = self.add_to_context(context)
+                # Make sure we have a list of any errors
+                error_list = [str(item) for item in self.arErr]
+                context['error_list'] = error_list
+                context['errors'] = self.arErr
+                # Standard: add request user to context
+                context['requestuser'] = request.user
 
-            # Set any possible typeaheads
-            self.data['typeaheads'] = json.dumps(lst_typeahead)
+                # Set any possible typeaheads
+                self.data['typeaheads'] = json.dumps(lst_typeahead)
             
-            # Get the HTML response
-            sHtml = render_to_string(self.template_name, context, request)
-            sHtml = treat_bom(sHtml)
-            self.data['html'] = sHtml
-        else:
-            self.data['html'] = "Please log in before continuing"
+                # Get the HTML response
+                sHtml = render_to_string(self.template_name, context, request)
+                sHtml = treat_bom(sHtml)
+                self.data['html'] = sHtml
+            else:
+                self.data['html'] = "Please log in before continuing"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasicPart/get")
 
         # Return the information
         return JsonResponse(self.data)
+
+    def userpermissions(self, sType = "w"):
+        """Basic check for valid user permissions"""
+
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            # First step: authentication
+            if user_is_authenticated(self.request):
+                # Second step: app_user
+                is_moderator = user_is_ingroup(self.request, app_moderator)
+                is_app_user = is_moderator or user_is_ingroup(self.request, app_user)
+                is_app_editor = is_moderator or user_is_ingroup(self.request, app_editor)
+                if is_app_user or is_app_editor:
+                    # Any more checking needed?
+                    if sType == "w":
+                        bResult = is_app_editor
+                    else:
+                        bResult = True
+            # Otherwise: no permissions!
+        except:
+            oErr.DoError("BasicPart/userpermissions")
+        return bResult
 
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""

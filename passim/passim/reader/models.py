@@ -49,6 +49,7 @@ class SimpleAuthor(models.Model):
 
     def __str__(self):
         sBack = self.full
+        return sBack
 
 
 class SimpleLocation(models.Model):
@@ -62,6 +63,7 @@ class SimpleLocation(models.Model):
 
     def __str__(self):
         sBack = self.city
+        return sBack
 
 
 class Literatur(models.Model):
@@ -106,30 +108,43 @@ class Literatur(models.Model):
         sName = "{}.{}".format(self.huwatable, self.huwaid)
         return sName
 
-    def get_view(self):
-        """Get a view of this edition"""
+    def get_parts(self, pp=None, bAll=False):
+        """Get the parts of this literature reference
+        
+        Note: possibly add one's own PP, if that is passed on
+        """
 
         def do_append(html, field, fk = None):
             if fk is None:
                 value = getattr(self, field)
                 if not value is None and value != "":
                     html.append(value)
+                elif bAll:
+                    html.append("")
             else:
                 obj = getattr(self, fk)
                 if not obj is None:
                     value = getattr(obj, field)
                     if not value is None and value != "":
                         html.append(value)
+                    elif bAll:
+                        html.append("")
+                elif bAll:
+                    html.append("")
             return None
 
         html = []
-        sBack = ""
         oErr = ErrHandle()
         try:
             do_append(html, "full", "sauthor")
             do_append(html, "year")
             do_append(html, "reihekurz")
-            do_append(html, "pp")
+            if pp is None:
+                do_append(html, "pp")
+            elif pp == "0":
+                html.append("")
+            else:
+                html.append(pp)
             sTitel = "-"
             if not self.reihetitel is None and self.reihetitel != "":
                 sTitel = self.reihetitel
@@ -140,6 +155,41 @@ class Literatur(models.Model):
             html.append(sTitel)
             do_append(html, "band")
             do_append(html, "city", "slocation")
+            do_append(html, "country", "slocation")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Literatur/get_parts")
+        return html
+
+    def get_parts_obj(self, pp=None):
+        """Get the parts as an object"""
+
+        lParts = self.get_parts(pp, bAll=True)
+        oItem = dict(
+            edition = None,
+            author=dict(full=lParts[0]), 
+            year=lParts[1], 
+            reihekurz=lParts[2],
+            pp=lParts[3], 
+            reihetitel = None,
+            literaturtitel = None,
+            title=lParts[4], 
+            band=lParts[5], 
+            location = dict(city=lParts[6], country=lParts[7])  )
+        return oItem
+
+    def get_view(self, pp=None):
+        """Get a view of this edition
+        
+        Note: possibly add one's own PP, if that is passed on
+        """
+
+        html = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the parts from [get_parts()]
+            html = self.get_parts(pp)
 
             # Get the literature object
             sBack = ", ".join(html)
@@ -276,6 +326,17 @@ class Edition(models.Model):
     # [1] An edition must also connect with something from the [Literatur] table
     literatur = models.ForeignKey(Literatur, on_delete=models.CASCADE, related_name="literatur_editions")
 
+    # [0-1] The HUWA 'seiten' attribute = starting page
+    seiten = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'seitenattr' attribute = what precedes the starting page
+    seitenattr = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'bis' attribute = ending page
+    bis = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'bisattr' attribute = what precedes the ending page
+    bisattr = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+    # [0-1] The HUWA 'titel' attribute = title of this piece of info?
+    titel = models.CharField("Seiten", max_length = LONG_STRING, blank=True, null=True)
+
     def __str__(self):
         sName = "{}".format(self.editionid)
         return sName
@@ -314,10 +375,190 @@ class Edition(models.Model):
         # REturn the result
         return bResult
 
-    def get_edition_view(self):
-        """Get a view of this edition"""
+    def add_siglen(self, oSiglen):
+        """Create the [Siglen] specified in [oSiglen] and link it with an FK to [self]"""
 
-        sBack = self.literatur.get_view()
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # The siglen must have page and line, but may have cap, explicit and incipit
+            if not oSiglen is None:
+                iHandschrift = oSiglen.get("handschrift")
+                sSigle = oSiglen.get("sigle")
+                # See if it is there already
+                obj = Siglen.objects.filter(huwaedition=self, huwahandschrift=iHandschrift, sigle=sSigle).first()
+                if obj is None:
+                    # Create it
+                    obj = Siglen.objects.create(huwaedition=self, huwahandschrift=iHandschrift, sigle=sSigle)
+
+                    # Add other elements, if specified
+                    note = oSiglen.get("bem")
+                    if not note is None and note != "":
+                        obj.note = note
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_siglen")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def add_siglen_edd(self, oSiglenEdd):
+        """Create the [SiglenEdd] specified in [oSiglen] and link it with an FK to [self]"""
+
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            # The siglen must have page and line, but may have cap, explicit and incipit
+            if not oSiglenEdd is None:
+                iLiteratur = oSiglenEdd.get("literatur")
+                sSigle = oSiglenEdd.get("sigle")
+                # See if it is there already
+                obj = SiglenEdd.objects.filter(huwaedition=self, huwaliteratur=iLiteratur, sigle=sSigle).first()
+                if obj is None:
+                    # Create it
+                    obj = SiglenEdd.objects.create(huwaedition=self, huwaliteratur=iLiteratur, sigle=sSigle)
+
+                    # Add other elements, if specified
+                    note = oSiglenEdd.get("bem")
+                    if not note is None and note != "":
+                        obj.note = note
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_siglen_edd")
+            bResult = False
+
+        # REturn the result
+        return bResult
+
+    def get_edition_view(self, bParts = False):
+        """Get a view of this edition, using my own defined PP"""
+
+        pp = self.get_pp()
+        oBack = self.literatur.get_parts(pp, bParts)
+        if not bParts:
+            oBack = ", ".join(oBack)
+        return oBack
+
+    def get_opera_literature(opera_id, handschrift_id=None):
+        """Look for all literature related to [operaid]"""
+
+        oErr = ErrHandle()
+        lBack = []
+        try:
+            # (1) look in the table [Edition]
+            qs = Edition.objects.filter(operaid=opera_id)
+            for obj in qs:
+                # Get the parts
+                pp = obj.get_pp()
+                oItem = obj.literatur.get_parts_obj(pp)
+                oItem['edition'] = obj.editionid
+
+                # Does this one have a siglen?
+                sSigle = obj.get_siglen(handschrift_id)
+                oItem['sigle'] = sSigle     # [ sSigle ]
+                # Add it to the output list
+                lBack.append(oItem)
+
+                # Does this have any siglen_edds?
+                for obj_edd in SiglenEdd.objects.filter(huwaedition=obj):
+                    obj_lit = Literatur.objects.filter().first()
+                    if not obj_lit is None:
+                        oItem = obj_lit.get_parts_obj()
+                        oItem['edition'] = obj.editionid
+                        oItem['sigle'] = ", ".join(obj_edd.get_sigle())
+
+                        # Add it to the output list
+                        lBack.append(oItem)
+
+            # (2) Look in the table [OperaLit]
+            qs = OperaLit.objects.filter(operaid=opera_id)
+            for obj in qs:
+                # Add it to the output list
+                oItem = obj.literatur.get_parts_obj()
+                oItem['edition'] = ""
+                oItem['sigle'] = ""
+                lBack.append(oItem)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_opera_literature")
+        return lBack
+
+    def get_pp(self):
+        """Get a from until page range from table [editionen]"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Initialisations
+            seiten = None
+            bis = None
+            von_rv = ""
+            bis_rv = ""
+            html = []
+
+            # Collection of basic data
+            if not self.seiten is None: seiten = self.seiten.split('.')[0]
+            if not self.bis is None: bis = self.bis.split('.')[0]
+            if not self.seitenattr is None: von_rv = self.seitenattr
+            if not self.bisattr is None: bis_rv = self.bisattr
+
+            # Calculate from
+            lst_from = []
+            if von_rv != "": lst_from.append(von_rv)
+            if not seiten is None: lst_from.append(seiten)
+            sFrom = "".join(lst_from)
+
+            # Calculate until
+            lst_until = []
+            if bis_rv != "": lst_until.append(bis_rv)
+            if not bis is None: lst_until.append(bis)
+            sUntil = "".join(lst_until)
+
+            # Combine the two
+            if sFrom == sUntil:
+                sBack = sFrom
+            else:
+                sBack = "{}-{}".format(sFrom, sUntil)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_pp")
+
+        return sBack
+
+    def get_siglen(self, handschrift_id):
+        """Search in [Siglen] to see if there is anything"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Take the first one that is matching
+            obj = Siglen.objects.filter(huwaedition=self, huwahandschrift=handschrift_id).first()
+            if not obj is None:
+                # Get the sigle from it
+                sBack = obj.get_sigle()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_siglen")
+        return sBack
+
+    def get_siglen_edd(self, literatur_id):
+        """Search in [SiglenEdd] to see if there is anything"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Take the first one that is matching
+            obj = SiglenEdd.objects.filter(huwaedition=self, huwaliteratur=literatur_id).first()
+            if not obj is None:
+                # Get the sigle from it
+                sBack = obj.get_sigle(handschrift_id)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Edition/get_siglen_edd")
         return sBack
 
 
@@ -351,6 +592,76 @@ class Locus(models.Model):
             html.append("line {}".format(self.line))
         if len(html) > 0:
             sBack = " ".join(html)
+        return sBack
+
+
+class Siglen(models.Model):
+    """One siglen is a reading sign for one edition, as it pertains to one manuscript (handschrift)
+
+    HUWA: this is table [siglen], which links with [editionen]
+    """
+
+    # [1] Link to the edition
+    huwaedition = models.ForeignKey(Edition, on_delete=models.CASCADE, related_name="editionsiglens")
+    # [1] Link to the handschrift
+    huwahandschrift = models.IntegerField("HUWA Handschrift")
+
+    # [0-1] The optional 'sigle' element
+    sigle = models.CharField("Sigle", max_length = LONG_STRING, blank=True, null=True)
+
+    # [0-1] The optional 'bemerkungen' element
+    note = models.CharField("Remark", max_length = LONG_STRING, blank=True, null=True)
+
+    def __str__(self):
+        sBack = "-"
+        html = []
+        # Should at least add the handschrift
+        html.append("handschr {}".format(self.huwahandschrift))
+        if not self.sigle is None and self.sigle != "":
+            html.append("sigle {}".format(self.sigle))
+        if len(html) > 0:
+            sBack = " ".join(html)
+        return sBack
+
+    def get_sigle(self):
+        sBack = self.sigle
+        if not self.note is None:
+            sBack = "{} ({})".format(sBack, self.note)
+        return sBack
+
+
+class SiglenEdd(models.Model):
+    """One SiglenEdd is a reading sign for one edition, as it pertains to one literatur item
+
+    HUWA: this is table [siglen_edd], which links with [editionen]
+    """
+
+    # [1] Link to the edition
+    huwaedition = models.ForeignKey(Edition, on_delete=models.CASCADE, related_name="editionsiglenedds")
+    # [1] Link to the literatur
+    huwaliteratur = models.IntegerField("HUWA Literatur")
+
+    # [0-1] The optional 'sigle' element
+    sigle = models.CharField("Sigle", max_length = LONG_STRING, blank=True, null=True)
+
+    # [0-1] The optional 'bemerkungen' element
+    note = models.CharField("Remark", max_length = LONG_STRING, blank=True, null=True)
+
+    def __str__(self):
+        sBack = "-"
+        html = []
+        # Should at least add the handschrift
+        html.append("lit {}".format(self.huwaliteratur))
+        if not self.sigle is None and self.sigle != "":
+            html.append("sigle {}".format(self.sigle))
+        if len(html) > 0:
+            sBack = " ".join(html)
+        return sBack
+
+    def get_sigle(self):
+        sBack = self.sigle
+        if not self.note is None:
+            sBack = "{} ({})".format(sBack, self.note)
         return sBack
 
 

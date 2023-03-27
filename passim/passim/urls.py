@@ -62,7 +62,7 @@ urlpatterns = [
     url(r'^about', passim.seeker.views.about, name='about'),
     url(r'^short', passim.seeker.views.about, name='short'),
     url(r'^guide', passim.seeker.views.guide, name='guide'),
-    url(r'^mypassim$', passim.dct.views.mypassim, name='mypassim'),
+    # url(r'^mypassim$', passim.dct.views.mypassim, name='mypassim'),
     url(r'^technical', passim.seeker.views.technical, name='technical'),
     url(r'^bibliography', passim.seeker.views.bibliography, name='bibliography'),
     url(r'^nlogin', passim.seeker.views.nlogin, name='nlogin'),
@@ -93,6 +93,7 @@ urlpatterns = [
     url(r'^manuscript/list', ManuscriptListView.as_view(), name='manuscript_list'),
     url(r'^manuscript/details(?:/(?P<pk>\d+))?/$', ManuscriptDetails.as_view(), name='manuscript_details'),
     url(r'^manuscript/edit(?:/(?P<pk>\d+))?/$', ManuscriptEdit.as_view(), name='manuscript_edit'),
+    url(r'^manuscript/ukw(?:/(?P<pk>\d+))?/$', ManuscriptUserKeyword.as_view(), name='manuscript_ukw'),
     url(r'^manuscript/hierarchy(?:/(?P<pk>\d+))?/$', ManuscriptHierarchy.as_view(), name='manuscript_hierarchy'),
     url(r'^manuscript/download(?:/(?P<pk>\d+))?/$', ManuscriptDownload.as_view(), name='manuscript_download'),
     url(r'^manuscript/import/excel/$', ManuscriptUploadExcel.as_view(), name='manuscript_upload_excel'),
@@ -125,6 +126,7 @@ urlpatterns = [
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
+    url(r'^ssg/ukw(?:/(?P<pk>\d+))?/$', EqualGoldUserKeyword.as_view(), name='equalgold_ukw'),
     url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
@@ -178,9 +180,11 @@ urlpatterns = [
     url(r'^ssglink/details(?:/(?P<pk>\d+))?/$', EqualGoldLinkDetails.as_view(), name='equalgoldlink_details'),
     url(r'^ssglink/edit(?:/(?P<pk>\d+))?/$', EqualGoldLinkEdit.as_view(), name='equalgoldlink_edit'),
     
+    url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
-    url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
+    url(r'^sermon/move(?:/(?P<pk>\d+))?/$', SermonMove.as_view(), name='sermon_move'),
+    url(r'^sermon/ukw(?:/(?P<pk>\d+))?/$', SermonUserKeyword.as_view(), name='sermon_ukw'),
         
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
     url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),  
@@ -245,6 +249,7 @@ urlpatterns = [
     url(r'^userkeyword/list', UserKeywordListView.as_view(), name='userkeyword_list'),
     url(r'^userkeyword/details(?:/(?P<pk>\d+))?/$', UserKeywordDetails.as_view(), name='userkeyword_details'),
     url(r'^userkeyword/edit(?:/(?P<pk>\d+))?/$', UserKeywordEdit.as_view(), name='userkeyword_edit'),
+    url(r'^userkeyword/submit(?:/(?P<pk>\d+))?/$', UserKeywordSubmit.as_view(), name='userkeyword_submit'),
 
     url(r'^provenance/list', ProvenanceListView.as_view(), name='provenance_list'),
     url(r'^provenance/details(?:/(?P<pk>\d+))?/$', ProvenanceDetails.as_view(), name='provenance_details'),
@@ -297,6 +302,7 @@ urlpatterns = [
     url(r'^gold/details(?:/(?P<pk>\d+))?/$', SermonGoldDetails.as_view(), name='gold_details'),
     url(r'^gold/edit(?:/(?P<pk>\d+))?/$', SermonGoldEdit.as_view(), name='gold_edit'),
     url(r'^gold/import/json/$', SermonGoldUploadJson.as_view(), name='gold_upload_json'),
+    url(r'^gold/ukw(?:/(?P<pk>\d+))?/$', SermonGoldUserKeyword.as_view(), name='gold_ukw'),
 
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
@@ -354,6 +360,7 @@ urlpatterns = [
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
+    url(r'^reader/import/trans/ssg/$', ReaderTransEqgImport.as_view(), name='import_trans_eqg'),
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================

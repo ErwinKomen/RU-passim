@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>fe44b9d4-3a09-4292-8d93-21bc9e3e4757</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>interche.py</StartupFile>
+    <StartupFile>huwalibnew.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -14,7 +14,7 @@
     <RootNamespace>library</RootNamespace>
     <InterpreterId>MSBuild|{c850f0da-b556-4eff-b6ee-df7ce36720c5}|$(MSBuildProjectFullPath)</InterpreterId>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-m "test1" -i "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29.xml" -o "d:/data files/cache/literacy/chechenlanguagestudies/chechenbytheletter/stories24-29P.xml"</CommandLineArguments>
+    <CommandLineArguments>-i "d:/Data Files/TG/Passim/Data/huwa/lib_huwa_new_EK-jan2023.xlsx" -o "d:/Data Files/TG/Passim/Data/huwa/lib_huwa_new-jan2023.json"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
@@ -30,9 +30,15 @@
     <Compile Include="authnames.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="huwalibnew.py" />
+    <Compile Include="huwalib.py" />
+    <Compile Include="huwasig.py" />
     <Compile Include="interche.py" />
     <Compile Include="latinbats.py" />
     <Compile Include="cs_to_xlsx.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="libhuwa.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="library.py" />

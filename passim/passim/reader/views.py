@@ -38,6 +38,7 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
+import lxml.etree as ET
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
 from itertools import chain
@@ -54,7 +55,7 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, LocationRelation, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
@@ -2056,6 +2057,135 @@ def read_ead(username, data_file, filename, arErr, xmldoc=None, sName = None, so
     # Return the object that has been created
     return oBack
 
+def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = None, source=None):
+    """Import the sermon transcription part of an XML in TEI-P5 format
+        
+    This approach makes use of *lxml*
+    """
+
+    def process_para(item, html):
+        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
+
+        oErr = ErrHandle()
+        bResult = True
+        local = []
+        try:
+            # Walk all elements
+            if not item is None:
+                for element in item.xpath("./child::*"):
+                    tag = element.tag
+                    attrib = element.attrib
+                    if tag == "w":
+                        # This is a word 
+                        local.append(element.text)
+                    elif tag == "quote":
+                        # This is a quote: get the @source attribute and the @n
+                        quote_n = attrib['n']
+                        quote_source = attrib['source']
+                        quote = []
+                        for quote_el in element.xpath("./child::*"):
+                            if quote_el.tag == "w":
+                                quote.append(quote_el.text)
+                        sQuoteBody = " ".join(quote)
+                        sQuote = '<span class="fullquote" title="{}. {}: {}" >{}</span>'.format(
+                            quote_n, quote_source, sQuoteBody, quote_n )
+                        local.append(sQuote)
+                sPara = " ".join(local)
+                html.append(sPara)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_para")
+            bResult = False
+        return bResult
+
+    oErr = ErrHandle()
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username, 'lst_obj': []}
+    try:
+        # Read the XML file, transforming it into a Python dict
+        if xmldoc is None:
+            # Read and parse the data into a DOM element
+            xmldoc = ET.parse(data_file)  
+            
+        # Get the root
+        root = xmldoc.getroot()
+
+        # Clean up the namespace
+        for elem in root.getiterator():
+            if not (isinstance(elem, ET._Comment) or isinstance(elem, ET._ProcessingInstruction)):
+                elem.tag = ET.QName(elem).localname
+        ET.cleanup_namespaces(root)
+
+        # Get the titles
+        title_passim = None
+        titles = root.xpath("//title[@type='passim']")
+        if len(titles)>0:
+            title_passim = titles[0].text
+            # Get the list of sermon elements
+            html = []
+            sermon_items = root.xpath("//div[@type='sermon']/child::*")
+            for sermon_item in sermon_items:
+                tag = sermon_item.tag
+                attrib = sermon_item.attrib
+                if tag == "head":
+                    # This is one head at this moment
+                    headtype = attrib.get('type', '')
+                    level = "##" if headtype == "title" else "###"
+                    html.append("{} {}".format(level, sermon_item.text))
+                elif tag == "div" and attrib.get("type", "") == "paragraph":
+                    # Paragraph: add a newline
+                    html.append("")
+                    # This is a paragraph, that contains <head> and <p>
+                    for subitem in sermon_item.xpath("./child::*"):
+                        if subitem.tag == "head":
+                            # This is another level head
+                            html.append("#### {}".format(subitem.text))
+                        elif subitem.tag == "p":
+                            # This is a paragraph containing words and quotes
+                            process_para(subitem, html)
+
+            # Okay, we found all the elements, now store them.
+            text_sermon = "\n".join(html)
+
+            oBack['count'] = oBack['count'] + 1
+            oBack['tsize'] = len(text_sermon)
+            oBack['code'] = title_passim
+
+            # Can we continue?
+            if not title_passim is None and not text_sermon is None:
+                eqg = EqualGold.objects.filter(code__iexact=title_passim).first()
+                if not eqg is None:
+                    # We now have the right object: Set the text
+                    eqg.fulltext = text_sermon
+                    eqg.save()
+    except:
+        sError = oErr.get_error_message()
+        oBack['filename'] = filename
+        oBack['status'] = 'error'
+        oBack['msg'] = sError
+
+    # Return the object that has been created
+    return oBack
+
+def get_huwa_opera_literature(opera_id, handschrift_id):
+    lBack = Edition.get_opera_literature(opera_id, handschrift_id)
+    return lBack
+
+def read_kwcategories():
+    """Load the JSON that specifies the keyword categories"""
+
+    oErr = ErrHandle()
+    lst_kwcat = {}
+    try:
+        kwcat_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "passim_kwcat.json"))
+        with open(kwcat_json, "r", encoding="utf-8") as f:
+            lst_kwcat = json.load(f)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("read_kwcategories")
+    # Return the table that we found
+    return lst_kwcat
+
+
 
 class ReaderImport(View):
     # Initialisations
@@ -2500,6 +2630,91 @@ class ReaderEad(ReaderImport):
         return bOkay, code
 
 
+class ReaderTransEqgImport(ReaderImport):
+    """Read a transcription for a Passim SSG/AF into the appropriate field"""
+
+
+    import_type = "xtranseqg"
+    sourceinfo_url = "https://github.com/glsch"
+    template_name = "reader/import_transeqg.html"
+
+    def process_files(self, request, source, lResults, lHeader):
+        file_list = []
+        oErr = ErrHandle()
+        bOkay = True
+        code = ""
+        oStatus = self.oStatus
+        try:
+            # Make sure we have the username
+            username = self.username
+
+            # Get the contents of the imported file
+            files = request.FILES.getlist('files_field')
+            if files != None:
+                for data_file in files:
+                    filename = data_file.name
+                    file_list.append(filename)
+
+                    # Set the status
+                    oStatus.set("reading", msg="file={}".format(filename))
+
+                    # Get the source file
+                    if data_file == None or data_file == "":
+                        self.arErr.append("No source file specified for the selected project")
+                    else:
+                        # Check the extension
+                        arFile = filename.split(".")
+                        extension = arFile[len(arFile)-1]
+
+                        lst_manual = []
+                        lst_read = []
+
+                        # Further processing depends on the extension
+                        oResult = None
+                        if extension == "xml":
+                            # This is an XML file
+                            oResult = read_trans_eqg(username, data_file, filename, self.arErr, source=source)
+
+                            if oResult == None or oResult['status'] == "error":
+                                # Add to [lstRead]
+                                oTranscription = dict(code="error", tsize=0, filename=filename, msg = oResult['msg'])
+                                lst_read.append(oTranscription)
+                            else:
+                                # Get the results from oResult
+                                code = oResult.get("code")
+                                tsize = oResult.get("tsize")
+                                oResult['filename'] = filename
+
+                                if not code is None:
+                                    obj = EqualGold.objects.filter(code__iexact=code).first()
+                                    if not obj is None:
+                                        url = reverse("equalgold_details", kwargs={'pk': obj.id})
+                                        oResult['code'] = '<span><a class="nostyle" href="{}">{}</a></span>'.format(
+                                            url, code)
+
+
+                                # Add to [lstRead]
+                                oTranscription = dict(code=code, tsize=tsize, filename=filename)
+                                lst_read.append(oTranscription)
+
+                        # Create a report and add it to what we return
+                        oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
+                        oReport = Report.make(username, "itreqg", json.dumps(oContents))
+                                
+                        # Determine a status code
+                        statuscode = "error" if oResult == None or oResult['status'] == "error" else "completed"
+                        if oResult == None:
+                            self.arErr.append("There was an error. No transcriptions have been added to a SSG")
+                        else:
+                            lResults.append(oResult)
+            code = "Imported using the [import_trans_eqg] function on these XML files: {}".format(", ".join(file_list))
+        except:
+            bOkay = False
+            code = oErr.get_error_message()
+            oErr.DoError("")
+        return bOkay, code
+
+
 class ManuEadDownload(BasicPart):
     MainModel = Manuscript
     template_name = "seeker/download_status.html"
@@ -2857,9 +3072,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     name__iexact=lib_city, loctype__name="city", relations_location__in=country_set).first()
                 if obj_city is None:
                     # Add the city and the country it is in
-                    obj_city = Location.objects.create(name=lib_city, loctype__name="city")
-                    # Create a relation that the city is in the specified country
-                    obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
+                    loctype = LocationType.objects.filter(name="city").first()
+                    if not loctype is None:
+                        obj_city = Location.objects.create(name=lib_city, loctype=loctype)
+                        # Create a relation that the city is in the specified country
+                        obj_rel = LocationRelation.objects.create(container=obj_country, contained=obj_city)
                             
                 # Try to get it
                 obj_lib = Library.objects.filter(name__iexact=lib_name, lcity=obj_city, lcountry=obj_country).first()
@@ -3345,6 +3562,17 @@ class EqualGoldHuwaToJson(BasicPart):
                 oErr.DoError("get_support")
             return sBack
 
+        def lib_match(sHuwa, sLib):
+            """"""
+            bResult = False
+            if sHuwa is None:
+                bResult = (not sLib is None)
+            elif sLib is None:
+                bResult = False
+            else:
+                bResult = (sHuwa == sLib)
+            return bResult
+
         # Initialize
         oHuwaLand = { "Algerien": "Algeria", "Australien": "Australia", "Belgien": "Belgium",
             "Deutschland": "Germany", "Dänemark": "Denmark", "Finnland": "Finland", "Frankreich": "France",
@@ -3368,7 +3596,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 ]
         elif self.import_type == "edilit":
             # Tables needed to read the Editions and Literature for opera SSGs
-            huwa_tables = ["literatur", "editionen", "verfasser", "reihe", "ort", "land", "siglen_edd",
+            huwa_tables = ["literatur", "editionen", "verfasser", "reihe", "ort", "land", 'siglen', "siglen_edd",
                            "loci", "bloomfield", "schoenberger", "stegmueller", "huwa", "incipit", "desinit"]
         elif self.import_type == "opera":
             # Tables needed to process the information in BHL, BHM, THLL and RETR 
@@ -3443,6 +3671,7 @@ class EqualGoldHuwaToJson(BasicPart):
                 oLibraryInfo = self.read_libraries()
                 oLibHuwaPassim = oLibraryInfo['huwapassim']
                 oLibHuwaOnly = oLibraryInfo.get("huwaonly")
+                oLibHuwaConv = oLibraryInfo.get("conversion")
 
                 ## (6b) Read the Edilit information
                 #oEdilitItems = self.read_huwa_edilit()
@@ -3505,24 +3734,6 @@ class EqualGoldHuwaToJson(BasicPart):
                         oSaecBemHandschrift[handschrift_id] = []
                     # Add the whole object there, with fields @name and @bemerkungen
                     oSaecBemHandschrift[handschrift_id].append(oSaecBem)
-
-                # Turn [siglen] into a dictionary
-                oSiglenHandschrift = {}
-                for oSiglen in tables['siglen']:
-                    handschrift_id = str(oSiglen.get("handschrift"))
-                    if not handschrift_id in oSiglenHandschrift:
-                        oSiglenHandschrift[handschrift_id] = []
-                    # Add the whole object there, with fields @name and @bemerkungen
-                    oSiglenHandschrift[handschrift_id].append(oSiglen)
-
-                # Process [siglen_edd]
-                oSiglenEddItems = {}
-                for oSiglenEdd in tables['siglen_edd']:
-                    editionen_id = str(oSiglenEdd.get("editionen"))
-                    if not editionen_id in oSiglenEddItems:
-                        oSiglenEddItems[editionen_id] = []
-                    # Add the whole object there, with fields @name and @bemerkungen
-                    oSiglenEddItems[editionen_id].append(oSiglenEdd)
 
                 # Turn [zeilen_bem] into a dictionary
                 oZeilenBemHandschrift = {}
@@ -3685,6 +3896,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     # (3) Format: use fields format, hs_breite, schrift_hoehe, schrift_breite
                     oManuscript['format'] = get_format(oHandschrift, oFormatBemHandschrift)
 
+                    # Start adding notes to Hanschrift
+                    sNotes = oHandschrift.get("bemerkungen", "")
+                    if sNotes != "": 
+                        oManuscript['notes'] = sNotes
+
                     # Possibly add to the manuscript notes
                     if sHandschriftId in oNotizHandschrift:
                         notiz = oNotizHandschrift[sHandschriftId]
@@ -3692,41 +3908,25 @@ class EqualGoldHuwaToJson(BasicPart):
                             notes = oManuscript.get("notes")
                             if not notes is None and notes != "":
                                 notes = "{}; {}".format(notes, notiz)
+                            else:
+                                notes = notiz
                             oManuscript['notes'] = notes
 
-                    # Possibly add siglen + editionen
-                    lst_siglen = oSiglenHandschrift.get(sHandschriftId, [])
-                    if len(lst_siglen) > 0:
-                        lst_edition = []
-                        for oSiglen in lst_siglen:
-                            # Get the [editionen] ID
-                            sEdi = str(oSiglen['editionen'])
-                            sSigle = oSiglen.get("sigle", "")
-                            sBem = oSiglen.get("bemerkungen")
-                            # Get the 'Edition' object for this
-                            obj_edi = Edition.objects.filter(editionid=sEdi).first()
-                            if not obj_edi is None:
-                                # Create an initial edition object
-                                oEdition = dict(edition=obj_edi.id)
-                                if not sBem is None and sBem != "":
-                                    sSigle = "{} ({})".format(sSigle, sBem)
-                                # Start a list of sigles
-                                lst_sigle = [ sSigle]
-                                # Use the [editionen] ID to get stuff from [siglen_edd]
-                                if sEdi in oSiglenEddItems:
-                                    for oSigle in oSiglenEddItems[sEdi]:
-                                        sSigle = oSigle.get("sigle", "")
-                                        sBem = oSigle.get("bemerkungen", "")
-                                        lit_x = oSigle.get("literatur_x", "")
-                                        if sBem != "":
-                                            sSigle = "{} ({})".format(sSigle, sBem)
-                                        lst_sigle.append(sSigle)
-                                # Add the sigle to this edtion
-                                oEdition['sigle'] = ", ".join(lst_sigle)
-                                lst_edition.append(oEdition)
-
-                        # Note: This information should be added to the manuscripts in the form of a note “Used for [edition reference]”.
-                        oManuscript['editions'] = lst_edition
+                    # See if we can do something with the dating
+                    sDateRange = None
+                    if sHandschriftId in oDates:
+                        # Get the (more exact) date from this place
+                        sDateRange = oDates.get(sHandschriftId).strip()
+                    if sDateRange is None or sDateRange == "":
+                        iSaeculum = oHandschrift.get("saeculum", -1)
+                        if iSaeculum > 0:
+                            # Get the date and do something with it
+                            iYearStart = iSaeculum * 100
+                            iYearEnd = iYearStart + 99
+                            sDateRange = "{}-{}".format(iYearStart, iYearEnd)
+                            # oManuscript['date'] = sDateRange
+                    if not sDateRange is None and sDateRange != "":
+                        oManuscript['date'] = sDateRange
 
                     # Possibly add Zweitsignatur
                     lst_zweits = oZweitSigHandschrift.get(sHandschriftId, [])
@@ -3746,6 +3946,8 @@ class EqualGoldHuwaToJson(BasicPart):
                         notes = oManuscript.get("notes")
                         if not notes is None and notes != "":
                             notes = "{}; {}".format(notes, sCombi)
+                        else:
+                            notes = sCombi
                         oManuscript['notes'] = notes
 
                     # Figure out library and location
@@ -3753,8 +3955,10 @@ class EqualGoldHuwaToJson(BasicPart):
                     if not bibliothek_id is None:
                         lib_id = None
 
+                        sBibliothekId = str(bibliothek_id)
+
                         # A library has been specified for this manuscript
-                        if bibliothek_id in oLibHuwaPassim:
+                        if sBibliothekId in oLibHuwaPassim:
                             library_id = oLibHuwaPassim[str(bibliothek_id)]
                             library = Library.objects.filter(id=library_id).first()
                             lib_name = ""
@@ -3767,11 +3971,11 @@ class EqualGoldHuwaToJson(BasicPart):
                                 if not library.lcountry is None:
                                     lib_country = library.lcountry.name
                                 lib_id = library.id
-                        elif bibliothek_id in oLibHuwaOnly:
+                        elif sBibliothekId in oLibHuwaOnly:
                             # This library is known in HUWA, but not in Passim: try to add it
-                            oLibrary = oLibHuwaOnly[bibliothek_id]
+                            oLibrary = oLibHuwaOnly[sBibliothekId]
                             # Always get the pre-defined details
-                            lib_name = oLibrary.get("name", "")
+                            lib_name = oLibrary.get("library", "")
                             lib_city = oLibrary.get("city", "")
                             lib_country = oLibrary.get("country", "")
 
@@ -3787,6 +3991,33 @@ class EqualGoldHuwaToJson(BasicPart):
                             if lib_country != "" and lib_country in oHuwaLand:
                                 lib_country = oHuwaLand[lib_country]
 
+                            # Check whether there is a conversion attempt in "lib_huwa_new-jan2023"
+                            if lib_name != "" and lib_city != "":
+                                for oConvert in oLibHuwaConv:
+                                    # Get the passim data
+                                    oPassim = oConvert.get("passim")
+                                    pas_lib = oPassim.get("library")
+                                    pas_country = oPassim.get("country")
+                                    pas_city = oPassim.get("city")
+                                    # Get the huwa data
+                                    oHuwa = oConvert.get("huwa")
+                                    huwa_lib = oHuwa.get("library")
+                                    huwa_country = oHuwa.get("country")
+                                    huwa_city = oHuwa.get("city")
+
+                                    if lib_match(huwa_lib, lib_name) and lib_match(huwa_country, lib_country) and lib_match(huwa_city, lib_city):
+
+                                        # Apply Possible corrections
+                                        if not pas_lib is None: huwa_lib = pas_lib
+                                        if not pas_country is None: huwa_country = pas_country
+                                        if not pas_city is None: huwa_city = pas_city
+
+                                        # Make sure we have a 'full match':
+                                        if not huwa_lib is None and not huwa_country is None and not huwa_city is None:
+                                            # We found a correction to look up in passim
+                                            lib_id, lib_city, lib_country = get_or_create_library(bibliothek_id, lib_name, lib_city, huwa_country)
+                                            break
+
                             # NOTE: do *NOT* attempt to add this library.
                             #       it requires manual correction
 
@@ -3795,6 +4026,10 @@ class EqualGoldHuwaToJson(BasicPart):
                         oManuscript['library'] = lib_name
                         oManuscript['lcity'] = lib_city
                         oManuscript['lcountry'] = lib_country
+
+                        # Possibly process the correspondence between a HUWA library id and a Passim library id
+                        if not lib_id is None:
+                            pass
 
                     # Possibly add provenance
                     oManuscript['provenance'] = get_provenance(oHandschrift, oHerkunftBesitzer)
@@ -3844,23 +4079,6 @@ class EqualGoldHuwaToJson(BasicPart):
                             codico_notes.append(" ".join(lCombi))
                         oManuscript['codico_notes'] = "; ".join(codico_notes)
 
-                    ## Process Siglen into codico_notes
-                    #codico_notes = []
-                    #oSiglens = oSiglenHandschrift.get(sHandschriftId)
-                    #if not oSiglens is None:
-                    #    for oSiglen in oSiglens:
-                    #        sBem = oSiglen.get("bemerkungen")
-                    #        sSigle = oSiglen.get("sigle")
-                    #        sEdition = XX
-
-                    #        lCombi = []
-                    #        if not sSigle is None:
-                    #            lCombi.append(sSigle)
-                    #        if not sBem is None:
-                    #            lCombi.append("({})".format(sBem))
-                    #        codico_notes.append(" ".join(lCombi))
-                        oManuscript['codico_notes'] = "; ".join(codico_notes)
-
                     # Get and walk through the contents of this Handschrift
                     lst_inhalt = oInhaltHandschrift.get(sHandschriftId, [])
 
@@ -3877,15 +4095,41 @@ class EqualGoldHuwaToJson(BasicPart):
                         if opera_id in opera_passim:
                             oOpera = opera_passim[opera_id]
                             lst_notes = []
+
                             # Get all the necessary information of this Sermon Manifestation
-                            title = oOpera.get("opera_langname", "")
-                            note = oInhalt.get("bemerkungen", "")
+                            lst_note = []
+                            lst_note.append(oOpera.get("abk", ""))
+                            lst_note.append(oOpera.get("opera_langname", ""))
+
+                            lst_note.append(oInhalt.get("bemerkungen", ""))
+                            lst_note.append(oOpera.get("bemerkungen", ""))
+                            note = "\n".join([x for x in lst_note if x != ""])
+                            # note = "\n".join(lst_note)
+
                             postscriptum = oInfines.get(str(inhalt_id), None)
+
+                            ## Get a possible list of editions + siglen
+                            #lst_sigle = oOperaSiglen.get(sOperaId, [])
 
                             # Convert locus information into a Passim locus string
                             locus = get_locus(oInhalt)
                             # Getting the author also works differently
                             author_id, author_name = get_author(oInhalt, tables, lst_authors)
+                            # If this is none, try 'autor_opera'
+                            if author_id is None:
+                                huwa_autor_id = get_table_field(tables['autor_opera'], opera_id, "autor", "opera")
+                                if huwa_autor_id != "": 
+
+                                    # ================== DEBUGGING =========================
+                                    if huwa_autor_id == 3:
+                                        iStop = 1
+                                    # ======================================================
+
+                                    passim_author = self.get_passim_author(lst_authors, huwa_autor_id, tables['autor'])
+                                    if not passim_author is None:
+                                        author_id = passim_author.id
+                                        author_name = passim_author.name
+
                             # Get the incipit
                             # incipit = get_table_field(tables['inc'], inhalt_id, "inc_text", sIdField="inhalt")
                             incipit = oInhaltInc.get(str(inhalt_id), "")
@@ -3900,11 +4144,11 @@ class EqualGoldHuwaToJson(BasicPart):
                             manu_count = oInhaltOpera.get(str(opera_id), 0)   
                             
                             # Get possible title
-                            if title == "":
-                                # Look at the inhalt_id
-                                sInhaltId = str(inhalt_id)
-                                if sInhaltId in oTitles:
-                                    title = oTitles[sInhaltId]                         
+                            title = ""
+                            # Look at the inhalt_id
+                            sInhaltId = str(inhalt_id)
+                            if sInhaltId in oTitles:
+                                title = oTitles[sInhaltId]
 
                             # Combine into a Sermon record
                             # NOTE: no need to set [stype], since that must be set when reading the JSON
@@ -3914,6 +4158,7 @@ class EqualGoldHuwaToJson(BasicPart):
                                 title = title, incipit = incipit, explicit = explicit,
                                 note = note, keywords = ['HUWA'], datasets = ['HUWA_sermons'],
                                 signaturesA = signaturesA, manu_count=manu_count,
+                                # siglen = lst_sigle,
                                 externals=[dict(externalid=opera_id, externaltype="huwop")],
                                 )
                             if bAddUnusedSermonFields:
@@ -4013,6 +4258,14 @@ class EqualGoldHuwaToJson(BasicPart):
                 oIncipit = { str(x['id']):x['incipit_text'] for x in tables['incipit']}
                 oExplicit = { str(x['id']):x['desinit_text'] for x in tables['desinit']}
 
+                # Turn [siglen] into a dictionary, centered on editionen id
+                oSiglenEdition = {}
+                for oSiglen in tables['siglen']:
+                    editionen_id = str(oSiglen.get("editionen"))
+                    if not editionen_id in oSiglenEdition:
+                        oSiglenEdition[editionen_id] = []
+                    # Add the whole object there, with fields @name and @bemerkungen and @handschrift
+                    oSiglenEdition[editionen_id].append(oSiglen)
 
                 # Process [siglen_edd]
                 oSiglenEddItems = {}
@@ -4047,6 +4300,11 @@ class EqualGoldHuwaToJson(BasicPart):
                     pp = get_edipp(edition)
                     if not pp is None and pp != "":
                         oEdition['pp'] = pp
+                    # Also get all separate parts
+                    oPages = dict(seiten=edition.get("seiten"), seitenattr=edition.get("seitenattr"),
+                                  bis=edition.get("bis"), bisattr=edition.get("bisattr"),
+                                  titel=edition.get("titel"))
+                    oEdition['pages'] = oPages
                     # Find corresponding literature
                     literatur_id = edition.get('literatur')
                     if not literatur_id is None and literatur_id > 0:
@@ -4122,17 +4380,37 @@ class EqualGoldHuwaToJson(BasicPart):
 
                         # Is there a [sigle]?
                         sEditionId = str(edition_id)
+                        lst_siglen = []
+                        # Check for [siglen]
+                        if sEditionId in oSiglenEdition:
+                            # Get the list
+                            lst_siglen_edi = oSiglenEdition[sEditionId]
+                            # Process this list
+                            for oSiglenItem in lst_siglen_edi:
+                                # Retrieve all important elements
+                                handschrift_id = oSiglenItem.get("handschrift")
+                                sigle = oSiglenItem.get("sigle")
+                                bem = oSiglenItem.get("bemerkungen")
+                                # Create and add an appropriate item to [lst_siglen]
+                                oItem = dict(handschrift=handschrift_id, sigle=sigle)
+                                if not bem is None and bem != "": oItem['bem'] = bem
+                                lst_siglen.append(oItem)
+                        if len(lst_siglen) > 0:
+                            oEdition['siglen'] = lst_siglen
+
+                        # Check for [siglen_edd]
+                        lst_siglen_edd = []
                         if sEditionId in oSiglenEddItems:
-                            lst_siglen_edd = oSiglenEddItems[sEditionId]
-                            for oSiglenEdd in lst_siglen_edd:
+                            lst_siglen_edd_item = oSiglenEddItems[sEditionId]
+                            for oSiglenEdd in lst_siglen_edd_item:
                                 siglen_literatur = oSiglenEdd.get("literatur_x")
-                                if siglen_literatur == literatur_id:
-                                    # We found one!
-                                    sigle = oSiglenEdd.get("sigle")
-                                    bem = oSiglenEdd.get("bemerkungen")
-                                    oEdition['sigle'] = sigle
-                                    if not bem is None:
-                                        oEdition['sigle_bem'] = bem
+                                sigle = oSiglenEdd.get("sigle")
+                                bem = oSiglenEdd.get("bemerkungen")
+                                oItem = dict(literatur=siglen_literatur, sigle=sigle)
+                                if not bem is None and bem != "": oItem['bem'] = bem
+                                lst_siglen_edd.append(oItem)
+                        if len(lst_siglen_edd) > 0:
+                            oEdition['siglen_edd'] = lst_siglen_edd
 
                     # Add this item to the list
                     lst_ssg_edi.append(oEdition)
@@ -5152,25 +5430,6 @@ class EqualGoldHuwaToJson(BasicPart):
         # Return the table that we found
         return dict_operapassim
 
-    #def read_huwa_edilit(self):
-    #    """Load the JSON that specifies the inter-SSG relations according to Opera id's """
-
-    #    oErr = ErrHandle()
-    #    dict_edilit = {}
-    #    try:
-    #        lst_edilit = None
-    #        edilit_json = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_edilit.json"))
-    #        with open(edilit_json, "r", encoding="utf-8") as f:
-    #            lst_edilit = json.load(f)
-    #        # Process the list into a dictionary
-    #        if not lst_edilit is None:
-    #            dict_edilit = {str(x['edition']): x for x in lst_edilit}
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("HuwaEqualGoldToJson/read_huwa_edilit")
-    #    # Return the table that we found
-    #    return dict_edilit
-
     def read_huwa_conv_sig(self):
         """Load the JSON that specifies how [abk] may translated into Clavis/Gryson/Cppm"""
 
@@ -5266,9 +5525,13 @@ class EqualGoldHuwaToJson(BasicPart):
         passim = None
         try:
             shuwa_id = str(huwa_id)
+            if isinstance(huwa_id, str):
+                ihuwa_id = int(huwa_id)
+            else:
+                ihuwa_id = huwa_id
             passim_id = None
             for item in lst_authors:
-                if item['huwa_id'] == shuwa_id:
+                if item['huwa_id'] == ihuwa_id:  # shuwa_id:
                     # Found it!
                     passim_id = item['passim_id']
                     break

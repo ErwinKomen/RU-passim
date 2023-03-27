@@ -19,7 +19,7 @@ from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, \
     APPROVAL_TYPE, ACTION_TYPE, \
-    EqualGold, Profile, Project2, ProjectEditor
+    EqualGold, Profile, Project2, ProjectApprover
 
 STANDARD_LENGTH=255
 LONG_STRING=255
@@ -53,6 +53,7 @@ class EqualChange(models.Model):
         {'field': 'newauthor',          'tofld': 'author',   'type': 'fk', 'display': 'Author'},
         {'field': 'newincipit',         'tofld': 'incipit',  'type': 'string', 'display': 'Incipit'},
         {'field': 'newexplicit',        'tofld': 'explicit', 'type': 'string', 'display': 'Explicit'},
+        {'field': 'newfulltext',        'tofld': 'fulltext', 'type': 'string', 'display': 'Transcription'},
         {'field': 'keywords',           'tofld': 'keywords', 'type': 'm2m-inline',  'listfield': 'kwlist', 'display': 'Keywords'},
         {'field': 'collections',        'tofld': 'hcs',      'type': 'm2m-inline',  'listfield': 'collist_hist',
          'lstQ': [Q(settype="hc")],  
@@ -170,21 +171,22 @@ class EqualChange(models.Model):
                 iCount = self.changeapprovals.exclude(atype="acc").count()
             elif method == "per_project":
                 # Need at least one person per project
-                # First: get a list of projects linked to the SSG
-                project_ids = [x.id for x in self.super.projects.all()]
+                # First: get a list of projects linked to the SSG that need approval
+                project_ids = {str(x.id): False for x in self.super.projects.all()}
                 # Then count the number of projects linked to it
                 iTotal = len(project_ids)
                 # Now go through all approvals and see which projects have already made an approval
-                project_acc = []
                 for obj in self.changeapprovals.filter(atype="acc"):
                     # check out which projects this approver has rights for
                     approver_project_ids = [x.id for x in obj.profile.projects.all()]
                     for prj_id in approver_project_ids:
-                        if not prj_id in project_acc:
-                            project_acc.append(prj_id)
+                        sPrjId = str(prj_id)
+                        if sPrjId in project_ids:
+                            project_ids[sPrjId] = True
                 # The [project_acc] now contains the id's of all projects for which the SSG has been approved
                 #   (We want to know how many projects there are *left*)
-                iCount = iTotal - len(project_acc)
+                iApproved = len([{k:v} for k,v in project_ids.items() if v==True])
+                iCount = iTotal - iApproved
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualChange/get_approval_count")
@@ -206,7 +208,7 @@ class EqualChange(models.Model):
             # Note: only SSGs that belong to more than one project need to be reviewed
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
-                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
+                lst_profile_id = [x['profile_id'] for x in ProjectApprover.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
                 if len(lst_profile_id) > 0:
                     if excl == None:
                         lstBack = Profile.objects.filter(id__in=lst_profile_id)
@@ -235,6 +237,21 @@ class EqualChange(models.Model):
             if self.field == oItem['tofld']:
                 sBack = oItem['display']
                 break
+        return sBack
+
+    def get_proposer(self):
+        """Provide details of the person who proposed this change and when"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        try:
+            sBack = self.profile.user.username
+            #sWhen = self.get_saved()
+            #sBack = "{} (on {})".format(sName, sWhen)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualChange/get_proposer")
+
         return sBack
 
     def get_review_list(profile, all=False):
@@ -540,7 +557,7 @@ class EqualAdd(models.Model):
             # Note: only SSGs that belong to more than one project need to be reviewed 
             if len(lst_project) > 1:
                 # Get all the editors associated with these projects
-                lst_profile_id = [x['profile_id'] for x in ProjectEditor.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
+                lst_profile_id = [x['profile_id'] for x in ProjectApprover.objects.filter(project__id__in=lst_project).values('profile_id').distinct()]
                 if len(lst_profile_id) > 0:
                     if excl == None:
                         lstBack = Profile.objects.filter(id__in=lst_profile_id)

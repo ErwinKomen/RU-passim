@@ -146,6 +146,20 @@
                       </h4>
                     </div>
                   </div>
+
+                </div>
+
+                <!-- Room for possible errors -->
+                <div class="row err-msg">
+                  <div class="col-md-10">
+                    {% if listForm.errors|length > 0 %}
+                      <table>
+                        {% for key, value in listForm.errors.items %}
+                          <tr><td>{{key}}:&nbsp;</td><td>{{value}}</td></tr>
+                        {% endfor %}
+                      </table>
+                    {% endif %}
+                  </div>
                 </div>
               
                 <div class="row" id="basiclist_filter_specs">
@@ -514,6 +528,7 @@
                         <!-- walk the other fields -->
                         {% for field in result.fields %}
                           <td class="{{field.classes}}  {% if field.colwrap or field.autohide == "on" %}hidden{% endif %}" 
+                              scope="col"
                               style="{{field.styles}}" {% if field.title %}title="{{field.title}}"{% endif %} 
                               {% if field.align %}align="{{field.align}}"{% endif %}>
                             {% if field.linkdetails %}

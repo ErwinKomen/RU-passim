@@ -1052,16 +1052,16 @@ var ru = (function ($, ru) {
           if (el === undefined ) { return; }
           // Get the column number
           offset = parseInt($(el).attr("offset"), 10);
-          colnum = offset;
-          elTable = $("#tab_list").find("table").first();
+          colnum = offset - 1;
+          elTable = $("#tab_list").find("table.table").first();
           // Determine what to do
           if ($(el).hasClass(onclass)) {
             // Need to switch off this column
             $(el).removeClass(onclass);
-            $(elTable).find("thead tr th").eq(colnum).addClass("hidden");
+            $(elTable).find("thead tr th[scope=col]").eq(colnum).addClass("hidden");
             // Process all rows
             $(elTable).find("tbody tr").each(function (idx, elThis) {
-              $(elThis).find("td").eq(colnum).addClass("hidden");
+              $(elThis).find("td[scope=col]").eq(colnum).addClass("hidden");
             });
             // TODO: make this known to the server
             private_methods.colwrap_switch(colnum, true);
@@ -1069,10 +1069,10 @@ var ru = (function ($, ru) {
             // Need to switch on this column
             $(el).addClass(onclass);
             // Process header
-            $(elTable).find("thead tr th").eq(colnum).removeClass("hidden");
+            $(elTable).find("thead tr th[scope=col]").eq(colnum).removeClass("hidden");
             // Process all rows
             $(elTable).find("tbody tr").each(function (idx, elThis) {
-              $(elThis).find("td").eq(colnum).removeClass("hidden");
+              $(elThis).find("td[scope=col]").eq(colnum).removeClass("hidden");
             });
             // TODO: make this known to the server
             private_methods.colwrap_switch(colnum, false);
@@ -1487,6 +1487,7 @@ var ru = (function ($, ru) {
 
         try {
           $(".ms.editable a").unbind("click").click(ru.basic.manu_edit);
+          $(".ukw.editable a").unbind("click").click(ru.basic.ukw_edit);
 
           // Switch filters
           $(".badge.filter").unbind("click").click(ru.basic.filter_click);
@@ -1841,6 +1842,104 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("init_typeahead", ex);
+        }
+      },
+
+      /**
+       * ukw_edit
+       *   Switch between edit modes on this <tr>
+       *   And if saving is required, then call the [targeturl] to send a POST of the form data
+       *
+       */
+      ukw_edit: function (el, sType, oParams) {
+        var sMode = "",
+            elTr = null,
+            frm = null,
+            colspan = "",
+            bOkay = true,
+            err = "#little_err_msg",
+            targeturl = "",
+            targetid = "",
+            elView = null,
+            elEdit = null;
+
+        try {
+          // Possibly correct [el]
+          if (el !== undefined && "currentTarget" in el) { el = el.currentTarget; }
+          // Get the mode
+          if (sType !== undefined && sType !== "") {
+            sMode = sType;
+          } else {
+            sMode = $(el).attr("mode");
+          }
+          // Get the <tr>
+          elTr = $(el).closest("td");
+          // Get the view and edit values
+          elView = $(el).find(".view-mode").first();
+          elEdit = $(el).find(".edit-mode").first();
+
+          // Action depends on the mode
+          switch (sMode) {
+            case "skip":
+              return;
+              break;
+            case "edit":
+              // Make sure all targetid's that need opening are shown
+              $(elTr).find(".view-mode:not(.hidden)").each(function () {
+                var elTarget = $(this).attr("targetid");
+                // Just open the target
+                $("#" + elTarget).removeClass("hidden");
+              });
+              // Go to edit mode
+              $(elTr).find(".view-mode").addClass("hidden");
+              $(elTr).find(".edit-mode").removeClass("hidden");
+              $(elTr).find(".new-mode").removeClass("hidden");
+              break;
+            case "cancel":
+              // Make sure all targetid's that need closing are hidden
+              $(elTr).find(".edit-mode:not(.hidden)").each(function () {
+                var elTarget = $(this).attr("targetid");
+                if (elTarget !== undefined && elTarget !== "") {
+                  $("#" + elTarget).addClass("hidden");
+                }
+              });
+              // Go to view mode without saving
+              $(elTr).find(".view-mode").removeClass("hidden");
+              $(elTr).find(".edit-mode").addClass("hidden");
+              $(elTr).find(".new-mode").addClass("hidden");
+              break;
+            case "save":
+              // Show waiting symbol
+              $(elTr).find(".waiting").removeClass("hidden");
+
+              // Make sure we know where the error message should come
+              if ($(err).length === 0) { err = $(".err-msg").first(); }
+
+              // Get any possible targeturl
+              targeturl = $(el).attr("targeturl");
+
+              // Go to the save view in targeturl, but do it with a POST
+              frm = $(el).closest("form");
+              if (bOkay && frm === undefined) { $(err).html("<i>There is no <code>form</code> in this page</i>"); }
+
+              // Either POST the request
+              if (bOkay) {
+                // Make sure the Form values are correct
+                frm.attr("method", "POST");
+                frm.attr("action", targeturl);
+
+                // Submit the form
+                $(frm).submit();
+
+              } else {
+                // Or else stop waiting - with error message above
+                $(elTr).find(".waiting").addClass("hidden");
+              }
+
+              break;
+          }
+        } catch (ex) {
+          private_methods.errMsg("ukw_edit", ex);
         }
       },
 

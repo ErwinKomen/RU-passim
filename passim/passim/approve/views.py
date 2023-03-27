@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from passim.seeker.models import COLLECTION_SCOPE, SPEC_TYPE, LINK_TYPE, LINK_BIDIR, \
     get_crpp_date, get_current_datetime, get_reverse_spec,  \
     Author, Collection, Profile, EqualGold, Collection, CollectionSuper, Manuscript, SermonDescr, \
-    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectEditor
+    Keyword, SermonGold, EqualGoldLink, FieldChoice, EqualGoldKeyword, Project2, ProjectApprover
 from passim.approve.models import EqualChange, EqualApproval, EqualAdd, EqualAddApproval
 from passim.approve.forms import EqualChangeForm, EqualApprovalForm, EqualAddForm, EqualAddApprovalForm
 from passim.basic.views import BasicList, BasicDetails, adapt_m2m, adapt_m2o, add_rel_item, app_editor
@@ -126,9 +126,14 @@ def equalchange_json_to_html(instance, type, profile=None):
                     number)
                 sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
                     number, note)
-            url = reverse('equalgold_details', kwargs={'pk': dst_id})
+            if dst is None:
+                url = "(removed)"
+                dst_view = "(dst was: {})".format(dst_id)
+            else:
+                url = reverse('equalgold_details', kwargs={'pk': dst_id})
+                dst_view = dst.get_view()
             html.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
-                url, sTitle, dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+                url, sTitle, dst_view, sAlternatives, sNoteShow, sNoteDiv))
             html.append("</tr>")
 
             # Combine
@@ -167,6 +172,11 @@ def equalchange_json_to_html(instance, type, profile=None):
                     explicit = oItem.get("text")
                     # Add to html
                     html.append(explicit)
+                elif field == "fulltext":
+                    # Process fulltext string
+                    fulltext = oItem.get("text")
+                    # Add to html
+                    html.append(fulltext)
                 elif field == "keywords":
                     # Process list of FK-to-keyword
                     kwlist = oItem.get('kwlist')
@@ -438,7 +448,7 @@ def approval_parse_adding(profile, qs_projlist, super, allow_adding = None):
                     # (1) status of the current user
                     is_approver = profile.projects.filter(id=prj.id).exists()
                     # (2) number of approvers for this project
-                    num_approvers = prj.project_editor.count()
+                    num_approvers = prj.project_approver.count()
 
                     if is_approver and num_approvers == 1:
                         # There is no need to ask for approval: the project may be added right away
@@ -479,7 +489,7 @@ def approval_parse_removing(profile, qs_projlist, super, allow_removing = None):
                     # (2) status of the current user
                     is_approver = profile.projects.filter(id=prj.id).exists()
                     # (3) number of approvers for this project
-                    num_approvers = prj.project_editor.count()
+                    num_approvers = prj.project_approver.count()
 
                     if count_projects > 1 and is_approver and num_approvers == 1:
                         # There is no need to ask for approval: the project may be removed right away
@@ -514,7 +524,7 @@ def approval_parse_deleting(profile, qs_projlist, super):
             proj_all_ids = [x.id for x in super.projects.all()]
             # (2) Figur out all projects to which [profile] has editor access
             proj_profile_ids = [x.id for x in profile.projects.all()]
-            # proj_profile_ids = [x.project.id for x in ProjectEditor.objects.filter(profile=profile, status="incl")]
+            # proj_profile_ids = [x.project.id for x in ProjectApprover.objects.filter(profile=profile, status="incl")]
             # (3) get the list of projects for which consent is needed
             proj_need_ids = []
             for prj_id in proj_all_ids:
@@ -1173,7 +1183,7 @@ class EqualAddDetails(EqualAddEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status
@@ -1258,7 +1268,7 @@ class EqualChangeDetails(EqualChangeEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status
@@ -1333,13 +1343,14 @@ class EqualApprovalList(BasicList):
     use_team_group = True
     prefix = "all"
     basic_name_prefix = "equalapproval"
-    order_cols = ['profile__user__username', 'saved', 'change__super__code', 'change__field', 'atype']
-    order_default = ['profile__user__username', '-saved', 'change__super__code', 'change__field', 'atype']
+    order_cols = ['profile__user__username', 'saved', 'change__super__code', 'change__field', 'change__profile__user__username', 'atype']
+    order_default = ['profile__user__username', '-saved', 'change__super__code', 'change__field', 'change__profile__user__username', 'atype']
     order_heads = [
         {'name': 'User',            'order': 'o=1', 'type': 'str', 'custom': 'user',    'linkdetails': True},
         {'name': 'Date',            'order': 'o=2', 'type': 'str', 'custom': 'date',    'linkdetails': True},
         {'name': 'Authority File',  'order': 'o=3', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
         {'name': 'Field',           'order': 'o=4', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
+        {'name': 'Proposer',        'order': 'o=4', 'type': 'str', 'custom': 'proposer','linkdetails': True},
         {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
         ]
     filters = [ 
@@ -1369,13 +1380,14 @@ class EqualApprovalList(BasicList):
             # Restricted to a particular user...
             self.plural_name = "Field approvals"
             self.sg_name = "Field approval"
-            self.order_cols = ['saved', 'change__super__code', 'change__field', 'atype']
-            self.order_default = ['-saved', 'change__super__code', 'change__field', 'atype']
+            self.order_cols = ['saved', 'change__super__code', 'change__field', 'change__profile__user__username', 'atype']
+            self.order_default = ['-saved', 'change__super__code', 'change__field', 'change__profile__user__username', 'atype']
             self.order_heads = [
                 {'name': 'Date',            'order': 'o=1', 'type': 'str', 'custom': 'date',    'linkdetails': True},
                 {'name': 'Authority File',  'order': 'o=2', 'type': 'str', 'custom': 'code',    'linkdetails': True, 'align': 'right'},
                 {'name': 'Field',           'order': 'o=3', 'type': 'str', 'custom': 'field',   'linkdetails': True, 'main': True},
-                {'name': 'Status',          'order': 'o=4', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
+                {'name': 'Proposer',        'order': 'o=4', 'type': 'str', 'custom': 'proposer','linkdetails': True},
+                {'name': 'Status',          'order': 'o=5', 'type': 'str', 'custom': 'atype',   'linkdetails': True},
                 ]
             self.filters = [
                 {"name": "Authority File",       "id": "filter_code",      "enabled": False},
@@ -1403,6 +1415,8 @@ class EqualApprovalList(BasicList):
             sBack = saved.strftime("%d/%b/%Y %H:%M")
         elif custom == "user":
             sBack = instance.profile.user.username
+        elif custom == "proposer":
+            sBack = instance.change.profile.user.username
         elif custom == "atype":
             sBack = instance.get_atype_display()
         elif custom == "code":
@@ -1609,7 +1623,10 @@ class EqualApprovalEdit(BasicDetails):
                 # --------------------------------------------
                 {'type': 'plain', 'label': "Authority File:",'value': instance.change.get_code_html()},         #,   'field_key': 'super'},
                 {'type': 'plain', 'label': "Field:",        'value': instance.change.get_display_name()},       #,   'field_key': 'field'},
-                {'type': 'plain', 'label': "Date:",         'value': instance.get_saved()},
+                {'type': 'safe',  'label': "Proposed by:",  'value': instance.change.get_proposer(),
+                 'title': 'The user who suggested the change'         },
+                {'type': 'plain', 'label': "Date:",         'value': instance.get_saved(),
+                 'title': 'Date on which the suggestion has been made'},
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_atype_display()},             #,   'field_key': 'atype'},
                 {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment_html()},              #,   'field_key': 'comment'},
                 {'type': 'safe',  'label': "Current:",      'value': equalchange_json_to_html(instance.change, "current", profile)},
@@ -1619,13 +1636,18 @@ class EqualApprovalEdit(BasicDetails):
             if locked:
                 # Possibly show the comment
                 if not instance.change.comment is None and instance.change.comment != "":
-                    mainitems_main.append({'type': 'plain', 'label': "Processed:", 'value': instance.change.comment})
+                    mainitems_main.append({'type': 'line', 'label': "Processed:", 'value': instance.change.comment})
             else:
                 # Make sure fields status and comment are editable
                 editables = {'Status:': 'atype', 'Comment:': 'comment'}
                 for item in mainitems_main:
                     if item['label'] in editables:
                         item['field_key'] = editables[item['label']]
+            # Add the list of approvals here
+            context['changeapprovals'] = instance.change.changeapprovals.all().order_by('atype', '-saved')
+            sApprovals = render_to_string('approve/change_approvals.html', context, self.request)
+            oItem = dict(type='line', label='', value=sApprovals)
+            mainitems_main.append(oItem)
 
             for item in mainitems_main: 
                 context['mainitems'].append(item)
@@ -1712,6 +1734,8 @@ class EqualApprovalDetails(EqualApprovalEdit):
         sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
         sort_end = '</span>'
 
+        bDoApprovers = False
+
         oErr = ErrHandle()
         try:
             # Lists of related objects
@@ -1721,50 +1745,51 @@ class EqualApprovalDetails(EqualApprovalEdit):
             username = self.request.user.username
             team_group = app_editor
 
-            # List of approvers related to the this Change 
-            approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
+            if bDoApprovers:
+                # List of approvers related to the this Change 
+                approvers = dict(title="Approvals", prefix="appr", gridclass="resizable")
 
-            rel_list =[]
-            qs = instance.change.changeapprovals.all().order_by('atype', '-saved')
-            for item in qs:
-                change = item.change
-                url = reverse('equalapprovaluser_details', kwargs={'pk': item.id})
-                url_chg = reverse('equalchangeuser_details', kwargs={'pk': change.id})
-                rel_item = []
+                rel_list =[]
+                qs = instance.change.changeapprovals.all().order_by('atype', '-saved')
+                for item in qs:
+                    change = item.change
+                    url = reverse('equalapprovaluser_details', kwargs={'pk': item.id})
+                    url_chg = reverse('equalchangeuser_details', kwargs={'pk': change.id})
+                    rel_item = []
 
-                # S: Order number for this approval
-                add_rel_item(rel_item, index, False, align="right")
-                index += 1
+                    # S: Order number for this approval
+                    add_rel_item(rel_item, index, False, align="right")
+                    index += 1
 
-                # Who is this?
-                approver = item.profile.user.username
-                add_rel_item(rel_item, approver, False, main=False, link=url)
+                    # Who is this?
+                    approver = item.profile.user.username
+                    add_rel_item(rel_item, approver, False, main=False, link=url)
 
-                # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
-                add_rel_item(rel_item, projects_md, False, main=False, link=url)
+                    # Which project(s) does this person have?
+                    projects_md = item.profile.get_approver_projects_markdown()
+                    add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
-                # Approval status
-                astatus = item.get_atype_display()
-                add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
+                    # Approval status
+                    astatus = item.get_atype_display()
+                    add_rel_item(rel_item, astatus, False, nowrap=False, main=False, link=url)
 
-                # Comments on this approval
-                comment_txt = item.get_comment_html()
-                add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
+                    # Comments on this approval
+                    comment_txt = item.get_comment_html()
+                    add_rel_item(rel_item, comment_txt, False, nowrap=False, main=True, link=url)
 
-                # Add this line to the list
-                rel_list.append(dict(id=item.id, cols=rel_item))
+                    # Add this line to the list
+                    rel_list.append(dict(id=item.id, cols=rel_item))
 
-            approvers['rel_list'] = rel_list
+                approvers['rel_list'] = rel_list
 
-            approvers['columns'] = [
-                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
-                '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
-                '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
-                '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
-                '{}<span>Note</span>{}'.format(sort_start, sort_end), 
-                ]
-            related_objects.append(approvers)
+                approvers['columns'] = [
+                    '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                    '{}<span>Approver</span>{}'.format(sort_start, sort_end), 
+                    '{}<span>Project(s)</span>{}'.format(sort_start, sort_end), 
+                    '{}<span>Approval status</span>{}'.format(sort_start, sort_end), 
+                    '{}<span>Note</span>{}'.format(sort_start, sort_end), 
+                    ]
+                related_objects.append(approvers)
             
             # Add all related objects to the context
             context['related_objects'] = related_objects
@@ -1992,7 +2017,7 @@ class EqualAddApprovalDetails(EqualAddApprovalEdit):
                 add_rel_item(rel_item, approver, False, main=False, link=url)
 
                 # Which project(s) does this person have?
-                projects_md = item.profile.get_projects_markdown()
+                projects_md = item.profile.get_approver_projects_markdown()
                 add_rel_item(rel_item, projects_md, False, main=False, link=url)
 
                 # Approval status

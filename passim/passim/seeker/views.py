@@ -61,7 +61,7 @@ from reportlab.rl_config import defaultPageSize
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, SearchSermonForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
     SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
@@ -84,11 +84,11 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
-    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectEditor, \
+    ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads
+from passim.reader.views import reader_uploads, get_huwa_opera_literature
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -306,7 +306,8 @@ def project_dependant_delete(request, to_be_deleted):
         # Find out who this is
         profile = Profile.get_user_profile(request.user.username)
         # Get the editing rights for this person
-        project_id = [x['id'] for x in profile.projects.all().values("id")]
+        # project_id = [x['id'] for x in profile.projects.all().values("id")]
+        project_id = [x.id for x in profile.get_myprojects()]
 
         # CHeck all deletables
         delete = []
@@ -339,7 +340,8 @@ def get_non_editable_projects(profile, projects):
     try:
         id_list = []
         current_project_ids = [x['id'] for x in projects.values('id')]
-        profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        # profile_project_ids = [x['id'] for x in profile.projects.all().values('id')]
+        profile_project_ids = [x.id for x in profile.get_myprojects()]
         # Walk all the projects I need to evaluate
         for prj_id in current_project_ids:
             if not prj_id in profile_project_ids:
@@ -362,7 +364,8 @@ def evaluate_projlist(profile, instance, projlist, sText):
             non_editable_projects = get_non_editable_projects(profile, instance.projects.all())
             if non_editable_projects == 0:
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() != 1:
                     # We cannot assign the default project
                     bBack = False
@@ -2565,6 +2568,22 @@ def passim_get_history(instance):
     sBack = "\n".join(lhtml)
     return sBack
 
+def get_userkeyword_interface(request, context):
+    """Get HTML stuff providing a user-keyword edit interface for non-editing users"""
+
+    template_name = "seeker/userkeyword_select.html"
+    sBack = ""
+    oErr = ErrHandle()
+    try:
+
+        pass
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_userkeyword_interface")
+    return sBack
+
+
+
 
 
 # ============== NOTE: superseded by the READER app ===================
@@ -4392,8 +4411,8 @@ class SermonEdit(BasicDetails):
                        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
                        {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
 
-    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'postscriptum', 'quote', 
-                                'bibnotes', 'feast', 'bibleref', 'additional', 'note',
+    stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'fulltext',
+                        'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
                         #'kwlist',
                         'SermonSignature', 'siglist',
                         #'CollectionSerm', 'collist_s',
@@ -4456,7 +4475,7 @@ class SermonEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="serm")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="serm")
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = SermonDescrExternal.objects.filter(sermon=instance).first()
@@ -4492,6 +4511,8 @@ class SermonEdit(BasicDetails):
                  'field_key': 'explicit', 'key_ta': 'srmexplicit-key'}, 
                 {'type': 'safe',  'label': "Postscriptum:",         'value': instance.get_postscriptum_markdown(),
                  'field_key': 'postscriptum'}, 
+                {'type': 'safe',  'label': "Transcription:",        'value': self.get_transcription(instance),
+                 'field_key': 'fulltext'}, 
                 # Issue #23: delete bibliographic notes
                 {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
                  'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
@@ -4516,7 +4537,7 @@ class SermonEdit(BasicDetails):
                 context['mainitems'].append(mainitems_CodNotes)
 
             mainitems_more =[
-                {'type': 'plain', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
+                {'type': 'line', 'label': "Note:",                 'value': instance.get_note_markdown(),             'field_key': 'note'}
                 ]
             for item in mainitems_more: context['mainitems'].append(item)
 
@@ -4527,7 +4548,7 @@ class SermonEdit(BasicDetails):
                     {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                      # 'multiple': True,  'field_list': 'kwlist',         'fso': self.formset_objects[1]},
                      'field_list': 'kwlist',         'fso': self.formset_objects[1]},
-                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                    {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                      'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
                      'title': 'Keywords attached to the Authority file(s)'},
@@ -4559,6 +4580,32 @@ class SermonEdit(BasicDetails):
             context['mainitems'].append(mainitems_SSG)
             # Notes:
             # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
+
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
+            if not instance is None:
+                # NOTE: this code should be extended to include other external projects, when the time is right
+                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
+                if not ext is None:
+                    # Get the field values
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                        # THis is the HUWA 'opera_id'
+                        opera_id = externalid
+                        # Now we need to get the handschrift_id from the manuscript
+                        manu = instance.get_manuscript()
+                        obj = ManuscriptExternal.objects.filter(manu=manu).first()
+                        if not obj is None:
+                            handschrift_id = obj.externalid
+                            # Let's see if there is any editor information
+                            lst_edilit = get_huwa_opera_literature(opera_id, handschrift_id)
+                            context['edilits'] = lst_edilit
+                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
+                            context['mainitems'].append(oItemEdi)
+
+
+
 
             # Add a button back to the Manuscript
             topleftlist = []
@@ -4595,11 +4642,16 @@ class SermonEdit(BasicDetails):
             # Signal that we have select2
             context['has_select2'] = True
 
+            # Start making room for AfterDetails
+            lhtml = []
+
+            # Add all needed information for moving a sermon
+            lhtml.append(render_to_string("seeker/sermon_move.html", context, self.request))
+
             # Add comment modal stuff
             initial = dict(otype="sermo", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('sermo', instance, profile)
-            lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['comment_count'] = instance.comments.count()
 
@@ -4628,6 +4680,51 @@ class SermonEdit(BasicDetails):
             sBack = render_to_string(template_name, context)
         return sBack
 
+    def get_transcription(self, instance):
+        """Make a good visualization of a transcription, which includes a show/hide button"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the text
+            if not instance.fulltext is None and instance.fulltext != "":
+                sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Combine with button click + default hidden
+                html = []
+                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
+                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonEdit/get_transcription")
+        return sBack
+
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('sermon_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
 
@@ -4643,7 +4740,7 @@ class SermonEdit(BasicDetails):
             # Need to know who is 'talking'...
             username = self.request.user.username
             profile = Profile.get_user_profile(username)
-            profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
+            profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
             project_count = instance.projects.count()
 
@@ -4657,7 +4754,7 @@ class SermonEdit(BasicDetails):
                     instance.projects.add(project)
                 elif profile_projects.count() == 1:
                     # This editor is only editor for one project
-                    # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                    # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
                     project = profile_projects.first().project
                     instance.projects.add(project)
 
@@ -4825,7 +4922,7 @@ class SermonEdit(BasicDetails):
                     # Need to know who is 'talking'...
                     username = self.request.user.username
                     profile = Profile.get_user_profile(username)
-                    profile_projects = ProjectEditor.objects.filter(profile=profile, status="incl")
+                    profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
                     # Always get the project list
                     projlist = form.cleaned_data.get("projlist")
@@ -4854,7 +4951,7 @@ class SermonEdit(BasicDetails):
                             bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
                     elif profile_projects.count() == 1:
                         # This editor is only editor for one project
-                        # Issue #546: if editor is only ProjectEditor for one project, then assign the sermon to that project
+                        # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
                         project = profile_projects.first().project
                         instance.projects.add(project)
                     else:
@@ -5043,6 +5140,73 @@ class SermonDetails(SermonEdit):
 
     def after_save(self, form, instance):
         return True, ""
+
+
+class SermonUserKeyword(SermonDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("sermon_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "sermo", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'sermo'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonUserKeyword/custom_init")
+    
+
+class SermonMove(SermonDetails):
+    # newRedirect = True
+
+    def custom_init(self, instance):
+        errHandle = ErrHandle()
+
+        # Note: use [errHandle]
+        try:
+            # Find the right parameter
+            manu_id = self.qd.get("sermo-manuone")
+            if not manu_id is None and manu_id != "":
+                dst_manu = Manuscript.objects.filter(id=manu_id).first()
+                if not dst_manu is None:
+                    # Yes, a destination manuscript has been identified
+                    # Find out what the last codico-unit is
+                    lastcodico = dst_manu.manuscriptcodicounits.all().order_by('-order').first()
+                    if not lastcodico is None:
+                        # Get the msitem of the sermon
+                        msitem = instance.msitem
+                        # Move the MsItem to a different Codico
+                        msitem.move_codico(lastcodico)
+
+                    # Make sure to set the correct redirect page: the manuscript to which it has been moved
+                    if instance:
+                        self.redirectpage = reverse("manuscript_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            return True
+        except:
+            msg = errHandle.get_error_message()
+            errHandle.DoError("SermonMove")
+            return False
 
 
 class SermonListView(BasicList):
@@ -5595,6 +5759,7 @@ class KeywordEdit(BasicDetails):
         context['mainitems'] = [
             {'type': 'plain', 'label': "Name:",       'value': instance.name,                     'field_key': 'name'},
             {'type': 'plain', 'label': "Visibility:", 'value': instance.get_visibility_display(), 'field_key': 'visibility'},
+            {'type': 'plain', 'label': "Category:",   'value': instance.get_category_display(),   'field_key': 'category'},
             {'type': 'plain', 'label': "Description:",'value': instance.description,              'field_key': 'description'}
             ]
         # Return the context we have made
@@ -5626,13 +5791,17 @@ class KeywordListView(BasicList):
     sg_name = "Keyword"     
     plural_name = "Keywords"
     page_function = "ru.passim.seeker.search_paged_start"
-    order_cols = ['name', 'visibility', '']
+    order_cols = ['name', 'visibility', 'category', '']
     order_default = order_cols
-    order_heads = [{'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
-                   {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
-                   {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
+    order_heads = [
+        {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+        {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
+        {'name': 'Category',   'order': 'o=3', 'type': 'str', 'custom': 'category'},
+        {'name': 'Frequency',  'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-                {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
+                # See issue #628 -- keep the following commented for now 
+                # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
+                ]
     searches = [
         {'section': '', 'filterlist': [
             {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
@@ -5640,34 +5809,51 @@ class KeywordListView(BasicList):
         ]
 
     def initializations(self):
+        # Make sure possible adaptations are executed
+        listview_adaptations("keyword_list")
+
         # Check out who I am
         in_team = user_is_in_team(self.request)
         self.in_team = in_team
         if in_team:
-            self.order_cols = ['name', 'visibility', '']
+            self.order_cols = ['name', 'visibility', 'category', '']
             self.order_default = self.order_cols
             self.order_heads = [
                 {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
                 {'name': 'Visibility', 'order': 'o=2', 'type': 'str', 'custom': 'visibility'},
-                {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
-            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False},
-                             {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}]
+                {'name': 'Category',   'order': 'o=3', 'type': 'str', 'custom': 'category'},
+                {'name': 'Frequency',  'order': '',    'type': 'str', 'custom': 'links'}]
+            self.filters = [ 
+                {"name": "Keyword",       "id": "filter_keyword",     "enabled": False},
+                {"name": "Category",      "id": "filter_category",    "enabled": False}
+                # See issue #628 -- keep the following commented for now 
+                # {"name": "Visibility",      "id": "filter_visibility",  "enabled": False}
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
-                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }]}
+                    # {'filter': 'category',   'dbfield': 'category',     'keyS': 'category',   'keyList': 'kwcatlist', 'infield': 'english_name'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
+                    ]}
                 ]
             self.bUseFilter = False
         else:
-            self.order_cols = ['name', '']
+            self.order_cols = ['name', 'category', '']
             self.order_default = self.order_cols
             self.order_heads = [
                 {'name': 'Keyword',    'order': 'o=1', 'type': 'str', 'field': 'name', 'default': "(unnamed)", 'main': True, 'linkdetails': True},
+                {'name': 'Category',   'order': 'o=2', 'type': 'str', 'custom': 'category'},
                 {'name': 'Frequency', 'order': '', 'type': 'str', 'custom': 'links'}]
-            self.filters = [ {"name": "Keyword",         "id": "filter_keyword",     "enabled": False}]
+            self.filters = [ 
+                {"name": "Keyword",       "id": "filter_keyword",     "enabled": False},
+                {"name": "Category",      "id": "filter_category",    "enabled": False}
+                ]
             self.searches = [
                 {'section': '', 'filterlist': [
-                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' }]},
+                    {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
                     ]}
@@ -5678,39 +5864,47 @@ class KeywordListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "links":
-            html = []
-            # Get the HTML code for the links of this instance
-            number = instance.freqsermo()
-            if number > 0:
-                url = reverse('sermon_list')
-                html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
-            number = instance.freqgold()
-            if number > 0:
-                url = reverse('search_gold')
-                html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
-            number = instance.freqmanu()
-            if number > 0:
-                url = reverse('search_manuscript')
-                html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
-            number = instance.freqsuper()
-            if number > 0:
-                url = reverse('equalgold_list')
-                html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
-                html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
-            # Combine the HTML code
-            sBack = "\n".join(html)
-        elif custom == "visibility":
-            sBack = instance.get_visibility_display()
+        oErr = ErrHandle()
+        try:
+            if custom == "links":
+                html = []
+                # Get the HTML code for the links of this instance
+                number = instance.freqsermo()
+                if number > 0:
+                    url = reverse('sermon_list')
+                    html.append("<a href='{}?sermo-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+                number = instance.freqgold()
+                if number > 0:
+                    url = reverse('search_gold')
+                    html.append("<a href='{}?gold-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-2 clickable' title='Frequency in gold sermons'>{}</span></a>".format(number))
+                number = instance.freqmanu()
+                if number > 0:
+                    url = reverse('search_manuscript')
+                    html.append("<a href='{}?manu-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-3 clickable' title='Frequency in manuscripts'>{}</span></a>".format(number))
+                number = instance.freqsuper()
+                if number > 0:
+                    url = reverse('equalgold_list')
+                    html.append("<a href='{}?ssg-kwlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-4 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
+                # Combine the HTML code
+                sBack = "\n".join(html)
+            elif custom == "visibility":
+                sBack = instance.get_visibility_display()
+            elif custom == "category":
+                sBack = instance.get_category_display()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("KeywordListView/get_field_value")
         return sBack, sTitle
 
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        if not self.in_team:
+        # if not self.in_team:
+        if not user_is_ingroup(self.request, app_editor):
             # restrict access to "all" marked ons
             fields['visibility'] = "all"
 
@@ -5806,6 +6000,32 @@ class UserKeywordDetails(UserKeywordEdit):
     """Like UserKeyword Edit, but then html output"""
     rtype = "html"
     
+
+class UserKeywordSubmit(UserKeywordDetails):
+    """Submit an adapted range of user keywords and return to the details page"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        """"""
+
+        # Note: use [oErr]
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("userkeyword_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+  
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("UserKeywordSubmit")
+            return False
+
+
 
 class UserKeywordListView(BasicList):
     """Search and list keywords"""
@@ -6487,66 +6707,92 @@ class FeastDetails(FeastEdit):
         # First get the 'standard' context from TestsetEdit
         context = super(FeastDetails, self).add_to_context(context, instance)
 
-        context['sections'] = []
+        oErr = ErrHandle()
+        try:
+            context['sections'] = []
 
-        # Lists of related objects
-        related_objects = []
-        resizable = True
-        index = 1
-        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
-        sort_end = '</span>'
+            # Lists of related objects
+            related_objects = []
+            resizable = True
+            index = 1
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
 
-        # List of Sermons that link to this feast (with an FK)
-        sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
-        if resizable: sermons['gridclass'] = "resizable"
+            # List of Sermons that link to this feast (with an FK)
+            sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
+            if resizable: sermons['gridclass'] = "resizable"
 
-        rel_list =[]
-        qs = instance.feastsermons.all().order_by('msitem__manu__idno', 'locus')
-        for item in qs:
-            manu = item.msitem.manu
-            url = reverse('sermon_details', kwargs={'pk': item.id})
-            url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
-            rel_item = []
+            rel_list =[]
+            # Note: default sort order according to issue #632
+            qs = instance.feastsermons.all().order_by('msitem__manu__lcity__name', 'msitem__manu__library__name', 'msitem__manu__idno', 'locus')
+            for item in qs:
+                manu = item.msitem.manu
+                url = reverse('sermon_details', kwargs={'pk': item.id})
+                url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
+                rel_item = []
 
-            # S: Order number for this sermon
-            add_rel_item(rel_item, index, False, align="right")
-            index += 1
+                # S: Order number for this sermon
+                add_rel_item(rel_item, index, False, align="right")
+                index += 1
 
-            # Manuscript
-            manu_full = "{}, {}, <span class='signature'>{}</span> {}".format(manu.get_city(), manu.get_library(), manu.idno, manu.name)
-            add_rel_item(rel_item, manu_full, False, main=True, link=url_m)
+                # Manuscript
+                manu_full = manu.get_full_name(plain=False)
+                add_rel_item(rel_item, manu_full, False, main=False, nowrap=False, link=url_m)
 
-            # Locus
-            locus = "(none)" if item.locus == None or item.locus == "" else item.locus
-            add_rel_item(rel_item, locus, False, main=True, link=url, 
-                         title="Locus within the manuscript (links to the sermon)")
+                # Locus
+                locus = "(none)" if item.locus == None or item.locus == "" else item.locus
+                add_rel_item(rel_item, locus, False, main=False, nowrap=False, link=url, 
+                             title="Locus within the manuscript (links to the manifestation)")
 
-            # Origin/provenance
-            or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
-            add_rel_item(rel_item, or_prov, False, main=True, 
-                         title="Origin (if known), followed by provenances (between brackets)")
+                # Title
+                title = item.get_title()
+                add_rel_item(rel_item, title, False, main=False, nowrap=False, link=url, 
+                             title="Manifestation's title (links to the manifestation)")
 
-            # Date
-            daterange = "{}-{}".format(manu.yearstart, manu.yearfinish)
-            add_rel_item(rel_item, daterange, False, link=url_m, align="right")
+                # Section title
+                section_title = item.get_sectiontitle()
+                add_rel_item(rel_item, section_title, False, main=False, nowrap=False, link=url, 
+                             title="Manifestation's section title (links to the manifestation)")
 
-            # Add this line to the list
-            rel_list.append(dict(id=item.id, cols=rel_item))
+                # Signature (Gryson/Clavis/Other)
+                sig_text = item.signature_auto_string()
+                add_rel_item(rel_item, sig_text, False, main=False, nowrap=False, link=url, 
+                             title="Gryson/Clavis/Other of associated Authority File (links to the manifestation)")
 
-        sermons['rel_list'] = rel_list
+                # Origin/provenance
+                or_prov = "{} ({})".format(manu.get_origin(), manu.get_provenance_markdown())
+                add_rel_item(rel_item, or_prov, False, main=False, nowrap=False, 
+                             title="Origin (if known), followed by provenances (between brackets)")
 
-        sermons['columns'] = [
-            '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
-            '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
-            '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
-            '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
-            '{}<span>date</span>{}'.format(sort_start_int, sort_end)
-            ]
-        related_objects.append(sermons)
+                # Date
+                daterange = "{}-{}".format(manu.yearstart, manu.yearfinish)
+                add_rel_item(rel_item, daterange, False, link=url_m, align="right")
 
-        # Add all related objects to the context
-        context['related_objects'] = related_objects
+                # Add this line to the list
+                rel_list.append(dict(id=item.id, cols=rel_item))
+
+            sermons['rel_list'] = rel_list
+
+            sermons['columns'] = [
+                '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+                '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+                '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Manifestation title (links to the manifestation)">Title</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Manifestation section title (links to the manifestation)">Section</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Gryson/Clavis/Other of associated Authority File (links to the manifestation)">Gr./Cl.</span>{}'.format(
+                    sort_start, sort_end), 
+                '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end), 
+                '{}<span>date</span>{}'.format(sort_start_int, sort_end)
+                ]
+            related_objects.append(sermons)
+
+            # Add all related objects to the context
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("FeastDetails/add_to_context")
 
         # Return the context we have made
         return context
@@ -6605,16 +6851,30 @@ class FeastListView(BasicList):
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "sermon":
-            html = []
-            for sermon in instance.feastsermons.all().order_by('feast__name'):
-                # find the shelfmark
-                manu = sermon.msitem.manu
-                url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-                html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
-            sBack = ", ".join(html)
-        elif custom == "sermons":
-            sBack = "{}".format(instance.feastsermons.count())
+        oErr = ErrHandle()
+        try:
+            if custom == "sermon":
+                html = []
+                for sermon in instance.feastsermons.all().order_by('feast__name'):
+                    # find the shelfmark
+                    manu = sermon.msitem.manu
+                    url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
+                sBack = ", ".join(html)
+            elif custom == "sermons":
+                # sBack = "{}".format(instance.feastsermons.count())
+                html = []
+                # Get the HTML code for the links of this instance
+                number = instance.feastsermons.count()
+                if number > 0:
+                    url = reverse('sermon_list')
+                    html.append("<a href='{}?sermo-feastlist={}'>".format(url, instance.id))
+                    html.append("<span class='badge jumbo-1 clickable' title='Frequency in manifestation sermons'>{}</span></a>".format(number))
+                sBack = "\n".join(html)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("FeastListView/get_field_value")
         return sBack, sTitle
 
 
@@ -6801,7 +7061,7 @@ class UserEdit(BasicDetails):
     def custom_init(self, instance):
 
         # Set the LISTVIEW to the MyPassim page
-        self.listview = reverse('mypassim')
+        self.listview = reverse('mypassim_details')
         self.listviewtitle = "My Passim"
 
         # Return nothing
@@ -6872,7 +7132,8 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Groups:",       'value': instance.get_groups_markdown(), },
             {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
-            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_projects_markdown(),    'field_list': 'projlist'}
+            {'type': 'line',  'label': "Project editing rights:", 'value': instance.get_editor_projects_markdown(),     'field_list': 'editlist'},
+            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'}
             ]
 
         # Adapt the permission, if this is the actual user that is logged in
@@ -6926,9 +7187,14 @@ class ProfileEdit(BasicDetails):
             if bSaveUser:
                 instance.user.save()
 
-            # (6) 'projects'
+            # (6) 'projects' - approver
             projlist = form.cleaned_data['projlist']
-            adapt_m2m(ProjectEditor, instance, "profile", projlist, "project")
+            adapt_m2m(ProjectApprover, instance, "profile", projlist, "project")
+
+            # (7) 'projects' - editor
+            editlist = form.cleaned_data['editlist']
+            adapt_m2m(ProjectEditor, instance, "profile", editlist, "project")
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileEdit/after_save")
@@ -6963,29 +7229,40 @@ class ProfileListView(BasicList):
         {'name': 'Project Approver',    'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
 
+    def initializations(self):
+        # Make sure possible adaptations are executed
+        listview_adaptations("profile_list")
+        # We are not returning anything        
+        return None
+
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
-        if custom == "name":
-            sBack = instance.user.username
-        elif custom == "email":
-            sBack = instance.user.email
-        elif custom == "status":
-            sBack = instance.get_ptype_display()
-        elif custom == "affiliation":
-            sBack = "-" if instance.affiliation == None else instance.affiliation
-        elif custom == "projects":
-            lHtml = []
-            for g in instance.projects.all():
-                name = g.name
-                lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
-            sBack = ", ".join(lHtml)
-        elif custom == "groups":
-            lHtml = []
-            for g in instance.user.groups.all():
-                name = g.name.replace("passim_", "")
-                lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
-            sBack = ", ".join(lHtml)
+        oErr = ErrHandle()
+        try:
+            if custom == "name":
+                sBack = instance.user.username
+            elif custom == "email":
+                sBack = instance.user.email
+            elif custom == "status":
+                sBack = instance.get_ptype_display()
+            elif custom == "affiliation":
+                sBack = "-" if instance.affiliation == None else instance.affiliation
+            elif custom == "projects":
+                lHtml = []
+                for g in instance.projects.all():
+                    name = g.name
+                    lHtml.append("<span class='badge signature cl'>{}</span>".format(name))
+                sBack = ", ".join(lHtml)
+            elif custom == "groups":
+                lHtml = []
+                for g in instance.user.groups.all():
+                    name = g.name.replace("passim_", "")
+                    lHtml.append("<span class='badge signature gr'>{}</span>".format(name))
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProfileListView/get_field_value")
         return sBack, sTitle
 
 
@@ -7004,7 +7281,7 @@ class DefaultEdit(BasicDetails):
     mainitems = []
 
     def custom_init(self, instance):
-        self.listview = reverse('mypassim')
+        self.listview = reverse('mypassim_details')
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7012,8 +7289,9 @@ class DefaultEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             {'type': 'plain', 'label': "User",              'value': instance.user.id, 'field_key': "user", 'empty': 'idonly'},
-            {'type': 'plain', 'label': "Username:",         'value': instance.user.username, },
-            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_projects_markdown()},
+            {'type': 'plain', 'label': "Username:",         'value': instance.user.username,                    },
+            {'type': 'line',  'label': "Editing rights:",   'value': instance.get_editor_projects_markdown()    },
+            {'type': 'line',  'label': "Approver rights:",  'value': instance.get_approver_projects_markdown()  },
             {'type': 'line',  'label': 'Default projects:', 'value': instance.get_defaults_markdown(), 'field_list': 'deflist'}
             ]
         # Return the context we have made
@@ -7217,6 +7495,7 @@ class CollAnyEdit(BasicDetails):
     codico = None
     datasettype = ""
     use_team_group = True
+    max_items = 500            # Maximum number of items shown in details view
     mainitems = []
     hlistitems = [
         {'type': 'manu',    'clsColl': CollectionMan,   'field': 'manuscript'},
@@ -7331,157 +7610,162 @@ class CollAnyEdit(BasicDetails):
         prefix_readonly = ['any', 'manu', 'sermo', 'gold', 'super']
         prefix_elevate = ['any', 'super', 'priv', 'publ']
 
-        # Need to know who this is
-        profile = Profile.get_user_profile(self.request.user.username)
+        oErr = ErrHandle()
+        try:
 
-        # Prepare saveditem handling
-        saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
-        saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
+            # Need to know who this is
+            profile = Profile.get_user_profile(self.request.user.username)
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
-            {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
-            {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
-            {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
-            ]
+            # Prepare saveditem handling
+            saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype=self.settype)
+            saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype=self.settype)
 
-        # Optionally add Scope: but only for the actual *owner* of this one
-        if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
+                {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
+                {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
+                {'type': 'plain', 'label': "URL:",         'value': instance.url, 'field_key': 'url'}, 
+                ]
+
+            # Optionally add Scope: but only for the actual *owner* of this one
+            if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+                context['mainitems'].append(
+                {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
+
+            # Always add Type, but its value may not be changed
             context['mainitems'].append(
-            {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
+                {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
 
-        # Always add Type, but its value may not be changed
-        context['mainitems'].append(
-            {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
+            # Always add project label(s)
+            #context['mainitems'].append(
+            #    {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown(), 'field_key': 'project'})
 
-        # Always add project label(s)
-        #context['mainitems'].append(
-        #    {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown(), 'field_key': 'project'})
+            # Optionally add Readonly
+            if self.prefix in prefix_readonly:
+                context['mainitems'].append(
+                {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
 
-        # Optionally add Readonly
-        if self.prefix in prefix_readonly:
-            context['mainitems'].append(
-            {'type': 'plain', 'label': "Readonly:",    'value': instance.readonly, 'field_key': 'readonly'})
-
-        # This is only for private PDs:
-        if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
-            name_choice = dict(
-                manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
-                sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
-                gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
-                super=dict(sg_name="Authority file", pl_name="Authority files")
-                )
-            # Add a button + text
-            context['datasettype'] = instance.type
-            context['sg_name'] = name_choice[instance.type]['sg_name']
-            context['pl_name'] = name_choice[instance.type]['pl_name']
-            
-            context['size'] = instance.get_size_markdown()
-            size_value = render_to_string("seeker/collpriv.html", context, self.request)
-        else:
-            size_value = instance.get_size_markdown()
-        
-        # Always add Created (with name of the creator) and Size                
-        context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
-        context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
-
-        # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
-        if instance.settype == "hc" and context['is_app_editor']:
-            # If 'manu' is set, then this procedure is called from 'collhist_compare'
-            if self.manu == None:
-                context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
-        # Historical collections may have literature references
-        if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
-            oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
-            if context['is_app_editor']:
-                oLitref['multiple'] = True
-                oLitref['field_list'] = 'litlist'
-                oLitref['fso'] = self.formset_objects[0]
-                oLitref['template_selection'] = 'ru.passim.litref_template'
-            context['mainitems'].append(oLitref)        
-        
-        # Historical collections have a project assigned to them
-        if instance.settype == "hc":
-            oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
-            if may_edit_project(self.request, profile, instance):
-                oProject['field_list'] = 'projlist'
-            context['mainitems'].append(oProject)        
-
-        # Add comment modal stuff
-        if instance.settype == "hc":
-            initial = dict(otype="hc", objid=instance.id, profile=profile)
-            context['commentForm'] = CommentForm(initial=initial, prefix="com")
-            context['comment_list'] = get_usercomments('hc', instance, profile)            
-            lhtml = []
-            lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
-            context['comment_count'] = instance.comments.count()
-
-            # Also add the saved item form
-            lhtml.append(saveditem_form)
-
-            # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)    
-        else:
-            lhtml = []                    
-            # Also add the saved item form
-            lhtml.append(saveditem_form)
-
-            # Store the after_details in the context
-            context['after_details'] = "\n".join(lhtml)    
-
-        # Any dataset may optionally be elevated to a historical collection
-        # BUT: only if a person has permission
-        if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
-            context['authenticated'] and context['is_app_editor']:
-            context['mainitems'].append(
-                {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
-                )
-        # Buttons to switch to a listview of M/S/SG/SSG based on this collection
-        context['mainitems'].append(
-                {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
-                 'title': 'Open a listview that is filtered on this dataset'}
-                )
-        # For HC: buttons to switch between related listviews
-        if instance.settype == "hc" and context['is_app_editor'] and self.manu == None and self.codico == None:
-            context['mainitems'].append(
-                    {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
-                     'title': 'Optionally show and edit the Authority files in this collection'}
+            # This is only for private PDs:
+            if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
+                name_choice = dict(
+                    manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
+                    sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
+                    gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
+                    super=dict(sg_name="Authority file", pl_name="Authority files")
                     )
-
-
-        # Signal that we have select2
-        context['has_select2'] = True
-
-        
-
-
-        # Determine what the permission level is of this collection for the current user
-        # (1) Is this user a different one than the one who created the collection?
-        profile_owner = instance.owner
-        profile_user = Profile.get_user_profile(self.request.user.username)
-        # (2) Set default permission
-        permission = ""
-        if profile_owner.id == profile_user.id:
-            # (3) Any creator of the collection may write it
-            permission = "write"
-        else:
-            # (4) permission for different users
-            if context['is_app_editor']:
-                # (5) what if the user is an app_editor?
-                if instance.scope == "publ":
-                    # Editors may read/write collections with 'public' scope
-                    permission = "write"
-                elif instance.scope == "team":
-                    # Editors may read collections with 'team' scope
-                    permission = "read"
+                # Add a button + text
+                context['datasettype'] = instance.type
+                context['sg_name'] = name_choice[instance.type]['sg_name']
+                context['pl_name'] = name_choice[instance.type]['pl_name']
+            
+                context['size'] = instance.get_size_markdown()
+                size_value = render_to_string("seeker/collpriv.html", context, self.request)
             else:
-                # (5) any other users
-                if instance.scope == "publ":
-                    # All users may read collections with 'public' scope
-                    permission = "read"
+                size_value = instance.get_size_markdown()
+        
+            # Always add Created (with name of the creator) and Size                
+            context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
+            context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
 
-        context['permission'] = permission
+            # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
+            if instance.settype == "hc" and context['is_app_editor']:
+                # If 'manu' is set, then this procedure is called from 'collhist_compare'
+                if self.manu == None:
+                    context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
+            # Historical collections may have literature references
+            if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
+                oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
+                if context['is_app_editor']:
+                    oLitref['multiple'] = True
+                    oLitref['field_list'] = 'litlist'
+                    oLitref['fso'] = self.formset_objects[0]
+                    oLitref['template_selection'] = 'ru.passim.litref_template'
+                context['mainitems'].append(oLitref)        
+        
+            # Historical collections have a project assigned to them
+            if instance.settype == "hc":
+                oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
+                if may_edit_project(self.request, profile, instance):
+                    oProject['field_list'] = 'projlist'
+                context['mainitems'].append(oProject)        
+
+            # Add comment modal stuff
+            if instance.settype == "hc":
+                initial = dict(otype="hc", objid=instance.id, profile=profile)
+                context['commentForm'] = CommentForm(initial=initial, prefix="com")
+                context['comment_list'] = get_usercomments('hc', instance, profile)            
+                lhtml = []
+                lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
+                context['comment_count'] = instance.comments.count()
+
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
+                # Store the after_details in the context
+                context['after_details'] = "\n".join(lhtml)    
+            else:
+                lhtml = []                    
+                # Also add the saved item form
+                lhtml.append(saveditem_form)
+
+                # Store the after_details in the context
+                context['after_details'] = "\n".join(lhtml)    
+
+            # Any dataset may optionally be elevated to a historical collection
+            # BUT: only if a person has permission
+            if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
+                context['authenticated'] and context['is_app_editor']:
+                context['mainitems'].append(
+                    {'type': 'safe', 'label': "Historical:", 'value': instance.get_elevate()}
+                    )
+            # Buttons to switch to a listview of M/S/SG/SSG based on this collection
+            context['mainitems'].append(
+                    {'type': 'safe', 'label': "Listviews:", 'value': self.get_listview_buttons(instance),
+                     'title': 'Open a listview that is filtered on this dataset'}
+                    )
+            # For HC: buttons to switch between related listviews
+            if instance.settype == "hc" and context['is_app_editor'] and self.manu == None and self.codico == None:
+                context['mainitems'].append(
+                        {'type': 'safe', 'label': "Show/hide:", 'value': self.get_hc_buttons(instance),
+                         'title': 'Optionally show and edit the Authority files in this collection'}
+                        )
+
+            # Signal that we have select2
+            context['has_select2'] = True
+
+            # Determine what the permission level is of this collection for the current user
+            # (1) Is this user a different one than the one who created the collection?
+            profile_owner = instance.owner
+            profile_user = Profile.get_user_profile(self.request.user.username)
+            # (2) Set default permission
+            permission = ""
+            if self.may_edit():
+                if profile_owner.id == profile_user.id:
+                    # (3) Any creator of the collection may write it
+                    permission = "write"
+                else:
+                    # (4) permission for different users
+                    if context['is_app_editor']:
+                        # (5) what if the user is an app_editor?
+                        if instance.scope == "publ":
+                            # Editors may read/write collections with 'public' scope
+                            permission = "write"
+                        elif instance.scope == "team":
+                            # Editors may read collections with 'team' scope
+                            permission = "read"
+                    else:
+                        # (5) any other users
+                        if instance.scope == "publ":
+                            # All users may read collections with 'public' scope
+                            permission = "read"
+            else:
+                permission = "readonly"
+
+            context['permission'] = permission
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollAnyEdit/add_to_context")
           
         # Return the context we have made
         return context    
@@ -7742,9 +8026,10 @@ class CollHistEdit(CollAnyEdit):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() == 1:
-                    project = profile.projects.first()
+                    project = user_projects.first()
                     CollectionProject.objects.create(collection=instance, project=project)
         except:
             msg = oErr.get_error_message()
@@ -7827,7 +8112,6 @@ class CollPrivDetails(CollAnyEdit):
             self.check_hlist(instance)
         return None
 
-
     def add_to_context(self, context, instance):
         # Perform the standard initializations:
         context = super(CollPrivDetails, self).add_to_context(context, instance)
@@ -7877,9 +8161,13 @@ class CollPrivDetails(CollAnyEdit):
                         'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
                 check_order(qs_manu)
 
-                for obj in qs_manu:
+                for idx, obj in enumberate(qs_manu):
                     rel_item = []
                     item = obj.manuscript
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # S: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right", draggable=True)
@@ -7934,9 +8222,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.sermon
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # S: Order in Sermon
                     #add_one_item(rel_item, index, False, align="right")
@@ -7988,9 +8280,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.gold
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # G: Order in Gold
                     #add_one_item(rel_item, index, False, align="right")
@@ -8042,9 +8338,13 @@ class CollPrivDetails(CollAnyEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.super
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # SSG: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right")
@@ -8260,9 +8560,13 @@ class CollHistDetails(CollHistEdit):
                 check_order(qs_sermo)
 
                 # Walk these collection sermons
-                for obj in qs_sermo:
+                for idx, obj in enumerate(qs_sermo):
                     rel_item = []
                     item = obj.super
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
 
                     # SSG: Order in Manuscript
                     #add_one_item(rel_item, index, False, align="right")
@@ -8319,8 +8623,12 @@ class CollHistDetails(CollHistEdit):
                         'id').distinct().order_by('manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
 
                     rel_list =[]
-                    for item in qs_codi:
+                    for idx, item in enumerate(qs_codi):
                         rel_item = []
+
+                        # Leave if this is too much
+                        if idx > self.max_items:
+                            break
 
                         # Shelfmark = IDNO
                         add_one_item(rel_item,  self.get_field_value("codicos", item, "manuscript"), False, title=item.manuscript.idno, main=True, 
@@ -8370,8 +8678,12 @@ class CollHistDetails(CollHistEdit):
                         'id').distinct().order_by('lcity__name', 'library__name', 'idno')
 
                     rel_list =[]
-                    for item in qs_manu:
+                    for idx, item in enumerate(qs_manu):
                         rel_item = []
+
+                        # Leave if this is too much
+                        if idx > self.max_items:
+                            break
 
                         # Get the codico's for this manuscript
                         codico_lst = item.manuscriptcodicounits.all().order_by('order')
@@ -8468,9 +8780,14 @@ class CollHistDetails(CollHistEdit):
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
-                for item in qs_ssg:
+                for idx, item in enumerate(qs_ssg):
                     rel_item = []
                     equal = item
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # S: Order in Manuscript
                     rel_item.append({'value': "-", 'initial': 'small'})
 
@@ -8521,8 +8838,13 @@ class CollHistDetails(CollHistEdit):
                 rel_list =[]
                 equal_list = []
                 index = 1
-                for item in qs_s:
+                for idx, item in enumerate(qs_s):
                     rel_item = []
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # Determine the matching SSG from the Historical Collection
                     equal = EqualGold.objects.filter(sermondescr_super__super__in=qs_ssg, sermondescr_super__sermon__id=item.id).first()
                     # List of SSGs that have been dealt with already
@@ -8570,9 +8892,14 @@ class CollHistDetails(CollHistEdit):
 
                 # Check if there are any SSGs in the collection that have not been dealt with yet
                 qs_ssg = instance.collections_super.exclude(id__in=equal_list)
-                for item in qs_ssg:
+                for idx, item in enumerate(qs_ssg):
                     rel_item = []
                     equal = item
+
+                    # Leave if this is too much
+                    if idx > self.max_items:
+                        break
+
                     # S: Order in Manuscript
                     rel_item.append({'value': "-", 'initial': 'small'})
 
@@ -9288,41 +9615,50 @@ class CommentSend(BasicPart):
                 obj = Collection.objects.filter(id=objid).first()
             return obj
 
-        if self.add:
-            # Get the form
-            form = CommentForm(self.qd, prefix="com")
-            if form.is_valid():
-                cleaned = form.cleaned_data
-                # Yes, we are adding something new - check what we have
-                profile = cleaned.get("profile")
-                otype = cleaned.get("otype")
-                objid = cleaned.get("objid")
-                content = cleaned.get("content")
-                if content != None and content != "":
-                    # Yes, there is a remark
-                    comment = Comment.objects.create(profile=profile, content=content, otype=otype)
-                    obj = get_object(otype, objid)
-                    # Add a new object for this user 
-                    obj.comments.add(comment) 
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
 
-                    # Send this comment by email
-                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id}) # HIER GAAT HET MIS
-                    context['objurl'] = self.request.build_absolute_uri(objurl)
-                    context['objname'] = obj_names[otype]
-                    context['comdate'] = comment.get_created()
-                    context['user'] = profile.user
-                    context['objcontent'] = content
-                    contents = render_to_string('seeker/comment_mail.html', context, self.request)
-                    comment.send_by_email(contents)
+            if self.add:
+                # Get the form
+                form = CommentForm(self.qd, prefix="com")
+                if form.is_valid():
+                    cleaned = form.cleaned_data
+                    # Yes, we are adding something new - check what we have
+                    profile = cleaned.get("profile")
+                    otype = cleaned.get("otype")
+                    objid = cleaned.get("objid")
+                    content = cleaned.get("content")
+                    if content != None and content != "":
+                        # Yes, there is a remark
+                        comment = Comment.objects.create(profile=profile, content=content, otype=otype)
+                        obj = get_object(otype, objid)
+                        # Add a new object for this user 
+                        obj.comments.add(comment) 
 
-                    # Get a list of comments by this user for this item
-                    context['comment_list'] = get_usercomments(otype, obj, profile)
-                    # Translate this list into a valid string
-                    comment_list = render_to_string('seeker/comment_list.html', context, self.request)
-                    # And then pass on this string in the 'data' part of the POST response
-                    #  (this is done using the BasicPart POST handling)
-                    context['data'] = dict(comment_list=comment_list)
+                        # Send this comment by email
+                        objurl = reverse(url_names[otype], kwargs={'pk': obj.id}) # HIER GAAT HET MIS
+                        context['objurl'] = self.request.build_absolute_uri(objurl)
+                        context['objname'] = obj_names[otype]
+                        context['comdate'] = comment.get_created()
+                        context['user'] = profile.user
+                        context['objcontent'] = content
+                        contents = render_to_string('seeker/comment_mail.html', context, self.request)
+                        comment.send_by_email(contents)
 
+                        # Get a list of comments by this user for this item
+                        context['comment_list'] = get_usercomments(otype, obj, profile)
+                        # Translate this list into a valid string
+                        comment_list = render_to_string('seeker/comment_list.html', context, self.request)
+                        # And then pass on this string in the 'data' part of the POST response
+                        #  (this is done using the BasicPart POST handling)
+                        context['data'] = dict(comment_list=comment_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentSend")
 
         # Send the result
         return context
@@ -9604,7 +9940,7 @@ class ManuscriptEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="manu")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="manu")
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = ManuscriptExternal.objects.filter(manu=instance).first()
@@ -9636,8 +9972,10 @@ class ManuscriptEdit(BasicDetails):
                 team_group = app_editor
                 mainitems_m2m = [
                     {'type': 'plain', 'label': "Keywords:",     'value': instance.get_keywords_markdown(),      'field_list': 'kwlist'},
-                    {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
-                     'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    {'type': 'line', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   
+                     'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                    #{'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                    # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                     {'type': 'plain', 'label': "Personal Datasets:",  'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
                         'multiple': True, 'field_list': 'collist', 'fso': self.formset_objects[0] },
                     {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown(), 
@@ -9861,6 +10199,31 @@ class ManuscriptEdit(BasicDetails):
         sBack = render_to_string("seeker/manu_provs.html", context, self.request)
         return sBack
 
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['manuForm']
+                context['ukwupdate'] = reverse('manuscript_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def process_formset(self, prefix, request, formset):
         errors = []
         bResult = True
@@ -10032,9 +10395,10 @@ class ManuscriptEdit(BasicDetails):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.projects.all()
+                # user_projects = profile.projects.all()
+                user_projects = profile.get_defaults()
                 if user_projects.count() == 1:
-                    project = profile.projects.first()
+                    project = user_projects.first()
                     ManuscriptProject.objects.create(manuscript=instance, project=project)
             
             # Process many-to-ONE changes
@@ -10072,7 +10436,7 @@ class ManuscriptEdit(BasicDetails):
 
     def get_history(self, instance):
         return passim_get_history(instance)
-    
+
 
 class ManuscriptDetails(ManuscriptEdit):
     rtype = "html"
@@ -10175,6 +10539,38 @@ class ManuscriptDetails(ManuscriptEdit):
                 instance.set_projects(projects)
         return True, ""
 
+
+class ManuscriptUserKeyword(ManuscriptDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("manuscript_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "manu", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'manu'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptUserKeyword/custom_init")
+    
 
 class ManuscriptHierarchy(ManuscriptDetails):
     newRedirect = True
@@ -11963,7 +12359,7 @@ class SermonGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Bibliography:",         'value': instance.get_bibliography_markdown(),  'field_key': 'bibliography'},
                 {'type': 'line',  'label': "Keywords:",             'value': instance.get_keywords_markdown(), 
                  'field_list': 'kwlist', 'fso': self.formset_objects[1], 'maywrite': True},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                 {'type': 'line',  'label': "Keywords (related):",   'value': instance.get_keywords_ssg_markdown(),
                  'title': 'Keywords attached to the Authority file of which this Sermon Gold is part'},
@@ -11983,7 +12379,7 @@ class SermonGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = SermonGoldExternal.objects.filter(gold=instance).first()
@@ -12196,6 +12592,31 @@ class SermonGoldEdit(BasicDetails):
         """User can fill this in to his/her liking"""
         passim_action_add(self, instance, details, actiontype)
 
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('gold_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def get_history(self, instance):
         return passim_get_history(instance)
 
@@ -12239,6 +12660,38 @@ class SermonGoldDetails(SermonGoldEdit):
         return True, ""
 
 
+class SermonGoldUserKeyword(SermonGoldDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("gold_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "gold", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'gold'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonGoldUserKeyword/custom_init")
+    
+
 # ================= EQUALGOLD =============================
 
 class EqualGoldEdit(BasicDetails):
@@ -12276,7 +12729,7 @@ class EqualGoldEdit(BasicDetails):
         ]
 
     # Note: do not include [code] in here
-    stype_edi_fields = ['author', 'number', 'incipit', 'explicit',
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit', 'fulltext',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
@@ -12312,6 +12765,7 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
                 {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
                 {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
+                {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
 
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -12322,11 +12776,13 @@ class EqualGoldEdit(BasicDetails):
                  'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
                 {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
                  'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                 'field_key': 'newfulltext'}, 
                 # Hier project    
     
 
                 {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': instance.get_keywords_user_markdown(profile),   'field_list': 'ukwlist',
+                {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
                 {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
                 {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
@@ -12350,7 +12806,7 @@ class EqualGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
-            # If this user belongs to the ProjectEditor of HUWA, show him the HUWA ID if it is there
+            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
                 ext = EqualGoldExternal.objects.filter(equal=instance).first()
@@ -12448,6 +12904,26 @@ class EqualGoldEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_transcription(self, instance):
+        """Make a good visualization of a transcription, which includes a show/hide button"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the text
+            if not instance.fulltext is None and instance.fulltext != "":
+                sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Combine with button click + default hidden
+                html = []
+                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
+                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_transcription")
+        return sBack
 
     def get_goldset_html(goldlist):
         context = {}
@@ -12614,6 +13090,31 @@ class EqualGoldEdit(BasicDetails):
 
         return sBack
 
+    def get_userkeywords(self, instance, profile, context):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # At the very least get the list of user keywords
+            sKeywordList = instance.get_keywords_user_markdown(profile)
+            # Now determine what interface to show
+            if context['is_app_editor']:
+                # We simply return the list
+                sBack = sKeywordList
+            else:
+                # We need to construct an interface:
+                # (1) Set up the context to include view and edit elements
+                context['userkeywords'] = sKeywordList
+                context['ukwform'] = context['{}Form'.format(self.prefix)]
+                context['ukwupdate'] = reverse('equalgold_ukw', kwargs={'pk': instance.id })
+
+                # Combine and provide the code needed
+                # sBack = get_userkeyword_interface(self.request, context)
+                sBack = render_to_string("seeker/userkeyword_edit.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_userkeywords")
+        return sBack
+
     def before_delete(self, instance):
         bResult = True
         msg = ""
@@ -12649,6 +13150,7 @@ class EqualGoldEdit(BasicDetails):
         transfer_changes = [
             {'src': 'newincipit',  'dst': 'incipit',  'type': 'text'},
             {'src': 'newexplicit', 'dst': 'explicit', 'type': 'text'},
+            {'src': 'newfulltext', 'dst': 'fulltext', 'type': 'text'},
             {'src': 'newauthor',   'dst': 'author',   'type': 'fk'},
             ]
         try:
@@ -12899,13 +13401,26 @@ class EqualGoldEdit(BasicDetails):
                 profile = Profile.get_user_profile(username)
 
                 # The user has not selected a project (yet): try default assignment
-                user_projects = profile.project_editor.filter(status="incl")
+                user_projects = profile.project_approver.filter(status="incl")
                 if user_projects.count() == 1:
-                    project = user_projects.first()
+                    obj = user_projects.first()
+                    project = obj.project
+                    # project = user_projects.first()
                     EqualGoldProject.objects.create(equal=instance, project=project)
                     # Make sure the atype is set correctly
                     instance.atype = "acc"
                     instance.save()
+                else:
+                    # Look for projects where I am editor of
+                    editor_projects = profile.get_editor_projects()
+                    if editor_projects.count() == 1:
+                        # Get this project
+                        project = editor_projects.first()
+                        # Assign the project to this SSG/AF
+                        EqualGoldProject.objects.create(equal=instance, project=project)
+                        # Make sure the atype is set correctly
+                        instance.atype = "acc"
+                        instance.save()
 
             # Process many-to-ONE changes
             # (1) links from SG to SSG
@@ -13179,7 +13694,7 @@ class EqualGoldDetails(EqualGoldEdit):
             if self.isnew:
                 # Try default project assignment
                 profile = Profile.get_user_profile(self.request.user.username)
-                qs = profile.project_editor.filter(status="incl")
+                qs = profile.project_approver.filter(status="incl")
                 for obj in qs:
                     EqualGoldProject.objects.create(project=obj.project, equal=instance)
                 # is it just one project?
@@ -13193,6 +13708,38 @@ class EqualGoldDetails(EqualGoldEdit):
             bBack = False
         return bBack, msg
 
+
+class EqualGoldUserKeyword(EqualGoldDetails):
+    """This version only looks at one kind of data: the ukwlist"""
+
+    newRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Make sure to set the correct redirect page
+            if instance:
+                self.redirectpage = reverse("equalgold_details", kwargs={'pk': instance.id})
+            # Make sure we are not saving
+            self.do_not_save = True
+
+            # Get the value
+            qd = self.qd
+            if self.prefix_type == "simple":
+                sUkwList = "{}-ukwlist".format(self.prefix)
+            else:
+                sUkwList = "{}-{}-ukwlist".format(self.prefix, instance.id)
+            ukwlist_ids = qd.getlist(sUkwList)
+            ukwlist = Keyword.objects.filter(id__in=ukwlist_ids)
+            
+            # Process the contents of the ukwlist, the chosen user-keywords
+            profile = Profile.get_user_profile(self.request.user.username)
+            adapt_m2m(UserKeyword, instance, "super", ukwlist, "keyword", qfilter = {'profile': profile}, extrargs = {'profile': profile, 'type': 'super'})
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldUserKeyword/custom_init")
+    
 
 class EqualGoldListView(BasicList):
     """List super sermon gold instances"""
@@ -13320,6 +13867,7 @@ class EqualGoldListView(BasicList):
             # Possibly add to 'uploads'
             bHasJson = False
             bHasEdilit = False
+            bHasTrans = False
             for item in self.uploads:
                 if item['title'] == "huwajson":
                     bHasJson = True
@@ -13344,6 +13892,15 @@ class EqualGoldListView(BasicList):
                 oJson = dict(title="huwaedilit", label="HUWA edilit",
                               url=reverse('equalgold_upload_edilit'),
                               type="multiple", msg=msg)
+                self.uploads.append(oJson)
+
+            if not bHasTrans:
+                # Add a reference to the XML transcription upload method
+                html = []
+                msg = "Upload sermon transcription(s) from TEI-P5 xml file(s)"
+                oJson = dict(title="xtranseqg", label="XML transcription", 
+                             url = reverse('import_trans_eqg'),
+                             type='multiple', msg=msg)
                 self.uploads.append(oJson)
 
 
@@ -14056,7 +14613,8 @@ class LibraryListView(BasicList):
                  {"label": "csv (tab-separated)", "dtype": "csv", "url": 'library_results'},
                  {"label": None},
                  {"label": "json", "dtype": "json", "url": 'library_results'}]
-    uploads = [{"title": "huwa", "label": "Huwa", "url": "library_upload_excel", "type": "multiple", 
+    uploads = [
+        {"title": "huwa", "label": "Huwa (Excel)", "url": "library_upload_excel", "type": "multiple", 
                 "msg": "Upload Huwa library Excel files"}]
 
     def initializations(self):
@@ -14819,260 +15377,275 @@ class BasketUpdate(BasicPart):
     form_objects = [{'form': CollectionForm, 'prefix': colltype, 'readonly': True}]
 
     def add_to_context(self, context):
-        # Reset the redirect page
-        self.redirectpage = ""
 
-        method = "use_profile_search_id_list"
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                context['basketsize'] = 0
+                context['basketuser'] = "no_user"
+                context['basketwarning'] = "Sorry, only Passim users are allowed to use the baskets"
+                return context
 
-        # Get the operation
-        if 'operation' in self.qd:
-            operation = self.qd['operation']
-        else:
-            return context
+            # Reset the redirect page
+            self.redirectpage = ""
 
-        username=self.request.user.username
-        team_group=app_editor
+            method = "use_profile_search_id_list"
 
-        # Note: only operations in either of these two lists will be executed
-        lst_basket_target = ["create", "add", "remove", "reset"]
-        lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
-
-        # Get our profile
-        profile = Profile.get_user_profile(self.request.user.username)
-        if profile != None:
-
-            # Obligatory initialization
-            rset = None
-
-            # Get the queryset
-            self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
-
-            # Action depends on operations
-            if operation in lst_basket_target:
-                if method == "use_profile_search_id_list":
-                    # Get the latest search results
-                    search_s = getattr(profile, "search_{}".format(self.colltype))
-                    search_id = []
-                    if search_s != None and search_s != "" and search_s[0] == "[":
-                        search_id = json.loads(search_s)
-                    search_count = len(search_id)
-
-                    kwargs = {'profile': profile}
-
-                    # NOTE PROBLEM - we don't have the [oFields] at this point...
-
-                    # Action depends on the operation specified
-                    if search_count > 0 and operation == "create":
-                        # Remove anything there
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif search_count > 0  and operation == "add":
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                obj = self.clsBasket.objects.filter(**kwargs).first()
-                                if obj == None:
-                                    self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif search_count > 0  and operation == "remove":
-                        # Add
-                        with transaction.atomic():
-                            for item in search_id:
-                                kwargs["{}_id".format(self.s_field)] = item
-                                self.clsBasket.objects.filter(**kwargs).delete()
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif operation == "reset":
-                        # Remove everything from our basket
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Reset the history for this one
-                        profile.history(operation, self.colltype)
-
-                else:
-                    
-                    kwargs = {'profile': profile}
-
-                    # Action depends on the operation specified
-                    if qs and operation == "create":
-                        # Remove anything there
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif qs and operation == "add":
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.create(**kwargs)
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif qs and operation == "remove":
-                        # Add
-                        with transaction.atomic():
-                            for item in qs:
-                                kwargs[self.s_field] = item
-                                self.clsBasket.objects.filter(**kwargs).delete()
-                        # Process history
-                        profile.history(operation, self.colltype, oFields)
-                    elif operation == "reset":
-                        # Remove everything from our basket
-                        self.clsBasket.objects.filter(profile=profile).delete()
-                        # Reset the history for this one
-                        profile.history(operation, self.colltype)
-
-            elif operation in lst_basket_source:
-                # Queryset: the basket contents
-                qs = self.clsBasket.objects.filter(profile=profile)
-
-                # Get the history string
-                history = getattr(profile, "history{}".format(self.colltype))
-
-                # New collection or existing one?
-                coll = None
-                bChanged = False
-                if operation == "collcreate":
-                    # Save the current basket as a collection that needs to receive a name
-                    # Note: this assumes [scope='priv'] default
-                    if self.colltype != "super":
-                        coll = Collection.objects.create(path=history, settype="pd",
-                                descrip="Created from a {} listview basket".format(self.colltype), 
-                                owner=profile, type=self.colltype)
-                    else:
-                        coll = Collection.objects.create(path=history, settype="pd",
-                                descrip="Created from a Authority file listview basket", 
-                                owner=profile, type=self.colltype)
-                    # Assign it a name based on its ID number and the owner
-                    if self.colltype != "super":
-                        name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)                         
-                    else:
-                        name = "{}_{}_{}".format(profile.user.username, coll.id, "af")
-                    coll.name = name
-                    coll.save()
-                elif operation == "rsetcreate":
-                    # Save the current basket as a research-set that needs to receive a name
-                    rset = ResearchSet.objects.create(
-                        name="tijdelijk",
-                        notes="Created from a {} listview basket".format(self.colltype),
-                        profile=profile)
-                    # Assign it a name based on its ID number and the owner
-                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
-                    rset.name = name
-                    rset.save()
-                elif operation == "dctlaunch":
-                    # Save the current basket as a research-set that needs to receive a name
-                    rset = ResearchSet.objects.create(
-                        name="tijdelijk",
-                        notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
-                        profile=profile)
-                    # Assign it a name based on its ID number and the owner
-                    name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
-                    rset.name = name
-                    rset.save()
-                elif oFields['collone']:
-                    coll = oFields['collone']
-
-                # Process the basket elements into the ResearchSet or into the Collection
-                if rset != None:
-                    with transaction.atomic():
-                        for idx, item in enumerate(qs):
-                            # Check if it doesn't exist yet
-                            obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
-                            if obj == None:
-                                # Create this
-                                order = idx + 1
-                                SetList.objects.create(researchset=rset, 
-                                                       order = order,
-                                                       setlisttype="manu",
-                                                       manuscript=item.manu)
-
-                    # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
-                    if operation == "rsetcreate":
-                        self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
-                    elif operation == "dctlaunch":
-                        # Get the default DCT for this ad-hoc ResearchSet
-                        dct = rset.researchset_setdefs.first()
-                        self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
-                elif coll == None:
-                    # TODO: provide some kind of error??
-                    pass
-                else:
-                    # Link the collection with the correct model
-                    kwargs = {'collection': coll}
-                    if self.colltype == "sermo":
-                        clsColl = CollectionSerm
-                        field = "sermon"
-                    elif self.colltype == "gold":
-                        clsColl = CollectionGold
-                        field = "gold"
-                    elif self.colltype == "manu":
-                        clsColl = CollectionMan
-                        field = "manuscript"
-                    elif self.colltype == "super":
-                        clsColl = CollectionSuper
-                        field = "super"
-
-                    # THis is only needed for collections
-                    with transaction.atomic():
-                        for item in qs:
-                            kwargs[field] = getattr( item, self.s_field)
-                            # Check if it doesn't exist yet
-                            obj = clsColl.objects.filter(**kwargs).first()
-                            if obj == None:
-                                clsColl.objects.create(**kwargs)
-                                # Note that some changes have been made
-                                bChanged = True
-
-                    # Make sure to redirect to this instance -- but only for COLLCREATE
-                    if operation == "collcreate":
-                        self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
-                    else:
-                        # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
-                        if coll.settype == "pd":
-                            if coll.scope == "publ":
-                                # Public dataset
-                                urltype = "publ"
-                            else:
-                                # Team or Priv
-                                urltype = "priv"
-                        elif coll.settype == "hc":
-                            urltype = "hist"
-                        collurl = reverse('coll{}_details'.format(urltype), kwargs={'pk': coll.id})
-                        collname = coll.name
-                        context['data'] = dict(collurl=collurl, collname=collname)
-                        # Have changes been made?
-                        if bChanged:
-                            # Add the current basket history to the collection's path
-                            lst_history_basket = json.loads(history)
-                            lst_history_coll = json.loads(coll.path)
-                            for item in lst_history_basket:
-                                lst_history_coll.append(item)
-                            coll.path = json.dumps(lst_history_coll)
-                            coll.save()
-
-            # Adapt the basket size
-            context['basketsize'] = self.get_basketsize(profile)
-
-            # Set the other context parameters
-            if self.colltype == "sermo":
-                context['basket_show'] = reverse('basket_show' )
-                context['basket_update'] = reverse('basket_update')
+            # Get the operation
+            if 'operation' in self.qd:
+                operation = self.qd['operation']
             else:
-                context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
-                context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
-            context['colltype'] = self.colltype
+                return context
+
+            username=self.request.user.username
+            team_group=app_editor
+
+            # Note: only operations in either of these two lists will be executed
+            lst_basket_target = ["create", "add", "remove", "reset"]
+            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
+
+            # Get our profile
+            profile = Profile.get_user_profile(self.request.user.username)
+            if profile != None:
+
+                # Obligatory initialization
+                rset = None
+
+                # Get the queryset
+                self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
+
+                # Action depends on operations
+                if operation in lst_basket_target:
+                    if method == "use_profile_search_id_list":
+                        # Get the latest search results
+                        search_s = getattr(profile, "search_{}".format(self.colltype))
+                        search_id = []
+                        if search_s != None and search_s != "" and search_s[0] == "[":
+                            search_id = json.loads(search_s)
+                        search_count = len(search_id)
+
+                        kwargs = {'profile': profile}
+
+                        # NOTE PROBLEM - we don't have the [oFields] at this point...
+
+                        # Action depends on the operation specified
+                        if search_count > 0 and operation == "create":
+                            # Remove anything there
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "add":
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    obj = self.clsBasket.objects.filter(**kwargs).first()
+                                    if obj == None:
+                                        self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "remove":
+                            # Add
+                            with transaction.atomic():
+                                for item in search_id:
+                                    kwargs["{}_id".format(self.s_field)] = item
+                                    self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif operation == "reset":
+                            # Remove everything from our basket
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Reset the history for this one
+                            profile.history(operation, self.colltype)
+
+                    else:
+                    
+                        kwargs = {'profile': profile}
+
+                        # Action depends on the operation specified
+                        if qs and operation == "create":
+                            # Remove anything there
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif qs and operation == "add":
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.create(**kwargs)
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif qs and operation == "remove":
+                            # Add
+                            with transaction.atomic():
+                                for item in qs:
+                                    kwargs[self.s_field] = item
+                                    self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif operation == "reset":
+                            # Remove everything from our basket
+                            self.clsBasket.objects.filter(profile=profile).delete()
+                            # Reset the history for this one
+                            profile.history(operation, self.colltype)
+
+                elif operation in lst_basket_source:
+                    # Queryset: the basket contents
+                    qs = self.clsBasket.objects.filter(profile=profile)
+
+                    # Get the history string
+                    history = getattr(profile, "history{}".format(self.colltype))
+
+                    # New collection or existing one?
+                    coll = None
+                    bChanged = False
+                    if operation == "collcreate":
+                        # Save the current basket as a collection that needs to receive a name
+                        # Note: this assumes [scope='priv'] default
+                        if self.colltype != "super":
+                            coll = Collection.objects.create(path=history, settype="pd",
+                                    descrip="Created from a {} listview basket".format(self.colltype), 
+                                    owner=profile, type=self.colltype)
+                        else:
+                            coll = Collection.objects.create(path=history, settype="pd",
+                                    descrip="Created from a Authority file listview basket", 
+                                    owner=profile, type=self.colltype)
+                        # Assign it a name based on its ID number and the owner
+                        if self.colltype != "super":
+                            name = "{}_{}_{}".format(profile.user.username, coll.id, self.colltype)                         
+                        else:
+                            name = "{}_{}_{}".format(profile.user.username, coll.id, "af")
+                        coll.name = name
+                        coll.save()
+                    elif operation == "rsetcreate":
+                        # Save the current basket as a research-set that needs to receive a name
+                        rset = ResearchSet.objects.create(
+                            name="tijdelijk",
+                            notes="Created from a {} listview basket".format(self.colltype),
+                            profile=profile)
+                        # Assign it a name based on its ID number and the owner
+                        name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                        rset.name = name
+                        rset.save()
+                    elif operation == "dctlaunch":
+                        # Save the current basket as a research-set that needs to receive a name
+                        rset = ResearchSet.objects.create(
+                            name="tijdelijk",
+                            notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
+                            profile=profile)
+                        # Assign it a name based on its ID number and the owner
+                        name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
+                        rset.name = name
+                        rset.save()
+                    elif oFields['collone']:
+                        coll = oFields['collone']
+
+                    # Process the basket elements into the ResearchSet or into the Collection
+                    if rset != None:
+                        with transaction.atomic():
+                            for idx, item in enumerate(qs):
+                                # Check if it doesn't exist yet
+                                obj = SetList.objects.filter(researchset=rset, manuscript=item.manu).first()
+                                if obj == None:
+                                    # Create this
+                                    order = idx + 1
+                                    SetList.objects.create(researchset=rset, 
+                                                           order = order,
+                                                           setlisttype="manu",
+                                                           manuscript=item.manu)
+
+                        # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
+                        if operation == "rsetcreate":
+                            self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
+                        elif operation == "dctlaunch":
+                            # Get the default DCT for this ad-hoc ResearchSet
+                            dct = rset.researchset_setdefs.first()
+                            self.redirectpage = reverse('setdef_details', kwargs={'pk': dct.id})
+                    elif coll == None:
+                        # TODO: provide some kind of error??
+                        pass
+                    else:
+                        # Link the collection with the correct model
+                        kwargs = {'collection': coll}
+                        if self.colltype == "sermo":
+                            clsColl = CollectionSerm
+                            field = "sermon"
+                        elif self.colltype == "gold":
+                            clsColl = CollectionGold
+                            field = "gold"
+                        elif self.colltype == "manu":
+                            clsColl = CollectionMan
+                            field = "manuscript"
+                        elif self.colltype == "super":
+                            clsColl = CollectionSuper
+                            field = "super"
+
+                        # THis is only needed for collections
+                        with transaction.atomic():
+                            for item in qs:
+                                kwargs[field] = getattr( item, self.s_field)
+                                # Check if it doesn't exist yet
+                                obj = clsColl.objects.filter(**kwargs).first()
+                                if obj == None:
+                                    clsColl.objects.create(**kwargs)
+                                    # Note that some changes have been made
+                                    bChanged = True
+
+                        # Make sure to redirect to this instance -- but only for COLLCREATE
+                        if operation == "collcreate":
+                            self.redirectpage = reverse('collpriv_details', kwargs={'pk': coll.id})
+                        else:
+                            # We are adding to an existing Collecion that is either public or private (or 'team' in scope)
+                            if coll.settype == "pd":
+                                if coll.scope == "publ":
+                                    # Public dataset
+                                    urltype = "publ"
+                                else:
+                                    # Team or Priv
+                                    urltype = "priv"
+                            elif coll.settype == "hc":
+                                urltype = "hist"
+                            collurl = reverse('coll{}_details'.format(urltype), kwargs={'pk': coll.id})
+                            collname = coll.name
+                            context['data'] = dict(collurl=collurl, collname=collname)
+                            # Have changes been made?
+                            if bChanged:
+                                # Add the current basket history to the collection's path
+                                lst_history_basket = json.loads(history)
+                                lst_history_coll = json.loads(coll.path)
+                                for item in lst_history_basket:
+                                    lst_history_coll.append(item)
+                                coll.path = json.dumps(lst_history_coll)
+                                coll.save()
+
+                # Adapt the basket size
+                context['basketsize'] = self.get_basketsize(profile)
+
+                # Set the other context parameters
+                if self.colltype == "sermo":
+                    context['basket_show'] = reverse('basket_show' )
+                    context['basket_update'] = reverse('basket_update')
+                else:
+                    context['basket_show'] = reverse('basket_show_{}'.format(self.colltype))
+                    context['basket_update'] = reverse('basket_update_{}'.format(self.colltype))
+                context['colltype'] = self.colltype
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasketUpdate")
 
         # Return the updated context
         return context
