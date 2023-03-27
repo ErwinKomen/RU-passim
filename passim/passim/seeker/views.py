@@ -8161,7 +8161,7 @@ class CollPrivDetails(CollAnyEdit):
                         'order', 'manuscript__lcity__name', 'manuscript__library__name', 'manuscript__idno')
                 check_order(qs_manu)
 
-                for idx, obj in enumberate(qs_manu):
+                for idx, obj in enumerate(qs_manu):
                     rel_item = []
                     item = obj.manuscript
 
@@ -10983,7 +10983,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},  
-            {'filter': 'title',         'fkfield': 'manuscriptcodicounits', 'keyS': 'title_ta',               'keyFK': 'name'},            
+            {'filter': 'title',         'fkfield': 'manuscriptcodicounits', 'keyS': 'title_ta',               'keyFk': 'name'},            
             {'filter': 'origin',        'fkfield': 'manuscriptcodicounits__origins__location|manuscriptcodicounits__origins', 
              # Issue #427. This was: 'manuscriptcodicounits__origin',                 
              'keyS': 'origin_ta',     'keyId': 'origin',      'keyFk': "name"},
