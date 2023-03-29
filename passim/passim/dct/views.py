@@ -627,8 +627,10 @@ class SavedItemApply(BasicPart):
         data = dict(status="ok")
        
         try:
-            # Check validity
-            if not self.userpermissions("w"):
+            # Check validity and permissions
+            # issue #386: non-editors must be able to do this too
+            # if not self.userpermissions("w"):
+            if not self.userpermissions("r"):
                 # Don't do anything
                 return context
 
@@ -646,7 +648,12 @@ class SavedItemApply(BasicPart):
 
             if sitemaction == "add":
                 # We are going to add an item as a saveditem
-                obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(sitemtype=sitemtype))
+                lstQ.append(Q(**{"{}_id".format(itemidfield): itemid}))
+                obj = SavedItem.objects.filter(*lstQ).first()
+                # OLD and obsolete: obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
                 if obj is None:
                     obj = SavedItem.objects.create(
                         profile=profile, sitemtype=sitemtype)
@@ -679,7 +686,7 @@ class SavedItemApply(BasicPart):
 
 
 class SelectItemApply(BasicPart):
-    """Either add or remove an item as saved data"""
+    """Either add or remove an item as selected data"""
 
     MainModel = Profile
 
@@ -703,8 +710,10 @@ class SelectItemApply(BasicPart):
             # We already know who we are
             profile = self.obj
 
-            # Check validity
-            if not self.userpermissions("w"):
+            # Check validity and permissions
+            # issue #386: non-editors must be able to do this too
+            # if not self.userpermissions("w"):
+            if not self.userpermissions("r"):
                 # Don't do anything
                 return context
 
@@ -791,6 +800,13 @@ class SelectItemApply(BasicPart):
                     field_s = selParams['field_s']
                     field_p = selParams['field_p']
 
+                    # Get initial basket size
+                    basketsize = cls.objects.filter(profile=profile).count()
+                    # If that initial size is zero...
+                    if basketsize == 0:
+                        # Then we need to supply a targeturl to return to where we came from
+                        data['newbasket'] = "#basiclist_filter"
+
                     # Walk all selected items
                     for obj_sel in qs:  
                         # which object is this?
@@ -801,7 +817,7 @@ class SelectItemApply(BasicPart):
                         lstQ.append(Q(**{"{}".format(field_b): obj.id}))
                         obj_basket = cls.objects.filter(*lstQ).first()
                         if obj_basket is None:
-                            # Create a dictionry with the required stuff
+                            # Create a dictionary with the required stuff
                             data_dict = dict(profile=profile)
                             data_dict[field_b] = obj
                             # Add it to the basket
@@ -1689,7 +1705,7 @@ class SetDefDetails(SetDefEdit):
             # Create the DCT with a template
             dct_view = render_to_string(template_name, context)
 
-            # Add the visualisation we made
+            # Add the visualization we made
             context['add_to_details'] = dct_view
 
             # Define navigation buttons

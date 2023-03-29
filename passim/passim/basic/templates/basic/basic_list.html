@@ -396,7 +396,7 @@
             <h3>
               <span>{{title|title}}</span>
               <span class="pull-right">
-                {% if is_app_editor and sel_button %}
+                {% if sel_button %}
                   <!-- Button to switch selection on/off -->
                   <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
                     <!-- Show the possibility icons -->
@@ -476,7 +476,7 @@
                     <thead class="fixed-header">
                       <tr>
                         <th class="hidden">id</th>
-                        {% if  is_app_editor and sel_button %}
+                        {% if sel_button %}
                           <th class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}"><!-- This is for selecting --></th>
                         {% endif %}
                         {% for hd in order_heads %}
@@ -518,7 +518,7 @@
                         <!-- put the ID field here-->
                         <td class="hidden">{{result.id}}</td>
 
-                        {% if  is_app_editor and sel_button %}
+                        {% if sel_button %}
                           <!-- Possibly add select field-->
                           <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
                             {{result.sel_info|safe}}

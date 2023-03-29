@@ -1102,6 +1102,7 @@ def search_generic(s_view, cls, form, qd, username=None, team_group=None):
     qs = None
     oErr = ErrHandle()
     bFilter = False
+    bUsingMan = False
     genForm = None
     oFields = {}
     try:
@@ -1146,14 +1147,17 @@ def search_generic(s_view, cls, form, qd, username=None, team_group=None):
                 if 'mtype' in oFields and oFields['mtype'] == "":
                     # Make sure we only select MAN and not TEM (template)
                     oFields['mtype'] = "man"
+                    bUsingMan = True
                                  
                 # Create the search based on the specification in searches
                 filters, lstQ, qd, lstExclude = make_search_list(filters, oFields, searches, qd, lstExclude)
 
                 # Calculate the final qs
-                if len(lstQ) == 0:
+                if len(lstQ) == 0 or (bUsingMan and len(lstQ) == 1):
                     # No filter: Just show everything
-                    qs = cls.objects.all()
+                    # qs = cls.objects.all()
+                    # No filter: do *NOT* show anything
+                    qs = cls.objects.none()
                 else:
                     # There is a filter: apply it
                     qs = cls.objects.filter(*lstQ).distinct()
@@ -6854,8 +6858,8 @@ class FeastListView(BasicList):
             {'filter': 'library',       'fkfield': 'feastsermons__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'feastsermons__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'feastsermons__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'feastsermons__msitem__manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'feastsermons__msitem__manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'datestart',     'dbfield': 'feastsermons__msitem__codico__codico_dateranges__yearstart__gte',    'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'feastsermons__msitem__codico__codico_dateranges__yearfinish__lte',   'keyS': 'date_until'},
             ]}
         ]
 
@@ -15428,6 +15432,8 @@ class BasketUpdate(BasicPart):
 
                 # Get the queryset
                 self.filters, self.bFilter, qs, ini, oFields = search_generic(self.s_view, self.MainModel, self.s_form, self.qd, username, team_group)
+
+                # Check if *any* filter has been set
 
                 # Action depends on operations
                 if operation in lst_basket_target:

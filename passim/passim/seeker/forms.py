@@ -4724,6 +4724,10 @@ class FeastForm(BasicModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+    country_ta  = forms.CharField(label=_("Country"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+    city_ta     = forms.CharField(label=_("City"), required=False, 
+                widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Provenance (location)...',  'style': 'width: 100%;'}))
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
@@ -4734,6 +4738,8 @@ class FeastForm(BasicModelForm):
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    typeaheads = ["cities", "countries"]
+
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 

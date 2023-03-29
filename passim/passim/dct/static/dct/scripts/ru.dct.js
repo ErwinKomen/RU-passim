@@ -2200,6 +2200,11 @@ var ru = (function ($, ru) {
                         selitemcount = 0;
                         break;
                       case "update_basket":
+                        // Check if this is a new basket
+                        if (response['newbasket'] !== undefined) {
+                          frm = response['newbasket'];
+                          $(frm).submit();
+                        }
                         // Adapt all relevant material
                         $(".selitem-button-selected").each(function (idx, el) {
                           var elTd = $(el).closest("td"),
