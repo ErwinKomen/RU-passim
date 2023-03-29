@@ -232,7 +232,8 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
     def enable_filter(filter_id, head_id=None): 
         full_filter_id = "filter_{}".format(filter_id)
         for item in filters:
-            if filter_id in item['id'] or full_filter_id == item['include_id']:
+            include_id = item.get('include_id', '')
+            if filter_id in item['id'] or full_filter_id == include_id:
                 item['enabled'] = True
                 # Break from my loop
                 break
