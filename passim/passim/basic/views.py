@@ -233,19 +233,26 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
         full_filter_id = "filter_{}".format(filter_id)
         for item in filters:
             include_id = item.get('include_id', '')
-            if filter_id in item['id'] or full_filter_id == include_id:
+            # EK: this is too loose:
+            #     if filter_id in item['id'] or full_filter_id == include_id:
+            if full_filter_id == item['id'] or full_filter_id == include_id:
                 item['enabled'] = True
                 # Break from my loop
                 break
-            # first create two strings in order to compare the selected filters and the hidden columns (title and sectiontitle) with each other 
+
+            # =============================
+            # EK: This is the code that got replaced by the above
+            ## (1) first create two strings in order to compare with one another:
+            ##           the selected filters 
+            ##           and the hidden columns (e.g. title and sectiontitle)
             #temp_filter_id = str("filter_" + filter_id)
             #temp_item_id = str(item['id'])                  
-            # If the selected filter(s) match(es) one or two of the hidden columns 
-            # enabled should be given a True
+            ## (2) If the selected filter(s) match(es) one or two of the hidden columns,
+            ##        then enabled should be given a True
             #if temp_filter_id == temp_item_id:    
             #    item['enabled'] = True            
-                # Break from my loop (deleted)
-                # break 
+            # =============================
+
         # Check if this one has a head
         if head_id != None and head_id != "":
             for item in filters:
@@ -1474,7 +1481,8 @@ class BasicList(ListView):
                 # Process the column wrapping
                 lColWrap = json.loads(colwrap)
                 for idx, oHead in enumerate(self.order_heads):
-                    if idx+1 in lColWrap:
+                    # if idx+1 in lColWrap:
+                    if idx in lColWrap:
                         # Indicate that this column must be hidden
                         oHead['colwrap'] = True
 

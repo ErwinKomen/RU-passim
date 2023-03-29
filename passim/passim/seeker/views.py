@@ -10947,6 +10947,8 @@ class ManuscriptListView(BasicList):
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
+        {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
+        {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
         {"name": "Attr. author",            "id": "filter_sermo_author",        "enabled": False, "head_id": "filter_sermon"},
         {"name": "Author type",             "id": "filter_sermo_authortype",    "enabled": False, "head_id": "filter_sermon"},
         {"name": "Incipit",                 "id": "filter_sermo_incipit",       "enabled": False, "head_id": "filter_sermon"},
@@ -10963,11 +10965,11 @@ class ManuscriptListView(BasicList):
         {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "hidden"}, 
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
-        {"name": "Passim code",                         "id": "filter_authority_file_code",        "enabled": False, "head_id": "filter_authority_file"},        
-        {"name": "Gryson/Clavis/Other code",            "id": "filter_authority_file_signature",   "enabled": False, "head_id": "filter_authority_file"},
+        #{"name": "Passim code",                         "id": "filter_authority_file_code",        "enabled": False, "head_id": "filter_authority_file"},        
+        #{"name": "Gryson/Clavis/Other code",            "id": "filter_authority_file_signature",   "enabled": False, "head_id": "filter_authority_file"},
         
-        {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_authority_file_signature_m", "enabled": False, "head_id": "filter_authority_file"},
-        {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_authority_file_signature_a", "enabled": False, "head_id": "filter_authority_file"},
+        #{"name": "Gryson/Clavis/Other code: manual",    "id": "filter_authority_file_signature_m", "enabled": False, "head_id": "filter_authority_file"},
+        #{"name": "Gryson/Clavis/Other code: automatic", "id": "filter_authority_file_signature_a", "enabled": False, "head_id": "filter_authority_file"},
         
         {"name": "Author",                              "id": "filter_authority_file_author",      "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Incipit",                             "id": "filter_authority_file_incipit",     "enabled": False, "head_id": "filter_authority_file"},
@@ -11020,10 +11022,10 @@ class ManuscriptListView(BasicList):
             # ===================
             ]},
         {'section': 'sermon', 'filterlist': [
-            #{'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
-            # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            #{'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
-            # 'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, KAN WEG
+            {'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            {'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, # KAN WEG
             {'filter': 'sermo_authortype', 'keyS': 'authortype',  'help': 'authorhelp'}, 
             {'filter': 'sermo_author',        'fkfield': 'manuitems__itemsermons__author',            
                      'keyS': 'sermo_authorname', 'keyFk': 'name', 'keyList': 'sermo_authorlist', 'infield': 'id', 'external': 'sermo-authorname'},            
