@@ -4608,9 +4608,6 @@ class SermonEdit(BasicDetails):
                             oItemEdi = dict(type="safe", label="HUWA editions", value=value)
                             context['mainitems'].append(oItemEdi)
 
-
-
-
             # Add a button back to the Manuscript
             topleftlist = []
             if instance.get_manuscript():
@@ -4649,8 +4646,10 @@ class SermonEdit(BasicDetails):
             # Start making room for AfterDetails
             lhtml = []
 
-            # Add all needed information for moving a sermon
-            lhtml.append(render_to_string("seeker/sermon_move.html", context, self.request))
+            # These actions are only available for editors
+            if user_is_ingroup(self.request, app_editor):
+                # Add all needed information for moving a sermon and other sermon actions
+                lhtml.append(render_to_string("seeker/sermon_action.html", context, self.request))
 
             # Add comment modal stuff
             initial = dict(otype="sermo", objid=instance.id, profile=profile)

@@ -14,15 +14,17 @@
 
               <!-- View-mode: show the destination SSG according to the specs-->
               <div class="view-mode">
-                <!-- Only allow copying, if the link is 'equal' -->
-                {% if instance.linktype == "eqs" or instance.linktype == "uns" %}
-                  <span>
-                    <a class="btn btn-xs jumbo-1" 
-                        onclick="ru.passim.seeker.elevate_confirm(this)"
-                        title="Copy information from this Super Sermon Gold to this Sermon manifestation (Author, incipit, explicit)">
-                      Copy <span class="glyphicon glyphicon-share-alt"></span>
-                    </a>
-                  </span>
+                {% if is_app_editor %}
+                  <!-- Only allow copying, if the link is 'equal' -->
+                  {% if instance.linktype == "eqs" or instance.linktype == "uns" %}
+                    <span>
+                      <a class="btn btn-xs jumbo-1" 
+                          onclick="ru.passim.seeker.elevate_confirm(this)"
+                          title="Copy information from this Super Sermon Gold to this Sermon manifestation (Author, incipit, explicit)">
+                        Copy <span class="glyphicon glyphicon-share-alt"></span>
+                      </a>
+                    </span>
+                  {% endif %}
                 {% endif %}
                 <!-- The standard details of the SSG -->
                 <span>
