@@ -1306,194 +1306,197 @@ class BasicList(ListView):
         return fields, None, None
 
     def get_queryset(self, request = None):
+        """Calculate the queryset that should be used"""
 
-        if request == None: request = self.request
-        ## Get the parameters passed on with the GET or the POST request
-        #get = request.GET if request.method == "GET" else request.POST
-        #get = get.copy()
-        ## Possibly get 
-        #self.qd = get
-        get = self.qd
+        qs = None
+        oErr = ErrHandle()
+        try:
+            if request == None: request = self.request
+            get = self.qd
 
-        # Immediately take care of the rangeslider stuff
-        lst_remove = []
-        for k,v in self.qd.items():
-            if "-rangeslider" in k: lst_remove.append(k)
-        for item in lst_remove: self.qd.pop(item)
+            # Immediately take care of the rangeslider stuff
+            lst_remove = []
+            for k,v in self.qd.items():
+                if "-rangeslider" in k: lst_remove.append(k)
+            for item in lst_remove: self.qd.pop(item)
 
-        # username=self.request.user.username
-        username=request.user.username
-        team_group=app_editor
+            # username=self.request.user.username
+            username=request.user.username
+            team_group=app_editor
 
-        self.bFilter = False
-        self.bHasParameters = (len(get) > 0)
-        bHasListFilters = False
-        if self.bHasParameters:
-            # y = [x for x in get ]
-            bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
-            if not bHasListFilters:
-                self.basketview = ("usebasket" in get and get['usebasket'] == "True")
-
-        # Initial setting of qs
-        qs = self.model.objects.none()
-
-        # Get the queryset and the filters
-        if self.basketview:
-            self.basketview = True
-            # We should show the contents of the basket
-            # (1) Reset the filters
-            for item in self.filters: item['enabled'] = False
-            # (2) Indicate we have no filters
             self.bFilter = False
-            # (3) Set the queryset -- this is listview-specific
-            qs = self.get_basketqueryset()
+            self.bHasParameters = (len(get) > 0)
+            bHasListFilters = False
+            if self.bHasParameters:
+                # y = [x for x in get ]
+                bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
+                if not bHasListFilters:
+                    self.basketview = ("usebasket" in get and get['usebasket'] == "True")
 
-            # Do the ordering of the results
-            order = self.order_default
-            qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
-        elif self.bHasParameters or self.bUseFilter:
-            self.basketview = False
-            lstQ = []
-            # Indicate we have no filters
-            self.bFilter = False
+            # Initial setting of qs
+            qs = self.model.objects.none()
 
-            # Read the form with the information
-            prefix = self.prefix
-            if prefix == "any": prefix = ""
-            if self.use_team_group:
-                thisForm = self.listform(self.qd, prefix=prefix, username=username, team_group=team_group)
-            else:
-                thisForm = self.listform(self.qd, prefix=prefix)
+            # Get the queryset and the filters
+            if self.basketview:
+                self.basketview = True
+                # We should show the contents of the basket
+                # (1) Reset the filters
+                for item in self.filters: item['enabled'] = False
+                # (2) Indicate we have no filters
+                self.bFilter = False
+                # (3) Set the queryset -- this is listview-specific
+                qs = self.get_basketqueryset()
 
-            if thisForm.is_valid():
-                # Process the criteria for this form
-                oFields = thisForm.cleaned_data
+                # Do the ordering of the results
+                order = self.order_default
+                qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+            elif self.bHasParameters or self.bUseFilter:
+                self.basketview = False
+                lstQ = []
+                # Indicate we have no filters
+                self.bFilter = False
 
-                # Set the param_list variable
-                self.param_list = []
-                lookfor = "{}-".format(prefix)
-                for k,v in self.qd.items():
-                    if lookfor in k and not isempty(v):
-                        self.param_list.append("{}={}".format(k,v))
-
-                # Store the paramlist - but only if this is not a repetition
-                if "usersearch" in self.qd:
-                    # Make sure we have the user search number
-                    self.usersearch_id = self.qd.get("usersearch")
+                # Read the form with the information
+                prefix = self.prefix
+                if prefix == "any": prefix = ""
+                if self.use_team_group:
+                    thisForm = self.listform(self.qd, prefix=prefix, username=username, team_group=team_group)
                 else:
-                    oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
-                    if oSearch != None:
-                        self.usersearch_id = oSearch.id
+                    thisForm = self.listform(self.qd, prefix=prefix)
+
+                if thisForm.is_valid():
+                    # Process the criteria for this form
+                    oFields = thisForm.cleaned_data
+
+                    # Set the param_list variable
+                    self.param_list = []
+                    lookfor = "{}-".format(prefix)
+                    for k,v in self.qd.items():
+                        if lookfor in k and not isempty(v):
+                            self.param_list.append("{}={}".format(k,v))
+
+                    # Store the paramlist - but only if this is not a repetition
+                    if "usersearch" in self.qd:
+                        # Make sure we have the user search number
+                        self.usersearch_id = self.qd.get("usersearch")
+                    else:
+                        oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
+                        if oSearch != None:
+                            self.usersearch_id = oSearch.id
                 
-                # Allow user to adapt the list of search fields
-                oFields, lstExclude, qAlternative = self.adapt_search(oFields)
+                    # Allow user to adapt the list of search fields
+                    oFields, lstExclude, qAlternative = self.adapt_search(oFields)
 
-                self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
-                # qs = self.model.objects.filter(manuitems__itemsermons__goldsermons__goldsignatures__code__in = "AN Mt h 42")
+                    self.filters, lstQ, self.initial, lstExclude = make_search_list(self.filters, oFields, self.searches, self.qd, lstExclude)
+                    # qs = self.model.objects.filter(manuitems__itemsermons__goldsermons__goldsignatures__code__in = "AN Mt h 42")
 
-                # Combine exclude filters with logical or
-                exclude = None
-                if not lstExclude is None and len(lstExclude) > 0:
-                    exclude = lstExclude[0]
-                    for expr in lstExclude[1:]:
-                        exclude |= expr
+                    # Combine exclude filters with logical or
+                    exclude = None
+                    if not lstExclude is None and len(lstExclude) > 0:
+                        exclude = lstExclude[0]
+                        for expr in lstExclude[1:]:
+                            exclude |= expr
 
-                # Calculate the final qs
-                if len(lstQ) == 0 and not self.none_on_empty:
-                    if lstExclude:
-                        if qAlternative:
-                            # qs = self.model.objects.filter(qAlternative).exclude(*lstExclude).distinct()
-                            qs = self.model.objects.filter(qAlternative).exclude(exclude).distinct()
+                    # Calculate the final qs
+                    if len(lstQ) == 0 and not self.none_on_empty:
+                        if lstExclude:
+                            if qAlternative:
+                                # qs = self.model.objects.filter(qAlternative).exclude(*lstExclude).distinct()
+                                qs = self.model.objects.filter(qAlternative).exclude(exclude).distinct()
+                            else:
+                                # qs = self.model.objects.exclude(*lstExclude)
+                                qs = self.model.objects.exclude(exclude)
                         else:
-                            # qs = self.model.objects.exclude(*lstExclude)
-                            qs = self.model.objects.exclude(exclude)
+                            if qAlternative:
+                                qs = self.model.objects.filter(qAlternative).distinct()
+                            else:
+                                # Just show everything
+                                qs = self.model.objects.all()
                     else:
+                        # There is a filter, so build it up
+                        filter = lstQ[0]
+                        for item in lstQ[1:]:
+                            filter = filter & item
                         if qAlternative:
-                            qs = self.model.objects.filter(qAlternative).distinct()
+                            filter = ( ( qAlternative ) & filter )
+
+                        # Check if excluding is needed
+                        if lstExclude:
+                            # qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
+                            qs = self.model.objects.filter(filter).exclude(exclude).distinct()
                         else:
-                            # Just show everything
-                            qs = self.model.objects.all()
-                else:
-                    # There is a filter, so build it up
-                    filter = lstQ[0]
-                    for item in lstQ[1:]:
-                        filter = filter & item
-                    if qAlternative:
-                        filter = ( ( qAlternative ) & filter )
+                            qs = self.model.objects.filter(filter).distinct()
 
-                    # Check if excluding is needed
-                    if lstExclude:
-                        # qs = self.model.objects.filter(filter).exclude(*lstExclude).distinct()
-                        qs = self.model.objects.filter(filter).exclude(exclude).distinct()
-                    else:
-                        qs = self.model.objects.filter(filter).distinct()
+                    # Only set the [bFilter] value if there is an overt specified filter
+                    for filter in self.filters:
+                        if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
+                            self.bFilter = True
+                            break
+                        # OLD self.bFilter = True
+                elif not self.none_on_empty:
+                    # Provide an error message for the LOG...
+                    print('Form error WARNING: {}'.format(thisForm.errors))
 
-                # Only set the [bFilter] value if there is an overt specified filter
-                for filter in self.filters:
-                    if filter['enabled'] and ('head_id' not in filter or filter['head_id'] != 'filter_other'):
-                        self.bFilter = True
-                        break
-                    # OLD self.bFilter = True
-            elif not self.none_on_empty:
-                # Provide an error message for the LOG...
-                print('Form error WARNING: {}'.format(thisForm.errors))
+                    # Just show everything
+                    qs = self.model.objects.all().distinct()
 
-                # Just show everything
-                qs = self.model.objects.all().distinct()
+                # Do the ordering of the results
+                order = self.order_default
+                qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
 
-            # Do the ordering of the results
-            order = self.order_default
-            qs, self.order_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+                # Adapt order_heads 'autohide' if a column has a filter set
+                for oOrderHead in self.order_heads:
+                    if 'filter' in oOrderHead:
+                        sFilterId = oOrderHead['filter'] 
+                        # Initial: on
+                        oOrderHead['autohide'] = "on"
+                        # Look for the correct filter
+                        for oFilter in self.filters:                        
+                            if oFilter['id'] == sFilterId:
+                                # We found the filter - is it being used? 
+                                if oFilter['enabled']:                      
+                                    # It is used, so make sure to switch OFF the autohide
+                                    oOrderHead['autohide'] = "off"                                 
 
-            # Adapt order_heads 'autohide' if a column has a filter set
-            for oOrderHead in self.order_heads:
-                if 'filter' in oOrderHead:
-                    sFilterId = oOrderHead['filter'] 
-                    # Initial: on
-                    oOrderHead['autohide'] = "on"
-                    # Look for the correct filter
-                    for oFilter in self.filters:                        
-                        if oFilter['id'] == sFilterId:
-                            # We found the filter - is it being used? 
-                            if oFilter['enabled']:                      
-                                # It is used, so make sure to switch OFF the autohide
-                                oOrderHead['autohide'] = "off"                                 
-
-        else:
-            # No filter and no basket: show all
-            self.basketview = False
-            if self.basic_filter:
-                qs = self.model.objects.filter(self.basic_filter).distinct()
             else:
-                qs = self.model.objects.all().distinct()
-            order = self.order_default
-            qs, tmp_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
-        self.sort_order = colnum
+                # No filter and no basket: show all
+                self.basketview = False
+                if self.basic_filter:
+                    qs = self.model.objects.filter(self.basic_filter).distinct()
+                else:
+                    qs = self.model.objects.all().distinct()
+                order = self.order_default
+                qs, tmp_heads, colnum = make_ordering(qs, self.qd, order, self.order_cols, self.order_heads)
+            self.sort_order = colnum
 
-        # Process column wrapping...
-        for oHead in self.order_heads:
-            if 'colwrap' in oHead:
-                del oHead['colwrap']
-        colwrap = self.qd.get("w", None)
-        if colwrap != None:
-            self.col_wrap = colwrap.strip()
-            if colwrap != "" and colwrap[0] == "[":
-                # Process the column wrapping
-                lColWrap = json.loads(colwrap)
-                for idx, oHead in enumerate(self.order_heads):
-                    # if idx+1 in lColWrap:
-                    if idx in lColWrap:
-                        # Indicate that this column must be hidden
-                        oHead['colwrap'] = True
+            # Process column wrapping...
+            for oHead in self.order_heads:
+                if 'colwrap' in oHead:
+                    del oHead['colwrap']
+            colwrap = self.qd.get("w", None)
+            if colwrap != None:
+                self.col_wrap = colwrap.strip()
+                if colwrap != "" and colwrap[0] == "[":
+                    # Process the column wrapping
+                    lColWrap = json.loads(colwrap)
+                    for idx, oHead in enumerate(self.order_heads):
+                        # if idx+1 in lColWrap:
+                        if idx in lColWrap:
+                            # Indicate that this column must be hidden
+                            oHead['colwrap'] = True
 
-        # Determine the length
-        self.entrycount = 0 if qs is None else qs.count()   # len(qs)
+            # Determine the length
+            self.entrycount = 0 if qs is None else qs.count()   # len(qs)
         
-        # Allow doing something additionally with the queryset
-        self.view_queryset(qs)
+            # Allow doing something additionally with the queryset
+            self.view_queryset(qs)
 
-        # Return the resulting filtered and sorted queryset
-        self.qs = qs
+            # Return the resulting filtered and sorted queryset
+            self.qs = qs
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BasicList/get_queryset")
+
         return qs
 
     def get_selectitem_info(self, instance, context):

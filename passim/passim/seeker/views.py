@@ -5911,6 +5911,9 @@ class KeywordListView(BasicList):
         return fields, lstExclude, qAlternative
 
 
+# =============== USERKEYWORD ===============================
+        
+
 class UserKeywordEdit(BasicDetails):
     """The details of one 'user-keyword': one that has been linked by a user"""
 
@@ -6024,7 +6027,6 @@ class UserKeywordSubmit(UserKeywordDetails):
             msg = oErr.get_error_message()
             oErr.DoError("UserKeywordSubmit")
             return False
-
 
 
 class UserKeywordListView(BasicList):
@@ -6150,6 +6152,9 @@ class UserKeywordListView(BasicList):
             context['ukw_list'] = reverse("userkeyword_list")
         return context
 
+
+# =============== PROVENANCE ===============================
+        
 
 class ProvenanceEdit(BasicDetails):
     """The details of one 'provenance'"""
@@ -6481,6 +6486,9 @@ class ProvenanceCodEdit(BasicDetails):
 class ProvenanceCodDetails(ProvenanceCodEdit):
     """Like ProvenanceCod Edit, but then html output"""
     rtype = "html"
+
+
+# =============== BIBRANGE ===============================
         
 
 class BibRangeEdit(BasicDetails):
@@ -6553,7 +6561,7 @@ class BibRangeListView(BasicList):
     sg_name = "Bible reference"
     plural_name = "Bible references"
     new_button = False  # BibRanges are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 'sermon__msitem__manu__idno;sermon__locus']
+    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 'sermon__msitem__codico__manuscript__idno;sermon__locus']
     order_default = order_cols
     order_heads = [
         {'name': 'Book',            'order': 'o=1', 'type': 'str', 'custom': 'book', 'linkdetails': True},
@@ -6584,14 +6592,14 @@ class BibRangeListView(BasicList):
             {'filter': 'added',     'dbfield': 'added',     'keyS': 'added'}
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',        'fkfield': 'sermon__msitem__manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
-            {'filter': 'country',       'fkfield': 'sermon__msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'sermon__msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
-            {'filter': 'library',       'fkfield': 'sermon__msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
-            {'filter': 'origin',        'fkfield': 'sermon__msitem__manu__origin',            'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
-            {'filter': 'provenance',    'fkfield': 'sermon__msitem__manu__provenances',       'keyS': 'prov_ta',      'keyId': 'prov',        'keyFk': "name"},
-            {'filter': 'datestart',     'dbfield': 'sermon__msitem__manu__manuscript_dateranges__yearstart__gte',    'keyS': 'date_from'},
-            {'filter': 'datefinish',    'dbfield': 'sermon__msitem__manu__manuscript_dateranges__yearfinish__lte',   'keyS': 'date_until'},
+            {'filter': 'manuid',        'fkfield': 'sermon__msitem__manu',                    'keyS': 'manuidno',   'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'country',       'fkfield': 'sermon__msitem__manu__library__lcountry', 'keyS': 'country_ta', 'keyId': 'country',     'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'sermon__msitem__manu__library__lcity',    'keyS': 'city_ta',    'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'library',       'fkfield': 'sermon__msitem__manu__library',           'keyS': 'libname_ta', 'keyId': 'library',     'keyFk': "name"},
+            {'filter': 'origin',        'fkfield': 'sermon__msitem__manu__origin',            'keyS': 'origin_ta',  'keyId': 'origin',      'keyFk': "name"},
+            {'filter': 'provenance',    'fkfield': 'sermon__msitem__manu__provenances',       'keyS': 'prov_ta',    'keyId': 'prov',        'keyFk': "name"},
+            {'filter': 'datestart',     'dbfield': 'sermon__msitem__codico__codico_dateranges__yearstart__gte',     'keyS': 'date_from'},
+            {'filter': 'datefinish',    'dbfield': 'sermon__msitem__codico__codico_dateranges__yearfinish__lte',    'keyS': 'date_until'},
             ]},
         {'section': 'other', 'filterlist': [
             {'filter': 'bibref',     'dbfield': 'id',    'keyS': 'bibref'}
@@ -6641,6 +6649,9 @@ class BibRangeListView(BasicList):
 
         return fields, lstExclude, qAlternative
 
+
+# =============== FEAST ==================================
+        
 
 class FeastEdit(BasicDetails):
     """The details of one Christian Feast"""
