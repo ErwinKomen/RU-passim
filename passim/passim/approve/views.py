@@ -608,8 +608,8 @@ def approval_parse_changes(profile, cleaned_data, super):
 
                     # Special processing?
                     if to_field == "hcs":
-                        # This is special - the lst_id_change must include all private HCs from other people
-                        hc_others = Collection.objects.filter(settype="hc", scope="priv").exclude(owner=profile).values('id')
+                        # This is special - the lst_id_change must include all private HCs from other people for this particular collection
+                        hc_others = Collection.objects.filter(super_col__super=current, settype="hc", scope="priv").exclude(owner=profile).values('id')
                         for item in hc_others:
                             lst_id_change.append(item['id'])
                     

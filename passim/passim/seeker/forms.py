@@ -3207,7 +3207,7 @@ class SuperSermonGoldForm(PassimModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = EqualGold
-        fields = ['author', 'incipit', 'explicit', 'fulltext', 'code', 'number', 'stype']
+        fields = ['author', 'incipit', 'explicit', 'fulltext', 'code', 'number', 'stype', 'transcription' ]
         widgets={
             # 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
             'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
@@ -3215,9 +3215,12 @@ class SuperSermonGoldForm(PassimModelForm):
             'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
             'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
             'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+            'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
+
+            # ----------------- STEMMATOLOGY -----------------------------------
             'fulltext':    forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
                                              'class': 'searching', 'placeholder': 'Full text (markdown)...'}),
-            'stype':       forms.Select(attrs={'style': 'width: 100%;'})
+            'transcription':forms.FileInput(attrs={'style': 'width: 100%;', 'placeholder': 'TEI-P5 XML file'}),
             }
 
     def __init__(self, *args, **kwargs):
@@ -3231,6 +3234,7 @@ class SuperSermonGoldForm(PassimModelForm):
             # Some fields are not required
             self.fields['authorname'].required = False
             self.fields['stype'].required = False
+            self.fields['transcription'].required = False
             self.fields['soperator'].initial = 2
             self.fields['ssgoperator'].initial = 2
             self.fields['scount'].initial = -1

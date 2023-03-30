@@ -12812,9 +12812,13 @@ class EqualGoldEdit(BasicDetails):
                  'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
                 {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
                  'field_key': 'newfulltext'}, 
+                 ]
+            # Add transcription file, if possible
+            if user_is_ingroup(self.request, app_editor):
+                context['mainitems'].append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+            # some more items
+            mainitems_add = [
                 # Hier project    
-    
-
                 {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
@@ -12837,6 +12841,8 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
                  'title': 'All the literature references associated with the Gold Sermons in this equality set'}
                 ]
+            for oItem in mainitems_add: 
+                context['mainitems'].append(oItem)
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
@@ -13467,6 +13473,17 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
+
+            # Possibly read transcription if this is 'new'
+            if 'transcription' in form.changed_data:
+                # Try to read the updated transcription
+                oTranscription = read_transcription(instance.transcription)
+                # Are we okay?
+                sStatus = oTranscription.get("status", "")
+                sText = oTranscription.get("text", "")
+                if sStatus == "ok" and sText != "":
+                    instance.fulltext = sText
+                    instance.save()
 
 
             # ADDED Take over any data from [instance] to [frm.data]

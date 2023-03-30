@@ -1267,16 +1267,16 @@ def transcription_path(sType, instance, filename):
     sBack = ""
     sSubdir = "transcription"
     try:
+        # Adapt the filename for storage
+        sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+
         # The stuff that we return
-        sBack = os.path.join(sSubdir, filename)
+        sBack = os.path.join(sSubdir, sAdapted)
 
         # Add the subdir [wordlist]
         fullsubdir = os.path.abspath(os.path.join(MEDIA_ROOT, sSubdir))
         if not os.path.exists(fullsubdir):
             os.mkdir(fullsubdir)
-
-        # Adapt the filename for storage
-        sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
 
         # Add the actual filename to form an absolute path
         sAbsPath = os.path.abspath(os.path.join(fullsubdir, sAdapted))
@@ -7138,6 +7138,14 @@ class EqualGold(models.Model):
         if self.explicit: lHtml.append("{}".format(self.srchexplicit))
         # Return the results
         return "".join(lHtml)
+
+    def get_trans_file(self):
+        """If file has been filled in, get the file name"""
+
+        sBack = "-"
+        if not self.transcription is None:
+            sBack = self.transcription
+        return sBack
 
     def get_view(self, bShort = False):
         """Get a HTML valid view of myself"""
