@@ -2166,6 +2166,107 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
     # Return the object that has been created
     return oBack
 
+def read_transcription(data_file):
+    """Read a sermon transcription part of an XML in TEI-P5 format
+        
+    This approach makes use of *lxml*
+    """
+
+    def process_para(item, html):
+        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
+
+        oErr = ErrHandle()
+        bResult = True
+        local = []
+        try:
+            # Walk all elements
+            if not item is None:
+                for element in item.xpath("./child::*"):
+                    tag = element.tag
+                    attrib = element.attrib
+                    if tag == "w":
+                        # This is a word 
+                        local.append(element.text)
+                    elif tag == "quote":
+                        # This is a quote: get the @source attribute and the @n
+                        quote_n = attrib['n']
+                        quote_source = attrib['source']
+                        quote = []
+                        for quote_el in element.xpath("./child::*"):
+                            if quote_el.tag == "w":
+                                quote.append(quote_el.text)
+                        sQuoteBody = " ".join(quote)
+                        sQuote = '<span class="fullquote" title="{}. {}: {}" >{}</span>'.format(
+                            quote_n, quote_source, sQuoteBody, quote_n )
+                        local.append(sQuote)
+                sPara = " ".join(local)
+                html.append(sPara)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_para")
+            bResult = False
+        return bResult
+
+    oErr = ErrHandle()
+    oBack = {'status': 'ok', 'count': 0, 'msg': "", 'lst_obj': []}
+    try:
+        # Read and parse the data into a DOM element
+        xmldoc = ET.parse(data_file)  
+            
+        # Get the root
+        root = xmldoc.getroot()
+
+        # Clean up the namespace
+        for elem in root.getiterator():
+            if not (isinstance(elem, ET._Comment) or isinstance(elem, ET._ProcessingInstruction)):
+                elem.tag = ET.QName(elem).localname
+        ET.cleanup_namespaces(root)
+
+        # Get the titles
+        title_passim = None
+        titles = root.xpath("//title[@type='passim']")
+        if len(titles)>0:
+            title_passim = titles[0].text
+            # Get the list of sermon elements
+            html = []
+            sermon_items = root.xpath("//div[@type='sermon']/child::*")
+            for sermon_item in sermon_items:
+                tag = sermon_item.tag
+                attrib = sermon_item.attrib
+                if tag == "head":
+                    # This is one head at this moment
+                    headtype = attrib.get('type', '')
+                    level = "##" if headtype == "title" else "###"
+                    html.append("{} {}".format(level, sermon_item.text))
+                elif tag == "div" and attrib.get("type", "") == "paragraph":
+                    # Paragraph: add a newline
+                    html.append("")
+                    # This is a paragraph, that contains <head> and <p>
+                    for subitem in sermon_item.xpath("./child::*"):
+                        if subitem.tag == "head":
+                            # This is another level head
+                            html.append("#### {}".format(subitem.text))
+                        elif subitem.tag == "p":
+                            # This is a paragraph containing words and quotes
+                            process_para(subitem, html)
+
+            # Okay, we found all the elements, now store them.
+            text_sermon = "\n".join(html)
+
+            oBack['text'] = text_sermon
+            oBack['count'] = oBack['count'] + 1
+            oBack['tsize'] = len(text_sermon)
+            oBack['code'] = title_passim
+
+    except:
+        sError = oErr.get_error_message()
+        oBack['filename'] = filename
+        oBack['status'] = 'error'
+        oBack['msg'] = sError
+
+    # Return the object that has been created
+    return oBack
+
 def get_huwa_opera_literature(opera_id, handschrift_id):
     lBack = Edition.get_opera_literature(opera_id, handschrift_id)
     return lBack

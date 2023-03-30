@@ -33,28 +33,6 @@
 
             </div>
 
-            <div class="view-mode">
-              <!-- Button to add a transcription to this sermon -->
-              <a role="button" class="btn btn-xs jumbo-1"
-                 data-target="#add_sermon_transcription"
-                 data-toggle="collapse"
-                 title="Toggle the add transcription dialogue">Attach a transcription...</a>
-            </div>
-
-            <!-- Standard way to upload a transcription from an XML -->
-            <div id="add_sermon_transcription" class="collapse">
-              <form action="TODO: Add a proper URL here and a method to upload it" method="post" enctype="multipart/form-data">
-                <div class="hidden">
-                  {% csrf_token %}
-                  <input type="text" name="sermo-transcription" value="">
-                </div>
-                Select the <b>XML file</b> from which the transcription should be retrieved
-
-                <a class="btn btn-xs jumbo-3" 
-                   title="Upload the transcription into this sermon manifestation">Upload transcription</a>
-              </form>
-            </div>
-
           </td>
         </tr>
 

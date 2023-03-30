@@ -34,6 +34,7 @@ elif "/applejack" in BASE_DIR:
     WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/passim/database/"))
 
 MEDIA_DIR = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
+MEDIA_ROOT = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
 
 APP_PREFIX = ""
 USE_REDIS = False

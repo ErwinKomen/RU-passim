@@ -88,7 +88,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads, get_huwa_opera_literature
+from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -4517,11 +4517,18 @@ class SermonEdit(BasicDetails):
                  'field_key': 'postscriptum'}, 
                 {'type': 'safe',  'label': "Transcription:",        'value': self.get_transcription(instance),
                  'field_key': 'fulltext'}, 
-                # Issue #23: delete bibliographic notes
+                 ]
+            # Add transcription file, if possible
+            if user_is_ingroup(self.request, app_editor):
+                mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+            # some more items
+            mainitems_add = [
+                                # Issue #23: delete bibliographic notes
                 {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
                  'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
                 {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}
-                 ]
+                ]
+            for oItem in mainitems_add: mainitems_main.append(oItem)
             exclude_field_keys = ['locus']
             for item in mainitems_main: 
                 # Make sure to exclude field key 'locus'
@@ -5027,6 +5034,17 @@ class SermonEdit(BasicDetails):
                 # (2) 'sermonsignatures'
                 siglist_m = form.cleaned_data['siglist_m']
                 adapt_m2o(SermonSignature, instance, "sermon", siglist_m)
+
+                # Possibly read transcription if this is 'new'
+                if 'transcription' in form.changed_data:
+                    # Try to read the updated transcription
+                    oTranscription = read_transcription(instance.transcription)
+                    # Are we okay?
+                    sStatus = oTranscription.get("status", "")
+                    sText = oTranscription.get("text", "")
+                    if sStatus == "ok" and sText != "":
+                        instance.fulltext = sText
+                        instance.save()
 
             ## Make sure the 'verses' field is adapted, if needed
             #bResult, msg = instance.adapt_verses()

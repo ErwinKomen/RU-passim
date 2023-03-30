@@ -6,8 +6,10 @@ from django.apps import apps
 from django.contrib.auth.models import User, Group
 # from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.files.base import File
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
+from django.db.models.fields.files import FieldFile
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.forms.models import model_to_dict
@@ -134,36 +136,44 @@ def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
     return p_list
 
 def action_model_changes(form, instance):
-    field_values = model_to_dict(instance)
-    changed_fields = form.changed_data
     changes = {}
     exclude = []
-    if hasattr(form, 'exclude'):
-        exclude = form.exclude
-    for item in changed_fields: 
-        if item in field_values:
-            changes[item] = field_values[item]
-        elif item not in exclude:
-            # It is a form field
-            try:
-                representation = form.cleaned_data[item]
-                if isinstance(representation, QuerySet):
-                    # This is a list
-                    rep_list = []
-                    for rep in representation:
-                        rep_str = str(rep)
-                        rep_list.append(rep_str)
-                    representation = json.dumps(rep_list)
-                elif isinstance(representation, str) or isinstance(representation, int):
-                    representation = representation
-                elif isinstance(representation, object):
-                    try:
-                        representation = representation.__str__()
-                    except:
-                        representation = str(representation)
-                changes[item] = representation
-            except:
-                changes[item] = "(unavailable)"
+    oErr = ErrHandle()
+    try:
+        field_values = model_to_dict(instance)
+        changed_fields = form.changed_data
+        if hasattr(form, 'exclude'):
+            exclude = form.exclude
+        for item in changed_fields: 
+            if item in field_values:
+                if isinstance(field_values[item], File):
+                    changes[item] =  str(field_values[item])
+                else:
+                    changes[item] = field_values[item]
+            elif item not in exclude:
+                # It is a form field
+                try:
+                    representation = form.cleaned_data[item]
+                    if isinstance(representation, QuerySet):
+                        # This is a list
+                        rep_list = []
+                        for rep in representation:
+                            rep_str = str(rep)
+                            rep_list.append(rep_str)
+                        representation = json.dumps(rep_list)
+                    elif isinstance(representation, str) or isinstance(representation, int):
+                        representation = representation
+                    elif isinstance(representation, object):
+                        try:
+                            representation = representation.__str__()
+                        except:
+                            representation = str(representation)
+                    changes[item] = representation
+                except:
+                    changes[item] = "(unavailable)"
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("action_model_changes")
     return changes
 
 def has_string_value(field, obj):

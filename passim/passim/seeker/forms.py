@@ -1928,7 +1928,7 @@ class SermonForm(PassimModelForm):
         model = SermonDescr
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',  #  'feast', 
                  'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum',
-                 'fulltext']       # , 'bibleref'
+                 'fulltext', 'transcription'    ]       # , 'bibleref'
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -1942,8 +1942,6 @@ class SermonForm(PassimModelForm):
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
-                 'fulltext':    forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
-                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
@@ -1952,6 +1950,11 @@ class SermonForm(PassimModelForm):
                  # 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+
+                 # ----------- Stemmatology ================================================
+                 'fulltext':    forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
+                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}),
+                 'transcription':forms.FileInput(attrs={'style': 'width: 100%;', 'placeholder': 'TEI-P5 XML file'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -1970,6 +1973,7 @@ class SermonForm(PassimModelForm):
             self.fields['stype'].required = False
             self.fields['mtype'].required = False
             self.fields['authortype'].required = False
+            self.fields['transcription'].required = False
             
             # NEW 493
             #self.fields['atype'].required = False

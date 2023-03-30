@@ -36,7 +36,7 @@ from xml.dom import minidom
 
 # From this own application
 from passim.utils import *
-from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, MEDIA_ROOT
 from passim.seeker.excel import excel_to_list
 from passim.bible.models import Reference, Book, BKCHVS_LENGTH
 
@@ -1255,6 +1255,40 @@ def send_email(subject, profile, contents, add_team=False):
         msg = oErr.get_error_message()
         oErr.DoError("send_mail")
     return True
+
+def transcription_path(instance, filename):
+    """Upload TEI-P5 XML file to the right place,and remove old file if existing
+    
+    This function is used within the model SermonDescr
+    NOTE: this must be the relative path w.r.t. MEDIA_ROOT
+    """
+
+    oErr = ErrHandle()
+    sBack = ""
+    sSubdir = "transcription"
+    try:
+        # The stuff that we return
+        sBack = os.path.join(sSubdir, filename)
+
+        # Add the subdir [wordlist]
+        fullsubdir = os.path.abspath(os.path.join(MEDIA_ROOT, sSubdir))
+        if not os.path.exists(fullsubdir):
+            os.mkdir(fullsubdir)
+
+        # Add the actual filename to form an absolute path
+        sAbsPath = os.path.abspath(os.path.join(fullsubdir, filename))
+        sAbsPathNoSpace = os.path.abspath(os.path.join(fullsubdir, filename.replace(" ", "_")))
+        if os.path.exists(sAbsPath):
+            # Remove it
+            os.remove(sAbsPath)
+        elif os.path.exists(sAbsPathNoSpace):
+            # Remove it
+            os.remove(sAbsPathNoSpace)
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("transcription_path")
+    return sBack
 
 
 # =================== HELPER models ===================================
@@ -8820,6 +8854,7 @@ class SermonDescr(models.Model):
     # [0-1] Stemmatology full plain text (all in Latin)
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
+    transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_path)
 
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
@@ -10160,6 +10195,14 @@ class SermonDescr(models.Model):
             if template:
                 url = reverse('template_details', kwargs={'pk': template.id})
                 sBack = "<div class='template_notice'>THIS IS A <span class='badge'><a href='{}'>TEMPLATE</a></span></div>".format(url)
+        return sBack
+
+    def get_trans_file(self):
+        """If file has been filled in, get the file name"""
+
+        sBack = "-"
+        if not self.transcription is None:
+            sBack = self.transcription
         return sBack
 
     def goldauthors(self):
