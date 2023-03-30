@@ -1256,7 +1256,7 @@ def send_email(subject, profile, contents, add_team=False):
         oErr.DoError("send_mail")
     return True
 
-def transcription_path(instance, filename):
+def transcription_path(sType, instance, filename):
     """Upload TEI-P5 XML file to the right place,and remove old file if existing
     
     This function is used within the model SermonDescr
@@ -1275,20 +1275,32 @@ def transcription_path(instance, filename):
         if not os.path.exists(fullsubdir):
             os.mkdir(fullsubdir)
 
+        # Adapt the filename for storage
+        sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+
         # Add the actual filename to form an absolute path
-        sAbsPath = os.path.abspath(os.path.join(fullsubdir, filename))
-        sAbsPathNoSpace = os.path.abspath(os.path.join(fullsubdir, filename.replace(" ", "_")))
+        sAbsPath = os.path.abspath(os.path.join(fullsubdir, sAdapted))
+
+        ## Add the actual filename to form an absolute path
+        #sAbsPath = os.path.abspath(os.path.join(fullsubdir, filename))
+        #sAbsPathNoSpace = os.path.abspath(os.path.join(fullsubdir, filename.replace(" ", "_")))
         if os.path.exists(sAbsPath):
             # Remove it
             os.remove(sAbsPath)
-        elif os.path.exists(sAbsPathNoSpace):
-            # Remove it
-            os.remove(sAbsPathNoSpace)
+        #elif os.path.exists(sAbsPathNoSpace):
+        #    # Remove it
+        #    os.remove(sAbsPathNoSpace)
 
     except:
         msg = oErr.get_error_message()
         oErr.DoError("transcription_path")
     return sBack
+
+def transcription_sermo_path(instance, filename):
+    return transcription_path("srm", instance, filename)
+
+def transcription_eqgold_path(instance, filename):
+    return transcription_path("eqg", instance, filename)
 
 
 # =================== HELPER models ===================================
@@ -6563,6 +6575,7 @@ class EqualGold(models.Model):
     # [0-1] Stemmatology full plain text (all in Latin)
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
+    transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_eqgold_path)
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
@@ -8854,7 +8867,7 @@ class SermonDescr(models.Model):
     # [0-1] Stemmatology full plain text (all in Latin)
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
-    transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_path)
+    transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_sermo_path)
 
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
