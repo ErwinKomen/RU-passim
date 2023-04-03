@@ -3171,6 +3171,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    lstprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     addprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     delprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -3250,11 +3252,13 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
 
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # issue #576: this one is for the details view
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            # issue #576: this one is for the listview
+            self.fields['lstprojlist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['lstprojlist'].widget.queryset = self.fields['lstprojlist'].queryset
 
             current_proj_ids = [x.id for x in self.fields['projlist'].queryset]
             self.fields['addprojlist'].queryset = Project2.objects.exclude(id__in=current_proj_ids).order_by('name').distinct()
