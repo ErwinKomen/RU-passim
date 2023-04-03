@@ -4802,7 +4802,8 @@ class BibRangeForm(BasicModelForm):
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 69%;', 
+                                              'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
 
     # =========== MANUSCRIPT-specific ===========================
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
@@ -4833,9 +4834,9 @@ class BibRangeForm(BasicModelForm):
         model = BibRange
         fields = ['book', 'chvslist', 'intro', 'added']
         widgets={'book':        BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'added':       forms.TextInput(attrs={'style': 'width: 100%;'})
+                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'added':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
