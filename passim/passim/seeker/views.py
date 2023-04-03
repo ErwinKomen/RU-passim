@@ -6664,9 +6664,10 @@ class BibRangeListView(BasicList):
             lstQ = []
             lstQ.append(Q(bibrangeverses__bkchvs__gte=start))
             lstQ.append(Q(bibrangeverses__bkchvs__lte=einde))
-            sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
+            # sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibrefbk'] = Q(id__in=sermonlist)
+            # fields['bibrefbk'] = Q(id__in=sermonlist)
+            fields['bibrefbk'] = Q(bibrangeverses__bkchvs__gte=start) & Q(bibrangeverses__bkchvs__lte=einde)
 
         return fields, lstExclude, qAlternative
 
@@ -12816,6 +12817,10 @@ class EqualGoldEdit(BasicDetails):
             # Add transcription file, if possible
             if user_is_ingroup(self.request, app_editor):
                 context['mainitems'].append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+
+                # Make sure the spectypes are checked
+                instance.check_links()
+
             # some more items
             mainitems_add = [
                 # Hier project    
@@ -13515,6 +13520,12 @@ class EqualGoldEdit(BasicDetails):
 
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
+
+    #def custom_init(self, instance):
+    #    # Make sure the spectypes are checked
+    #    if not instance is None:
+    #        instance.check_links()
+    #    return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""

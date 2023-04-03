@@ -6712,6 +6712,26 @@ class EqualGold(models.Model):
 
         return "\n".join(html)
 
+    def check_links(self):
+        """Check the EqualGoldLink items connected to this AF"""
+
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in self.equalgold_src.all():
+                    if obj.spectype == "0":
+                        obj.spectype = None
+                        obj.save()
+            with transaction.atomic():
+                for obj in self.equalgold_dst.all():
+                    if obj.spectype == "0":
+                        obj.spectype = None
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/check_links")
+        return None
+
     def create_empty():
         """Create an empty new one"""
 
