@@ -183,6 +183,7 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
+    url(r'^sermon/transdel(?:/(?P<pk>\d+))?/$', SermonTransDel.as_view(), name='sermon_transdel'),
     url(r'^sermon/move(?:/(?P<pk>\d+))?/$', SermonMove.as_view(), name='sermon_move'),
     url(r'^sermon/ukw(?:/(?P<pk>\d+))?/$', SermonUserKeyword.as_view(), name='sermon_ukw'),
         
@@ -312,8 +313,10 @@ urlpatterns = [
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
     url(r'^dct/download(?:/(?P<pk>\d+))?/$', SetDefDownload.as_view(), name='setdef_download'),
+
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
+
     url(r'^saveditem/apply(?:/(?P<pk>\d+))?/$', SavedItemApply.as_view(), name='saveditem_apply'),
     url(r'^selitem/apply(?:/(?P<pk>\d+))?/$', SelectItemApply.as_view(), name='selitem_apply'),
 

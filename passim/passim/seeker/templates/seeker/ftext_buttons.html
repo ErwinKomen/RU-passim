@@ -1,0 +1,35 @@
+﻿
+
+<div>
+  <span>
+    <a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a>
+  </span>
+  {% if delete_permission %}
+    <span>&nbsp;&nbsp;</span>
+    <span>
+      <a class='btn btn-xs jumbo-2' role='button' data-toggle='collapse' data-target='#trans_delete'>Delete</a>
+    </span>
+  {% endif %}
+  
+</div>
+<!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
+{% if delete_permission  %}
+  <div class="delete-confirm hidden selected">
+    <span>Are you sure you would like to delete this transcription?</span>
+    {{delete_message}}
+    <span>
+      <!-- The button to cancel deletion -->
+      <a title="Cancel deletion" class="btn btn-xs jumbo-1"
+          onclick="ru.basic.delete_cancel(this);">Cancel</a>
+      <!-- The actual delete button-->
+      <a mode="delete" title="Delete the transcription" class="btn btn-xs jumbo-3" onclick="{{transdelurl}}" >
+        Delete
+      </a>
+    </span>
+    <span class="waiting glyphicon glyphicon-refresh glyphicon-refresh-animate hidden"></span>
+  </div>
+{% endif %}
+
+<!-- Place for the fulltext to appear -->
+<div class='collapse' id='trans_fulltext'>{{fulltext}}</div>
+

@@ -130,6 +130,7 @@ app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_developer = "{}_developer".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
+stemma_editor = "stemma_editor"
 
 def get_usercomments(type, instance, profile):
     """Get a HTML list of comments made by this user and possible users in the same group"""
@@ -4699,12 +4700,33 @@ class SermonEdit(BasicDetails):
             # Get the text
             if not instance.fulltext is None and instance.fulltext != "":
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Get URL of deleting transcription
+                transdelurl = reverse('sermon_transdel', kwargs={'pk': instance.id})
                 # Combine with button click + default hidden
-                html = []
-                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
-                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-                # Combine
-                sBack = "\n".join(html)
+                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                               delete_message="",
+                               transdelurl=transdelurl,
+                               fulltext=sText)
+                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
+                #html = []
+                #html.append("<div>")
+                ## Everyone should be able to see the transcription
+                #html.append("<a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a>")
+                ## Deleting a transcription is only for particular stemma editors
+                #if user_is_ingroup(self.request, stemma_editor):
+                #    # Provide a button to remove the transcription, if needed
+                #    html.append("&nbsp;&nbsp;<a class='btn btn-xs jumbo-2' role='button' data-toggle='collapse' data-target='#trans_delete'>Delete</a>")
+                ## Finish off the div with the buttons
+                #html.append("</div>")
+                ## Place for delete confirmation
+                #html.append("<div class='delete-confirm hidden selected'>")
+                #html.append("<span>Are you sure you would like to delete this item?</span>")
+                #html.append("</div>")
+
+                ## Place for the FullText to appear
+                #html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+                ## Combine
+                #sBack = "\n".join(html)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
@@ -5161,6 +5183,21 @@ class SermonDetails(SermonEdit):
 
     def after_save(self, form, instance):
         return True, ""
+
+
+class SermonTransDel(SermonDetails):
+    """Remove the fulltrans from this sermon"""
+
+    def custom_init(self, instance):
+        # Check ... something
+        if not instance is None:
+            # Remove the transcription
+            instance.srchfulltext = None
+            instance.fulltext = None
+            instance.transcription = None
+            instance.save()
+            # Now it's all been deleted
+        return None
 
 
 class SermonUserKeyword(SermonDetails):
