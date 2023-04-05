@@ -126,6 +126,7 @@ urlpatterns = [
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
+    url(r'^ssg/transdel(?:/(?P<pk>\d+))?/$', EqualGoldTransDel.as_view(), name='equalgold_transdel'),
     url(r'^ssg/ukw(?:/(?P<pk>\d+))?/$', EqualGoldUserKeyword.as_view(), name='equalgold_ukw'),
     url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),

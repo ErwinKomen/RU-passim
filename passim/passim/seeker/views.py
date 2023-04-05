@@ -12986,16 +12986,38 @@ class EqualGoldEdit(BasicDetails):
             # Get the text
             if not instance.fulltext is None and instance.fulltext != "":
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Get URL of deleting transcription
+                transdelurl = reverse('equalgold_transdel', kwargs={'pk': instance.id})
                 # Combine with button click + default hidden
-                html = []
-                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
-                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-                # Combine
-                sBack = "\n".join(html)
+                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                               delete_message="",
+                               transdelurl=transdelurl,
+                               fulltext=sText)
+                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("EqualGold/get_transcription")
+            oErr.DoError("EqualGoldEdit/get_transcription")
         return sBack
+
+    #def get_transcription(self, instance):
+    #    """Make a good visualization of a transcription, which includes a show/hide button"""
+
+    #    sBack = ""
+    #    oErr = ErrHandle()
+    #    try:
+    #        # Get the text
+    #        if not instance.fulltext is None and instance.fulltext != "":
+    #            sText = instance.get_fulltext_markdown("actual", lowercase=False)
+    #            # Combine with button click + default hidden
+    #            html = []
+    #            html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
+    #            html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
+    #            # Combine
+    #            sBack = "\n".join(html)
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        oErr.DoError("EqualGold/get_transcription")
+    #    return sBack
 
     def get_goldset_html(goldlist):
         context = {}
@@ -13796,6 +13818,30 @@ class EqualGoldDetails(EqualGoldEdit):
             oErr.DoError("EqualGoldDetails/before_save")
             bBack = False
         return bBack, msg
+
+
+class EqualGoldTransDel(EqualGoldDetails):
+    """Remove the fulltrans from this SSG"""
+
+    initRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Check ... something
+            if not instance is None:
+                # Make sure to set the correct redirect page
+                self.redirectpage = reverse("equalgold_details", kwargs={'pk': instance.id})
+                # Remove the transcription
+                instance.srchfulltext = None
+                instance.fulltext = None
+                instance.transcription = None
+                instance.save()
+                # Now it's all been deleted
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldTransDel/custom_init")
+        return None
 
 
 class EqualGoldUserKeyword(EqualGoldDetails):
