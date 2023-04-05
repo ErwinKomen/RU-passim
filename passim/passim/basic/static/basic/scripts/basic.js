@@ -1129,6 +1129,24 @@ var ru = (function ($, ru) {
 
       /**
        * delete_confirm
+       *   In order to get delete confirmation (or not), open the .delete-confirm one under .view-mode above me
+       *
+       */
+      delete_confirm_view: function (el) {
+        var elView = null;
+
+        try {
+          elView = $(el).closest(".view-mode");
+          if (elView !== undefined && elView !== null) {
+            $(elView).find(".delete-confirm").removeClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("delete_confirm_view", ex);
+        }
+      },
+
+      /**
+       * delete_confirm
        *   Open the next <tr> to get delete confirmation (or not)
        *
        */
@@ -2463,7 +2481,7 @@ var ru = (function ($, ru) {
       },
 
       /**
-        * result_download
+        * post_download
         *   Trigger creating and downloading a result CSV / XLSX / JSON
         *
         */
@@ -2735,6 +2753,33 @@ var ru = (function ($, ru) {
           }
         } catch (ex) {
           private_methods.errMsg("post_download", ex);
+        }
+      },
+
+      /**
+        * post_submit
+        *   Submit this page via [targeturl] on the nearest <form> through POST
+        *
+        */
+      post_submit: function (elStart) {
+        var frm = null,
+            targeturl = null,
+            data = null;
+
+        try {
+          // Get targeturl
+          targeturl = $(elStart).attr("targeturl");
+          if (targeturl !== undefined && targeturl !== null) {
+            // Get the form
+            frm = $(elStart).closest("form");
+            // Set the method to POST and the action to targeturl
+            $(frm).attr("method", "POST");
+            $(frm).attr("action", targeturl);
+            $(frm).submit();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("post_submit", ex);
         }
       },
 

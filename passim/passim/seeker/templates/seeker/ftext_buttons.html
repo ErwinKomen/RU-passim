@@ -1,19 +1,21 @@
-﻿
+{% load i18n %}
 
 <div>
   <span>
     <a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a>
   </span>
-  {% if delete_permission %}
+  {% if delete_permission and fulltext|length > 0 %}
     <span>&nbsp;&nbsp;</span>
     <span>
-      <a class='btn btn-xs jumbo-2' role='button' data-toggle='collapse' data-target='#trans_delete'>Delete</a>
+      <a class='btn btn-xs jumbo-2' role='button' 
+         title="You have permission to delete this {{fulltext|length}}, since you are in the [stemma_editor] group" 
+         onclick="ru.basic.delete_confirm_view(this);" >Delete</a>
     </span>
   {% endif %}
   
 </div>
 <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->
-{% if delete_permission  %}
+{% if delete_permission and fulltext|length > 0  %}
   <div class="delete-confirm hidden selected">
     <span>Are you sure you would like to delete this transcription?</span>
     {{delete_message}}
@@ -22,7 +24,8 @@
       <a title="Cancel deletion" class="btn btn-xs jumbo-1"
           onclick="ru.basic.delete_cancel(this);">Cancel</a>
       <!-- The actual delete button-->
-      <a mode="delete" title="Delete the transcription" class="btn btn-xs jumbo-3" onclick="{{transdelurl}}" >
+      <a mode="delete" title="Delete the transcription" class="btn btn-xs jumbo-3" targeturl="{{transdelurl}}"
+         onclick="ru.basic.post_submit(this);" >
         Delete
       </a>
     </span>
@@ -31,5 +34,5 @@
 {% endif %}
 
 <!-- Place for the fulltext to appear -->
-<div class='collapse' id='trans_fulltext'>{{fulltext}}</div>
+<div class='collapse' id='trans_fulltext'>{{fulltext|safe}}</div>
 

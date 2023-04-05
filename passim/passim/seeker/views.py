@@ -4708,25 +4708,6 @@ class SermonEdit(BasicDetails):
                                transdelurl=transdelurl,
                                fulltext=sText)
                 sBack = render_to_string("seeker/ftext_buttons.html", context, None)
-                #html = []
-                #html.append("<div>")
-                ## Everyone should be able to see the transcription
-                #html.append("<a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a>")
-                ## Deleting a transcription is only for particular stemma editors
-                #if user_is_ingroup(self.request, stemma_editor):
-                #    # Provide a button to remove the transcription, if needed
-                #    html.append("&nbsp;&nbsp;<a class='btn btn-xs jumbo-2' role='button' data-toggle='collapse' data-target='#trans_delete'>Delete</a>")
-                ## Finish off the div with the buttons
-                #html.append("</div>")
-                ## Place for delete confirmation
-                #html.append("<div class='delete-confirm hidden selected'>")
-                #html.append("<span>Are you sure you would like to delete this item?</span>")
-                #html.append("</div>")
-
-                ## Place for the FullText to appear
-                #html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-                ## Combine
-                #sBack = "\n".join(html)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
@@ -5188,15 +5169,24 @@ class SermonDetails(SermonEdit):
 class SermonTransDel(SermonDetails):
     """Remove the fulltrans from this sermon"""
 
+    initRedirect = True
+
     def custom_init(self, instance):
-        # Check ... something
-        if not instance is None:
-            # Remove the transcription
-            instance.srchfulltext = None
-            instance.fulltext = None
-            instance.transcription = None
-            instance.save()
-            # Now it's all been deleted
+        oErr = ErrHandle()
+        try:
+            # Check ... something
+            if not instance is None:
+                # Make sure to set the correct redirect page
+                self.redirectpage = reverse("sermon_details", kwargs={'pk': instance.id})
+                # Remove the transcription
+                instance.srchfulltext = None
+                instance.fulltext = None
+                instance.transcription = None
+                instance.save()
+                # Now it's all been deleted
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonTransDel/custom_init")
         return None
 
 
