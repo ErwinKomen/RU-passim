@@ -131,6 +131,7 @@ app_developer = "{}_developer".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
 stemma_editor = "stemma_editor"
+stemma_user = "stemma_user"
 
 def get_usercomments(type, instance, profile):
     """Get a HTML list of comments made by this user and possible users in the same group"""
