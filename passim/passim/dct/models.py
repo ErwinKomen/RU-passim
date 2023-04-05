@@ -963,6 +963,8 @@ class SavedItem(models.Model):
 class SavedSearch(models.Model):
     """A saved search links to the basic UserSearch"""
 
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [1] a saved item belongs to a particular user's profile
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savedsearches")
     # [1] The saved items may be ordered (and they can be re-ordered by the user)
@@ -973,6 +975,16 @@ class SavedSearch(models.Model):
 
     def __str__(self):
         sBack = "{}: {}".format(self.profile.user.username, self.usersearch.id)
+        return sBack
+
+    def get_view_name(self):
+        """Get the name of the view, without slashes"""
+
+        sBack = "-"
+        if not self.usersearch is None:
+            sBack = self.usersearch.view
+            sBack = sBack.replace("/list", "").replace("/search", "")
+            sBack = sBack.replace("/", "")
         return sBack
 
 

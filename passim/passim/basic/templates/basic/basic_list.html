@@ -305,12 +305,30 @@
 
                 <!-- Row with buttons-->
                 <div class="row">
-                  <div class="col-md-2 col-md-offset-8 text-right">
+                  <div class="col-md-offset-2 col-md-8 text-right">
                     {% if usersearch != "" %}
                       <span class="clipboard-confirm" style="color:red;"></span>
                       <a role="button" class="btn btn-sm jumbo-1 clipboard-copy" 
                          title="Copy the search URL to the clipboard">Search URL</a>
                       <textarea id="search_copy" class="hiddenaway">{{usersearch}}</textarea>
+                      <!-- If available: room to save a search -->
+                      <span>
+                        <a role="button" class="btn btn-sm jumbo-3 search-button" title="Save this search..." 
+                           data-toggle='collapse' data-target='#savedsearchdetails'>Save Search...</a>
+                      </span>
+                      <!-- Place where user enters search name and presses Save -->
+                      <span class="collapse" id="savedsearchdetails">
+                        <span class="hidden"><input type="text" name="svd-usersearch_id" value="{{usersearch_id}}" /></span>
+                        <span><input type="text" name="svd-searchname" style="width: 50%" placeholder="Enter a name for this search" /></span>
+                        <span>
+                          <a role="button" class="btn btn-sm jumbo-3 search-button" title="Save this search..." 
+                             targeturl="{% url 'savedsearch_apply' user.id %}"
+                             onclick="ru.dct.do_savedsearch(this);">Save</a>
+                        </span>
+                      </span>
+                      <span class="hidden" id="savedsearchresult">
+                        <!-- Result of the saved search -->
+                      </span>
                     {% endif %}
                   </div>
                   <div class="col-md-2 text-right">

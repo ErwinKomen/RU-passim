@@ -318,6 +318,7 @@ urlpatterns = [
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
 
+    url(r'^savedsearch/apply(?:/(?P<pk>\d+))?/$', SavedSearchApply.as_view(), name='savedsearch_apply'),
     url(r'^saveditem/apply(?:/(?P<pk>\d+))?/$', SavedItemApply.as_view(), name='saveditem_apply'),
     url(r'^selitem/apply(?:/(?P<pk>\d+))?/$', SelectItemApply.as_view(), name='selitem_apply'),
 

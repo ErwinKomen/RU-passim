@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
 from io import StringIO
+import copy
 import json
 import csv
 
@@ -357,7 +358,7 @@ class MyPassimEdit(BasicDetails):
         def check_order(qs):
             with transaction.atomic():
                 for idx, obj in enumerate(qs):
-                    if obj.order < 0:
+                    if obj.order <= 0:
                         obj.order = idx + 1
                         obj.save()
 
@@ -391,6 +392,7 @@ class MyPassimEdit(BasicDetails):
             if resizable: sitemset['gridclass'] = "resizable dragdrop"
             sitemset['savebuttons'] = bMayEdit
             sitemset['saveasbutton'] = False
+            rel_list =[]
 
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
             # Also store the count
@@ -443,11 +445,62 @@ class MyPassimEdit(BasicDetails):
                 ]
             if bMayEdit:
                 sitemset['columns'].append("")
-            related_objects.append(sitemset)
+            related_objects.append(copy.copy(sitemset))
 
             # [2] ===============================================================
-            # Deal with Saved Searches!!!!
-            # TODO: implement
+            # Get all 'SavedSearch' objects that belong to the current user (=profile)
+            svsearchset = dict(title="Saved searches", prefix="svsearch")  
+            if resizable: svsearchset['gridclass'] = "resizable dragdrop"
+            svsearchset['savebuttons'] = bMayEdit
+            svsearchset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_svsearchlist = instance.profile_savedsearches.all().order_by('order', 'name')
+            # Also store the count
+            svsearchset['count'] = qs_svsearchlist.count()
+            svsearchset['instance'] = instance
+            svsearchset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_svsearchlist)
+
+            # Walk these svsearchlist
+            for obj in qs_svsearchlist:
+                # The [obj] is of type `SavedSearch`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the saved searches are:
+                # 1 - order
+                # 2 - name for the saved search
+                # 3 - listview name (e.g. Manifestation, Manuscript, Authority File and so on)
+                #     or an icon for this listview, or a 3-letter abbr for this listview
+
+                # SavedSearch: Order within the set of SavedSearches
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SavedSearch: Name
+                add_one_item(rel_item, obj.name, False, main=True)
+
+                # SavedSearch: Listview name
+                add_one_item(rel_item, obj.get_view_name(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("savedsearch", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            svsearchset['rel_list'] = rel_list
+            svsearchset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of saved search">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Kind of listview">View</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                svsearchset['columns'].append("")
+            related_objects.append(copy.copy(svsearchset))
 
         except:
             msg = oErr.get_error_message()
@@ -524,6 +577,12 @@ class MyPassimEdit(BasicDetails):
                     sBack = instance.get_size_markdown()
 
             elif type == "saveditem":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "savedsearch":
                 # A saved item should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
@@ -611,6 +670,61 @@ class MyPassimDetails(MyPassimEdit):
             # Check for hlist saving
             self.check_hlist(profile)
         return None
+
+
+# ================= Views for SavedSearch ==========================
+
+class SavedSearchApply(BasicPart):
+    """Add a named saved search item"""
+
+    MainModel = User
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+
+            # We already know who we are
+            profile = self.obj.user_profiles.first()
+            # Retrieve necessary parameters
+            usersearch_id = self.qd.get("svd-usersearch_id")
+            searchname = ""
+            for k,v in self.qd.items():
+                if "-searchname" in k:
+                    if isinstance(v,str) and "<script" in v:
+                        searchname = "--script--"
+                    else:
+                        searchname = v
+                    break
+            if searchname == "--script--":
+                # The name contains a script
+                data['action'] = "script"
+            elif searchname == "":
+                # User did not supply a name
+                data['action'] = "empty"
+            else:
+                # Create a saved search
+                obj = SavedSearch.objects.filter(name=searchname, profile=profile).first()
+                if obj is None:
+                    obj = SavedSearch.objects.create(name=searchname, profile=profile, usersearch_id=usersearch_id)
+                else:
+                    # Check and set the usersearch_id
+                    searchid = obj.usersearch.id
+                    if usersearch_id != searchid:
+                        obj.usersearch_id = usersearch_id
+                        obj.save()
+                # Indicate what happened: adding
+                data['action'] = "added"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearchApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 

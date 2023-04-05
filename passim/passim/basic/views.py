@@ -1200,6 +1200,7 @@ class BasicList(ListView):
         else:
             context['usersearch'] = "{}://{}{}?usersearch={}".format(
                 self.request.scheme, self.request.get_host(), self.request.path, self.usersearch_id)
+        context['usersearch_id'] = self.usersearch_id
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)

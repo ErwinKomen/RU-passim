@@ -1670,6 +1670,8 @@ class SearchManuForm(PassimModelForm):
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'})) # , 'value':'100'
+    searchname = forms.CharField(label=_("Name of this search"), required=False,
+                widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     
     # SERMON-specific  
     sermo_authorname = forms.CharField(label=_("Author"), required=False, 
@@ -1864,6 +1866,8 @@ class SermonForm(PassimModelForm):
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
+    searchname = forms.CharField(label=_("Name of this search"), required=False,
+                widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
 
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
