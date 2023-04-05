@@ -12,6 +12,11 @@
          onclick="ru.basic.delete_confirm_view(this);" >Delete</a>
     </span>
   {% endif %}
+  {% if fulltext|length > 0 %}
+    <!-- Show the word count -->
+    <span>&nbsp;&nbsp;</span>
+    <span>{{wordcount}} words</span>
+  {% endif %}
   
 </div>
 <!-- Provide a standard possibility to do delete confirmation *without* a popup form -->

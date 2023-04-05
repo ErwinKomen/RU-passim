@@ -2172,7 +2172,7 @@ def read_transcription(data_file):
     This approach makes use of *lxml*
     """
 
-    def process_para(item, html):
+    def process_para(item, html, info):
         """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
 
         oErr = ErrHandle()
@@ -2187,6 +2187,13 @@ def read_transcription(data_file):
                     if tag == "w":
                         # This is a word 
                         local.append(element.text)
+                        # Check if this is punctuation or not
+                        if attrib.get("pos", "").lower() == "punc":
+                            # It is punctuation - any action?
+                            pass
+                        else:
+                            # Keep track of wordcount
+                            info['wordcount'] += 1
                     elif tag == "quote":
                         # This is a quote: get the @source attribute and the @n
                         quote_n = attrib['n']
@@ -2229,6 +2236,7 @@ def read_transcription(data_file):
             title_passim = titles[0].text
             # Get the list of sermon elements
             html = []
+            info = dict(wordcount=0)
             sermon_items = root.xpath("//div[@type='sermon']/child::*")
             for sermon_item in sermon_items:
                 tag = sermon_item.tag
@@ -2248,7 +2256,7 @@ def read_transcription(data_file):
                             html.append("#### {}".format(subitem.text))
                         elif subitem.tag == "p":
                             # This is a paragraph containing words and quotes
-                            process_para(subitem, html)
+                            process_para(subitem, html, info)
 
             # Okay, we found all the elements, now store them.
             text_sermon = "\n".join(html)
@@ -2257,6 +2265,7 @@ def read_transcription(data_file):
             oBack['count'] = oBack['count'] + 1
             oBack['tsize'] = len(text_sermon)
             oBack['code'] = title_passim
+            oBack['wordcount'] = info.get("wordcount", 0)
 
     except:
         sError = oErr.get_error_message()

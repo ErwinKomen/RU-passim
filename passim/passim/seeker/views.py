@@ -4702,9 +4702,15 @@ class SermonEdit(BasicDetails):
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
                 # Get URL of deleting transcription
                 transdelurl = reverse('sermon_transdel', kwargs={'pk': instance.id})
+                sInfo = instance.fullinfo
+                oInfo = {}
+                if not sInfo is None:
+                    oInfo = json.loads(sInfo)
+                wordcount = oInfo.get("wordcount", 0)
                 # Combine with button click + default hidden
                 context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
                                delete_message="",
+                               wordcount=wordcount,
                                transdelurl=transdelurl,
                                fulltext=sText)
                 sBack = render_to_string("seeker/ftext_buttons.html", context, None)
@@ -5045,7 +5051,10 @@ class SermonEdit(BasicDetails):
                     # Are we okay?
                     sStatus = oTranscription.get("status", "")
                     sText = oTranscription.get("text", "")
+                    iWordcount = oTranscription.get("wordcount", 0)
+                    oFullInfo = dict(wordcount=iWordcount)
                     if sStatus == "ok" and sText != "":
+                        instance.fullinfo = json.dumps(oFullInfo)
                         instance.fulltext = sText
                         instance.save()
 
@@ -12988,9 +12997,15 @@ class EqualGoldEdit(BasicDetails):
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
                 # Get URL of deleting transcription
                 transdelurl = reverse('equalgold_transdel', kwargs={'pk': instance.id})
+                sInfo = instance.fullinfo
+                oInfo = {}
+                if not sInfo is None:
+                    oInfo = json.loads(sInfo)
+                wordcount = oInfo.get("wordcount", 0)
                 # Combine with button click + default hidden
                 context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
                                delete_message="",
+                               wordcount=wordcount,
                                transdelurl=transdelurl,
                                fulltext=sText)
                 sBack = render_to_string("seeker/ftext_buttons.html", context, None)
@@ -13535,7 +13550,10 @@ class EqualGoldEdit(BasicDetails):
                 # Are we okay?
                 sStatus = oTranscription.get("status", "")
                 sText = oTranscription.get("text", "")
+                iWordcount = oTranscription.get("wordcount", 0)
+                oFullInfo = dict(wordcount=iWordcount)
                 if sStatus == "ok" and sText != "":
+                    instance.fullinfo = json.dumps(oFullInfo)
                     instance.fulltext = sText
                     instance.save()
 

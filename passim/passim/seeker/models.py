@@ -8896,6 +8896,7 @@ class SermonDescr(models.Model):
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_sermo_path)
+    fullinfo = models.TextField("Full text info", null=True, blank=True)
 
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
