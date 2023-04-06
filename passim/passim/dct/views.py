@@ -482,8 +482,8 @@ class MyPassimEdit(BasicDetails):
                 # SavedSearch: Name
                 add_one_item(rel_item, obj.name, False, main=True)
 
-                # SavedSearch: Listview name
-                add_one_item(rel_item, obj.get_view_name(), False)
+                # SavedSearch: Listview name + link
+                add_one_item(rel_item, obj.get_view_link(), False)
 
                 if bMayEdit:
                     # Actions that can be performed on this item
@@ -542,9 +542,6 @@ class MyPassimEdit(BasicDetails):
                 # This is an Authority File (=SSG)
                 if custom == "title":
                     sBack = instance.get_passimcode_markdown()
-                    #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
-                    #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
-                    #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
                 elif custom == "size":
                     count = 1   # There is just 1 authority file
                     sBack = "{}".format(count)
@@ -600,54 +597,61 @@ class MyPassimEdit(BasicDetails):
         oErr = ErrHandle()
         bChanges = False
         bDebug = True
+        hlist_objects = [
+            {"prefix": "svitem",    "cls": SavedItem},
+            {"prefix": "svsearch",  "cls": SavedSearch},
+            ]
 
         try:
-            arg_hlist = "svitem-hlist"
-            arg_savenew = "svitem-savenew"
-            if arg_hlist in self.qd and arg_savenew in self.qd:
-                # Interpret the list of information that we receive
-                hlist = json.loads(self.qd[arg_hlist])
-                # Interpret the savenew parameter
-                savenew = self.qd[arg_savenew]
+            # Walk all hlist objects
+            for oHlist in hlist_objects:
+                prefix = oHlist.get("prefix")
+                cls = oHlist.get("cls")
+                arg_hlist = "{}-hlist".format(prefix)
+                arg_savenew = "{}-savenew".format(prefix)
+                if arg_hlist in self.qd and arg_savenew in self.qd:
+                    # Interpret the list of information that we receive
+                    hlist = json.loads(self.qd[arg_hlist])
+                    # Interpret the savenew parameter
+                    savenew = self.qd[arg_savenew]
 
-                # Make sure we are not saving
-                self.do_not_save = True
-                # But that we do a new redirect
-                self.newRedirect = True
+                    # Make sure we are not saving
+                    self.do_not_save = True
+                    # But that we do a new redirect
+                    self.newRedirect = True
 
-                # Change the redirect URL
-                if self.redirectpage == "":
-                    self.redirectpage = reverse('mypassim_details')
+                    # Change the redirect URL
+                    if self.redirectpage == "":
+                        self.redirectpage = reverse('mypassim_details')
 
-                # What we have is the ordered list of Manuscript id's that are part of this collection
-                with transaction.atomic():
-                    # Make sure the orders are correct
-                    for idx, item_id in enumerate(hlist):
-                        order = idx + 1
+                    # What we have is the ordered list of SavedItem id's that are part of this collection
+                    with transaction.atomic():
+                        # Make sure the orders are correct
+                        for idx, item_id in enumerate(hlist):
+                            order = idx + 1
+                            lstQ = [Q(profile=instance)]
+                            lstQ.append(Q(**{"id": item_id}))
+                            obj = cls.objects.filter(*lstQ).first()
+                            if obj != None:
+                                if obj.order != order:
+                                    obj.order = order
+                                    obj.save()
+                                    bChanges = True
+                    # See if any need to be removed
+                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    delete_id = []
+                    for item_id in existing_item_id:
+                        if not item_id in hlist:
+                            delete_id.append(item_id)
+                    if len(delete_id)>0:
                         lstQ = [Q(profile=instance)]
-                        lstQ.append(Q(**{"id": item_id}))
-                        obj = SavedItem.objects.filter(*lstQ).first()
-                        if obj != None:
-                            if obj.order != order:
-                                obj.order = order
-                                obj.save()
-                                bChanges = True
-                # See if any need to be removed
-                existing_item_id = [str(x.id) for x in SavedItem.objects.filter(profile=instance)]
-                delete_id = []
-                for item_id in existing_item_id:
-                    if not item_id in hlist:
-                        delete_id.append(item_id)
-                if len(delete_id)>0:
-                    lstQ = [Q(profile=instance)]
-                    lstQ.append(Q(**{"id__in": delete_id}))
-                    SavedItem.objects.filter(*lstQ).delete()
-                    bChanges = True
+                        lstQ.append(Q(**{"id__in": delete_id}))
+                        cls.objects.filter(*lstQ).delete()
+                        bChanges = True
 
-                if bChanges:
-                    # (6) Re-calculate the order
-                    SavedItem.update_order(instance)
-
+                    if bChanges:
+                        # (6) Re-calculate the order
+                        cls.update_order(instance)
             return True
         except:
             msg = oErr.get_error_message()

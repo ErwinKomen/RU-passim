@@ -7059,8 +7059,6 @@ class EqualGold(models.Model):
         code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         url = reverse('equalgold_details', kwargs={'pk': self.id})
         sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Authority file'>{}</a></span>".format(url, code)
-        #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
-        #sBack = " ".join(lHtml)
         return sBack
 
     def get_short(self):

@@ -987,6 +987,50 @@ class SavedSearch(models.Model):
             sBack = sBack.replace("/", "")
         return sBack
 
+    def get_view_link(self):
+        """Get the HTML code to actually click and perform a saved search"""
+
+        lHtml = []
+        oErr = ErrHandle()
+        try:
+            if not self.usersearch is None:
+                # Create the search
+                url = "{}?usersearch={}".format(self.usersearch.view, self.usersearch.id)
+                name = self.get_view_name()
+                sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved search'>{}</a></span>".format(url, name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearch/get_view_link")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = SavedSearch.objects.filter(profile=self.profile).count() + 1
+        response = super(SavedSearch, self).save(force_insert, force_update, using, update_fields)
+        # Return the regular save response
+        return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SavedSearch.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearch/update_order")
+            bOkay = Falses
+        return bOkay
+
 
 class SelectItem(models.Model):
     """A selected item can be a M/S/SSG or HC or PD"""
