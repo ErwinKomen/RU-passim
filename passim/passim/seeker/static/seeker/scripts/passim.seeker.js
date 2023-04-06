@@ -41,6 +41,16 @@ var ru = (function ($, ru) {
         loc_goldlink = {},      // Store one or more goldlinks
         loc_divErr = "passim_err",
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        loc_vis_params = {
+          "overlap": {
+            "options": ["overlap_alternatives", "overlap_scount", "overlap_linktypes", "overlap_direction", "overlap_histcoll"],
+            "ids": ["network_overlap_slider", "gravity_overlap_slider"]
+          },
+          "transmission": {
+            "options": [],
+            "ids": ["network_trans_slider", "gravity_trans_slider"]
+          }
+        },
         lAddTableRow = [
           { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
           { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
@@ -3122,6 +3132,162 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("do_new_sermon", ex);
+        }
+      },
+
+      /**
+       * do_savedvis
+       *    Collect parameters and call the server
+       *
+       */
+      do_savedvis: function (elStart, vistype) {
+        var targeturl = null,
+            action = null,
+            frm = null,
+            saveurl = null,
+            data = null,
+            oParams = null,
+            sPrefix = "",
+            key = "",
+            searchid = "-saveas",
+            resultid = "-saveas-result",
+            options = {};
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the parameters
+          targeturl = $(elStart).attr("targeturl");
+          saveurl = $(elStart).attr("saveurl");
+
+          // Save the URL to be used
+          options['visurl'] = saveurl;
+          options['vistype'] = vistype;
+
+          // Get the right searchid and resultid
+          searchid = "#" + vistype + searchid;
+          resultid = "#" + vistype + resultid;
+
+          // Find the part of [loc_vis_params] to be used
+          for (var key in loc_vis_params) {
+            if (key === vistype) {
+              oParams = loc_vis_params[key];
+              break;
+            }
+          }
+          // Get the parts from [loc_network_options]
+          if (oParams !== null) {
+            // Get items from the locally stored options into [options]
+            for (var i = 0; i < oParams['options'].length; i++) {
+              key = oParams['options'][i];
+              // Is the prefix part of the key?
+              if (key in loc_network_options) {
+                // Then we need to add the k/v in options
+                options[key] = loc_network_options[key];
+              }
+            }
+            // Get the values of the elements
+            for (var i = 0; i < oParams['ids'].length; i++) {
+              key = oParams['ids'][i];
+              // Get the value for this key and store it
+              options[key] = $("#id_" + key).val();
+            }
+          }
+          // Add the options to the data
+          data.push({ "name": "options", "value": JSON.stringify(options) })
+
+          // Show the waiting symbol
+          $(searchid).removeClass("in");
+          $(searchid).addClass("collapse");
+          $(resultid).html(loc_sWaiting);
+          $(resultid).removeClass("hidden");
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "deleted":
+                      case "removed":
+                        $("#id_sitemaction").val("add");
+                        break;
+                      case "script":
+                        // Provide warning that user attempted to enter a script name
+                        $(resultid).html("<span style='color: red'>SCRIPT??</span>");
+                        $(searchid).removeClass("collapse");
+                        $(searchid).addClass("in");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 8000);
+                        break;
+                      case "empty":
+                        // Give warning that name is empty
+                        $(resultid).html("<span style='color: red'>NAME??</span>");
+                        $(searchid).removeClass("collapse");
+                        $(searchid).addClass("in");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 8000);
+                        break;
+                      case "added":
+                        $(resultid).html("<span style='color: red'>saved</span>");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 3000);
+                        break;
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_savedvis", ex);
         }
       },
 
@@ -6515,6 +6681,8 @@ var ru = (function ($, ru) {
                 // Hide the historical collection buttons
                 $(".histcolls").addClass("hidden");
               }
+              // Do save this
+              loc_network_options[type] = status;
               // No need to continue
               return;
           }

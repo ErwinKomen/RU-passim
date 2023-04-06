@@ -31,7 +31,7 @@ from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, 
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
-    SavedItem, SavedSearch, SelectItem
+    SavedItem, SavedSearch, SelectItem, SavedVis
 from passim.dct.forms import ResearchSetForm, SetDefForm
 from passim.approve.models import EqualChange, EqualApproval
 
@@ -730,6 +730,72 @@ class SavedSearchApply(BasicPart):
         context['data'] = data
         return context
 
+
+class SavedVisualizationApply(BasicPart):
+    """Add a named saved visualization item"""
+
+    MainModel = User
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+
+            # We already know who we are
+            profile = self.obj.user_profiles.first()
+            # Retrieve necessary parameters
+            options = self.qd.get("options")
+            # Unwrap the options
+            if not options is None:
+                oOptions = json.loads(options)
+                # URL to be called to get the visualization
+                visurl = oOptions.get("visurl")
+                # Type of visualization
+                vistype = oOptions.get("vistype")
+
+                searchname = ""
+                for k,v in self.qd.items():
+                    if "-visname" in k:
+                        if isinstance(v,str) and "<script" in v:
+                            searchname = "--script--"
+                        else:
+                            searchname = v
+                        break
+                if searchname == "--script--":
+                    # The name contains a script
+                    data['action'] = "script"
+                elif searchname == "":
+                    # User did not supply a name
+                    data['action'] = "empty"
+                else:
+                    # Create a saved search
+                    obj = SavedVis.objects.filter(name=searchname, profile=profile).first()
+                    if obj is None:
+                        obj = SavedVis.objects.create(name=searchname, profile=profile, visurl=visurl, options=options)
+                    else:
+                        bNeedSaving = False
+                        # Check and set the visurl + options
+                        if obj.visurl != visurl: 
+                            obj.visurl = visurl 
+                            bNeedSaving = True
+                        if obj.options != options:
+                            obj.options = options
+                            bNeedSaving = True
+
+                        if bNeedSaving:
+                            obj.save()
+                    # Indicate what happened: adding
+                    data['action'] = "added"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedVisualizationApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 # ================= Views for SavedItem, SelectItem ================
