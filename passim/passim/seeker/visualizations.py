@@ -29,6 +29,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.stylo.corpus import Corpus
 from passim.stylo.analysis import bootstrapped_distance_matrices, hierarchical_clustering, distance_matrix
+from passim.dct.models import SavedVis
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
@@ -244,6 +245,15 @@ class EqualGoldOverlap(BasicPart):
                                    networkslider=networkslider,
                                    legend="AF overlap network")
 
+            # Check if we have a 'savedvis' parameter
+            savedvis_id = self.qd.get("savedvis")
+            if not savedvis_id is None:
+                # Get the saved visualization
+                savedvis = SavedVis.objects.filter(id=savedvis_id).first()
+                if not savedvis is None:
+                    # Pass on the parameters
+                    context['data']['options'] = savedvis.options
+                    context['overlap_options'] = savedvis.options
 
             if self.method == "GET":
                 # We need to return HTML

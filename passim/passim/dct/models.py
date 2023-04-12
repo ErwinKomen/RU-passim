@@ -1083,15 +1083,19 @@ class SavedVis(models.Model):
                 name = options.get("vistype", "unknown")
                 # Get the URL to the visualization
                 visurl = options.get("visurl")
-                # Find all parameters
-                param_list = []
-                for k,v in options.items():
-                    if not k in pass_over:
-                        param_list.append("{}={}".format(k,v))
-                # Encode the parameters
-                params = base64_encode( "&".join(param_list))
-                # Combine into url
-                url = "{}?params={}".format( visurl, params)
+                # Add the id of the savedvis
+                url = "{}?savedvis={}".format(visurl, self.id)
+
+                ## Find all parameters
+                #param_list = []
+                #for k,v in options.items():
+                #    if not k in pass_over:
+                #        param_list.append("{}={}".format(k,v))
+                ## Encode the parameters
+                #params = base64_encode( "&".join(param_list))
+                ## Combine into url
+                #url = "{}?params={}".format( visurl, params)
+
                 # Last chance...
                 if not url is None and url != "":
                     sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved visualization'>{}</a></span>".format(url, name)

@@ -6917,6 +6917,10 @@ var ru = (function ($, ru) {
             iWidth = 1600,
             iHeight = 1000,
             max_value = 0,
+            sOptions = "",
+            value = null,
+            oOptions = null,
+            divOptions = "#overlap_options",
             divTarget = "super_network_overlap",
             divWait = "#super_network_overlap_wait",
             divNetwork = "#ssg_network_overlap";
@@ -6925,6 +6929,36 @@ var ru = (function ($, ru) {
           // Figure out what course of action to take
           if (private_methods.sticky_switch(elStart) === "leave") {
             return;
+          }
+
+          // Check whether there are overlap options
+          sOptions = $(divOptions).val();
+          if (sOptions !== undefined && sOptions !== "") {
+            oOptions = JSON.parse(sOptions);
+            // Possibly add these options to loc_
+            for (var key in oOptions) {
+              value = oOptions[key];
+              // At any rate...
+              loc_network_options[key] = value;
+              // Try to actually take action
+              switch (key) {
+                case "overlap_alternatives":
+                  $("#overlap_alternatives").attr("checked", true);
+                  break;
+                case "overlap_direction":
+                  $("#overlap_direction").attr("checked", true);
+                  break;
+                case "network_overlap_slider":
+                  $("#network_overlap_slider_value").html(value);
+                  $("#id_network_overlap_slider").val(value);
+                  loc_network_options['degree'] = parseInt(value, 10);
+                  break;
+                case "gravity_overlap_slider":
+                  $("#gravity_overlap_slider_value").html(value);
+                  $("#id_gravity_overlap_slider").val(value);
+                  break;
+              }
+            }
           }
 
           // Show what we can about the network
@@ -6952,10 +6986,10 @@ var ru = (function ($, ru) {
                   options['watermark'] = response.watermark;
                   options['hcset'] = response.hist_set;
                   options['degree'] = 1;
-                  if ("networkslider" in response) {
-                    $("#network_overlap_slider_value").html(response.networkslider);
-                    options['degree'] = parseInt(response.networkslider, 10);
-                  }
+                  //if ("networkslider" in response) {
+                  //  $("#network_overlap_slider_value").html(response.networkslider);
+                  //  options['degree'] = parseInt(response.networkslider, 10);
+                  //}
                   // Calculate the width we have right now
                   iWidth = $("#" + divTarget).width();
                   // iHeight = iWidth / fFactor - 100;
