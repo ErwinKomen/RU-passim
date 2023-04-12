@@ -18,6 +18,7 @@ import json, copy
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.basic.models import UserSearch
+from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
     SermonDescr, EqualGold
@@ -1065,16 +1066,35 @@ class SavedVis(models.Model):
         return sBack
 
     def get_view_link(self):
-        """Get the HTML code to actually click and perform a saved search"""
+        """Get the HTML code to actually click and perform a saved visualization
+        
+        Note: the 'name' shown here should be the *type* of visualization
+              (e.g: AF overlap, AF transmission, DCT)
+        """
 
         lHtml = []
+        pass_over = ['visurl', 'vistype']
         oErr = ErrHandle()
         try:
-            if not self.usersearch is None:
-                # Create the search
-                url = "{}?usersearch={}".format(self.usersearch.view, self.usersearch.id)
-                name = self.get_view_name()
-                sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved search'>{}</a></span>".format(url, name)
+            # The visualization type is filed away in 'options'
+            if not self.options is None:
+                options = json.loads(self.options)
+                # Get the [vistype] parameter
+                name = options.get("vistype", "unknown")
+                # Get the URL to the visualization
+                visurl = options.get("visurl")
+                # Find all parameters
+                param_list = []
+                for k,v in options.items():
+                    if not k in pass_over:
+                        param_list.append("{}={}".format(k,v))
+                # Encode the parameters
+                params = base64_encode( "&".join(param_list))
+                # Combine into url
+                url = "{}?params={}".format( visurl, params)
+                # Last chance...
+                if not url is None and url != "":
+                    sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved visualization'>{}</a></span>".format(url, name)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedVis/get_view_link")

@@ -2306,11 +2306,14 @@ class BasicPart(View):
     arErr = []              # errors   
     template_name = None    # The template to be used
     template_err_view = None
+    permission = True
     form_validated = True   # Used for POST form validation
     savedate = None         # When saving information, the savedate is returned in the context
     add = False             # Are we adding a new record or editing an existing one?
     obj = None              # The instance of the MainModel
     action = ""             # The action to be undertaken
+    method = None           # GET or POST
+    rtype = "json"          # JSON response (alternative: html)    
     MainModel = None        # The model that is mainly used for this form
     form_objects = []       # List of forms to be processed
     formset_objects = []    # List of formsets to be processed
@@ -2321,6 +2324,7 @@ class BasicPart(View):
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
     def post(self, request, pk=None):
+        self.method = "POST"
         # A POST request means we are trying to SAVE something
         self.initializations(request, pk)
         # Initialize typeahead list
@@ -2686,6 +2690,7 @@ class BasicPart(View):
         
     def get(self, request, pk=None): 
         self.data['status'] = 'ok'
+        self.method = "GET"
         # Perform the initializations that need to be made anyway
         self.initializations(request, pk)
         # Initialize typeahead list
@@ -2698,6 +2703,7 @@ class BasicPart(View):
                 context = dict(object_id = pk, savedate=None)
                 context['prevpage'] = self.previous
                 context['authenticated'] = user_is_authenticated(request)
+                context['permission'] = self.permission
                 context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
                 context['is_app_editor'] = user_is_ingroup(request, app_editor)
                 # Walk all the form objects
@@ -2774,12 +2780,20 @@ class BasicPart(View):
                 self.data['html'] = sHtml
             else:
                 self.data['html'] = "Please log in before continuing"
+
+            # Determine the response type
+            if self.rtype == "json":
+                response = JsonResponse(self.data)
+            else:
+                # This takes self.template_name...
+                sHtml = self.data['html']
+                response = HttpResponse(sHtml)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BasicPart/get")
 
         # Return the information
-        return JsonResponse(self.data)
+        return response
 
     def userpermissions(self, sType = "w"):
         """Basic check for valid user permissions"""

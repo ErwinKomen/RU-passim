@@ -340,8 +340,9 @@ class MyPassimEdit(BasicDetails):
 
         Currently:
             - Saved items
-        To be extended (see issue #408):
             - Saved searches
+        To be extended (see issue #409):
+            - Saved visualizations
         """
 
         def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
@@ -502,6 +503,62 @@ class MyPassimEdit(BasicDetails):
                 svsearchset['columns'].append("")
             related_objects.append(copy.copy(svsearchset))
 
+            # [3] ===============================================================
+            # Get all 'SavedVis' objects that belong to the current user (=profile)
+            svdvisset = dict(title="Saved visualizations", prefix="svdvis")  
+            if resizable: svdvisset['gridclass'] = "resizable dragdrop"
+            svdvisset['savebuttons'] = bMayEdit
+            svdvisset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_svdvislist = instance.profile_savedvisualizations.all().order_by('order', 'name')
+            # Also store the count
+            svdvisset['count'] = qs_svdvislist.count()
+            svdvisset['instance'] = instance
+            svdvisset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_svdvislist)
+
+            # Walk these svdvislist
+            for obj in qs_svdvislist:
+                # The [obj] is of type `SavedVis`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the Saved visualisations are:
+                # 1 - order
+                # 2 - name for the saved search
+                # 3 - visualization name (e.g. AF Overlap, AF transmission, DCT and so on)
+                #     or: an icon for this visualization
+                #     or: a 3-letter abbr for this visualization
+
+                # SavedVis: Order within the set of Saved visualizations
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SavedVis: Name
+                add_one_item(rel_item, obj.name, False, main=True)
+
+                # SavedVis: visualization type + link to open/execute it
+                add_one_item(rel_item, obj.get_view_link(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("savedvis", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            svdvisset['rel_list'] = rel_list
+            svdvisset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of saved visualization">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Kind of visualization">Type</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                svdvisset['columns'].append("")
+            related_objects.append(copy.copy(svdvisset))
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("mypassimedit/get_related_objects")
@@ -580,6 +637,12 @@ class MyPassimEdit(BasicDetails):
                     sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
 
             elif type == "savedsearch":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "savedvis":
                 # A saved item should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button

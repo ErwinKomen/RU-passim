@@ -1,0 +1,148 @@
+
+<div id="ssg_network_trans" class="container-small">
+  <form action="{{equalgold_trans}}" method="post" >
+    {% csrf_token %}
+    <div id="downloadcenter" class="hidden">
+      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+    </div>
+
+    <div class="row">
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Minimum number of manuscripts in which AFs co-occur: </span>
+        <span id="network_trans_slider_value">2</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="network_trans_slider" id="id_network_trans_slider" valueid="network_trans_slider_value"
+                type="range" min="1" max="{{manuscripts}}" value="2" class="slider" />
+      </div>
+
+      <!-- Button to stop -->
+      <div class="col-md-1 align-right tdnowrap">
+
+        <a role="button" class="btn btn-xs jumbo-2" data-target="#transmission-saveas" data-toggle="collapse"
+            title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim." >
+          <span class="glyphicon glyphicon-floppy-disk"></span>
+        </a>
+        <a role="button" class="btn btn-xs jumbo-2"
+            title="Update/refresh the visualization with the current setting"
+            targeturl={{equalgold_trans}}
+            onclick="ru.passim.seeker.network_transmission(this);">
+          <span class="glyphicon glyphicon-repeat"></span>
+        </a>
+
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-5 col-md-offset-3 align-right">
+        <span>Gravity: </span>
+        <span id="gravity_trans_value">100</span>
+      </div>
+      <div class="col-md-3 slidecontainer">
+        <input name="gravity_trans_slider" id="id_gravity_trans_slider" valueid="gravity_trans_value"
+                type="range" min="-100" max="300" value="100" class="slider" />
+      </div>
+
+      <!-- Download button -->
+      <div class="col-md-1 align-right">
+        {% include 'seeker/download.html' with downloadid="trans" urlname="equalgold_trans_download" object_id=object.id %}
+      </div>
+    </div>
+
+    <!-- Room for saving a visualization -->
+    <div class="row">
+      <div class="col-md-6 col-md-offset-6 align-right">
+        <div id="transmission-saveas" class="saveas collapse">
+          <span>
+            <input type="text" name="transmission-visname" style="width: 80%" placeholder="Name for this visualisation" />
+          </span>
+          &nbsp;
+          <span class="pull-right">
+            <a role="button" class="btn btn-xs jumbo-2" 
+                saveurl="{{equalgold_trans}}" targeturl="{% url 'savedvis_apply' user.id %}" 
+                onclick="ru.passim.seeker.do_savedvis(this, 'transmission');">Save</a>
+          </span>            
+        </div>
+        <!-- Any responses -->
+        <div id="transmission-saveas-result" class="hidden">
+          <!-- Any result to be shown-->
+        </div>
+
+      </div>
+    </div>
+
+  </form>
+
+  <div id="super_network_trans_wait" class="hidden">
+    <span>Calculating AF co-occurrance network...</span>
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
+
+  <div class="row" style="height: 800px;">
+    <!-- A legend of author names (selectable) -->
+    <div class="col-md-2">
+      <div id="super_network_trans_authors" style="width: 100%; ">
+        <svg viewBox="0,0,100,500"></svg>
+      </div>
+    </div>
+
+    <!-- The transmission network -->
+    <div class="col-md-10">
+      <div id="super_network_trans" class="visborder" style="width: 100%; ">
+        <svg viewBox="0,0,800,500"></svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal form that helps define a color -->
+<div id="modal-nodecolor" class="modal fade" role="dialog">
+  <div class="modal-dialog nodecolorpicker">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <!-- introduction header -->
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" title="Cancel color selection">&times;</button>
+        <h4 class="modal-title">Select a color</h4>
+      </div>
+
+      <!-- Body of the modal-->
+      <div class="modal-body modal-dragpoint" id="view-nodecolor">
+        <!-- This is where the list of possible colors shows up -->
+        <table>
+          <tr>
+            <td valign="top" align="right">Click the button and select a color:</td>
+            <td valign="top" align="left"><input type="color" value="#ff0000" id="nodecolor" list="presets" /></td>
+          </tr>
+        </table>
+        <div>
+          <datalist id="presets">
+            <option value="#ea2028">Red</option>
+            <option value="#f02d93">Pink</option>
+            <option value="#78cbd1">Light blue</option>
+            <option value="#5c9924">Green</option>
+            <option value="#d4d426">Light green</option>
+          </datalist>
+        </div>
+      </div>
+
+      <!-- Footer with the save button -->
+      <div class="modal-footer">
+        <a class="btn jumbo-1" data-dismiss="modal" >
+          <span class="glyphicon glyphicon-ok" 
+                onclick="ru.passim.seeker.network_overlap_setcolor(this);"
+                title="Back to the original and apply the selected color">&nbsp;Ok</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if only_transmission %}
+<script>
+  ru.passim.seeker.network_transmission("#ssg_network_trans");
+</script>
+{% endif %}
+
