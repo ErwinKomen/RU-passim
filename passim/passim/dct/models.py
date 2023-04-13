@@ -1043,12 +1043,12 @@ class SavedVis(models.Model):
     # [1] The saved items may be ordered (and they can be re-ordered by the user)
     order = models.IntegerField("Order", default=0)
 
-    # [1] The URL that this saved visualisation points to 
+    # [1] The URL that this saved visualization points to 
     visurl = models.CharField("Visualisation URL", max_length=STANDARD_LENGTH)
     # [0-1] The parameters (JSON) belonging to this search
     options = models.TextField("Parameters", blank=True, null=True)
 
-    # [1] And a date: the date when this visualisation was created
+    # [1] And a date: the date when this visualization was created
     created = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):

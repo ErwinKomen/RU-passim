@@ -6905,7 +6905,7 @@ var ru = (function ($, ru) {
        *   Create and show a SSG-overlap network
        *
        */
-      network_overlap: function (elStart) {
+      network_overlap: function (elStart, bSkipOptions) {
         var targeturl = "",
             frm = null,
             data = null,
@@ -6931,34 +6931,37 @@ var ru = (function ($, ru) {
             return;
           }
 
-          // Check whether there are overlap options
-          sOptions = $(divOptions).val();
-          if (sOptions !== undefined && sOptions !== "") {
-            oOptions = JSON.parse(sOptions);
-            // Possibly add these options to loc_
-            for (var key in oOptions) {
-              value = oOptions[key];
-              // At any rate...
-              loc_network_options[key] = value;
-              // Try to actually take action
-              switch (key) {
-                case "overlap_alternatives":
-                  $("#overlap_alternatives").attr("checked", true);
-                  break;
-                case "overlap_direction":
-                  $("#overlap_direction").attr("checked", true);
-                  break;
-                case "network_overlap_slider":
-                  $("#network_overlap_slider_value").html(value);
-                  $("#id_network_overlap_slider").val(value);
-                  loc_network_options['degree'] = parseInt(value, 10);
-                  break;
-                case "gravity_overlap_slider":
-                  $("#gravity_overlap_slider_value").html(value);
-                  $("#id_gravity_overlap_slider").val(value);
-                  break;
+          if (bSkipOptions === undefined || !bSkipOptions) {
+            // Check whether there are overlap options
+            sOptions = $(divOptions).val();
+            if (sOptions !== undefined && sOptions !== "") {
+              oOptions = JSON.parse(sOptions);
+              // Possibly add these options to loc_
+              for (var key in oOptions) {
+                value = oOptions[key];
+                // At any rate...
+                loc_network_options[key] = value;
+                // Try to actually take action
+                switch (key) {
+                  case "overlap_alternatives":
+                    $("#overlap_alternatives").attr("checked", true);
+                    break;
+                  case "overlap_direction":
+                    $("#overlap_direction").attr("checked", true);
+                    break;
+                  case "network_overlap_slider":
+                    $("#network_overlap_slider_value").html(value);
+                    $("#id_network_overlap_slider").val(value);
+                    loc_network_options['degree'] = parseInt(value, 10);
+                    break;
+                  case "gravity_overlap_slider":
+                    $("#gravity_overlap_value").html(value);
+                    $("#id_gravity_overlap_slider").val(value);
+                    break;
+                }
               }
             }
+
           }
 
           // Show what we can about the network
@@ -7046,7 +7049,7 @@ var ru = (function ($, ru) {
        *   Create and show a sermon-transmission network
        *
        */
-      network_transmission: function (elStart) {
+      network_transmission: function (elStart, bSkipOptions) {
         var targeturl = "",
             frm = null,
             data = null,
@@ -7058,6 +7061,10 @@ var ru = (function ($, ru) {
             iWidth = 1600,
             iHeight = 1000,
             max_value = 0,
+            sOptions = "",
+            value = null,
+            oOptions = null,
+            divOptions = "#trans_options",
             divTargetA = "super_network_trans_authors",
             divTarget = "super_network_trans",
             divWait = "#super_network_trans_wait",
@@ -7067,6 +7074,33 @@ var ru = (function ($, ru) {
           // Figure out what course of action to take
           if (private_methods.sticky_switch(elStart) === "leave") {
             return;
+          }
+
+          if (bSkipOptions === undefined || !bSkipOptions) {
+            // Check whether there are trans options
+            sOptions = $(divOptions).val();
+            if (sOptions !== undefined && sOptions !== "") {
+              oOptions = JSON.parse(sOptions);
+              // Possibly add these options to loc_
+              for (var key in oOptions) {
+                value = oOptions[key];
+                // At any rate...
+                loc_network_options[key] = value;
+                // Try to actually take action
+                switch (key) {
+                  case "network_trans_slider":
+                    $("#network_trans_slider_value").html(value);
+                    $("#id_network_trans_slider").val(value);
+                    loc_network_options['degree'] = parseInt(value, 10);
+                    break;
+                  case "gravity_trans_slider":
+                    $("#gravity_trans_value").html(value);
+                    $("#id_gravity_trans_slider").val(value);
+                    break;
+                }
+              }
+
+            }
           }
 
           // Show what we can about the network
@@ -7109,8 +7143,18 @@ var ru = (function ($, ru) {
                   options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
                   options['legend'] = response.legend;
                   options['watermark'] = response.watermark;
+                  
+                  // Copy the options into [loc_network_options]
+                  // OLD loc_network_options = options;
 
-                  loc_network_options = options;
+                  // Copy from [options] to [loc]
+                  for (var key in options) {
+                    loc_network_options[key] = options[key];
+                  }
+                  // COpy from [loc] to [options]
+                  for (var key in loc_network_options) {
+                    options[key] = loc_network_options[key];
+                  }
 
                   // Use D3 to draw a force-directed network
                   private_methods.draw_network_trans(options);

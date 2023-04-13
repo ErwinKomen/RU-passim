@@ -57,7 +57,7 @@
               <a role="button" class="btn btn-xs jumbo-2"
                  title="Update/refresh the visualization with the current setting"
                  targeturl={{equalgold_overlap}}
-                 onclick="ru.passim.seeker.network_overlap(this);">
+                 onclick="ru.passim.seeker.network_overlap(this, true);">
                 <span class="glyphicon glyphicon-repeat"></span>
               </a>
             </td>
@@ -136,7 +136,7 @@
             <td colspan="4"  align="right">
               <div id="overlap-saveas" class="saveas collapse">
                 <span>
-                  <input type="text" name="overlap-visname" style="width: 80%" placeholder="Name for this visualisation" />
+                  <input type="text" name="overlap-visname" style="width: 80%" placeholder="Name for this visualization" value="{{visname}}" />
                 </span>
                 &nbsp;
                 <span>

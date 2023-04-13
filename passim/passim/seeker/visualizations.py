@@ -254,6 +254,7 @@ class EqualGoldOverlap(BasicPart):
                     # Pass on the parameters
                     context['data']['options'] = savedvis.options
                     context['overlap_options'] = savedvis.options
+                    context['visname'] = savedvis.name
 
             if self.method == "GET":
                 # We need to return HTML
@@ -462,6 +463,17 @@ class EqualGoldTrans(BasicPart):
             # Can remove the lock
             ssg_corpus.status = "ready"
             ssg_corpus.save()
+
+            # Check if we have a 'savedvis' parameter
+            savedvis_id = self.qd.get("savedvis")
+            if not savedvis_id is None:
+                # Get the saved visualization
+                savedvis = SavedVis.objects.filter(id=savedvis_id).first()
+                if not savedvis is None:
+                    # Pass on the parameters
+                    context['data']['options'] = savedvis.options
+                    context['trans_options'] = savedvis.options
+                    context['visname'] = savedvis.name
 
             if self.method == "GET":
                 # We need to return HTML
