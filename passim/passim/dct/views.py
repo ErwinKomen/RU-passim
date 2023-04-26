@@ -341,8 +341,9 @@ class MyPassimEdit(BasicDetails):
         Currently:
             - Saved items
             - Saved searches
-        To be extended (see issue #409):
             - Saved visualizations
+        To be extended (see issue #409):
+            - DCTs
         """
 
         def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
@@ -559,6 +560,71 @@ class MyPassimEdit(BasicDetails):
                 svdvisset['columns'].append("")
             related_objects.append(copy.copy(svdvisset))
 
+            # [3] ===============================================================
+            # Get all 'SetDef' objects that belong to the current user (=profile)
+            dctdefset = dict(title="Dynamic comparitive tables", prefix="dctdef")  
+            if resizable: dctdefset['gridclass'] = "resizable dragdrop"
+            dctdefset['savebuttons'] = bMayEdit
+            dctdefset['saveasbutton'] = False
+            rel_list =[]
+
+            # qs_dctdeflist = instance.profile_mydctualizations.all().order_by('order', 'name')
+            qs_dctdeflist = SetDef.objects.filter(researchset__profile=instance).order_by('order', 'name')
+            # Also store the count
+            dctdefset['count'] = qs_dctdeflist.count()
+            dctdefset['instance'] = instance
+            dctdefset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+
+            # And store an introduction
+            lIntro = []
+            lIntro.append('View and work with research sets on the <em>development version</em> of ')
+            lIntro.append('the <a role="button" class="btn btn-xs jumbo-1" ')
+            lIntro.append('href="{}">DCT tool</a> page.'.format(reverse('researchset_list')))
+            sIntro = " ".join(lIntro)
+            dctdefset['introduction'] = sIntro
+
+            # These elements have an 'order' attribute, but...
+            #   ... but that order may *NOT be corrected here
+            # check_order(qs_dctdeflist)
+
+            # Walk these dctdeflist
+            for obj in qs_dctdeflist:
+                # The [obj] is of type `SetDef`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the Your visualisations are:
+                # 1 - order
+                # 2 - name of the ResearchSet
+                # 3 - name of the DCT
+
+                # SetDef: Order within the set of Your visualizations
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SetDef: researchSet name
+                add_one_item(rel_item, obj.researchset.name, False, main=True)
+
+                # SetDef: DCT name
+                add_one_item(rel_item, obj.get_view_link(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("mydct", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            dctdefset['rel_list'] = rel_list
+            dctdefset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Research set">Research set</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Dynamic Comparative Table">DCT</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                dctdefset['columns'].append("")
+            related_objects.append(copy.copy(dctdefset))
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("mypassimedit/get_related_objects")
@@ -647,6 +713,13 @@ class MyPassimEdit(BasicDetails):
                 if custom == "buttons":
                     # Create the remove button
                     sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "mydct":
+                # A DCT should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
 
         except:
             msg = oErr.get_error_message()

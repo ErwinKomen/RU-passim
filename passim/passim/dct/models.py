@@ -850,6 +850,23 @@ class SetDef(models.Model):
             oErr.DoError("SetDef/get_setlist")
         return oBack
 
+    def get_view_link(self):
+        """Get the HTML code to go to and view a DCT"""
+
+        lHtml = []
+        oErr = ErrHandle()
+        try:
+            if not self.contents == "":
+                # Create the search
+                # rl = "{}?usersearch={}".format(self.usersearch.view, self.usersearch.id)
+                url = reverse('setdef_details', kwargs={'pk': self.id})
+                name = self.name
+                sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to this DCT'>{}</a></span>".format(url, name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDef/get_view_link")
+        return sBack
+
 
 # ====================== Personal Research Environment models ========================================
 
