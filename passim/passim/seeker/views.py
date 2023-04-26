@@ -15558,7 +15558,7 @@ class BasketUpdate(BasicPart):
 
             # Note: only operations in either of these two lists will be executed
             lst_basket_target = ["create", "add", "remove", "reset"]
-            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
+            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "rsetadd", "dctlaunch"]
 
             # Get our profile
             profile = Profile.get_user_profile(self.request.user.username)
@@ -15696,6 +15696,8 @@ class BasketUpdate(BasicPart):
                         name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
                         rset.name = name
                         rset.save()
+                    elif operation == "rsetadd":
+                        pass
                     elif operation == "dctlaunch":
                         # Save the current basket as a research-set that needs to receive a name
                         rset = ResearchSet.objects.create(

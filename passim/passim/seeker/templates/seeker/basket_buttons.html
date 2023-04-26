@@ -46,5 +46,45 @@
       </a>
     </div>
   </div>
+
+  <!-- static selection of target research set (for DCT) -->
+  {% if listForm.rsetone %}
+    <div id="rsetaddinterface" class="hidden">
+      <table style="width: 100%;">
+        <tr><td style="width: 100%;">{{listForm.rsetone}}</td></tr>
+        <tr>
+          <td align="right">
+            <a id="basket_rsetaddcancel" title="Cancel adding to a research set" 
+               class="btn btn-sm jumbo-1" 
+                href="#" operation="rsetaddcancel" targetid="rsetaddinterface"
+                onclick="ru.passim.seeker.do_basket(this);">
+              <span>Cancel</span>
+            </a>
+            <a id="basket_rsetadd" title="Add search results to a research set" 
+               class="btn btn-sm jumbo-3" 
+                href="#" operation="rsetadd" targetid="basket_buttons"
+                ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+              <span>Add to this research set</span>
+            </a>
+          </td>
+        </tr>
+      </table>
+      <!-- Show the options to the user -->
+    </div>
+  {% endif %}
+
+  <!-- Report and link to Collection -->
+  <div id="basket_report" class="hidden">
+    <div>The research set has been updated.</div>
+    <div>
+      <a id="basket_rset_link" class="btn btn-sm jumbo-1"
+         href="{% url 'collany_details' 777 %}" title="Open this research set">
+        <span>Open...</span>
+      </a>
+    </div>
+  </div>
+
+
+
 </div>
 

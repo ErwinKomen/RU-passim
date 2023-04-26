@@ -4731,6 +4731,7 @@ var ru = (function ($, ru) {
             operation = "",
             targetid = "",
             colladdid = "#colladdinterface",
+            rsetaddid = "#rsetaddinterface",
             basketwait = "#basket_waiting",
             basketreport = "#basket_report",
             basketlink = "#basket_coll_link",
@@ -4758,6 +4759,18 @@ var ru = (function ($, ru) {
               break;
             case "colladdcancel":
               $(colladdid).addClass("hidden");
+              return;
+              break;
+            case "rsetaddstart":
+              $(rsetaddid).removeClass("hidden");
+              return;
+              break;
+            case "rsetaddcancel":
+              $(rsetaddid).addClass("hidden");
+              return;
+              break;
+            case "rsetadd":
+              $(rsetaddid).addClass("hidden");
               return;
               break;
             default:

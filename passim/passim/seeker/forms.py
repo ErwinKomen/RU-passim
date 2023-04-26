@@ -1106,13 +1106,18 @@ class ResearchSetOneWidget(ModelSelect2Widget):
     model = ResearchSet
     search_fields = [ 'name__icontains' ]
     type = None
+    qs = None
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
-        profile = self.attrs.pop('profile', '')
-        qs = ResearchSet.objects.filter(profile=profile)
+        if self.qs is None:
+            profile = self.attrs.pop('profile', '')
+            qs = ResearchSet.objects.filter(profile=profile)
+            self.qs = qs
+        else:
+            qs = self.qs
         return qs
 
 
