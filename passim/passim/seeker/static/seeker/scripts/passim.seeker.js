@@ -4755,23 +4755,27 @@ var ru = (function ($, ru) {
           switch (operation) {
             case "colladdstart":
               $(colladdid).removeClass("hidden");
+              // Just return from this function
               return;
               break;
             case "colladdcancel":
               $(colladdid).addClass("hidden");
+              // Just return from this function
               return;
               break;
             case "rsetaddstart":
               $(rsetaddid).removeClass("hidden");
+              // Just return from this function
               return;
               break;
             case "rsetaddcancel":
               $(rsetaddid).addClass("hidden");
+              // Just return from this function
               return;
               break;
             case "rsetadd":
               $(rsetaddid).addClass("hidden");
-              return;
+              // CONTINUE
               break;
             default:
               $(colladdid).addClass("hidden");
@@ -4819,6 +4823,7 @@ var ru = (function ($, ru) {
                   // Possibly show a report
                   switch (operation) {
                     case "colladd":
+                    case "rsetadd":
                       // Add the correct parameters to the report
                       $(basketlink).attr("href", response.collurl);
                       $(basketlink).html("<span>" + response.collname + "</span>");

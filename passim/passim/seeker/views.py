@@ -15697,7 +15697,18 @@ class BasketUpdate(BasicPart):
                         rset.name = name
                         rset.save()
                     elif operation == "rsetadd":
-                        pass
+                        # Get the rsetone parameter
+                        if 'manuForm' in context:
+                            manuForm = context['manuForm']
+                            # Get the value: the ID
+                            rsetone_id = manuForm['rsetone'].value()
+                            if not rsetone_id is None or rsetone_id == "":
+                                # Get the researchset
+                                rset = ResearchSet.objects.filter(id=rsetone_id).first()
+                                # Set parameters to show upon return
+                                rseturl = reverse('researchset_details', kwargs={'pk': rset.id})
+                                rsetname = rset.name
+                                context['data'] = dict(collurl=rseturl, collname=rsetname)
                     elif operation == "dctlaunch":
                         # Save the current basket as a research-set that needs to receive a name
                         rset = ResearchSet.objects.create(
@@ -15725,8 +15736,8 @@ class BasketUpdate(BasicPart):
                                                            setlisttype="manu",
                                                            manuscript=item.manu)
 
-                        # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
-                        if operation == "rsetcreate":
+                        # Make sure to redirect to this instance -- but only for RSETCREATE, RSETADD and DCTLAUNCH
+                        if operation in ["rsetcreate"]:
                             self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
                         elif operation == "dctlaunch":
                             # Get the default DCT for this ad-hoc ResearchSet
