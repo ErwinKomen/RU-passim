@@ -1575,6 +1575,7 @@ class BasicDetails(DetailView):
     backbutton = True
     bNeedReload = False     # Needed to signal a Ctrl+F5 reload for JS
     custombuttons = []
+    sel_button = None
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
@@ -1835,6 +1836,10 @@ class BasicDetails(DetailView):
         context['new_button'] = self.new_button
         context['add_text'] = self.add_text
         context['backbutton'] = self.backbutton
+
+        # Selection buttons
+        if len(self.selectbuttons) > 0:
+            context['selectbuttons'] = self.selectbuttons
 
         if self.is_basic and context.get('afterdelurl') == None :
             if self.afterdelurl != None:

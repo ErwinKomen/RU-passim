@@ -28,6 +28,7 @@ ABBR_LENGTH = 5
 
 SETLIST_TYPE = "dct.setlisttype"
 SAVEDITEM_TYPE = "dct.saveditemtype"
+SELITEM_TYPE = "dct.selitemtype"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -1159,7 +1160,7 @@ class SelectItem(models.Model):
     order = models.IntegerField("Order", default=0)
     # [1] Each saved item must be of a particular type
     #     Possibilities: manu, serm, ssg, hist, pd
-    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SELITEM_TYPE), max_length=5)
 
     # Depending on the type of SelectItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
@@ -1170,6 +1171,8 @@ class SelectItem(models.Model):
     equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_selectitems")
     # [0-1] Collection pointer (that can be HC, public or personal collection
     collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_selectitems")
+    # [0-1] Pointer to SavedItem
+    saveditem = models.ForeignKey(SavedItem, blank=True, null=True, on_delete=models.SET_NULL, related_name="saveditem_selectitems")
 
     def __str__(self):
         sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
@@ -1191,6 +1194,8 @@ class SelectItem(models.Model):
                     obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, equal=item).first()
                 elif selitemtype == "hc" or selitemtype == "pd":
                     obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, collection=item).first()
+                elif selitemtype == "svdi":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, saveditem=item).first()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SelectItem/get_selectitem")

@@ -2406,10 +2406,10 @@ var ru = (function ($, ru) {
                     if (selitemcount !== undefined) {
                       if (selitemcount <= 0) {
                         $(".selcount").html("");
-                        $("h3 .select-execute button").attr("disabled", true);
+                        $(".select-execute button").attr("disabled", true);
                       } else {
                         $(".selcount").html(selitemcount);
-                        $("h3 .select-execute button").attr("disabled", false);
+                        $(".select-execute button").attr("disabled", false);
                       }
                     }
                   }
@@ -2579,6 +2579,83 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("load_dct", ex);
+        }
+      },
+
+      /**
+       * sel_button
+       *    Show or hide the select column
+       *
+       */
+      sel_button: function (elStart) {
+        var elTable = null,
+            elS = null,
+            elH = null,
+            elRelated = null,
+            selcount = "",
+            mode = "";
+
+        try {
+          // Find out which mode I am in
+          mode = ($(elStart).hasClass("jumbo-1")) ? "hide" : "show";
+
+          // Figure out what the selection count is
+          selcount = $(".selcount").first().html().trim();
+
+          // Find the table
+          elTable = $("table.func-view").first();
+          // Find the <h3> element
+          elH = $(elStart).closest("h4");
+          // Find the related container
+          elRelated = $(elStart).closest(".related-original");
+          // Either hide or show the .select-column
+          switch (mode) {
+            case "hide":
+              // Turn into showing
+              $(elTable).find(".select-column").removeClass("hidden");
+              // Change the button into 'showing'
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-3");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").removeClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(elRelated).find(".selcount").addClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              } else {
+                $(elH).find(".select-execute button").attr("disabled", false);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("show");
+              break;
+            case "show":
+              // Turn into hiding
+              $(elTable).find(".select-column").addClass("hidden");
+              // Change the button into 'hiding'
+              $(elStart).removeClass("jumbo-3");
+              $(elStart).addClass("jumbo-1");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").addClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(elRelated).find(".selcount").removeClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("hide");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sel_button", ex);
         }
       },
 

@@ -26,7 +26,8 @@ import csv
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
-from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
+from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
+    user_is_superuser, get_selectitem_info
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
@@ -230,8 +231,13 @@ class MyPassimEdit(BasicDetails):
     prefix = "pre"  # Personal Research Environment
     prefix_type = "simple"
     title = "MY PASSIM"
+    sel_button = "svdi"
     template_name = "dct/mypassim.html"
     mainitems = []
+
+    selectbuttons = [
+        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
 
     def custom_init(self, instance):
         if user_is_authenticated(self.request):
@@ -391,12 +397,18 @@ class MyPassimEdit(BasicDetails):
             # [1] =============================================================
             # Get all 'SavedItem' objects that belong to the current user (=profile)
             sitemset = dict(title="Saved items", prefix="svitem")  
-            if resizable: sitemset['gridclass'] = "resizable dragdrop"
+            if resizable: sitemset['gridclass'] = "resizable dragdrop sel-table"
             sitemset['savebuttons'] = bMayEdit
             sitemset['saveasbutton'] = False
+            sitemset['selbutton'] = True
             rel_list =[]
 
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+
+            # Look into selections
+            qs_sitemids = [x.id for x in qs_sitemlist]
+            sitemset['sel_count'] = instance.profile_selectitems.filter(saveditem_id__in=qs_sitemids).count()
+
             # Also store the count
             sitemset['count'] = qs_sitemlist.count()
             sitemset['instance'] = instance
@@ -435,8 +447,10 @@ class MyPassimEdit(BasicDetails):
                     # Actions that can be performed on this item
                     add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
 
+                sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
+
                 # Add this line to the list
-                rel_list.append(dict(id=obj.id, cols=rel_item))
+                rel_list.append(dict(id=obj.id, cols=rel_item, sel_info=sel_info))
             
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
@@ -1049,7 +1063,8 @@ class SelectItemApply(BasicPart):
                     rsetoneid = v
                     break
 
-            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", 
+                           hc="collection", pd="collection", svdi="saveditem")
             itemidfield = itemset[selitemtype]
 
             if selitemaction == "-" and not mode is None:
