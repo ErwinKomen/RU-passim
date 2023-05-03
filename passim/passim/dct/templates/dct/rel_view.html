@@ -60,7 +60,7 @@
                 <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
                   <!-- Show the possibility icons -->
                   <button class="btn btn-xs jumbo-4" role="button" mode="clear_sel"
-                      title="Unselect everything" >
+                          title="Unselect everything" >
                     <span class="glyphicon glyphicon-refresh" ></span>
                   </button>
                   {% for selbut in selectbuttons %}
@@ -86,6 +86,17 @@
           {% if related.rel_list|length == 0 %}
             <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
           {% else %}
+            <!-- main part of selecting a research set -->
+            {% if related.selbutton %}
+              <form class="selitem-main" targeturl="{% url 'selitem_apply' profile.id %}">
+                {% csrf_token %}
+                <div class="hidden">
+                  <input type="text" id="id_selitemtype"   name="selitemtype"   value="{{related.selitemtype}}" />
+                  <input type="text" id="id_selitemaction" name="selitemaction" value="-" />
+                </div>
+              </form>
+            {% endif %}
+
             <!-- List of related items -->
             <table class="func-view compact-simple {{related.gridclass}}" 
                     style="width: 100%;">

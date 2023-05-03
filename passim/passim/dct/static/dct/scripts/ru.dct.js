@@ -2234,6 +2234,10 @@ var ru = (function ($, ru) {
             data = null;
 
         try {
+          // Figure out what we are doing
+          if ($(elSelItemDct).length === 0) {
+            // Need to change this stuff
+          }
           // In general: hide the -rset
           $(elSelItemRset).addClass("hidden");
 

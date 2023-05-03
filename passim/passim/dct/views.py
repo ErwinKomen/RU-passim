@@ -401,6 +401,7 @@ class MyPassimEdit(BasicDetails):
             sitemset['savebuttons'] = bMayEdit
             sitemset['saveasbutton'] = False
             sitemset['selbutton'] = True
+            sitemset['selitemtype'] = "svdi"
             rel_list =[]
 
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
