@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
     <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+    {% if has_select2 %}{{basic_form.media.css}}{% endif %}
 {% endblock %}
 
 
@@ -269,3 +270,6 @@
 </div>
 {% endblock %}
 
+{% block endcontent %} 
+  {% if has_select2 %}{{basic_form.media.js }}{% endif %}
+{% endblock %}

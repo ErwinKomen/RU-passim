@@ -33,7 +33,7 @@ from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, 
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
     SavedItem, SavedSearch, SelectItem, SavedVis
-from passim.dct.forms import ResearchSetForm, SetDefForm
+from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm
 from passim.approve.models import EqualChange, EqualApproval
 
 def get_application_name():
@@ -233,10 +233,15 @@ class MyPassimEdit(BasicDetails):
     title = "MY PASSIM"
     sel_button = "svdi"
     template_name = "dct/mypassim.html"
+    has_select2 = True
     mainitems = []
 
+    form_list = [
+        {"prefix": "svdi", "formclass": RsetSelForm, "forminstance": None}
+        ]
+
     selectbuttons = [
-        {'title': 'Add to DCT',         'mode': 'add_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        {'title': 'Add to DCT',         'mode': 'show_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
         ]
 
     def custom_init(self, instance):
@@ -279,6 +284,18 @@ class MyPassimEdit(BasicDetails):
             context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
             context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
             context['sermones_allow'] = bAllowSermonesReset
+
+            # Special treatment: we have select2 and we have at least one form 
+            initial = {}
+            user= self.request.user
+            for oItem in self.form_list:
+                frmcls = oItem['formclass']
+                prefix = oItem['prefix']
+                frm = frmcls(initial, prefix=prefix, user=user)
+                oItem['forminstance'] = frm
+                # Possibly set the basic_form
+                if context.get("basic_form") is None:
+                    context['basic_form'] = frm
 
             # COunting table sizes for the super user
             if user_is_superuser(self.request):
@@ -402,6 +419,7 @@ class MyPassimEdit(BasicDetails):
             sitemset['saveasbutton'] = False
             sitemset['selbutton'] = True
             sitemset['selitemtype'] = "svdi"
+            sitemset['selitemForm'] = self.form_list[0]['forminstance']
             rel_list =[]
 
             qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
@@ -1174,32 +1192,71 @@ class SelectItemApply(BasicPart):
                     data['action'] = "update_basket"
 
             elif selitemaction == "add_dct":
-                # Double check: this functionality only exists for M, HC, PD
-                if selitemtype in oSelDct and not rsetoneid is None:
-                    # Add all selected items to the DCT
-                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
-
-                    # Figure out which selection object to use
-                    selParams = oSelDct[selitemtype]
-                    setlisttype = selParams['setlisttype']
-                    field_s = selParams['field_s']
-
-                    # Add all selected items to the DCT
+                # A research set needs to have been selected
+                if not rsetoneid is None:
+                    # Get to the research set
                     rset = ResearchSet.objects.filter(id=rsetoneid).first()
                     if not rset is None:
-                        # Walk all the selected items
-                        for obj in qs:
-                            # Add this item to the chosen research set
-                            item = getattr(obj,field_s)
-                            rset.add_list(item, setlisttype)
-                        # make sure to add a link to the research set here
-                        data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+                        # Make a list of items that are to be added to the DCT
+                        if selitemtype == "svdi":
+                            # Treat special case: 'svdi' = SavedItems from the PRE
+                            qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
 
-                    # Remove the selection
-                    qs.delete()
+                            # List to capture of all id's of SelItem that are used
+                            lst_selitem = []
 
-                    # Indicate that the JS also needs to do some clearing
-                    data['action'] = "update_dct"
+                            # Retrieve each SavedItem and interpret it
+                            for selitem in qs:
+                                saveditem = selitem.saveditem
+                                if not saveditem is None:
+                                    selitemtype = saveditem.sitemtype
+
+                                    if selitemtype in oSelDct:
+                                        # Figure out which selection object to use
+                                        selParams = oSelDct[selitemtype]
+                                        setlisttype = selParams['setlisttype']
+                                        field_s = selParams['field_s']
+
+                                        # Add what the SavedItem points to the chosen research set
+                                        item = getattr(saveditem,field_s)
+                                        rset.add_list(item, setlisttype)
+
+                                        # Indicate that this can be 'unselected'
+                                        lst_selitem.append(selitem.id)
+
+                            # make sure to add a link to the research set here
+                            data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                            # Remove the selection
+                            if len(lst_selitem) > 0:
+                                SelectItem.objects.filter(id__in=lst_selitem).delete()
+
+                            # Indicate that the JS also needs to do some clearing
+                            data['action'] = "update_dct"
+
+                        # Double check: this functionality only exists for M, HC, PD
+                        elif selitemtype in oSelDct:
+                            # Add all selected items to the DCT
+                            qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                            # Figure out which selection object to use
+                            selParams = oSelDct[selitemtype]
+                            setlisttype = selParams['setlisttype']
+                            field_s = selParams['field_s']
+
+                            # Walk all the selected items
+                            for obj in qs:
+                                # Add this item to the chosen research set
+                                item = getattr(obj,field_s)
+                                rset.add_list(item, setlisttype)
+                            # make sure to add a link to the research set here
+                            data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                            # Remove the selection
+                            qs.delete()
+
+                            # Indicate that the JS also needs to do some clearing
+                            data['action'] = "update_dct"
 
             
 

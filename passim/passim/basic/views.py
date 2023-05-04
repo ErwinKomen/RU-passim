@@ -1575,6 +1575,7 @@ class BasicDetails(DetailView):
     backbutton = True
     bNeedReload = False     # Needed to signal a Ctrl+F5 reload for JS
     custombuttons = []
+    selectbuttons = []
     sel_button = None
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations

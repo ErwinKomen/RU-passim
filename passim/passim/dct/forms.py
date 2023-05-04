@@ -74,6 +74,25 @@ class ProfileWidget(ModelSelect2MultipleWidget):
         return Profile.objects.all().order_by('user__username').distinct()
 
 
+class ResearchSetOneWidget(ModelSelect2Widget):
+    model = ResearchSet
+    search_fields = [ 'name__icontains' ]
+    type = None
+    qs = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.qs is None:
+            profile = self.attrs.pop('profile', '')
+            qs = ResearchSet.objects.filter(profile=profile)
+            self.qs = qs
+        else:
+            qs = self.qs
+        return qs
+
+
 # ================ FORMS ================================================
 
 class ResearchSetForm(BasicModelForm):
@@ -199,3 +218,37 @@ class SetDefForm(BasicModelForm):
             msg = oErr.get_error_message()
             oErr.DoError("SetDefForm")
         return None
+
+
+class RsetSelForm(BasicSimpleForm):
+    """Form to facilitate selecting a research set for DCT work"""
+
+    rsetone     = ModelChoiceField(queryset=None, required=False)
+
+    def __init__(self, *args, **kwargs):
+        # NOTE: we do need to have the user here
+        self.user = kwargs.pop('user')
+        # Start by executing the standard handling
+        super(RsetSelForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Get the profile from the username
+            if self.user is None:
+                # Just show this on the server log
+                oErr.Status("WARNING: RsetSelForm: no user supplied")
+            else:
+                profile = self.user.user_profiles.first()
+                # Set the widgets correctly
+                self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
+                            'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+
+                # The rsetone information is needed for "selection-to-DCT" processing
+                self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("rsetselform")
+
+
+
