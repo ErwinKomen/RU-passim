@@ -4589,7 +4589,7 @@ class SermonEdit(BasicDetails):
             # IN all cases
             mainitems_SSG = {'type': 'line',    'label': "Authority file links:",  'value': self.get_superlinks_markdown(instance), 
                  'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
-                 'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssgdist_template'}
+                 'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
             context['mainitems'].append(mainitems_SSG)
             # Notes:
             # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection

@@ -2817,9 +2817,13 @@ class SermonDescrSuperForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, # help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
     # For the method "nodistance"
-    newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+    newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
                 widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
-                                                  'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+                        'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
+    #            widget=EqualGoldWidget(attrs={'data-placeholder': 'Select links...', 
+    #                    'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+
     # For the method "superdist"
     #newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
     #            widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
