@@ -193,11 +193,16 @@ var ru = (function ($, ru) {
        *  errMsg - show error message in <div> loc_divErr
        */
       errMsg: function (sMsg, ex) {
+        var err = "#" + loc_divErr;
+
         var sHtml = "Error in [" + sMsg + "]<br>";
         if (ex !== undefined && ex !== null) {
           sHtml = sHtml + ex.message;
         }
-        $("#" + loc_divErr).html(sHtml);
+        if ($(err).length === 0) {
+          err = $(".err-msg").first();
+        }
+        $(err).html(sHtml);
       },
 
       /** 
@@ -2646,6 +2651,19 @@ var ru = (function ($, ru) {
 
                           // Now submit the form
                           oBack = frm.submit();
+
+                        })
+                        .catch(function (err) {
+                          var x = 1;
+
+                          // Need to stop showing waiting?
+                          if (waitclass !== null) {
+                            // Start waiting
+                            $(frm).find(waitclass).addClass("hidden");
+                          }
+
+                          // Show something has happened
+                          private_methods.errMsg("Sorry, unable to create an image");
 
                         });
 
