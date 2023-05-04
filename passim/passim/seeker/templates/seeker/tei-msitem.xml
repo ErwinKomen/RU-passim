@@ -1,26 +1,31 @@
 <msItem>
-  {% if msitem.itemsermons.count == 1 %}
-    {% for sermon in msitem.itemsermons.all %}
-      <locus from="{{sermon.locus_first}}" to="{{sermon.locus_last}}">{{sermon.locus}}</locus>
-      <title>{% if sermon.title %}{{sermon.title.strip}}{% endif %}</title>
-      {% if sermon.subtitle %}<rubric>{{sermon.subtitle.strip}}</rubric>{% endif %}
-      {% if sermon.incipit %}<incipit>{{sermon.incipit}}</incipit>{% endif %}
-      {% if sermon.explicit %}<explicit>{{sermon.explicit}}</explicit>{% endif %}
-      {% if sermon.quote %}<quote>{{sermon.quote}}</quote>{% endif %}
-      {% if sermon.note %}<note>{{sermon.note}}</note>{% endif %}
-      {% if sermon.author %}
-        <author cert="{{sermon.get_autype_display}}">{{sermon.author.name}}</author>
-      {% endif %}
-    {% endfor %}
-  {% else %}
-    {% for sermonhead in msitem.itemheads.all %}
-      <locus from="{{sermonhead.locus_first}}" to="{{sermonhead.locus_last}}">{{sermonhead.locus}}</locus>
-      <title>{% if sermonhead.title %}{{sermonhead.title.strip}}{% endif %}</title>
-    {% endfor %}
-  {% endif %}
+  {% spaceless %}
+    {% if msitem.itemsermons.count == 1 %}
+      {% for sermon in msitem.itemsermons.all %}
+        <locus from="{{sermon.locus_first}}" to="{{sermon.locus_last}}">{{sermon.locus}}</locus>
+        <title>
+          {% if sermon.title %}<title type="title">{{sermon.title.strip}}</title>{% endif %}
+          {% for sig in sermon.get_eqsetsignatures %}<title type="{{sig.get_editype_display|lower}}">{{sig.code}}</title>{% endfor %}
+        </title>
+        {% if sermon.subtitle %}<rubric>{{sermon.subtitle.strip}}</rubric>{% endif %}
+        {% if sermon.incipit %}<incipit>{{sermon.incipit}}</incipit>{% endif %}
+        {% if sermon.explicit %}<explicit>{{sermon.explicit}}</explicit>{% endif %}
+        {% if sermon.quote %}<quote>{{sermon.quote}}</quote>{% endif %}
+        {% if sermon.note %}<note>{{sermon.note}}</note>{% endif %}
+        {% if sermon.author %}
+          <author key="author_{{sermon.author.id|stringformat:'09d'}}" cert="{{sermon.get_autype_display}}">(ascr. {{sermon.author.name}})</author>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      {% for sermonhead in msitem.itemheads.all %}
+        <locus from="{{sermonhead.locus_first}}" to="{{sermonhead.locus_last}}">{{sermonhead.locus}}</locus>
+        <title type="heading">{% if sermonhead.title %}{{sermonhead.title.strip}}{% endif %}</title>
+      {% endfor %}
+    {% endif %}
 
-  {% for child in msitem.get_children %}
-    {% include 'seeker/tei-msitem.xml' with msitem=child %}
-  {% endfor %}
+    {% for child in msitem.get_children %}
+      {% include 'seeker/tei-msitem.xml' with msitem=child %}
+    {% endfor %}
+  {% endspaceless %}
 </msItem>
 

@@ -9817,6 +9817,27 @@ class SermonDescr(models.Model):
             oErr.DoError("get_eqset")
         return sBack
 
+    def get_eqsetsignatures(self):
+
+        # Initializations
+        signatures = Signature.objects.none()
+        oErr = ErrHandle()
+        try:
+            # Get all linked SSG items
+            ssg_list = self.equalgolds.all().values('id')
+            if len(ssg_list) > 0:
+                # Get a list of all the SG that are in these equality sets
+                gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+                if len(gold_list) > 0:
+                    # Get the list of Signature objects this results in
+                    signatures = Signature.objects.filter(gold__in=gold_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/get_eqsetsignatures")
+
+        # Return what we received
+        return signatures
+
     def get_eqsetsignatures_markdown(self, type="all", plain=False):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 

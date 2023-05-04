@@ -1768,10 +1768,14 @@ var ru = (function ($, ru) {
       fixed_header: function() {
         $("div .fixed-header-container").each(function (idx, el) {
           var iHeight,
+              elFoot = null,
               elDiv;
 
-          iHeight = $("footer").get(0).offsetTop - 300;
-          $(el).height(iHeight);
+          elFoot = $("footer").get(0);
+          if (elFoot !== undefined) {
+            iHeight = elFoot.offsetTop - 300;
+            $(el).height(iHeight);
+          }
         });
 
       },
