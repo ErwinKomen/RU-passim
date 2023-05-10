@@ -41,7 +41,7 @@ adaptation_list = {
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
         'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
-        'huwa_edilit_remove'],
+        'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
@@ -1159,6 +1159,54 @@ def adapt_huwa_edilit_remove():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_searchable():
+    # Issue #522: mono-projectal SSGs must have atype 'acc'
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    fields_sermondescr = ['incipit', 'explicit', 'fulltext', 'title', 'subtitle', 'sectiontitle']
+    fields_equalgold = ['incipit', 'explicit', 'fulltext']
+    fields_sermongold = ['incipit', 'explicit']
+
+    def adapt_value(obj, field):
+        # Need to know the name of the [srch] field
+        srchfield = "srch{}".format(field)         
+        # Get current value of that srch-field           
+        srch_current = getattr(obj, srchfield)
+        if srch_current is None: srch_current = ""
+        # Get value as it should be
+        srch_new = get_searchable(getattr(obj, field))
+        # Compare and correct
+        if srch_current != srch_new:
+            setattr(obj, srchfield, srch_new)
+            obj.save()
+
+    try:
+        # Process SermonDescr
+        with transaction.atomic():
+            for obj in SermonDescr.objects.all():
+                for field in fields_sermondescr:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+        # Process EqualGold
+        with transaction.atomic():
+            for obj in EqualGold.objects.all():
+                for field in fields_equalgold:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+        # Process SermonGold
+        with transaction.atomic():
+            for obj in SermonGold.objects.all():
+                for field in fields_sermongold:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
 
 
 # =========== Part of provenance_list ==================

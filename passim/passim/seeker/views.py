@@ -5285,7 +5285,7 @@ class SermonListView(BasicList):
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
-                  'sectiontitle', 'title', '','','', 'stype']
+                  'srchsectiontitle', 'srchtitle', '','','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
@@ -5344,8 +5344,8 @@ class SermonListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
-            {'filter': 'title',         'dbfield': 'title',             'keyS': 'srch_title'},
-            {'filter': 'sectiontitle',  'dbfield': 'sectiontitle',      'keyS': 'srch_sectiontitle'},
+            {'filter': 'title',         'dbfield': 'srchtitle',         'keyS': 'srch_title'},
+            {'filter': 'sectiontitle',  'dbfield': 'srchsectiontitle',  'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},

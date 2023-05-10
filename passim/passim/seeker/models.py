@@ -387,14 +387,25 @@ def striphtmlre(data):
 
 def striphtml(data):
     sBack = data
-    if not data is None and data != "":
-        xml = lxml.html.document_fromstring(data)
-        if not xml is None:
-            sBack = xml.text_content()
+    oErr = ErrHandle()
+    try:
+        if not data is None and data != "":
+            try:
+                xml = lxml.html.document_fromstring(data)
+                if not xml is None:
+                    sBack = xml.text_content()
+            except:
+                # If it fails here, we just assume it is not parseable
+                sBack = ""
+                oErr.Status("striphtml: removed [{}]".format(data))
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("seeker/striphtml")
     return sBack
 
 def get_searchable(sText):
-    sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
+    # Note: no opening or closing slash!
+    sRemove = r"\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]"
 
     oErr = ErrHandle()
     try:
@@ -8866,12 +8877,15 @@ class SermonDescr(models.Model):
 
     # [0-1] Not every sermon might have a title ...
     title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
+    srchtitle = models.TextField("Title (searchable)", null=True, blank=True)
 
     # [0-1] Some (e.g. e-codices) may have a subtitle (field <rubric>)
     subtitle = models.CharField("Sub title", null=True, blank=True, max_length=LONG_STRING)
+    srchsubtitle = models.TextField("Sub title (searchable)", null=True, blank=True)
 
     # [0-1] Section title 
     sectiontitle = models.CharField("Section title", null=True, blank=True, max_length=LONG_STRING)
+    srchsectiontitle = models.TextField("Section title (searchable)", null=True, blank=True)
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
@@ -10339,22 +10353,32 @@ class SermonDescr(models.Model):
         istop = 1
         response = None
         oErr = ErrHandle()
+        brush_up_fields = ['incipit', 'explicit', 'fulltext', 'title', 'subtitle', 'sectiontitle']
         try:
-            # Brush up incipit
-            if self.incipit: 
-                srchincipit = get_searchable(self.incipit)
-                if self.srchincipit != srchincipit:
-                    self.srchincipit = srchincipit
-            # Brush up explicit
-            if self.explicit: 
-                srchexplicit = get_searchable(self.explicit)
-                if self.srchexplicit != srchexplicit:
-                    self.srchexplicit = srchexplicit
-            # Brush up fulltext
-            if self.fulltext: 
-                srchfulltext = get_searchable(self.fulltext)
-                if self.srchfulltext != srchfulltext:
-                    self.srchfulltext = srchfulltext
+            # Brush up fields that need to
+            for field in brush_up_fields:
+                srchfield = "srch{}".format(field)
+                # Get current and intended value
+                value_current = getattr(self, srchfield)
+                if value_current is None: value_current = ""
+                value_intended = get_searchable(getattr(self, field))
+                if value_current != value_intended:
+                    setattr(self, srchfield, value_intended)
+            ## Brush up incipit
+            #if self.incipit: 
+            #    srchincipit = get_searchable(self.incipit)
+            #    if self.srchincipit != srchincipit:
+            #        self.srchincipit = srchincipit
+            ## Brush up explicit
+            #if self.explicit: 
+            #    srchexplicit = get_searchable(self.explicit)
+            #    if self.srchexplicit != srchexplicit:
+            #        self.srchexplicit = srchexplicit
+            ## Brush up fulltext
+            #if self.fulltext: 
+            #    srchfulltext = get_searchable(self.fulltext)
+            #    if self.srchfulltext != srchfulltext:
+            #        self.srchfulltext = srchfulltext
 
             # Preliminary saving, before accessing m2m fields
             response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
