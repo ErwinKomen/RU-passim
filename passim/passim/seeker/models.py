@@ -8631,7 +8631,8 @@ class Collection(models.Model):
         msitems = []
         with transaction.atomic():
             order = 1
-            for ssg in self.collections_super.all():
+            for obj in CollectionSuper.objects.filter(collection=self).order_by('order'):
+                ssg = obj.super
                 # Create a MsItem
                 msitem = MsItem.objects.create(manu=manu, codico=codico, order=order)
                 order += 1
