@@ -7744,7 +7744,7 @@ class CollAnyEdit(BasicDetails):
                 if self.manu == None:
                     context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
             # Historical collections may have literature references
-            if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
+            if instance.settype == "hc" and len(self.formset_objects) > 0 and len(self.formset_objects[0]) > 0:
                 oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
                 if context['is_app_editor']:
                     oLitref['multiple'] = True
@@ -8547,16 +8547,21 @@ class CollHistDetails(CollHistEdit):
     def custom_init(self, instance):
         # First do the original custom init
         response = super(CollHistDetails, self).custom_init(instance)
-        # Now continue
-        if instance.settype != "hc":
-            # Someone does as if this is a historical collection...
-            # Determine what kind of dataset/collection this is
-            if instance.owner == Profile.get_user_profile(self.request.user.username):
-                # Private dataset
-                self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
-            else:
-                # Public dataset
-                self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+
+        if not instance is None:
+            # Now continue
+            if instance.settype != "hc":
+                # Someone does as if this is a historical collection...
+                # Determine what kind of dataset/collection this is
+                if instance.owner == Profile.get_user_profile(self.request.user.username):
+                    # Private dataset
+                    self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+                else:
+                    # Public dataset
+                    self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+
+            # Check for hlist saving
+            self.check_hlist(instance)
         return None
 
     def add_to_context(self, context, instance):
