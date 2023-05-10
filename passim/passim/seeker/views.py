@@ -5585,6 +5585,22 @@ class SermonListView(BasicList):
                     # Reset the authortype
                     fields['authortype'] = ""
 
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(msitem__codico__codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(msitem__codico__codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(msitem__codico__codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(msitem__codico__codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
+
+
             # Adapt according to the 'free' fields
             free_term = fields.get("free_term", "")
             if free_term != None and free_term != "":
@@ -11333,148 +11349,159 @@ class ManuscriptListView(BasicList):
         #prjlist = None # old
         projlist = None
 
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        oErr = ErrHandle()
+        try:
+
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
        
-        # Check if a list of projects is given
-        if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
-            # Get the list
-            projlist = fields['projlist']
+            # Check if a list of projects is given
+            if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
+                # Get the list
+                projlist = fields['projlist']
 
-        ## Check if the prjlist is identified
-        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-        #    # Get the default project
-        #    qs = Project.objects.all()
-        #    if qs.count() > 0:
-        #        prj_default = qs.first()
-        #        qs = Project.objects.filter(id=prj_default.id)
-        #        fields['prjlist'] = qs
-        #        prjlist = qs
-
-        # Check if an overlap percentage is specified
-        if 'overlap' in fields and fields['overlap'] != None:
-            # Get the overlap
-            overlap = fields.get('overlap', "0")
-            # Use an overt truth 
-            fields['overlap'] = Q(mtype="man")
-            if 'collist_hist' in fields and fields['collist_hist'] != None:
-                coll_list = fields['collist_hist']
-                if len(coll_list) > 0:
-                    # Yes, overlap specified
-                    if isinstance(overlap, int):
-                        # Make sure the string is interpreted as an integer
-                        overlap = int(overlap)
-                        # Now add a Q expression
-                        fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
-
-                        # Make sure to actually *calculate* the overlap between the different collections and manuscripts
-                
-                        # (1) Possible manuscripts only filter on: mtype=man, prjlist
-                        lstQ = []
-                        # if prjlist != None: lstQ.append(Q(project__in=prjlist))
-                        lstQ.append(Q(mtype="man"))
-                        lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
-                        manu_list = Manuscript.objects.filter(*lstQ)
-
-                        # We also need to have the profile
-                        profile = Profile.get_user_profile(self.request.user.username)
-                        # Now calculate the overlap for all
-                        with transaction.atomic():
-                            for coll in coll_list:
-                                for manu in manu_list:
-                                    ptc = CollOverlap.get_overlap(profile, coll, manu)
-                if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
-                    # The base manuscripts with which the comparison goes
-                    base_manu_list = fields['cmpmanuidlist']
-                    if len(base_manu_list) > 0:
+            # Check if an overlap percentage is specified
+            if 'overlap' in fields and fields['overlap'] != None:
+                # Get the overlap
+                overlap = fields.get('overlap', "0")
+                # Use an overt truth 
+                fields['overlap'] = Q(mtype="man")
+                if 'collist_hist' in fields and fields['collist_hist'] != None:
+                    coll_list = fields['collist_hist']
+                    if len(coll_list) > 0:
                         # Yes, overlap specified
                         if isinstance(overlap, int):
                             # Make sure the string is interpreted as an integer
                             overlap = int(overlap)
                             # Now add a Q expression
-                            # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
-                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
 
-                            # (1) Get a list of SSGs associated with these manuscripts
-                            base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
-                            base_ssg_list = [x['id'] for x in base_ssg_list]
-                            base_count = len(base_ssg_list)
+                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
                 
-                            # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                            # (1) Possible manuscripts only filter on: mtype=man, prjlist
                             lstQ = []
                             # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                             lstQ.append(Q(mtype="man"))
-                            lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                            lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
 
                             # We also need to have the profile
                             profile = Profile.get_user_profile(self.request.user.username)
                             # Now calculate the overlap for all
-                            manu_include = []
                             with transaction.atomic():
-                                for manu in manu_list:
-                                    # Get a list of SSG id's associated with this particular manuscript
-                                    manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
-                                    if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
-                                        # Add this manuscript to the list 
-                                        if not manu.id in manu_include:
-                                            manu_include.append(manu.id)
-                            fields['cmpmanuidlist'] = None
-                            fields['cmpmanu'] = Q(id__in=manu_include)
+                                for coll in coll_list:
+                                    for manu in manu_list:
+                                        ptc = CollOverlap.get_overlap(profile, coll, manu)
+                    if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
+                        # The base manuscripts with which the comparison goes
+                        base_manu_list = fields['cmpmanuidlist']
+                        if len(base_manu_list) > 0:
+                            # Yes, overlap specified
+                            if isinstance(overlap, int):
+                                # Make sure the string is interpreted as an integer
+                                overlap = int(overlap)
+                                # Now add a Q expression
+                                # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                                # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+
+                                # (1) Get a list of SSGs associated with these manuscripts
+                                base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
+                                base_ssg_list = [x['id'] for x in base_ssg_list]
+                                base_count = len(base_ssg_list)
+                
+                                # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                                lstQ = []
+                                # if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                                lstQ.append(Q(mtype="man"))
+                                lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                                manu_list = Manuscript.objects.filter(*lstQ)
+
+                                # We also need to have the profile
+                                profile = Profile.get_user_profile(self.request.user.username)
+                                # Now calculate the overlap for all
+                                manu_include = []
+                                with transaction.atomic():
+                                    for manu in manu_list:
+                                        # Get a list of SSG id's associated with this particular manuscript
+                                        manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
+                                        if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
+                                            # Add this manuscript to the list 
+                                            if not manu.id in manu_include:
+                                                manu_include.append(manu.id)
+                                fields['cmpmanuidlist'] = None
+                                fields['cmpmanu'] = Q(id__in=manu_include)
+
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(manuscriptcodicounits__codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(manuscriptcodicounits__codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(manuscriptcodicounits__codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(manuscriptcodicounits__codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
 
 
-        # Adapt the bible reference list
-        bibrefbk = fields.get("bibrefbk", "")
-        if bibrefbk != None and bibrefbk != "":
-            bibrefchvs = fields.get("bibrefchvs", "")
+            # Adapt the bible reference list
+            bibrefbk = fields.get("bibrefbk", "")
+            if bibrefbk != None and bibrefbk != "":
+                bibrefchvs = fields.get("bibrefchvs", "")
 
-            # Get the start and end of this bibref
-            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+                # Get the start and end of this bibref
+                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
 
-            # Find out which manuscripts have sermons having references in this range
-            lstQ = []
-            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-            manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
+                # Find out which manuscripts have sermons having references in this range
+                lstQ = []
+                lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibrefbk'] = Q(id__in=manulist)
+                fields['bibrefbk'] = Q(id__in=manulist)
 
-        # Make sure we only show manifestations
-        # fields['mtype'] = 'man'
-        # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
+            # Make sure we only show manifestations
+            # fields['mtype'] = 'man'
+            # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
 
-        # Make sure we only use the Authority Files with accepted modifications
-        # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def')        
-        # With this condition we make sure ALL manuscripts are in de unfiltered listview
-        print (fields['passimcode'])
-        if fields['passimcode'] != '':
-            fields['atype'] = 'acc'
+            # Make sure we only use the Authority Files with accepted modifications
+            # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def')        
+            # With this condition we make sure ALL manuscripts are in de unfiltered listview
+            print (fields['passimcode'])
+            if fields['passimcode'] != '':
+                fields['atype'] = 'acc'
        
-        lstExclude = [ Q(mtype='tem') ]
+            lstExclude = [ Q(mtype='tem') ]
         
-        # Adapt the search for empty authors
-        # Hoe komen we aan dat authortype? Waar komt die bij sermon list view vandaan? EK vragen
-        if 'authortype' in fields:
-            authortype = fields['authortype']
-            if authortype == "non":
-                # lstExclude = []
-                lstExclude.append(Q(manuitems__itemsermons__author__isnull=False))
-            elif authortype == "spe":
-                # lstExclude = []
-                lstExclude.append(Q(manuitems__itemsermons__author__isnull=True))
-            else:
-                # Reset the authortype
-                fields['authortype'] = ""   
+            # Adapt the search for empty authors
+            # Hoe komen we aan dat authortype? Waar komt die bij sermon list view vandaan? EK vragen
+            if 'authortype' in fields:
+                authortype = fields['authortype']
+                if authortype == "non":
+                    # lstExclude = []
+                    lstExclude.append(Q(manuitems__itemsermons__author__isnull=False))
+                elif authortype == "spe":
+                    # lstExclude = []
+                    lstExclude.append(Q(manuitems__itemsermons__author__isnull=True))
+                else:
+                    # Reset the authortype
+                    fields['authortype'] = ""   
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
@@ -12122,29 +12149,41 @@ class CodicoListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        # prjlist = None
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        oErr = ErrHandle()
+        try:
 
-        ## Check if the prjlist is identified
-        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-        #    # Get the default project
-        #    qs = Project.objects.all()
-        #    if qs.count() > 0:
-        #        prj_default = qs.first()
-        #        qs = Project.objects.filter(id=prj_default.id)
-        #        fields['prjlist'] = qs
-        #        prjlist = qs
+            # prjlist = None
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
+
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CodicoListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
