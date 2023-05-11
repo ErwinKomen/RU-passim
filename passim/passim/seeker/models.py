@@ -9732,25 +9732,32 @@ class SermonDescr(models.Model):
     def get_collection_link(self, settype):
         lHtml = []
         lstQ = []
-        # Get all the SSG to which I link
-        lstQ.append(Q(super_col__super__in=self.equalgolds.all()))
-        lstQ.append(Q(settype=settype))
-        # Make sure we restrict ourselves to the *public* datasets
-        lstQ.append(Q(scope="publ"))
-        # Get the collections in which these SSGs are
-        collections = Collection.objects.filter(*lstQ).order_by('name')
-        # Visit all datasets/collections linked to me via the SSGs
-        for col in collections:
-            # Determine where clicking should lead to
-            # url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
-            if settype == "hc":
-                url = reverse("collhist_details", kwargs={'pk': col.id})
-            else:
-                url = reverse("collpubl_details", kwargs={'pk': col.id})
-            # Create a display for this topic
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get all the SSG to which I link
+            lstQ.append(Q(super_col__super__in=self.equalgolds.all()))
+            lstQ.append(Q(settype=settype))
+            # Make sure we restrict ourselves to the *public* datasets
+            # issue #547: do *NOT* have such a restriction
+            #   lstQ.append(Q(scope="publ"))
+            # Get the collections in which these SSGs are
+            collections = Collection.objects.filter(*lstQ).order_by('name')
+            # Visit all datasets/collections linked to me via the SSGs
+            for col in collections:
+                # Determine where clicking should lead to
+                # url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
+                if settype == "hc":
+                    url = reverse("collhist_details", kwargs={'pk': col.id})
+                else:
+                    url = reverse("collpubl_details", kwargs={'pk': col.id})
+                # Create a display for this topic
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 
-        sBack = ", ".join(lHtml)
+            sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_collection_link")
         return sBack
     
     def get_collections_markdown(self, username, team_group, settype = None, plain=False):
