@@ -3504,7 +3504,7 @@ class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
     # [1] Name of the manuscript (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
+    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="SUPPLY A NAME")
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -3636,7 +3636,7 @@ class Manuscript(models.Model):
         if codi == None:
             # Create and link a new codico
             codi = Codico.objects.create(
-                name="SUPPLY A NAME", order=1, pagefirst=1, pagelast=1, manuscript=self
+                name="", order=1, pagefirst=1, pagelast=1, manuscript=self
                 )
 
         # Possibly adapt the number of manuscripts for the associated library
@@ -3930,7 +3930,7 @@ class Manuscript(models.Model):
                         # Check if this codico has a proper name...
                         codico_name = oManu.get("codico_name")
                         if codico_name is None:
-                            if codico.name is None or codico.name == "SUPPLY A NAME":
+                            if codico.name is None or codico.name == "" or codico.name == "SUPPLY A NAME":
                                 # Evaluate all the sermons under it
                                 sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
                                 etc = "" if sermons.count() <= 1 else " etc."
@@ -5525,7 +5525,7 @@ class Codico(models.Model):
     """A codicological unit is a physical part (or whole) of a Manuscript"""
 
     # [1] Name of the codicological unit (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
+    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
 

@@ -34,7 +34,8 @@ from passim.reader.views import read_kwcategories
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions'],
+                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
+                        'supplyname'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
@@ -358,6 +359,32 @@ def adapt_doublecodico():
     except:
         bResult = False
         msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_supplyname():
+    """Convert SUPPLY A NAME to an empty string"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Walk all codico's
+        with transaction.atomic():
+            for codico in Codico.objects.all():
+                if codico.name == "SUPPLY A NAME":
+                    codico.name = ""
+                    codico.save()
+        # Walk all manuscripts
+        with transaction.atomic():
+            for manu in Manuscript.objects.all():
+                if manu.name == "SUPPLY A NAME":
+                    manu.name = ""
+                    manu.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adapt_supplyname")
+        bResult = False
     return bResult, msg
 
 def add_codico_to_manuscript(manu):
