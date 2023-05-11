@@ -33,8 +33,11 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_filter = [],        // Building a complex filter
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        loc_sFilterOp = "<select class='form-control input-xs filteropt' onchange='ru.basic.filter_opt(this)'><option value='and'>and</option>" +
+          "<option value='nand'>and not</option><option value='or'>or</option><option value='nor'>or not</option></select>",
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
         loc_language = [],
@@ -1177,6 +1180,26 @@ var ru = (function ($, ru) {
         }
       },
 
+      filter_opt: function (el) {
+        var elLabel = null,
+            sNumber = "",
+            iNumber = 0;
+
+        try {
+          elLabel = $(el).closest("span").find("label").first();
+          sNumber = $(elLabel).text().trim();
+          if (sNumber !== "") {
+            iNumber = parseInt(sNumber, 10);
+            // Find the element in loc_filter
+            loc_filter[iNumber - 1]['operator'] = $(el).val();
+            // Adapt the #qfilter
+            $("#qfilter").val(JSON.stringify(loc_filter);
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_opt", ex);
+        }
+      },
+
       /**
        * filter_click
        *    What happens when clicking a badge filter
@@ -1187,7 +1210,9 @@ var ru = (function ($, ru) {
             targetadd = null,
             target_item = null,
             i = 0,
+            operator = "",
             sLabel = "",
+            sNumber = "",
             lst_target = [],
             specs = null;
 
@@ -1202,6 +1227,24 @@ var ru = (function ($, ru) {
           // Start showing the target
           if (target !== undefined && target !== null && target !== "") {
             target = $("#" + target);
+
+            // Check whether this target should appear on the loc_filter
+            if (!$(target).hasClass("row")) {
+              // Determine the operator
+              operator = (loc_filter.length === 0) ? "start" : "and";
+
+              // Should be added
+              loc_filter.push({ operator: operator, name: $(target).attr("id") });
+              // Adapt the #qfilter
+              $("#qfilter").val(JSON.stringify(loc_filter);
+
+              // If this is not start, then add the operator code
+              if (operator !== "start") {
+                sNumber = "<label>" + loc_filter.length + "</label>" + loc_sFilterOp;
+                $(target).find(".filter-operator").html(sNumber);
+              }
+            }
+
             // Create a list of targets
             lst_target.push(target);
             if (targetadd !== null && $(targetadd).length > 0) {
@@ -3000,54 +3043,57 @@ var ru = (function ($, ru) {
         try {
           // Clear filters
           $(".badge.filter").each(function (idx, elThis) {
-             var target,
-                 targetadd,
-                 targetitem,
-                 i,
-                 lst_target = [];
+              var target,
+                  targetadd,
+                  targetitem,
+                  i,
+                  lst_target = [];
 
             target = $(elThis).attr("targetid");
             targetadd = $(elThis).attr("targetaddid");
-              if (target !== undefined && target !== null && target !== "") {
-                  target = $("#" + target);
-                  lst_target.push(target);
-                  if (targetadd !== undefined && targetadd !== null && targetadd !== "") {
-                      lst_target.push($("#" + targetadd));
-                  }
-
-                  // Action depends on checking or not
-                  if ($(elThis).hasClass("on")) {
-                      // it is on, switch it off
-                      $(elThis).removeClass("on");
-                      $(elThis).removeClass("jumbo-3");
-                      $(elThis).addClass("jumbo-1");
-
-                      // Must hide it and reset all associated targets
-                      for (i = 0; i < lst_target.length; i++) {
-                          targetitem = lst_target[i];
-                          $(targetitem).addClass("hidden");
-
-                          // Process the <input> element
-                          $(target).find("input").each(function (idx, elLocal) {
-                              $(elLocal).val("");
-                          });
-                          // Process the <textarea> element
-                          $(target).find("textarea").each(function (idx, elLocal) {
-                              $(elLocal).val("");
-                          });
-                          // Also reset all select 2 items
-                          $(target).find("select").each(function (idx, elLocal) {
-                              $(elLocal).val("").trigger("change");
-                          });
-                        }  
-                      }  
-                    }  
-                  });
-
-                } catch (ex) {
-                  private_methods.errMsg("search_clear", ex);
+            if (target !== undefined && target !== null && target !== "") {
+                target = $("#" + target);
+                lst_target.push(target);
+                if (targetadd !== undefined && targetadd !== null && targetadd !== "") {
+                    lst_target.push($("#" + targetadd));
                 }
-               },
+
+                // Action depends on checking or not
+                if ($(elThis).hasClass("on")) {
+                    // it is on, switch it off
+                    $(elThis).removeClass("on");
+                    $(elThis).removeClass("jumbo-3");
+                    $(elThis).addClass("jumbo-1");
+
+                    // Must hide it and reset all associated targets
+                    for (i = 0; i < lst_target.length; i++) {
+                        targetitem = lst_target[i];
+                        $(targetitem).addClass("hidden");
+
+                        // Process the <input> element
+                        $(target).find("input").each(function (idx, elLocal) {
+                            $(elLocal).val("");
+                        });
+                        // Process the <textarea> element
+                        $(target).find("textarea").each(function (idx, elLocal) {
+                            $(elLocal).val("");
+                        });
+                        // Also reset all select 2 items
+                        $(target).find("select").each(function (idx, elLocal) {
+                            $(elLocal).val("").trigger("change");
+                        });
+                    }  
+                }  
+              }  
+          });
+
+            // Make sure to clear the filter builder
+          loc_filter = [];
+
+          } catch (ex) {
+            private_methods.errMsg("search_clear", ex);
+          }
+        },
 
       /**
        * search_start

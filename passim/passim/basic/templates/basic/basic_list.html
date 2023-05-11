@@ -122,6 +122,7 @@
           <!-- basket switched on or not -->
           <div class="hidden">
             <input name="usebasket" type="text" value="{{usebasket}}" />
+            <input name="qfilter" id="qfilter" type="text" value="" />
           </div>
 
           <!-- Filter tab -->
@@ -185,6 +186,13 @@
                                     </a>
                                   {% endif %}
                                 </td>
+
+                                <!-- Room for operator -->
+                                <td style="min-width: 80px;" valign="middle">
+                                  <span class="filter-operator form-inline">&nbsp;</span>
+                                </td>
+
+                                <!-- Actual filter -->
                                 <td style="width: 100%;">
                                   {% if filter.help != "" and filter.helptext != "" %}
                                     <div id="basic_h_{{filter.help}}" class="collapse">
@@ -271,6 +279,13 @@
                                         </a>
                                       {% endif %}
                                     </td>                                                                        
+
+                                    <!-- Room for operator -->
+                                    <td style="min-width: 80px;" valign="middle">
+                                      <span class="filter-operator form-inline">&nbsp;</span>
+                                    </td>
+
+                                    <!-- Actual filter -->
                                     <td style="width: 100%;">
                                       {% if filter.help != "" and filter.helptext != "" %}
                                         <div id="basic_h_{{filter.help}}" class="collapse">

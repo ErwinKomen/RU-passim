@@ -135,3 +135,8 @@ td.ruler {
 .selcount.showing {
     color: white;
 }
+
+.filteropt {
+    font-size: smaller;
+    padding: unset;
+}
