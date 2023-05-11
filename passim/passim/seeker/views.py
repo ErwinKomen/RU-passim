@@ -4975,8 +4975,10 @@ class SermonEdit(BasicDetails):
                         project = profile_projects.first().project
                         instance.projects.add(project)
                     else:
-                        # It would seem that this kind of check is needed anyway...
-                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+                        # Action should not be performed if this is a template
+                        if instance.mtype != 'tem':
+                            # It would seem that this kind of check is needed anyway...
+                            bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
 
         except:
             msg = oErr.get_error_message()
