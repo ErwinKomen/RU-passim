@@ -454,22 +454,23 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
         else:
             combi_q = None
             lFilters = json.loads(qfilter)
-            for qf in lFilters:
-                operator = qf.get("operator")
-                sName = qf.get("name")
-                s_q = dictQ[sName]
-                if operator == "start":
-                    combi_q = s_q
-                elif operator == "and":
-                    combi_q = combi_q & (s_q)
-                elif operator == "nand":
-                    combi_q = combi_q & (~ s_q)
-                elif operator == "or":
-                    combi_q = combi_q | (s_q)
-                elif operator == "nor":
-                    combi_q = combi_q | (~ s_q)
-            # Now set the lstQ
-            lstQ.append(combi_q)
+            if len(lFilters) > 0:
+                for qf in lFilters:
+                    operator = qf.get("operator")
+                    sName = qf.get("name")
+                    s_q = dictQ[sName]
+                    if operator == "start":
+                        combi_q = s_q
+                    elif operator == "and":
+                        combi_q = combi_q & (s_q)
+                    elif operator == "nand":
+                        combi_q = combi_q & (~ s_q)
+                    elif operator == "or":
+                        combi_q = combi_q | (s_q)
+                    elif operator == "nor":
+                        combi_q = combi_q | (~ s_q)
+                # Now set the lstQ
+                lstQ.append(combi_q)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("make_search_list")
