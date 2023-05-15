@@ -1343,6 +1343,13 @@ class BasicList(ListView):
                 bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
                 if not bHasListFilters:
                     self.basketview = ("usebasket" in get and get['usebasket'] == "True")
+            # At least get the qFilter
+            qfilter = get.get("qfilter")
+            if qfilter is None or qfilter == "":
+                qfilter = []
+            else:
+                qfilter = json.loads(qfilter)
+            self.qFilter = qfilter
 
             # Initial setting of qs
             qs = self.model.objects.none()

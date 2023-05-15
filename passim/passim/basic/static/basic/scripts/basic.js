@@ -1190,10 +1190,12 @@ var ru = (function ($, ru) {
           sNumber = $(elLabel).text().trim();
           if (sNumber !== "") {
             iNumber = parseInt(sNumber, 10);
-            // Find the element in loc_filter
-            loc_filter[iNumber - 1]['operator'] = $(el).val();
+            if (iNumber > 0 && iNumber <= loc_filter.length) {
+              // Find the element in loc_filter
+              loc_filter[iNumber - 1]['operator'] = $(el).val();
+            }
             // Adapt the #qfilter
-            $("#qfilter").val(JSON.stringify(loc_filter);
+            $("#qfilter").val(JSON.stringify(loc_filter));
           }
         } catch (ex) {
           private_methods.errMsg("filter_opt", ex);
@@ -1209,39 +1211,75 @@ var ru = (function ($, ru) {
         var target = null,
             targetadd = null,
             target_item = null,
+            target_id = "",
             i = 0,
+            iRemove = -1,
+            iNumber = 0,
             operator = "",
+            bRecalculate = false,
             sLabel = "",
             sNumber = "",
+            sName = "",
             lst_target = [],
             specs = null;
 
         try {
           // Find out which target to show
-          target = $(this).attr("targetid");
+          target_id = $(this).attr("targetid");
           // Find out which target to show
           sLabel = $(this).attr("targetaddid");
           if (sLabel !== undefined && sLabel !== null && sLabel !== "") {
             targetadd = $("#" + sLabel);
           }
           // Start showing the target
-          if (target !== undefined && target !== null && target !== "") {
-            target = $("#" + target);
+          if (target_id !== undefined && target_id !== null && target_id !== "") {
+            target = $("#" + target_id);
 
             // Check whether this target should appear on the loc_filter
             if (!$(target).hasClass("row")) {
-              // Determine the operator
-              operator = (loc_filter.length === 0) ? "start" : "and";
+              sName = $(target).attr("id");
+              // Are we switching on or off?
+              if ($(this).hasClass("on")) {
+                // WE are switching off: find the element within loc_filter
+                for (i = 0; i < loc_filter.length; i++) {
+                  if (loc_filter[i].name === sName) {
+                    // Mark this as 'to be removed'
+                    iRemove = i;
+                    break;
+                  }
+                  
+                }
+                // Actually remove it
+                if (iRemove >= 0) {
+                  // Splice it away in a sweep
+                  loc_filter.splice(iRemove, 1);
+                  // Re-calculate all targets
+                  for (i = 0; i < loc_filter.length; i++) {
+                    // Make sure to set the number of this one okay
+                    iNumber = i + 1;
+                    $(loc_filter[i].target).find("label").html(iNumber.toString());
+                    // Possibly adapt the operator
+                    if (i === 0 && loc_filter[i].operator !== "start") {
+                      loc_filter[i].operator = "start";
+                      $(loc_filter[i].target).find(".filter-operator").html("");
+                    }
+                  }
+                }
 
-              // Should be added
-              loc_filter.push({ operator: operator, name: $(target).attr("id") });
-              // Adapt the #qfilter
-              $("#qfilter").val(JSON.stringify(loc_filter);
+              } else {
+                // We are switching on: determine the operator
+                operator = (loc_filter.length === 0) ? "start" : "and";
 
-              // If this is not start, then add the operator code
-              if (operator !== "start") {
-                sNumber = "<label>" + loc_filter.length + "</label>" + loc_sFilterOp;
-                $(target).find(".filter-operator").html(sNumber);
+                // Should be added
+                loc_filter.push({ operator: operator, name: sName, target: "#" + target_id });
+                // Adapt the #qfilter
+                $("#qfilter").val(JSON.stringify(loc_filter));
+
+                // If this is not start, then add the operator code
+                if (operator !== "start") {
+                  sNumber = "<label>" + loc_filter.length + "</label>" + loc_sFilterOp;
+                  $(target).find(".filter-operator").html(sNumber);
+                }
               }
             }
 
