@@ -13061,26 +13061,6 @@ class EqualGoldEdit(BasicDetails):
             oErr.DoError("EqualGoldEdit/get_transcription")
         return sBack
 
-    #def get_transcription(self, instance):
-    #    """Make a good visualization of a transcription, which includes a show/hide button"""
-
-    #    sBack = ""
-    #    oErr = ErrHandle()
-    #    try:
-    #        # Get the text
-    #        if not instance.fulltext is None and instance.fulltext != "":
-    #            sText = instance.get_fulltext_markdown("actual", lowercase=False)
-    #            # Combine with button click + default hidden
-    #            html = []
-    #            html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
-    #            html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-    #            # Combine
-    #            sBack = "\n".join(html)
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("EqualGold/get_transcription")
-    #    return sBack
-
     def get_goldset_html(goldlist):
         context = {}
         template_name = 'seeker/super_goldset.html'

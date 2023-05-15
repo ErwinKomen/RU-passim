@@ -7103,38 +7103,74 @@ class EqualGold(models.Model):
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
 
-        lHtml = []
-        sBack = ""
-        oErr = ErrHandle()
-        try:
-            for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-                # Initializations
-                sSpectype = ""
-                sAlternatives = ""
-                sTitle = ""
-                sNoteShow = ""
-                sNoteDiv = ""
+        def get_one_row(lHtml, superlink, direction):
+            # Initializations
+            sSpectype = ""
+            sAlternatives = ""
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
 
-                # Get the URL for this particular link
-                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
+            try:
+                # Start the row
                 lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this AF to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other AFs to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Define the second column
                 if superlink.spectype != None and len(superlink.spectype) > 1:
                     # Show the specification type
                     sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
                 if superlink.alternatives != None and superlink.alternatives == "true":
                     sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+                # Get the URL for this particular link
+                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
                 lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span>{}</td>".format(
                     link_url, superlink.get_linktype_display(), sSpectype))
+
+                # Define the third column
                 if superlink.note != None and len(superlink.note) > 1:
                     sTitle = "title='{}'".format(superlink.note)
                     sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
                         superlink.id)
                     sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
                         superlink.id, superlink.note)
-                url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
+                ssg = superlink.dst if direction == "there" else superlink.src
+                url = reverse('equalgold_details', kwargs={'pk': ssg.id})
                 lHtml.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
-                    url, sTitle, superlink.dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+                    url, sTitle, ssg.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+
+                # Finish the row
                 lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_superlinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        unidirectional_spectype = ['com', 'uns', 'cap', 'tki', 'pro', 'pas', 'epi', 'pad']
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+                get_one_row(lHtml, superlink, "there")
+ 
+            # Get links from others to me
+            for superlink in self.equalgold_dst.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+                spectype = superlink.spectype
+                if not spectype is None and spectype != "" and spectype in unidirectional_spectype:
+                    get_one_row(lHtml, superlink, "back")
+
+            # Combine into a whole table
             if len(lHtml) > 0:
                 sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         except:
