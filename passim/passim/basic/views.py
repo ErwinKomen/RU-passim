@@ -284,6 +284,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
     try:
         # (1) Create default lstQ
         lstQ = []
+        dictQ = {}
 
         # (2) Reset the filters in the list we get
         for item in filters: item['enabled'] = False
@@ -305,6 +306,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 filter_type = get_value(search_item, "filter")
                 code_function = get_value(search_item, "code")
                 regex_function = get_value(search_item, "regex")
+                full_filter_id = "filter_{}".format(filter_type)
                 s_q = ""
                 arFkField = []
                 if fkfield != None:
@@ -441,7 +443,33 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                     s_q = s_q_lst if s_q == "" else s_q | s_q_lst
 
                 # Possibly add the result to the list
-                if s_q != "": lstQ.append(s_q)
+                if s_q != "": 
+                    dictQ[full_filter_id] = s_q
+                    # lstQ.append(s_q)
+        # Combine the query parts in the appropriate order
+        qfilter = qd.get("qfilter")
+        if qfilter is None or qfilter == "":
+            for k,v in dictQ.items():
+                lstQ.append(v)
+        else:
+            combi_q = None
+            lFilters = json.loads(qfilter)
+            for qf in lFilters:
+                operator = qf.get("operator")
+                sName = qf.get("name")
+                s_q = dictQ[sName]
+                if operator == "start":
+                    combi_q = s_q
+                elif operator == "and":
+                    combi_q = combi_q & (s_q)
+                elif operator == "nand":
+                    combi_q = combi_q & (~ s_q)
+                elif operator == "or":
+                    combi_q = combi_q | (s_q)
+                elif operator == "nor":
+                    combi_q = combi_q | (~ s_q)
+            # Now set the lstQ
+            lstQ.append(combi_q)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("make_search_list")
@@ -934,6 +962,7 @@ class BasicList(ListView):
     col_wrap = ""
     sel_mode = ""
     param_list = []
+    qfilter = []
     qs = None
     page_function = "ru.basic.search_paged_start"
 
@@ -1161,6 +1190,7 @@ class BasicList(ListView):
         context['filters'] = self.filters
         context['fsections'] = fsections
         context['list_fields'] = self.list_fields
+        context['qfilter'] = self.qfilter
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
@@ -1204,7 +1234,8 @@ class BasicList(ListView):
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)
-        x = context['is_app_editor'] and context['new_button']
+        # x = context['is_app_editor'] and context['new_button']
+
         # Return the calculated context
         return context
 
@@ -1387,20 +1418,28 @@ class BasicList(ListView):
                     oFields = thisForm.cleaned_data
 
                     # Set the param_list variable
-                    self.param_list = []
+                    # self.param_list = []
+                    param_list = []
                     lookfor = "{}-".format(prefix)
                     for k,v in self.qd.items():
                         if lookfor in k and not isempty(v):
-                            self.param_list.append("{}={}".format(k,v))
+                            # self.param_list.append("{}={}".format(k,v))
+                            param_list.append("{}={}".format(k,v))
+
+                    if 'qfilter' in self.qd:
+                        self.qfilter = self.qd.get("qfilter")
 
                     # Store the paramlist - but only if this is not a repetition
                     if "usersearch" in self.qd:
                         # Make sure we have the user search number
                         self.usersearch_id = self.qd.get("usersearch")
                     else:
-                        oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
+                        # oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username, self.qfilter)
+                        oSearch = UserSearch.add_search(request.path, param_list, request.user.username, self.qfilter)
                         if oSearch != None:
                             self.usersearch_id = oSearch.id
+                    # Make sure to add the usersearch into the paramlist
+                    self.param_list.append("usersearch={}".format(self.usersearch_id))
                 
                     # Allow user to adapt the list of search fields
                     oFields, lstExclude, qAlternative = self.adapt_search(oFields)
@@ -1522,6 +1561,7 @@ class BasicList(ListView):
 
     def view_queryset(self, qs):
         return None
+
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             # Do not allow to get a good response
@@ -1538,6 +1578,7 @@ class BasicList(ListView):
             if usersearch_id != None:
                 get = UserSearch.load_parameters(usersearch_id, get)
             self.qd = get
+            self.param_list = []
 
             # Then check if we have a redirect or not
             if self.redirectpage == "":

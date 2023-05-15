@@ -1203,6 +1203,42 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * filter_init
+       *    Initialize the logcal operations for all filters that are in loc_filter
+       *
+       */
+      filter_init: function () {
+        var i = 0,
+            target = "",
+            operator = "",
+            sName = "",
+            iNumber = -1,
+            sNumber = "";
+
+        try {
+          // Walk all filters
+          for (i = 0; i < loc_filter.length; i++) {
+            sName = loc_filter[i].name;
+            target = loc_filter[i].target;
+            operator = loc_filter[i].operator;
+            if (i === 0 && loc_filter[i].operator !== "start") {
+              $(target).find(".filter-operator").html("");
+            } else if (i > 0) {
+              iNumber = i + 1;
+              // Set label + number
+              sNumber = "<label>" + iNumber.toString() + "</label>" + loc_sFilterOp;
+              $(target).find(".filter-operator").html(sNumber);
+              // Set value of select correctly
+              $(target).find(".filter-operator select").val(operator);
+            }
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_init", ex);
+        }
+      },
+
+      /**
        * filter_click
        *    What happens when clicking a badge filter
        *
@@ -1585,6 +1621,7 @@ var ru = (function ($, ru) {
             object_id = "",
             targetid = null,
             elW = null,
+            sQfilter = "",
             sColwrap = "",
             post_loads = [],
             sHtml = "";
@@ -1610,6 +1647,14 @@ var ru = (function ($, ru) {
             } else {
               loc_colwrap = JSON.parse(sColwrap);
             }
+          }
+
+          // Get the qfilter
+          sQfilter = $("#qfilter").val();
+          if (sQfilter !== undefined && sQfilter !== null && sQfilter !== "") {
+            loc_filter = JSON.parse(sQfilter);
+            // Make sure to show the contents of the qfilter in the search interface
+            ru.basic.filter_init();
           }
 
           // Make sure we catch changes

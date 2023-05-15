@@ -12,6 +12,7 @@ from passim.settings import MEDIA_DIR
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
+from passim.basic.models import UserSearch
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -35,7 +36,7 @@ adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
                         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-                        'supplyname'],
+                        'supplyname', 'usersearch_params'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
@@ -384,6 +385,34 @@ def adapt_supplyname():
     except:
         msg = oErr.get_error_message()
         oErr.DoError("adapt_supplyname")
+        bResult = False
+    return bResult, msg
+
+def adapt_usersearch_params():
+    """Convert SUPPLY A NAME to an empty string"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Walk all UserSearch objects
+        with transaction.atomic():
+            for obj in UserSearch.objects.all():
+                # Get the 'params' string
+                sParams = obj.params
+                if sParams != "":
+                    oParams = json.loads(sParams)
+                    # Check if this is a dictionary or a list
+                    if isinstance(oParams, list):
+                        # It is a list - transform it
+                        oParams = dict(param_list = oParams, qfilter = [])
+                        obj.params = json.dumps(oParams)
+                        # Now save it
+                        obj.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adapt_usersearch_params")
         bResult = False
     return bResult, msg
 
