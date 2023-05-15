@@ -7157,18 +7157,25 @@ class EqualGold(models.Model):
 
         lHtml = []
         sBack = ""
-        unidirectional_spectype = ['com', 'uns', 'cap', 'tki', 'pro', 'pas', 'epi', 'pad']
+        unidirectional_spectype = ['com', 'cap', 'tki', 'pro', 'pas', 'epi', 'pad']
         oErr = ErrHandle()
         try:
+            lst_ssgs = []
+
             # Get the links from me to others
             for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
                 get_one_row(lHtml, superlink, "there")
+                ssg_id = superlink.dst.id
+                lst_ssgs.append(ssg_id)
  
             # Get links from others to me
             for superlink in self.equalgold_dst.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-                spectype = superlink.spectype
-                if not spectype is None and spectype != "" and spectype in unidirectional_spectype:
+                ssg_id = superlink.src.id
+                if not ssg_id in lst_ssgs:
+                    #spectype = superlink.spectype
+                    #if not spectype is None and spectype != "" and spectype in unidirectional_spectype:
                     get_one_row(lHtml, superlink, "back")
+                    lst_ssgs.append(ssg_id)
 
             # Combine into a whole table
             if len(lHtml) > 0:

@@ -1312,11 +1312,17 @@ var ru = (function ($, ru) {
                 $("#qfilter").val(JSON.stringify(loc_filter));
 
                 // If this is not start, then add the operator code
-                if (operator !== "start") {
+                if (operator === "start") {
+                  //
+                  $(target).find(".filter-operator").html("");
+                } else {
                   sNumber = "<label>" + loc_filter.length + "</label>" + loc_sFilterOp;
                   $(target).find(".filter-operator").html(sNumber);
                 }
               }
+            } else {
+              // At least re-construct the filters on the basis of loc_filter
+              ru.basic.filter_init();
             }
 
             // Create a list of targets
