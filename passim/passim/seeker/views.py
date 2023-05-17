@@ -67,7 +67,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
     SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
     ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-    LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
+    LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, ManuscriptLinkForm, SermonDescrKeywordForm, KeywordForm, \
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
@@ -82,12 +82,13 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptLink, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
-    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
+    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_BIDIR_MANU, \
+    LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
@@ -9964,27 +9965,23 @@ class ManuscriptEdit(BasicDetails):
                                          form=ManuscriptExtForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)    
-    # Kan weg
-    MprojFormSet = inlineformset_factory(Manuscript, ManuscriptProject,
-                                         form=ManuscriptProjectForm, min_num=0,
-                                         fk_name = "manuscript",
+    MlinkFormSet = inlineformset_factory(Manuscript, ManuscriptLink,
+                                         form=ManuscriptLinkForm, min_num=0,
+                                         fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [# {'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MprojFormSet, 'prefix': 'mproj', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}
-                       ]
+    formset_objects = [
+        {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MlinkFormSet, 'prefix': 'mlink', 'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_PARTIAL }], 'clean': True},
+        #{'formsetClass': MprojFormSet, 'prefix': 'mproj', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}
+        ]
     
     form_objects = [{'form': ManuReconForm, 'prefix': 'mrec', 'readonly': False}]
 
-    stype_edi_fields = [# 'name', 'support', 'extent', 'format', 
-                        # 'CollectionMan', 'collist',
-                        # 'ProvenanceMan', 'mprovlist'
-                        # 'Daterange', 'datelist',
-                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
+    stype_edi_fields = ['library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
                         'hierarchy',
                         'LitrefMan', 'litlist',
                         'ManuscriptExt', 'extlist']
@@ -10077,8 +10074,10 @@ class ManuscriptEdit(BasicDetails):
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
 
-                    {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[2] }
+                    {'type': 'plain', 'label': "Provenances:",          'value': self.get_provenance_markdown(instance), 
+                        'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
+                    {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
+                        'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -10285,6 +10284,17 @@ class ManuscriptEdit(BasicDetails):
         sBack = render_to_string("seeker/codi_provs.html", context, self.request)
         return sBack
 
+    def get_form_kwargs(self, prefix):
+        # This is for ssglink
+
+        oBack = None
+        if prefix == "mlink":
+            if self.object != None:
+                # Make sure to return the ID of the Manuscript
+                oBack = dict(manu_id=self.object.id)
+
+        return oBack
+
     def get_provenance_markdown(self, instance):
         """Calculate a collapsible table view of the provenances for this manuscript, for Manu details view"""
 
@@ -10401,13 +10411,48 @@ class ManuscriptEdit(BasicDetails):
                     newurl = cleaned.get('newurl')
                     if newurl:
                         form.instance.url = newurl
-                elif prefix == "mproj":
-                    proj_new = cleaned.get("proj_new")
-                    if proj_new != None:
-                        form.instance.project = proj_new
+                #elif prefix == "mproj":
+                #    proj_new = cleaned.get("proj_new")
+                #    if proj_new != None:
+                #        form.instance.project = proj_new
 
                     # Note: it will get saved with [sub]form.save()
 
+                elif prefix == "mlink":
+                    # Process the link from M to M
+                    newmanu = cleaned.get("newmanu")
+                    if not newmanu is None:
+                        # There also must be a linktype
+                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                            linktype = cleaned['newlinktype']
+                            # Get optional parameters
+                            note = cleaned.get('note', None)
+                            # Check existence
+                            obj = ManuscriptLink.objects.filter(src=instance, dst=newmanu, linktype=linktype).first()
+                            if obj == None:
+                                manu = Manuscript.objects.filter(id=newmanu.id).first()
+                                if manu != None:
+
+                                    # Set the right parameters for creation later on
+                                    form.instance.linktype = linktype
+                                    form.instance.dst = manu
+                                    if note != None and note != "": 
+                                        form.instance.note = note
+
+                                    # Double check reverse
+                                    if linktype in LINK_BIDIR_MANU:
+                                        rev_link = ManuscriptLink.objects.filter(src=manu, dst=instance).first()
+                                        if rev_link == None:
+                                            # Add it
+                                            rev_link = ManuscriptLink.objects.create(src=manu, dst=instance, linktype=linktype)
+                                        else:
+                                            # Double check the linktype
+                                            if rev_link.linktype != linktype:
+                                                rev_link.linktype = linktype
+                                        if note != None and note != "": 
+                                            rev_link.note = note
+                                        rev_link.save()
+                    # Note: it will get saved with form.save()
 
             else:
                 errors.append(form.errors)
@@ -10468,6 +10513,42 @@ class ManuscriptEdit(BasicDetails):
             # (5) 'provenances'Select a provenance...
             mprovlist = form.cleaned_data['mprovlist']
             adapt_m2m(ProvenanceMan, instance, "manuscript", mprovlist, "provenance", extra=['note'], related_is_through = True)
+
+            # (6) Related manuscript links...
+            mlinklist = form.cleaned_data['mlinklist']
+            manu_added = []
+            manu_deleted = []
+            adapt_m2m(ManuscriptLink, instance, "src", mlinklist, "dst", 
+                      extra = ['linktype', 'note'], related_is_through=True,
+                      added=manu_added, deleted=manu_deleted)
+            # Check for partial links in 'deleted'
+            for obj in manu_deleted:
+                # This if-clause is not needed: anything that needs deletion should be deleted
+                # if obj.linktype in LINK_BIDIR:
+                # First find and remove the other link
+                reverse = ManuscriptLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                if reverse != None:
+                    reverse.delete()
+                # Then remove myself
+                obj.delete()
+            # Make sure to add the reverse link in the bidirectionals
+            for obj in manu_added:
+                if obj.linktype in LINK_BIDIR_MANU:
+                    # Find the reversal
+                    reverse = ManuscriptLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse == None:
+                        # Create the reversal 
+                        reverse = ManuscriptLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Possibly copy note
+                        if obj.note != None and obj.note != "":
+                          reverse.note = obj.note
+                          bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                          reverse.save()
+
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
@@ -14488,6 +14569,100 @@ class EqualGoldTransDownload(EqualGoldVisDownload):
 class EqualGoldOverlapDownload(EqualGoldVisDownload):
     """Overlap graph"""
     vistype = "overlap"
+
+
+# ================= EQUALGOLDLINK ======================
+
+class ManuscriptLinkEdit(BasicDetails):
+    model = ManuscriptLink
+    mForm = ManuscriptLinkForm
+    prefix = 'mlink'
+    title = "Manuscript link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this M is
+            self.listview = reverse('manuscript_details', kwargs={'pk': src.id})
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
+        context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,        'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,        'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'safe',  'label': "Source manuscript:",    'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target manuscript:",    'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",            'value': instance.get_linktype_display(),   'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Note:",                 "value": instance.get_note(),               'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class ManuscriptLinkDetails(ManuscriptLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class ManuscriptLinkListView(BasicList):
+    """List manuscript link instances"""
+
+    model = ManuscriptLink
+    listform = ManuscriptLinkForm
+    has_select2 = True  # Check
+    prefix = "mlink"
+    bUseFilter = True  
+    plural_name = "Manuscript links"
+    sg_name = "Manuscript Link"
+    order_cols = ['src__idno', 'dst__idno', 'linktype'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True, 'main': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'id', 'keyList': 'dstlist', 'infield': 'id'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+
+        return sBack, sTitle
 
 
 # ================= EQUALGOLDLINK ======================

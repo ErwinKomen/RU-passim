@@ -103,6 +103,10 @@ urlpatterns = [
     url(r'^manuscript/huwa/download/$', ManuscriptHuwaToJson.as_view(), name='manuscript_huwajson'),
     url(r'^manuscript/ead/download', ManuEadDownload.as_view(), name='ead_results'),
 
+    url(r'^manulink/list', ManuscriptLinkListView.as_view(), name='manuscriptlink_list'),
+    url(r'^manulink/details(?:/(?P<pk>\d+))?/$', ManuscriptLinkDetails.as_view(), name='manuscriptlink_details'),
+    url(r'^manulink/edit(?:/(?P<pk>\d+))?/$', ManuscriptLinkEdit.as_view(), name='manuscriptlink_edit'),
+    
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
     url(r'^codico/details(?:/(?P<pk>\d+))?/$', CodicoDetails.as_view(), name='codico_details'),
     url(r'^codico/edit(?:/(?P<pk>\d+))?/$', CodicoEdit.as_view(), name='codico_edit'),

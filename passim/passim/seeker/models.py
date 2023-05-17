@@ -83,6 +83,7 @@ LINK_UNSPECIFIED = "uns"
 LINK_REL = 'rel'
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
+LINK_BIDIR_MANU = [LINK_REL, LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
 
 # All spec types with their possible bi-directional partners
 LINK_SPEC_A = ['usd', 'usi', 'udd', 'udi', 'cso', 'cdo', 'pto', 'pth', 'tro', 'tra',
@@ -3504,7 +3505,7 @@ class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
     # [1] Name of the manuscript (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="SUPPLY A NAME")
+    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -3558,6 +3559,10 @@ class Manuscript(models.Model):
     #       NOTE: better to use ManuscriptExternal table!!!
     external = models.IntegerField("ID in external DB", null=True)
 
+    # ============= CALCULATED FIELDS =============
+    # [1] The number of Manuscripts linked to me (i.e. relations.count)
+    manucount = models.IntegerField("Number of related manuscripts", default=0)
+
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     #     The third alternative is: a reconstruction
     #     So the options: 'man', 'tem', 'rec'
@@ -3585,6 +3590,8 @@ class Manuscript(models.Model):
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+    # [m] Many-to-many: all the manuscripts linked to me
+    relations = models.ManyToManyField("self", through="ManuscriptLink", symmetrical=False, related_name="related_to")
     
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
@@ -4500,6 +4507,69 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/get_litrefs_markdown")
         return sBack
 
+    def get_manulinks_markdown(self, plain=False):
+        """Return all the SSG links = type + dst"""
+
+        def get_one_row(lHtml, manulink, direction):
+            # Initializations
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
+
+            try:
+                # Start the row
+                lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this manuscript to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other manuscripts to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Get the URL for this particular link
+                link_url = reverse('manuscriptlink_details', kwargs={'pk': manulink.id})
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span></td>".format(
+                    link_url, manulink.get_linktype_display()))
+
+                # Define the third column
+                if manulink.note != None and len(manulink.note) > 1:
+                    sTitle = "title='{}'".format(manulink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#manunote_{}'>N</span>".format(
+                        manulink.id)
+                    sNoteDiv = "<div id='manunote_{}' class='collapse explanation'>{}</div>".format(
+                        manulink.id, manulink.note)
+                manu = manulink.dst if direction == "there" else manulink.src
+                url = reverse('manuscript_details', kwargs={'pk': manu.id})
+                lHtml.append("<td valign='top'><a href='{}' {}>{}</a>{}{}</td>".format(
+                    url, sTitle, manu.get_full_name(), sNoteShow, sNoteDiv))
+
+                # Finish the row
+                lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_manulinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for manulink in self.manuscript_src.all().order_by('dst__idno'):
+                get_one_row(lHtml, manulink, "there")
+
+            # Combine into a whole table
+            if len(lHtml) > 0:
+                sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_manulinks_markdown")
+        return sBack
+
     def get_notes_markdown(self):
         sBack = ""
         if self.notes != None:
@@ -4803,6 +4873,14 @@ class Manuscript(models.Model):
 
         # Return the new object
         return obj
+
+    def get_view(self, bShort = False):
+        """Get a HTML valid view of myself"""
+
+        url = reverse('manuscript_details', kwargs={'pk': self.id})
+        sBack = "<span class='signature badge ot'><a href='{}'>{}</a></span>".format(
+            url, self.get_full_name())
+        return sBack
 
     def import_template_adapt(self, template, profile, notes_only=False):
         """Adapt a manuscript after importing from template"""
@@ -5501,6 +5579,15 @@ class Manuscript(models.Model):
 
         # Return the object that has been created
         return oBack
+
+    def set_manucount(self):
+        # Calculate and set the manucount
+        manucount = self.manucount
+        iSize = self.relations.count()
+        if iSize != manucount:
+            self.manucount = iSize
+            self.save()
+        return True
 
     def set_projects(self, projects):
         """Make sure there are connections between myself and the projects"""
@@ -11043,6 +11130,57 @@ class ManuscriptExternal(models.Model):
 
     def __str__(self):
         sBack = "S_{} to id_{} ({})".format(self.manu.id, self.externalid, self.externaltype)
+        return sBack
+
+
+class ManuscriptLink(models.Model):
+    """Link between related manuscripts"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a Manuscript is deleted, then the ManuscriptLink instance that refers to it is removed too
+    src = models.ForeignKey(Manuscript, related_name="manuscript_src", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(Manuscript, related_name="manuscript_dst", on_delete=models.CASCADE)
+    # [1] Each manu-to-manu link must have a linktype, with default "related"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_REL)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
+
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is related to {}".format(src_name, dst_name)
+        return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check for identical links
+        if self.src == self.dst:
+            # do *NOT* actually save a link between the same manuscripts
+            response = None
+        else:
+            # Perform the actual save() method on [self]
+            response = super(ManuscriptLink, self).save(force_insert, force_update, using, update_fields)
+            # Adapt the ssgcount
+            self.src.set_manucount()
+            self.dst.set_manucount()
+        # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        manu_list = [self.src, self.dst]
+        response = super(ManuscriptLink, self).delete(using, keep_parents)
+        for obj in manu_list:
+            obj.set_manucount()
+        return response
+
+    def get_label(self):
+        sBack = "related to: {}".format(self.dst.get_full_name())
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 

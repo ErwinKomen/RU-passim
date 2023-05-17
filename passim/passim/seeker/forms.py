@@ -799,15 +799,32 @@ class ManuidWidget(ModelSelect2MultipleWidget):
 
 class ManuidOneWidget(ModelSelect2Widget):
     model = Manuscript
-    search_fields = [ 'idno__icontains']
+    search_fields = [ 'idno__icontains', 'lcity__name__icontains', 'library__name__icontains']
 
     def label_from_instance(self, obj):
-        return obj.idno
+        return obj.get_full_name()
 
     def get_queryset(self):
         qs = self.queryset
         if qs == None:
-            qs = Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+            qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
+        return qs
+
+
+class ManuscriptLinkAddOnlyWidget(ModelSelect2MultipleWidget):
+    model = ManuscriptLink
+    search_fields = ['dst__idno__icontains', 'dst__name__icontains', 'dst__id__icontains', 'dst__lcity__name__icontains', 'dst__lcountry__name__icontains']
+    addonly = True
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label()
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = ManuscriptLink.objects.none()
+        else:
+            qs = ManuscriptLink.objects.all().order_by('dst__idno').distinct()
         return qs
 
 
@@ -3353,6 +3370,95 @@ class SuperSermonGoldForm(PassimModelForm):
         return None
 
 
+class ManuscriptLinkForm(BasicModelForm):
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newmanu = ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget=ManuidOneWidget(attrs={'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
+                    'tdstyle': 'width: 300px;', 'rows': 1, 
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptLink
+        fields = ['src', 'linktype', 'dst', 'note' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Read the manu_id
+            manu_id = kwargs.pop("manu_id", "")
+            # Start by executing the standard handling
+            super(ManuscriptLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newmanu'].required = False
+
+            # Initialize choices for linktype
+            init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+            init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+
+            # For searching/listing
+            self.fields['newlinktype'].initial = "rel"
+
+            if manu_id != None and manu_id != "":
+                self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").exclude(id=manu_id).order_by('idno')
+                # Adapt the widget QS
+                self.fields['newmanu'].widget.exclude = manu_id
+            else:
+                self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").order_by('idno')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = Manuscript.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = Manuscript.objects.filter(id=instance.dst.id)
+
+                    # And set a possible new destination
+                    self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").exclude(id=instance.id).order_by('idno')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptLinkForm")
+
+        # REturn nothing
+        return None
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(ManuscriptLinkForm, self).clean()
+
+        # Get the source
+        src = cleaned_data.get("src")
+        if src != None:
+            # Any new destination is added in target_list
+            dst = cleaned_data.get("newmanu")
+            if dst != None:
+                # WE have a DST, now check how many links there are with this one
+                existing = src.relations.filter(id=dst.id)
+                if existing.count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "This Manuscript is already linked"
+                        )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
+
+
 class EqualGoldLinkForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
@@ -3422,6 +3528,13 @@ class EqualGoldLinkForm(BasicModelForm):
                     #       self.fields['linktype'].initial = instance.linktype
                     #       self.fields['dst'].initial = instance.dst
 
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = EqualGold.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = EqualGold.objects.filter(id=instance.dst.id)
+
+                    # Define the newsuper option
                     self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=instance.id).order_by('code')
         except:
             msg = oErr.get_error_message()
@@ -4416,14 +4529,12 @@ class ManuscriptForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProvenanceWidget(attrs={'data-placeholder': 'Select multiple provenances...', 'style': 'width: 100%;', 'class': 'searching'}))
     mprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+    mlinklist   = ModelMultipleChoiceField(queryset=None, required=False)
+
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
@@ -4463,20 +4574,21 @@ class ManuscriptForm(PassimModelForm):
             username = self.username
             team_group = self.team_group
             profile = Profile.get_user_profile(username)
+
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['editornotes'].required = False
-            #self.fields['yearstart'].required = False
-            #self.fields['yearfinish'].required = False
             self.fields['name'].required = False
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
+
+            # Define querysets
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            self.fields['mlinklist'].queryset = ManuscriptLink.objects.none()
 
             # Set the dependent fields for [lcity]
             if self.prefix != "":
@@ -4498,16 +4610,15 @@ class ManuscriptForm(PassimModelForm):
 
             self.fields['origone'].queryset = Origin.objects.all().order_by('name')
 
+            self.fields['mlinklist'].widget = ManuscriptLinkAddOnlyWidget(attrs={
+                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
+
             # Some lists need to be initialized to NONE:
-            #self.fields['provlist'].queryset = Provenance.objects.none()
             self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
-            # self.fields['datelist'].queryset = Daterange.objects.none()
 
-            # self.fields['provlist'].widget.addonly = True
             self.fields['mprovlist'].widget.addonly = True
             self.fields['extlist'].widget.addonly = True
-            # self.fields['datelist'].widget.addonly = True
         
             # Get the instance
             if 'instance' in kwargs:
@@ -4532,8 +4643,6 @@ class ManuscriptForm(PassimModelForm):
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
 
-                    # New method
-                    # self.fields['library'].initial = 
                 # Look after origin
                 origin = instance.origin
                 self.fields['origname_ta'].initial = "" if origin == None else origin.name
@@ -4544,23 +4653,17 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
-                #self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
-                # issue #289 - below was innovation, but that is now turned back. Above is current
-                # self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
-      
                 self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
-                # self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
                 
+                self.fields['mlinklist'].initial = [x.pk for x in instance.manuscript_src.all().order_by('dst__idno')]
+                self.fields['mlinklist'].queryset = ManuscriptLink.objects.filter(id__in=self.fields['mlinklist'].initial)
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
-                #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
-                # self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
 
-                #self.fields['provlist'].widget.manu = instance
                 self.fields['mprovlist'].widget.manu = instance
 
         except:
