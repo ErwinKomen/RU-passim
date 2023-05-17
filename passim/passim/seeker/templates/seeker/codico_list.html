@@ -137,6 +137,12 @@
                             <a class="btn btn-xs jumbo-3" onclick="ru.passim.seeker.add_codico(this);">Add to manuscript</a>
                           </form>
                         </div>
+
+                      {% endif %}
+
+                      <!-- If this Codico is used in a reconstructed manuscript -->
+                      {% if codico.recons|length > 0 %}
+                        <span class="badge signature ot" title="Used in reconstructed manuscripts"><span style="color: red;">{{codico.recons|length}}</span> mss.</span>
                       {% endif %}
 
                       {% if is_app_editor %}

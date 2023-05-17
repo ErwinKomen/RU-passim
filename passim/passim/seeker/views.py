@@ -10187,8 +10187,14 @@ class ManuscriptEdit(BasicDetails):
                 # Get the codico details URL
                 url = reverse("codico_details", kwargs={'pk': codico.id})
                 url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
+                # Get the list of manuscripts that use this codico
+                manu_recons = []
+                for recon in codico.codicoreconstructions.filter(manuscript__mtype='rec'):
+                    url_recon = reverse("manuscript_details", kwargs={'pk': recon.manuscript.id})
+                    manu_recons.append(url_recon)
                 # Add the information to the codico list
-                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
+                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), 
+                                         codico_id=codico.id, recons=manu_recons) )
             context['codico_list'] = codico_list
 
             # Make sure to add the mtype to the context
