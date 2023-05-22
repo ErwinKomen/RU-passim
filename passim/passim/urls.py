@@ -40,6 +40,8 @@ from django.views.generic.base import RedirectView
 
 admin.autodiscover()
 
+handler404 = 'passim.seeker.views.view_404'
+
 
 # Set admin stie information
 admin.site.site_header = "Patristic Sermons in the Middle Ages"
@@ -57,6 +59,7 @@ urlpatterns = [
     url(r'^$', passim.seeker.views.home, name='home'),
     # url(r'^404/$', passim.seeker.views.view_404, name='view_404'),
     path("404/", custom_page_not_found),
+    path("404", custom_page_not_found),
     url(r'^favicon\.ico$',RedirectView.as_view(url='/static/seeker/content/favicon.ico')),
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),
