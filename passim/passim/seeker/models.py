@@ -6674,6 +6674,8 @@ class EqualGold(models.Model):
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_eqgold_path)
+    fullinfo = models.TextField("Full text info", null=True, blank=True)
+
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
@@ -10061,10 +10063,6 @@ class SermonDescr(models.Model):
     def get_fulltext(self):
         """Return the *searchable* fulltext, without any additional formatting"""
         return self.fulltext
-
-    #def get_fulltext_markdown(self):
-    #    """Get the contents of the fulltext field using markdown"""
-    #    return adapt_markdown(self.fulltext)
 
     def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
         """Get the contents of the fulltext field using markdown"""

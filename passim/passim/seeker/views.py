@@ -89,7 +89,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription
+from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -755,6 +755,9 @@ def home(request, errortype=None):
 
     # Gather pie-chart data
     context['pie_data'] = get_pie_data()
+
+    # Possibly start getting new Stemmatology results
+    scan_transcriptions()
 
     # Render and return the page
     return render(request, template_name, context)
@@ -14056,6 +14059,7 @@ class EqualGoldListView(BasicList):
         {"name": "Manifestation count", "id": "filter_scount",        "enabled": False},
         {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
+        {"name": "Transcription",   "id": "filter_transcr",           "enabled": False},        
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -14073,12 +14077,14 @@ class EqualGoldListView(BasicList):
            
            # {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
            #  'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
-            {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
+            {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'         },
             {'filter': 'scount',    'dbfield': 'scount',            'keyS': 'scount',
-             'title': 'The number of sermons (manifestations) belonging to this Authority file'},
-            {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'},
+             'title': 'The number of sermons (manifestations) belonging to this Authority file' },
+            {'filter': 'transcr',   'dbfield': 'foperator',         'keyS': 'foperator'         },
+            {'filter': 'transcr',   'dbfield': 'srchfulltext',      'keyS': 'srchfulltext'      },
+            {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'       },
             {'filter': 'ssgcount',  'dbfield': 'ssgcount',          'keyS': 'ssgcount',
-             'title': 'The number of links an Authority file has to other Authority files'},
+             'title': 'The number of links an Authority file has to other Authority files'      },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
@@ -14323,6 +14329,20 @@ class EqualGoldListView(BasicList):
         if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
             # Action depends on the operator
             fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
+
+        foperator = fields.get('foperator')
+        srchfulltext = fields.get('srchfulltext')
+        if not foperator is None and foperator != "":
+            # Choices are: "obl" and "txt"
+            if foperator == "obl":
+                # Just check whether a text is there or not
+                fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
+            else:
+                # Well, if we are really looking for the full text, we don't have to do anything
+                pass
+        elif not srchfulltext is None and srchfulltext != "":
+            # This just means that we are really looking for the full text
+            pass
         
         # Make sure we only show the SSG/AF's that have accepted modifications
         # (fields['atype'] = 'acc'), so exclude the others:

@@ -40,10 +40,11 @@ def user_is_in_team(username, team_group, userplus=None):
             bResult = (owner.user.groups.filter(name=userplus).first() != None)
     return bResult
 
-CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Authority File'), ('non', 'Loner: not part of a Authority File')]
 AUTHOR_TYPE = [('', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
+TRANSCR_OPERATOR = [('', '(make a choice)'), ('obl', 'Contains a transcription'), ('txt', 'Find AFs, filtering the full text transcription')]
 
 
 # =================== HELPER FUNCTIONS ==========================
@@ -3180,8 +3181,10 @@ class SuperSermonGoldForm(PassimModelForm):
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
     newfulltext = forms.CharField(label=_("Explicit"), required=False,
-                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
-                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
+    srchfulltext = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 
+                                             'placeholder': 'Full text transcription ...'}))
     signature = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
@@ -3190,10 +3193,6 @@ class SuperSermonGoldForm(PassimModelForm):
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 
                                                 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
-    #superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
-    #                                                     'data-ajax--cache': 'false',
-    #                                                     'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -3215,6 +3214,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Relation set size'}))
     soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
     ssgoperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
+    foperator   = forms.ChoiceField(required=False, choices=TRANSCR_OPERATOR,widget=forms.Select())
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -3269,6 +3269,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['transcription'].required = False
             self.fields['soperator'].initial = 2
             self.fields['ssgoperator'].initial = 2
+            self.fields['foperator'].initial = 0
             self.fields['scount'].initial = -1
             self.fields['ssgcount'].initial = -1
 

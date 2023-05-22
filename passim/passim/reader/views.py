@@ -24,7 +24,7 @@ from django.views.generic import ListView, View
 from django.views.decorators.csrf import csrf_exempt
 
 # General imports
-from datetime import datetime
+from datetime import datetime, timedelta
 import operator 
 from operator import itemgetter
 from functools import reduce
@@ -38,6 +38,7 @@ import requests
 import demjson
 import openpyxl
 import sqlite3
+import glob
 import lxml.etree as ET
 from openpyxl.utils.cell import get_column_letter
 from io import StringIO
@@ -55,7 +56,7 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, Information, \
     Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
     Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
@@ -2063,100 +2064,25 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
     This approach makes use of *lxml*
     """
 
-    def process_para(item, html):
-        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
-
-        oErr = ErrHandle()
-        bResult = True
-        local = []
-        try:
-            # Walk all elements
-            if not item is None:
-                for element in item.xpath("./child::*"):
-                    tag = element.tag
-                    attrib = element.attrib
-                    if tag == "w":
-                        # This is a word 
-                        local.append(element.text)
-                    elif tag == "quote":
-                        # This is a quote: get the @source attribute and the @n
-                        quote_n = attrib['n']
-                        quote_source = attrib['source']
-                        quote = []
-                        for quote_el in element.xpath("./child::*"):
-                            if quote_el.tag == "w":
-                                quote.append(quote_el.text)
-                        sQuoteBody = " ".join(quote)
-                        sQuote = '<span class="fullquote" title="{}. {}: {}" >{}</span>'.format(
-                            quote_n, quote_source, sQuoteBody, quote_n )
-                        local.append(sQuote)
-                sPara = " ".join(local)
-                html.append(sPara)
-        except:
-            msg = oErr.get_error_message()
-            oErr.DoError("process_para")
-            bResult = False
-        return bResult
-
     oErr = ErrHandle()
     oBack = {'status': 'ok', 'count': 0, 'msg': "", 'user': username, 'lst_obj': []}
     try:
-        # Read the XML file, transforming it into a Python dict
-        if xmldoc is None:
-            # Read and parse the data into a DOM element
-            xmldoc = ET.parse(data_file)  
-            
-        # Get the root
-        root = xmldoc.getroot()
 
-        # Clean up the namespace
-        for elem in root.getiterator():
-            if not (isinstance(elem, ET._Comment) or isinstance(elem, ET._ProcessingInstruction)):
-                elem.tag = ET.QName(elem).localname
-        ET.cleanup_namespaces(root)
-
-        # Get the titles
-        title_passim = None
-        titles = root.xpath("//title[@type='passim']")
-        if len(titles)>0:
-            title_passim = titles[0].text
-            # Get the list of sermon elements
-            html = []
-            sermon_items = root.xpath("//div[@type='sermon']/child::*")
-            for sermon_item in sermon_items:
-                tag = sermon_item.tag
-                attrib = sermon_item.attrib
-                if tag == "head":
-                    # This is one head at this moment
-                    headtype = attrib.get('type', '')
-                    level = "##" if headtype == "title" else "###"
-                    html.append("{} {}".format(level, sermon_item.text))
-                elif tag == "div" and attrib.get("type", "") == "paragraph":
-                    # Paragraph: add a newline
-                    html.append("")
-                    # This is a paragraph, that contains <head> and <p>
-                    for subitem in sermon_item.xpath("./child::*"):
-                        if subitem.tag == "head":
-                            # This is another level head
-                            html.append("#### {}".format(subitem.text))
-                        elif subitem.tag == "p":
-                            # This is a paragraph containing words and quotes
-                            process_para(subitem, html)
-
-            # Okay, we found all the elements, now store them.
-            text_sermon = "\n".join(html)
-
-            oBack['count'] = oBack['count'] + 1
-            oBack['tsize'] = len(text_sermon)
-            oBack['code'] = title_passim
-
+        oTranscription = read_transcription(data_file)
+        if not oTranscription is None:
+            title_passim = oTranscription.get("code")
+            text_sermon = oTranscription.get("text")
             # Can we continue?
             if not title_passim is None and not text_sermon is None:
                 eqg = EqualGold.objects.filter(code__iexact=title_passim).first()
                 if not eqg is None:
                     # We now have the right object: Set the text
-                    eqg.fulltext = text_sermon
-                    eqg.save()
+                    if eqg.fulltext != text_sermon:
+                        eqg.fulltext = text_sermon
+                        eqg.save()
+            # make sure that we return the transcription together with the other stuff
+            for k,v in oTranscription.items():
+                oBack[k] = v
     except:
         sError = oErr.get_error_message()
         oBack['filename'] = filename
@@ -2166,6 +2092,58 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
     # Return the object that has been created
     return oBack
 
+def scan_transcriptions():
+    """Scan the agreed-upon server location for (new) transcription files"""
+
+    oErr = ErrHandle()
+    bResult = True
+    try:
+        # Check if this needs doing
+        next_time = Information.get_kvalue("next_stemma")
+        now_time = str(get_current_datetime())
+        # next_time = str(get_current_datetime() + timedelta(hours=24))
+        if next_time is None or now_time > next_time:
+            # Now execute the task
+            scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, "pasta", "pasta", "*.xml"))
+            lst_xml = glob.glob(scan_dir)
+            for sFile in lst_xml:
+                # Treat this file
+                oTrans = read_transcription(sFile)
+                status = oTrans.get("status")
+                if status == "ok":
+                    # It has been read and needs to be added
+                    code = oTrans.get("code")
+                    text_sermon = oTrans.get("text")
+                    full_info = {}
+                    for k,v in oTrans.items():
+                        if k != "text":
+                            full_info[k] = v
+                    # Turn the fullinfo into a string
+                    sFullInfo = json.dumps(full_info)
+                    obj = EqualGold.objects.filter(code__iexact=code).first()
+                    if not obj is None:
+                        bNeedSaving = False
+                        # We now have the right object: Set the text
+                        if obj.fulltext != text_sermon:
+                            obj.fulltext = text_sermon
+                            bNeedSaving= True
+                        if obj.fullinfo != sFullInfo:
+                            obj.fullinfo = sFullInfo
+                            bNeedSaving= True
+                        if bNeedSaving:
+                            obj.save()
+
+
+            # Set new next time
+            next_time = str(get_current_datetime() + timedelta(hours=24))
+            Information.set_kvalue("next_stemma", next_time)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("scan_transcriptions")
+        bResult = False
+    return bResult
+
+
 def read_transcription(data_file):
     """Read a sermon transcription part of an XML in TEI-P5 format
         
@@ -2173,7 +2151,10 @@ def read_transcription(data_file):
     """
 
     def process_para(item, html, info):
-        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>"""
+        """Process (possibly recursively) a paragraph that may include elements like <w> and <quote>
+        
+        Added: it may also have element <s>
+        """
 
         oErr = ErrHandle()
         bResult = True
@@ -2196,8 +2177,8 @@ def read_transcription(data_file):
                             info['wordcount'] += 1
                     elif tag == "quote":
                         # This is a quote: get the @source attribute and the @n
-                        quote_n = attrib['n']
-                        quote_source = attrib['source']
+                        quote_n = attrib.get('n', '*')
+                        quote_source = attrib.get('source', '')
                         quote = []
                         for quote_el in element.xpath("./child::*"):
                             if quote_el.tag == "w":
@@ -2206,6 +2187,9 @@ def read_transcription(data_file):
                         sQuote = '<span class="fullquote" title="{}. {}: {}" >{}</span>'.format(
                             quote_n, quote_source, sQuoteBody, quote_n )
                         local.append(sQuote)
+                    elif tag == "s":
+                        # This is a <s> sentence definition that may contain <w> and <quote> elements
+                        process_para(element, html, info)
                 sPara = " ".join(local)
                 html.append(sPara)
         except:
@@ -2219,7 +2203,8 @@ def read_transcription(data_file):
     try:
         # Read and parse the data into a DOM element
         xmldoc = ET.parse(data_file)  
-            
+        change_time = os.path.getmtime(data_file)
+
         # Get the root
         root = xmldoc.getroot()
 
@@ -2234,38 +2219,61 @@ def read_transcription(data_file):
         titles = root.xpath("//title[@type='passim']")
         if len(titles)>0:
             title_passim = titles[0].text
-            # Get the list of sermon elements
-            html = []
-            info = dict(wordcount=0)
-            sermon_items = root.xpath("//div[@type='sermon']/child::*")
-            for sermon_item in sermon_items:
-                tag = sermon_item.tag
-                attrib = sermon_item.attrib
-                if tag == "head":
-                    # This is one head at this moment
-                    headtype = attrib.get('type', '')
-                    level = "##" if headtype == "title" else "###"
-                    html.append("{} {}".format(level, sermon_item.text))
-                elif tag == "div" and attrib.get("type", "") == "paragraph":
-                    # Paragraph: add a newline
-                    html.append("")
-                    # This is a paragraph, that contains <head> and <p>
-                    for subitem in sermon_item.xpath("./child::*"):
-                        if subitem.tag == "head":
-                            # This is another level head
-                            html.append("#### {}".format(subitem.text))
-                        elif subitem.tag == "p":
-                            # This is a paragraph containing words and quotes
-                            process_para(subitem, html, info)
 
-            # Okay, we found all the elements, now store them.
-            text_sermon = "\n".join(html)
+            # Initially: assume this needs to be read again
+            bReadFile = True
 
-            oBack['text'] = text_sermon
-            oBack['count'] = oBack['count'] + 1
-            oBack['tsize'] = len(text_sermon)
-            oBack['code'] = title_passim
-            oBack['wordcount'] = info.get("wordcount", 0)
+            # Get the passim item
+            if not title_passim is None and title_passim != "":
+                obj = EqualGold.objects.filter(code__iexact=title_passim).first()
+                if not obj is None:
+                    # Get the information stored with this file
+                    sFullInfo = obj.fullinfo
+                    if sFullInfo is None or sFullInfo == "":
+                        sFullInfo = "{}"
+                    oFullInfo = json.loads(sFullInfo)
+                    last_time = oFullInfo.get("change_time")
+                    if not last_time is None and change_time <= last_time:
+                        # The file has not changed
+                        bReadFile = False
+            # Need to read it?
+            if bReadFile:
+
+                # Get the list of sermon elements
+                html = []
+                info = dict(wordcount=0)
+                sermon_items = root.xpath("//div[@type='sermon']/child::*")
+                for sermon_item in sermon_items:
+                    tag = sermon_item.tag
+                    attrib = sermon_item.attrib
+                    if tag == "head":
+                        # This is one head at this moment
+                        headtype = attrib.get('type', '')
+                        level = "##" if headtype == "title" else "###"
+                        html.append("{} {}".format(level, sermon_item.text))
+                    elif tag == "div" and attrib.get("type", "") == "paragraph":
+                        # Paragraph: add a newline
+                        html.append("")
+                        # This is a paragraph, that contains <head> and <p>
+                        for subitem in sermon_item.xpath("./child::*"):
+                            if subitem.tag == "head":
+                                # This is another level head
+                                html.append("#### {}".format(subitem.text))
+                            elif subitem.tag == "p":
+                                # This is a paragraph containing words and quotes
+                                process_para(subitem, html, info)
+
+                # Okay, we found all the elements, now store them.
+                text_sermon = "\n".join(html)
+
+                oBack['text'] = text_sermon
+                oBack['count'] = oBack['count'] + 1
+                oBack['tsize'] = len(text_sermon)
+                oBack['code'] = title_passim
+                oBack['wordcount'] = info.get("wordcount", 0)
+                oBack['change_time'] = change_time
+            else:
+                oBack['status'] = "skip"
 
     except:
         sError = oErr.get_error_message()
@@ -2294,7 +2302,6 @@ def read_kwcategories():
         oErr.DoError("read_kwcategories")
     # Return the table that we found
     return lst_kwcat
-
 
 
 class ReaderImport(View):
