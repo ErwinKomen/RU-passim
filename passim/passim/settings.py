@@ -131,6 +131,7 @@ INSTALLED_APPS = [
     'passim.reader',
     'passim.seeker',
     'passim.dct',
+    'passim.stemma',
     'passim.enrich'
 ]
 

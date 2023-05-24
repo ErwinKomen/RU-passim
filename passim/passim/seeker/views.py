@@ -155,6 +155,8 @@ def get_application_context(request, context):
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
     context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_stemma_editor'] = user_is_ingroup(request, stemma_editor)
+    context['is_stemma_user'] = user_is_ingroup(request, stemma_user)
     context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
     return context
 
@@ -727,10 +729,12 @@ def home(request, errortype=None):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -773,7 +777,9 @@ def contact(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Contact", True)
@@ -787,7 +793,8 @@ def more(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "More", True)
@@ -803,10 +810,11 @@ def technical(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
@@ -822,10 +830,11 @@ def guide(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
@@ -839,7 +848,8 @@ def bibliography(request):
                 'year':datetime.now().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Add the edition references (abreviated and full)
 
@@ -901,7 +911,8 @@ def about(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Calculate statistics
     sites = {}
@@ -941,7 +952,8 @@ def short(request):
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
                'year': get_current_datetime().year}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request, template, context)
 
 def nlogin(request):
@@ -950,7 +962,8 @@ def nlogin(request):
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
                     'year':get_current_datetime().year,}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
 
 # ================ OTHER VIEW HELP FUNCTIONS ============================
@@ -964,11 +977,12 @@ def sync_passim(request):
                'message': 'Radboud University PASSIM'
                }
     template_name = 'seeker/syncpassim.html'
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
-    context['is_superuser'] = user_is_superuser(request)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    #context['is_superuser'] = user_is_superuser(request)
 
     # Add the information in the 'context' of the web page
     return render(request, template_name, context)

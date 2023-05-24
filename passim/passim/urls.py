@@ -19,6 +19,7 @@ from passim import views
 from passim.seeker.views import *
 from passim.seeker.visualizations import *
 from passim.dct.views import *
+from passim.stemma.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel, \
@@ -313,6 +314,7 @@ urlpatterns = [
     url(r'^gold/import/json/$', SermonGoldUploadJson.as_view(), name='gold_upload_json'),
     url(r'^gold/ukw(?:/(?P<pk>\d+))?/$', SermonGoldUserKeyword.as_view(), name='gold_ukw'),
 
+    # ------------ DCT tool ------------------------------------------------------------------------------
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
     url(r'^rset/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
@@ -322,6 +324,12 @@ urlpatterns = [
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
     url(r'^dct/download(?:/(?P<pk>\d+))?/$', SetDefDownload.as_view(), name='setdef_download'),
 
+    # ------------ Stemmatology tool ---------------------------------------------------------------------
+    url(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),
+    url(r'^stemmaset/details(?:/(?P<pk>\d+))?/$', StemmaSetDetails.as_view(), name='stemmaset_details'),
+    url(r'^stemmaset/edit(?:/(?P<pk>\d+))?/$', StemmaSetEdit.as_view(), name='stemmaset_edit'),
+
+    # ------------ My Passim PRE -------------------------------------------------------------------------
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
 

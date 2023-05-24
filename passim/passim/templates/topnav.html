@@ -44,6 +44,9 @@
                           <li><a href="{% url 'literature_list' %}" title="Visualizations">Visualizations</a></li>
                           <li><a href="{% url 'collpriv_list' %}" title="List of datasets">Datasets</a></li>
                           <li><a href="{% url 'researchset_list' %}" title="Research Sets for Dynamic comparative tables">DCT tool</a></li>
+                          {% if is_stemma_user %}
+                            <li><a href="{% url 'researchset_list' %}" title="Research Sets for Stemmatology">Stemmatology sets</a></li>
+                          {% endif %}
                           {% if is_app_editor %}                            
                             <li role="separator" class="divider"></li>
                             <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li> 
