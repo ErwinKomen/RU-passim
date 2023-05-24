@@ -337,3 +337,5 @@ ModelManifest.xml
 /passim/passim_seeker_20221013.svg
 /passimproject/media/22.12.02_CfP_PASSIM_Conference2023.pdf
 /passimproject/media/Visions of Authority - Flyer.pdf
+/passim/passim/stemma/migrations
+/passim/passim/stemma/templates/index.html
