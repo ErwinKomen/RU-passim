@@ -30,7 +30,7 @@ from passim.basic.views import BasicList, BasicDetails, BasicPart, \
 #    user_is_superuser, get_selectitem_info
 from passim.seeker.models import Profile
 from passim.stemma.models import StemmaItem, StemmaSet
-from passim.stemma.forms import StemmaSetForm
+from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
 from passim.seeker.views import EqualGoldListView
 
@@ -109,7 +109,7 @@ class StemmaSetListView(BasicList):
         return sBack, sTitle
 
     def add_to_context(self, context, initial):
-        context['is_stemma_user'] = user_is_ingroup(stemma_user)
+        context['is_stemma_user'] = user_is_ingroup(self.request, stemma_user)
         return context
 
     def adapt_search(self, fields):
@@ -138,52 +138,63 @@ class StemmaSetEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
-        # Define the main items to show and edit
-        context['mainitems'] = [
-            {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
-            {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
-            {'type': 'plain', 'label': "Scope:",        'value': instance.get_scope_display, 'field_key': 'scope'},
-            {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
-            {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
-            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
-            {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
-            ]
-
-        # Only if the user has permission
-        if context['is_app_editor']:
-            add_html = render_to_string("dct/setlist_add.html", context, self.request)
-            context['mainitems'].append( {'type': 'line',  'label': "Add:",        'value': add_html})
+        oErr = ErrHandle()
+        try:
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
+                {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
+                {'type': 'plain', 'label': "Scope:",        'value': instance.get_scope_display, 'field_key': 'scope'},
+                {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
+                {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
+                {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+                {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
+                ]
 
 
-        # Signal that we do have select2
-        context['has_select2'] = True
+            context['is_stemma_editor'] = user_is_ingroup(self.request, stemma_editor) or context['is_app_moderator']
+            context['is_stemma_user'] = user_is_ingroup(self.request, stemma_user)
 
-        # Determine what the permission level is of this collection for the current user
-        # (1) Is this user a different one than the one who created the collection?
-        profile_owner = instance.profile
-        profile_user = Profile.get_user_profile(self.request.user.username)
-        # (2) Set default permission
-        permission = ""
-        if profile_owner.id == profile_user.id:
-            # (3) Any creator of the collection may write it
-            permission = "write"
-        else:
-            # (4) permission for different users
-            if context['is_app_editor']:
-                # (5) what if the user is an app_editor?
-                if instance.scope == "publ":
-                    # Editors may read/write collections with 'public' scope
-                    permission = "write"
-                elif instance.scope == "team":
-                    # Editors may read collections with 'team' scope
-                    permission = "read"
+            # Signal that we do have select2
+            context['has_select2'] = True
+
+            # Determine what the permission level is of this collection for the current user
+            # (1) Is this user a different one than the one who created the collection?
+            profile_owner = instance.profile
+            profile_user = Profile.get_user_profile(self.request.user.username)
+            # (2) Set default permission
+            permission = ""
+            if profile_owner.id == profile_user.id:
+                # (3) Any creator of the collection may write it
+                permission = "write"
             else:
-                # (5) any other users
-                if instance.scope == "publ":
-                    # All users may read collections with 'public' scope
-                    permission = "read"
+                # (4) permission for different users
+                if context['is_app_editor']:
+                    # (5) what if the user is an app_editor?
+                    if instance.scope == "publ":
+                        # Editors may read/write collections with 'public' scope
+                        permission = "write"
+                    elif instance.scope == "team":
+                        # Editors may read collections with 'team' scope
+                        permission = "read"
+                else:
+                    # (5) any other users
+                    if instance.scope == "publ":
+                        # All users may read collections with 'public' scope
+                        permission = "read"
 
-        context['permission'] = permission
+            # Only if the user has permission
+            if context['is_stemma_editor']:
+                # This user may add items to a StemmaSet
+                initial = dict(instance=instance)
+                context['stemitemForm'] = EqualSelectForm(initial)
+                add_html = render_to_string("stemma/stemitem_add.html", context, self.request)
+                context['after_details'] = add_html
+
+            context['permission'] = permission
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSetEdit/add_to_context")
 
         # Return the context we have made
         return context
@@ -194,10 +205,11 @@ class StemmaSetEdit(BasicDetails):
         oErr = ErrHandle()
         bChanges = False
         bDebug = True
+        prefix = "super"
 
         try:
-            arg_hlist = "setlists-hlist"
-            arg_savenew = "setlists-savenew"
+            arg_hlist = "{}-hlist".format(prefix)
+            arg_savenew = "{}-savenew".format(prefix)
             if arg_hlist in self.qd and arg_savenew in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd[arg_hlist])
@@ -211,37 +223,37 @@ class StemmaSetEdit(BasicDetails):
 
                 # Change the redirect URL
                 if self.redirectpage == "":
-                    self.redirectpage = reverse('StemmaSet_details', kwargs={'pk': instance.id})
+                    self.redirectpage = reverse('stemmaset_details', kwargs={'pk': instance.id})
 
                 # What we have is the ordered list of Manuscript id's that are part of this collection
                 with transaction.atomic():
                     # Make sure the orders are correct
                     for idx, item_id in enumerate(hlist):
                         order = idx + 1
-                        lstQ = [Q(StemmaSet=instance)]
+                        lstQ = [Q(stemmaset=instance)]
                         lstQ.append(Q(**{"id": item_id}))
-                        obj = SetList.objects.filter(*lstQ).first()
+                        obj = StemmaItem.objects.filter(*lstQ).first()
                         if obj != None:
                             if obj.order != order:
                                 obj.order = order
                                 obj.save()
                                 bChanges = True
                 # See if any need to be removed
-                existing_item_id = [str(x.id) for x in SetList.objects.filter(StemmaSet=instance)]
+                existing_item_id = [str(x.id) for x in StemmaItem.objects.filter(stemmaset=instance)]
                 delete_id = []
                 for item_id in existing_item_id:
                     if not item_id in hlist:
                         delete_id.append(item_id)
                 if len(delete_id)>0:
-                    lstQ = [Q(StemmaSet=instance)]
+                    lstQ = [Q(stemmaset=instance)]
                     lstQ.append(Q(**{"id__in": delete_id}))
-                    SetList.objects.filter(*lstQ).delete()
+                    StemmaItem.objects.filter(*lstQ).delete()
                     bChanges = True
 
                 if bChanges:
                     # (6) Re-calculate the set of setlists
                     force = True if bDebug else False
-                    instance.update_ssglists(force)
+                    #instance.update_ssglists(force)
 
             return True
         except:
@@ -339,7 +351,7 @@ class StemmaSetDetails(StemmaSetEdit):
             if resizable: supers['gridclass'] = "resizable dragdrop"
             supers['savebuttons'] = bMayEdit
             supers['saveasbutton'] = True
-            supers['classes'] = 'collapse'
+            supers['classes'] = ''
 
             qs_stemmaitem = instance.stemmaset_stemmaitems.all().order_by(
                     'order', 'equal__author__name', 'equal__firstsig', 'equal__srchincipit', 'equal__srchexplicit')
@@ -348,11 +360,7 @@ class StemmaSetDetails(StemmaSetEdit):
             # Walk these collection sermons
             for idx, obj in enumerate(qs_stemmaitem):
                 rel_item = []
-                item = obj.super
-
-                # Leave if this is too much
-                if idx > self.max_items:
-                    break
+                item = obj.equal
 
                 # SSG: Order in Manuscript
                 #add_one_item(rel_item, index, False, align="right")
@@ -363,23 +371,23 @@ class StemmaSetDetails(StemmaSetEdit):
                 add_one_item(rel_item, self.get_field_value("super", item, "author"), resizable)
 
                 # SSG: Passim code
-                add_one_item(rel_item, self.get_field_value("super", item, "code"), False)
+                add_one_item(rel_item, self.get_field_value("super", item, "code"), resizable) #, False) # , main=True)
 
                 # SSG: Gryson/Clavis = signature
-                add_one_item(rel_item, self.get_field_value("super", item, "sig"), False)
+                add_one_item(rel_item, self.get_field_value("super", item, "sig"), resizable) #, False)
 
                 # SSG: Inc/Expl
-                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), False, main=True)
+                add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), resizable, main=True) #, False)
 
                 # SSG: Size (number of SG in equality set)
-                add_one_item(rel_item, self.get_field_value("super", item, "size"), False)
+                add_one_item(rel_item, self.get_field_value("super", item, "size"), resizable) #, False)
 
                 # Actions that can be performed on this item
                 if bMayEdit:
                     add_one_item(rel_item, self.get_actions())
 
                 # Add this line to the list
-                rel_list.append(dict(id=item.id, cols=rel_item))
+                rel_list.append(dict(id=obj.id, cols=rel_item))
             
             supers['rel_list'] = rel_list
             supers['columns'] = [
@@ -431,54 +439,103 @@ class StemmaSetDetails(StemmaSetEdit):
         sBack = ""
         collection_types = ['hist', 'ssgd' ]
 
-        if type == "manu":
-            if custom == "title":
-                url = reverse("manuscript_details", kwargs={'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
-                    url, instance.get_city(), instance.get_library(), instance.idno)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this manuscript
-                count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
-                sBack = "{}".format(count)
-        elif type in collection_types:
-            if custom == "title":
-                sTitle = "none"
-                if instance is None:
-                    sBack = sTitle
-                else:
-                    if type == "hist":
-                        url = reverse("collhist_details", kwargs={'pk': instance.id})
+        oErr = ErrHandle()
+        try:
+            if type == "manu":
+                if custom == "title":
+                    url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                        url, instance.get_city(), instance.get_library(), instance.idno)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this manuscript
+                    count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
+                    sBack = "{}".format(count)
+            elif type in collection_types:
+                if custom == "title":
+                    sTitle = "none"
+                    if instance is None:
+                        sBack = sTitle
                     else:
-                        if instance.scope == "publ":
-                            url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                        if type == "hist":
+                            url = reverse("collhist_details", kwargs={'pk': instance.id})
                         else:
-                            url = reverse("collpriv_details", kwargs={'pk': instance.id})
-                    if kwargs != None and 'name' in kwargs:
-                        title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
-                    else:
-                        title = instance.name
-                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this collection
-                count = "-1" if instance is None else instance.super_col.count()
-                sBack = "{}".format(count)
-        elif type == "setdef":
-            if custom == "buttons":
-                # Create the launch button
-                url = reverse("setdef_details", kwargs={'pk': instance.id})
-                sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
-            elif custom == "name":
-                url = reverse("setdef_details", kwargs={'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
-        elif type == "setlist":
-            if custom == "buttons":
-                # Create the remove button
-                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
-        elif type == "super":
-            sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
+                            if instance.scope == "publ":
+                                url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                            else:
+                                url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                        if kwargs != None and 'name' in kwargs:
+                            title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                        else:
+                            title = instance.name
+                        sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this collection
+                    count = "-1" if instance is None else instance.super_col.count()
+                    sBack = "{}".format(count)
+            elif type == "setdef":
+                if custom == "buttons":
+                    # Create the launch button
+                    url = reverse("setdef_details", kwargs={'pk': instance.id})
+                    sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
+                elif custom == "name":
+                    url = reverse("setdef_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
+            elif type == "setlist":
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+            elif type == "super":
+                sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
+                if custom == "code":
+                    url = reverse('equalgold_details', kwargs={'pk': instance.id})
+                    sBack = "<span class='badge signature ot'><a class='nostyle' href='{}'>{}</a></span>".format(
+                        url, sBack)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSetDetails/get_field_value")
 
         return sBack
 
 
+class StemmaSetAdd(BasicPart):
+    """Add a SSG/AF to a stemmaset"""
 
+    MainModel = StemmaSet
+
+    def add_to_context(self, context):
+
+        # Gather all necessary data
+        data = {}
+
+        oErr = ErrHandle()
+        try:
+            # Get the object
+            instance = self.obj
+
+            # Check ... something
+            if not instance is None:
+                mode = self.qd.get("mode")
+
+                if mode == "add_item":
+                    # Get the SSG to be added
+                    frmThis = EqualSelectForm(self.request.POST)
+                    if frmThis.is_valid():
+                        cleaned = frmThis.cleaned_data
+                        ssgone = cleaned.get("ssgone")
+                        # Check if this SSG is not yet part of the StemmaSet
+                        obj = StemmaItem.objects.filter(stemmaset=instance, equal=ssgone).first()
+                        if obj is None:
+                            order = 1
+                            largest = StemmaItem.objects.filter(stemmaset=instance).order_by("-order").first()
+                            if not largest is None:
+                                order = largest.order + 1
+                            obj = StemmaItem.objects.create(stemmaset=instance, equal=ssgone, order=order)
+                # Make sure to set the correct redirect page
+                data['targeturl'] = reverse("stemmaset_details", kwargs={'pk': instance.id})
+            # FIll in the [data] part of the context with all necessary information
+            context['data'] = data
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSetAdd/add_to_context")
+        return context
 

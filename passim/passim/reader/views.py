@@ -2097,6 +2097,8 @@ def scan_transcriptions():
 
     oErr = ErrHandle()
     bResult = True
+    SCAN_SUBDIR = "pasta/pasta/*.xml"
+    SCAN_SUBDIR = "chocolate/pasta/xml_tei_src/*.xml"
     try:
         # Check if this needs doing
         next_time = Information.get_kvalue("next_stemma")
@@ -2104,7 +2106,7 @@ def scan_transcriptions():
         # next_time = str(get_current_datetime() + timedelta(hours=24))
         if next_time is None or now_time > next_time:
             # Now execute the task
-            scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, "pasta", "pasta", "*.xml"))
+            scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, SCAN_SUBDIR))
             lst_xml = glob.glob(scan_dir)
             for sFile in lst_xml:
                 # Treat this file
@@ -2123,6 +2125,8 @@ def scan_transcriptions():
                     obj = EqualGold.objects.filter(code__iexact=code).first()
                     if not obj is None:
                         bNeedSaving = False
+                        if obj.transcription is None or obj.transcription == "" or obj.transcription.name is None:
+                            obj.transcription = sFile
                         # We now have the right object: Set the text
                         if obj.fulltext != text_sermon:
                             obj.fulltext = text_sermon
@@ -2131,6 +2135,10 @@ def scan_transcriptions():
                             obj.fullinfo = sFullInfo
                             bNeedSaving= True
                         if bNeedSaving:
+                            # Show we are updating
+                            sXmlName = os.path.basename(sFile)
+                            oErr.Status("Scan transcriptions: {} - {}".format(sXmlName, code))
+                            # Actually perform the update
                             obj.save()
 
 

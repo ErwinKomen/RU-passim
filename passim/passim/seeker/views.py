@@ -155,9 +155,9 @@ def get_application_context(request, context):
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
     context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_stemma_editor'] = user_is_ingroup(request, stemma_editor)
-    context['is_stemma_user'] = user_is_ingroup(request, stemma_user)
     context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context['is_stemma_editor'] = user_is_ingroup(request, stemma_editor) or context['is_app_moderator']
+    context['is_stemma_user'] = user_is_ingroup(request, stemma_user)
     return context
 
 def treat_bom(sHtml):

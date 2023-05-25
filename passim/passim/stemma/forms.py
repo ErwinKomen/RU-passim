@@ -13,6 +13,7 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 # From my own application
 from passim.utils import ErrHandle
 from passim.basic.forms import BasicModelForm, BasicSimpleForm
+from passim.seeker.forms import order_search
 from passim.stemma.models import *
 from passim.seeker.models import Profile
 
@@ -25,10 +26,11 @@ class EqualGoldWidget(ModelSelect2Widget):
     addonly = False
     order = [F('code').asc(nulls_last=True), 'firstsig']
     exclude = None
+    filter = None
 
     def label_from_instance(self, obj):
         # Provide a label as in SuperOneWidget
-        sLabel = obj.get_label(do_incexpl = True)
+        sLabel = obj.get_label(do_incexpl = False)
 
         # Determine here what to return...
         return sLabel
@@ -36,6 +38,8 @@ class EqualGoldWidget(ModelSelect2Widget):
     def get_queryset(self):
         if self.addonly:
             qs = EqualGold.objects.none()
+        elif not self.filter is None:
+            qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(self.filter).order_by(*self.order).distinct()
         elif self.exclude == None:
             qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by(*self.order).distinct()
         else:
@@ -148,6 +152,41 @@ class StemmaSetOneWidget(ModelSelect2Widget):
 
 
 # ================ FORMS ================================================
+
+class EqualSelectForm(BasicSimpleForm):
+    """Simply allow selection of one EqualGold"""
+
+    ssgone = ModelChoiceField(queryset=None, required=False,
+            widget = EqualGoldWidget(attrs={'data-placeholder': 'Select an Authority File...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(EqualSelectForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Set the list from which SSGs may be selected
+            filter = Q(transcription__isnull=True) | Q(transcription="")
+            self.fields['ssgone'].queryset = EqualGold.objects.exclude(filter)
+
+            # See if we have an instance
+            if len(args) > 0:
+                # Get the instance, i.e. the StemmaSet object
+                instance = args[0].get("instance")
+                if not instance is None:
+                    # Okay, we have a StemmaSet: exclude all the items that are already part of this set
+                    exclude_ids = [x['equal__id'] for x in instance.stemmaset_stemmaitems.all().values('equal__id')]
+                    if len(exclude_ids) > 0:
+                        filter = filter | Q(id__in=exclude_ids)
+                        qs = EqualGold.objects.exclude(filter)
+                        self.fields['ssgone'].queryset = qs
+                    # Make sure that the widget's queryset is updated
+                    self.fields['ssgone'].widget.filter = filter
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualSelectForm")
+        return None
+
 
 class StemmaSetForm(BasicModelForm):
     profileid = forms.CharField(required=False)

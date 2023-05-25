@@ -328,6 +328,7 @@ urlpatterns = [
     url(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),
     url(r'^stemmaset/details(?:/(?P<pk>\d+))?/$', StemmaSetDetails.as_view(), name='stemmaset_details'),
     url(r'^stemmaset/edit(?:/(?P<pk>\d+))?/$', StemmaSetEdit.as_view(), name='stemmaset_edit'),
+    url(r'^stemmaset/add(?:/(?P<pk>\d+))?/$', StemmaSetAdd.as_view(), name='stemmaset_add'),
 
     # ------------ My Passim PRE -------------------------------------------------------------------------
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
