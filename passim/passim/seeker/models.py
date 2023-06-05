@@ -9075,11 +9075,16 @@ class SermonDescr(models.Model):
     ## ================ Calculated fields ===============================
     ## [1] Number of sermons 'equal' to me
     #scount = models.IntegerField("Equal sermon count", default=0)
+    # [1] The number of SermonDesrc objects linked to me (i.e. relations.count)
+    sermocount = models.IntegerField("Number of related sermon manifestations", default=0)
 
     ## ================ MANYTOMANY relations ============================
 
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
+    # [m] Many-to-many: all the sermon manifestations linked to me
+    relations = models.ManyToManyField("self", through="SermonDescrLink", symmetrical=False, related_name="related_to")
 
     # [0-n] Link to one or more golden standard sermons
     #       NOTE: this link is legacy. We now have the EqualGold link through 'SermonDescrEqual'
@@ -10559,6 +10564,15 @@ class SermonDescr(models.Model):
             bBack = False
         return bBack
 
+    def set_sermocount(self):
+        # Calculate and set the sermocount
+        sermocount = self.sermocount
+        iSize = self.relations.count()
+        if iSize != sermocount:
+            self.sermocount = iSize
+            self.save()
+        return True
+
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
 
@@ -11078,6 +11092,57 @@ class SermonDescrExternal(models.Model):
 
     def __str__(self):
         sBack = "S_{} to id_{} ({})".format(self.sermon.id, self.externalid, self.externaltype)
+        return sBack
+
+
+class SermonDescrLink(models.Model):
+    """Link between related sermon descriptions"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a SermonDescr is deleted, then the SermonDescrLink instance that refers to it is removed too
+    src = models.ForeignKey(SermonDescr, related_name="sermondescr_src", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(SermonDescr, related_name="sermondescr_dst", on_delete=models.CASCADE)
+    # [1] Each sermo-to-sermo link must have a linktype, with default "related"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_REL)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
+
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is related to {}".format(src_name, dst_name)
+        return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check for identical links
+        if self.src == self.dst:
+            # do *NOT* actually save a link between the same manuscripts
+            response = None
+        else:
+            # Perform the actual save() method on [self]
+            response = super(SermonDescrLink, self).save(force_insert, force_update, using, update_fields)
+            # Adapt the ssgcount
+            self.src.set_sermocount()
+            self.dst.set_sermocount()
+        # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        sermo_list = [self.src, self.dst]
+        response = super(SermonDescrLink, self).delete(using, keep_parents)
+        for obj in sermo_list:
+            obj.set_sermocount()
+        return response
+
+    def get_label(self):
+        sBack = "related to: {}".format(self.dst.get_full_name())
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 
