@@ -10065,6 +10065,26 @@ class SermonDescr(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
+    def get_full_name(self):
+        """Get a representation of this sermon """
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            manu = self.get_manuscript()
+            lHtml = []
+            if not manu is None:
+                sManu = manu.get_full_name()
+                lHtml.append(sManu)
+            sLocus = self.locus
+            if not sLocus is None and sLocus != "":
+                lHtml.append(sLocus)
+            # Combine
+            sBack = " ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/get_full_name")
+        return sBack
+
     def get_fulltext(self):
         """Return the *searchable* fulltext, without any additional formatting"""
         return self.fulltext
@@ -10332,6 +10352,69 @@ class SermonDescr(models.Model):
             sBack = self.sectiontitle
         return sBack
 
+    def get_sermolinks_markdown(self, plain=False):
+        """Return all the Sermon Manifestation links = type + dst"""
+
+        def get_one_row(lHtml, sermolink, direction):
+            # Initializations
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
+
+            try:
+                # Start the row
+                lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this manifestation to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other manifestations to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Get the URL for this particular link
+                link_url = reverse('sermondescrlink_details', kwargs={'pk': sermolink.id})
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span></td>".format(
+                    link_url, sermolink.get_linktype_display()))
+
+                # Define the third column
+                if sermolink.note != None and len(sermolink.note) > 1:
+                    sTitle = "title='{}'".format(sermolink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#sermonote_{}'>N</span>".format(
+                        sermolink.id)
+                    sNoteDiv = "<div id='sermonote_{}' class='collapse explanation'>{}</div>".format(
+                        sermolink.id, sermolink.note)
+                sermo = sermolink.dst if direction == "there" else sermolink.src
+                url = reverse('sermon_details', kwargs={'pk': sermo.id})
+                lHtml.append("<td valign='top' style='width: 100%;'><a href='{}' {}>{}</a>{}{}</td>".format(
+                    url, sTitle, sermo.get_full_name(), sNoteShow, sNoteDiv))
+
+                # Finish the row
+                lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_sermolinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for sermolink in self.sermondescr_src.all().order_by('dst__msitem__codico__manuscript__idno', 'dst__locus'):
+                get_one_row(lHtml, sermolink, "there")
+
+            # Combine into a whole table
+            if len(lHtml) > 0:
+                sBack = "<table style='width: 100%;'><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermolinks_markdown")
+        return sBack
+
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
 
@@ -10419,6 +10502,14 @@ class SermonDescr(models.Model):
         sBack = "-"
         if not self.transcription is None:
             sBack = self.transcription
+        return sBack
+
+    def get_view(self, bShort = False):
+        """Get a HTML valid view of myself"""
+
+        url = reverse('sermon_details', kwargs={'pk': self.id})
+        sBack = "<span class='signature badge gr'><a href='{}'>{}</a></span>".format(
+            url, self.get_full_name())
         return sBack
 
     def goldauthors(self):
@@ -11115,16 +11206,22 @@ class SermonDescrLink(models.Model):
         return combi
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Check for identical links
-        if self.src == self.dst:
-            # do *NOT* actually save a link between the same manuscripts
-            response = None
-        else:
-            # Perform the actual save() method on [self]
-            response = super(SermonDescrLink, self).save(force_insert, force_update, using, update_fields)
-            # Adapt the ssgcount
-            self.src.set_sermocount()
-            self.dst.set_sermocount()
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Check for identical links
+            if self.src == self.dst:
+                # do *NOT* actually save a link between the same manuscripts
+                response = None
+            else:
+                # Perform the actual save() method on [self]
+                response = super(SermonDescrLink, self).save(force_insert, force_update, using, update_fields)
+                # Adapt the ssgcount
+                self.src.set_sermocount()
+                self.dst.set_sermocount()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrLink/save")
         # Return the actual save() method response
         return response
 

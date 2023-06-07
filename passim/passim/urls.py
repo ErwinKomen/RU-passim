@@ -196,6 +196,10 @@ urlpatterns = [
     url(r'^sermon/move(?:/(?P<pk>\d+))?/$', SermonMove.as_view(), name='sermon_move'),
     url(r'^sermon/ukw(?:/(?P<pk>\d+))?/$', SermonUserKeyword.as_view(), name='sermon_ukw'),
         
+    url(r'^sermolink/list', SermonDescrLinkListView.as_view(), name='sermondescrlink_list'),
+    url(r'^sermolink/details(?:/(?P<pk>\d+))?/$', SermonDescrLinkDetails.as_view(), name='sermondescrlink_details'),
+    url(r'^sermolink/edit(?:/(?P<pk>\d+))?/$', SermonDescrLinkEdit.as_view(), name='sermondescrlink_edit'),
+    
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
     url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),  
     url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
