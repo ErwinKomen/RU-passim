@@ -871,6 +871,25 @@ class SetDef(models.Model):
 
 # ====================== Personal Research Environment models ========================================
 
+class SaveGroup(models.Model):
+    """A group that holds a number of SavedItems together"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savegroups")
+    # [1] obligatory name for this group
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+
+    def __str__(self):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            sBack = "{}: {}".format(self.profile.user.username, self.name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SaveGroup")
+        return sBack
+
+
 class SavedItem(models.Model):
     """A saved item can be a M/S/SSG or HC or PD"""
 
@@ -881,6 +900,9 @@ class SavedItem(models.Model):
     # [1] Each saved item must be of a particular type
     #     Possibilities: manu, serm, ssg, hist, pd
     sitemtype = models.CharField("Saved item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # [0-1] A SavedItem can optionally belong to a [SaveGroup]
+    group = models.ForeignKey(SaveGroup, blank=True, null=True, on_delete=models.SET_NULL, related_name="group_saveditems")
 
     # Depending on the type of SavedItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
