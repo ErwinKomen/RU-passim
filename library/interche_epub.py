@@ -1,11 +1,14 @@
 """
 Convert the latin chechen interlinear line (FLEX) into phonemic script
 
+Input:  "FlexInterlinear" xml
+Output: MS Word XML (to be opened by MS word)
+
 This version created by Erwin R. Komen
-Date: 2/dec/2020
+Date: 8/jun/2023
 
 Example:
-    python interche.py  -m "test1" 
+    python interche_epub.py  -m "test1" 
                         -i "d:/data files/elpash/stories.xml" 
                         -o "d:/data files/elpash/stories_phon.xml"
 """
@@ -148,18 +151,19 @@ def main(prgName, argv) :
 
 # ----------------------------------------------------------------------------------
 # Name :    interlinear2phonemic
-# Goal :    Convert the FLEX interlinear into phonemic
+# Goal :    Convert the FLEX interlinear XML into phonemic
 # History:
 # 16/nov/2020    ERK Created
 # ----------------------------------------------------------------------------------
 def interlinear2phonemic(oArgs):
-    """Read the CorpusSearch results and convert into Excel"""
+    """Read the FLEX MS-word and convert the ce-Latn parts into IPA"""
 
     # Defaults
     flInput = ""
     flOutput = ""
     method = "test1"
     rBreak =re.compile( r'[\-\:\.]')
+    template_name = "templates/flexword.xml"
     namespaces = {'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math',
                   'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
     
