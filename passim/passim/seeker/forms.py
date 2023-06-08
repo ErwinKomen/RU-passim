@@ -1139,6 +1139,37 @@ class ResearchSetOneWidget(ModelSelect2Widget):
         return qs
 
 
+class SermonOneWidget(ModelSelect2Widget):
+    model = SermonDescr
+    search_fields = [ 'msitem__codico__manuscript__idno__icontains', 'locus__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = SermonDescr.objects.filter(mtype='man').order_by('msitem__codico__manuscript__idno', 'locus').distinct()
+        return qs
+
+
+class SermonDescrLinkAddOnlyWidget(ModelSelect2MultipleWidget):
+    model = SermonDescrLink
+    search_fields = ['dst__msitem__codico__manuscript__idno__icontains', 'dst__id__icontains', 'dst__locus__icontains']
+    addonly = True
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label()
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = SermonDescrLink.objects.none()
+        else:
+            qs = SermonDescrLink.objects.all().order_by('dst__msitem__codico__manuscript__idno', 'dst__locus').distinct()
+        return qs
+
+
 class SermonDescrGoldWidget(ModelSelect2MultipleWidget):
     model = SermonDescrGold
     add_only = False
@@ -1923,6 +1954,7 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    slinklist   = ModelMultipleChoiceField(queryset=None, required=False)
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -2018,6 +2050,7 @@ class SermonForm(PassimModelForm):
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['slinklist'].queryset = SermonDescrLink.objects.none()
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
                 self.fields['ukwlist'].widget.is_team = True
@@ -2040,6 +2073,9 @@ class SermonForm(PassimModelForm):
             self.fields['free_exclude'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
             self.fields['free_include'].widget.main = "SermonDescr"
             self.fields['free_exclude'].widget.main = "SermonDescr"
+
+            self.fields['slinklist'].widget = SermonDescrLinkAddOnlyWidget(attrs={
+                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Some lists need to be initialized to NONE:
             self.fields['bibreflist'].queryset = Daterange.objects.none()
@@ -3455,6 +3491,95 @@ class ManuscriptLinkForm(BasicModelForm):
                     # This combination already exists
                     raise forms.ValidationError(
                             "This Manuscript is already linked"
+                        )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
+
+
+class SermonDescrLinkForm(BasicModelForm):
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newsermo = ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget=SermonOneWidget(attrs={'data-placeholder': 'Select one sermon manifestation...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
+                    'tdstyle': 'width: 300px;', 'rows': 1, 
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescrLink
+        fields = ['src', 'linktype', 'dst', 'note' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Read the manu_id
+            sermon_id = kwargs.pop("sermon_id", "")
+            # Start by executing the standard handling
+            super(SermonDescrLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newsermo'].required = False
+
+            # Initialize choices for linktype
+            init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+            init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+
+            # For searching/listing
+            self.fields['newlinktype'].initial = "rel"
+
+            if sermon_id != None and sermon_id != "":
+                self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").exclude(id=sermon_id).order_by('msitem__codico__manuscript__idno', 'locus')
+                # Adapt the widget QS
+                self.fields['newsermo'].widget.exclude = sermon_id
+            else:
+                self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").order_by('msitem__codico__manuscript__idno', 'locus')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = SermonDescr.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = SermonDescr.objects.filter(id=instance.dst.id)
+
+                    # And set a possible new destination
+                    self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").exclude(id=instance.id).order_by('idno')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrLinkForm")
+
+        # REturn nothing
+        return None
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonDescrLinkForm, self).clean()
+
+        # Get the source
+        src = cleaned_data.get("src")
+        if src != None:
+            # Any new destination is added in target_list
+            dst = cleaned_data.get("newsermo")
+            if dst != None:
+                # WE have a DST, now check how many links there are with this one
+                existing = src.relations.filter(id=dst.id)
+                if existing.count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "This Sermon manifestation is already linked"
                         )
         # Make sure to return the correct cleaned data again
         return cleaned_data

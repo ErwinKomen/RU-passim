@@ -458,17 +458,18 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 for qf in lFilters:
                     operator = qf.get("operator")
                     sName = qf.get("name")
-                    s_q = dictQ[sName]
-                    if operator == "start":
-                        combi_q = s_q
-                    elif operator == "and":
-                        combi_q = combi_q & (s_q)
-                    elif operator == "nand":
-                        combi_q = combi_q & (~ s_q)
-                    elif operator == "or":
-                        combi_q = combi_q | (s_q)
-                    elif operator == "nor":
-                        combi_q = combi_q | (~ s_q)
+                    s_q = dictQ.get(sName)
+                    if not s_q is None:
+                        if operator == "start" or combi_q is None:
+                            combi_q = s_q
+                        elif operator == "and":
+                            combi_q = combi_q & (s_q)
+                        elif operator == "nand":
+                            combi_q = combi_q & (~ s_q)
+                        elif operator == "or":
+                            combi_q = combi_q | (s_q)
+                        elif operator == "nor":
+                            combi_q = combi_q | (~ s_q)
                 # Now set the lstQ
                 lstQ.append(combi_q)
     except:

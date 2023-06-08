@@ -9075,11 +9075,16 @@ class SermonDescr(models.Model):
     ## ================ Calculated fields ===============================
     ## [1] Number of sermons 'equal' to me
     #scount = models.IntegerField("Equal sermon count", default=0)
+    # [1] The number of SermonDesrc objects linked to me (i.e. relations.count)
+    sermocount = models.IntegerField("Number of related sermon manifestations", default=0)
 
     ## ================ MANYTOMANY relations ============================
 
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
+    # [m] Many-to-many: all the sermon manifestations linked to me
+    relations = models.ManyToManyField("self", through="SermonDescrLink", symmetrical=False, related_name="related_to")
 
     # [0-n] Link to one or more golden standard sermons
     #       NOTE: this link is legacy. We now have the EqualGold link through 'SermonDescrEqual'
@@ -10060,6 +10065,26 @@ class SermonDescr(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
+    def get_full_name(self):
+        """Get a representation of this sermon """
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            manu = self.get_manuscript()
+            lHtml = []
+            if not manu is None:
+                sManu = manu.get_full_name()
+                lHtml.append(sManu)
+            sLocus = self.locus
+            if not sLocus is None and sLocus != "":
+                lHtml.append(sLocus)
+            # Combine
+            sBack = " ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/get_full_name")
+        return sBack
+
     def get_fulltext(self):
         """Return the *searchable* fulltext, without any additional formatting"""
         return self.fulltext
@@ -10327,6 +10352,69 @@ class SermonDescr(models.Model):
             sBack = self.sectiontitle
         return sBack
 
+    def get_sermolinks_markdown(self, plain=False):
+        """Return all the Sermon Manifestation links = type + dst"""
+
+        def get_one_row(lHtml, sermolink, direction):
+            # Initializations
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
+
+            try:
+                # Start the row
+                lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this manifestation to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other manifestations to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Get the URL for this particular link
+                link_url = reverse('sermondescrlink_details', kwargs={'pk': sermolink.id})
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span></td>".format(
+                    link_url, sermolink.get_linktype_display()))
+
+                # Define the third column
+                if sermolink.note != None and len(sermolink.note) > 1:
+                    sTitle = "title='{}'".format(sermolink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#sermonote_{}'>N</span>".format(
+                        sermolink.id)
+                    sNoteDiv = "<div id='sermonote_{}' class='collapse explanation'>{}</div>".format(
+                        sermolink.id, sermolink.note)
+                sermo = sermolink.dst if direction == "there" else sermolink.src
+                url = reverse('sermon_details', kwargs={'pk': sermo.id})
+                lHtml.append("<td valign='top' style='width: 100%;'><a href='{}' {}>{}</a>{}{}</td>".format(
+                    url, sTitle, sermo.get_full_name(), sNoteShow, sNoteDiv))
+
+                # Finish the row
+                lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_sermolinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for sermolink in self.sermondescr_src.all().order_by('dst__msitem__codico__manuscript__idno', 'dst__locus'):
+                get_one_row(lHtml, sermolink, "there")
+
+            # Combine into a whole table
+            if len(lHtml) > 0:
+                sBack = "<table style='width: 100%;'><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermolinks_markdown")
+        return sBack
+
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
 
@@ -10414,6 +10502,14 @@ class SermonDescr(models.Model):
         sBack = "-"
         if not self.transcription is None:
             sBack = self.transcription
+        return sBack
+
+    def get_view(self, bShort = False):
+        """Get a HTML valid view of myself"""
+
+        url = reverse('sermon_details', kwargs={'pk': self.id})
+        sBack = "<span class='signature badge gr'><a href='{}'>{}</a></span>".format(
+            url, self.get_full_name())
         return sBack
 
     def goldauthors(self):
@@ -10558,6 +10654,15 @@ class SermonDescr(models.Model):
             oErr.DoError("SermonDescr/set_projects")
             bBack = False
         return bBack
+
+    def set_sermocount(self):
+        # Calculate and set the sermocount
+        sermocount = self.sermocount
+        iSize = self.relations.count()
+        if iSize != sermocount:
+            self.sermocount = iSize
+            self.save()
+        return True
 
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
@@ -11078,6 +11183,63 @@ class SermonDescrExternal(models.Model):
 
     def __str__(self):
         sBack = "S_{} to id_{} ({})".format(self.sermon.id, self.externalid, self.externaltype)
+        return sBack
+
+
+class SermonDescrLink(models.Model):
+    """Link between related sermon descriptions"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a SermonDescr is deleted, then the SermonDescrLink instance that refers to it is removed too
+    src = models.ForeignKey(SermonDescr, related_name="sermondescr_src", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(SermonDescr, related_name="sermondescr_dst", on_delete=models.CASCADE)
+    # [1] Each sermo-to-sermo link must have a linktype, with default "related"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_REL)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
+
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is related to {}".format(src_name, dst_name)
+        return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Check for identical links
+            if self.src == self.dst:
+                # do *NOT* actually save a link between the same manuscripts
+                response = None
+            else:
+                # Perform the actual save() method on [self]
+                response = super(SermonDescrLink, self).save(force_insert, force_update, using, update_fields)
+                # Adapt the ssgcount
+                self.src.set_sermocount()
+                self.dst.set_sermocount()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrLink/save")
+        # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        sermo_list = [self.src, self.dst]
+        response = super(SermonDescrLink, self).delete(using, keep_parents)
+        for obj in sermo_list:
+            obj.set_sermocount()
+        return response
+
+    def get_label(self):
+        sBack = "related to: {}".format(self.dst.get_full_name())
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 

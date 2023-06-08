@@ -73,7 +73,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
-    UserForm
+    UserForm, SermonDescrLinkForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -85,9 +85,9 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptLink, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
-    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, SermonDescrLink, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
-    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_BIDIR_MANU, \
+    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
 from passim.bible.models import Reference
@@ -4428,12 +4428,19 @@ class SermonEdit(BasicDetails):
                                          form=BibRangeForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
+    SlinkFormSet = inlineformset_factory(SermonDescr, SermonDescrLink,
+                                         form=SermonDescrLinkForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
-                       {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
-                       {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
-                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
-                       {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
+    formset_objects = [
+        {'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
+        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SlinkFormSet,  'prefix': 'slink',  'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_REL }], 'clean': True},
+        ] 
 
     stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'fulltext',
                         'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
@@ -4472,6 +4479,11 @@ class SermonEdit(BasicDetails):
             if self.object != None:
                 # Make sure that the sermon is known
                 oBack = dict(sermon_id=self.object.id)
+        elif prefix == "slink":
+            if self.object != None:
+                # Make sure to return the ID of the Manuscript
+                oBack = dict(sermon_id=self.object.id)
+
         return oBack
            
     def add_to_context(self, context, instance):
@@ -4602,6 +4614,9 @@ class SermonEdit(BasicDetails):
                     {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
                     # AltPageNumber HIER
                     #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
+                    {'type': 'line',  'label': "Related sermon manifestations:",  'value': instance.get_sermolinks_markdown(), 
+                        'multiple': True,  'field_list': 'slinklist',   'fso': self.formset_objects[5]},
+
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
             # IN all cases
@@ -4934,6 +4949,42 @@ class SermonEdit(BasicDetails):
                                 form.instance.chvslist = newchvs
                             form.instance.intro = newintro
                             form.instance.added = newadded
+
+                    elif prefix == "slink":
+                        # Process the link from S to S
+                        newsermo = cleaned.get("newsermo")
+                        if not newsermo is None:
+                            # There also must be a linktype
+                            if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                                linktype = cleaned['newlinktype']
+                                # Get optional parameters
+                                note = cleaned.get('note', None)
+                                # Check existence
+                                obj = SermonDescrLink.objects.filter(src=instance, dst=newsermo, linktype=linktype).first()
+                                if obj == None:
+                                    sermo = SermonDescr.objects.filter(id=newsermo.id).first()
+                                    if sermo != None:
+
+                                        # Set the right parameters for creation later on
+                                        form.instance.linktype = linktype
+                                        form.instance.dst = sermo
+                                        if note != None and note != "": 
+                                            form.instance.note = note
+
+                                        # Double check reverse
+                                        if linktype in LINK_BIDIR_MANU:
+                                            rev_link = SermonDescrLink.objects.filter(src=sermo, dst=instance).first()
+                                            if rev_link == None:
+                                                # Add it
+                                                rev_link = SermonDescrLink.objects.create(src=sermo, dst=instance, linktype=linktype)
+                                            else:
+                                                # Double check the linktype
+                                                if rev_link.linktype != linktype:
+                                                    rev_link.linktype = linktype
+                                            if note != None and note != "": 
+                                                rev_link.note = note
+                                            rev_link.save()
+                        # Note: it will get saved with form.save()
                             
 
                 else:
@@ -5036,7 +5087,42 @@ class SermonEdit(BasicDetails):
                 collist_s = form.cleaned_data['collist_s']
                 adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
 
-                # (6) 'projects'
+                # (6) Related sermon manifestation links...
+                slinklist = form.cleaned_data['slinklist']
+                sermo_added = []
+                sermo_deleted = []
+                adapt_m2m(SermonDescrLink, instance, "src", slinklist, "dst", 
+                          extra = ['linktype', 'note'], related_is_through=True,
+                          added=sermo_added, deleted=sermo_deleted)
+                # Check for partial links in 'deleted'
+                for obj in sermo_deleted:
+                    # This if-clause is not needed: anything that needs deletion should be deleted
+                    # if obj.linktype in LINK_BIDIR:
+                    # First find and remove the other link
+                    reverse = SermonDescrLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse != None:
+                        reverse.delete()
+                    # Then remove myself
+                    obj.delete()
+                # Make sure to add the reverse link in the bidirectionals
+                for obj in sermo_added:
+                    if obj.linktype in LINK_BIDIR_MANU:
+                        # Find the reversal
+                        reverse = SermonDescrLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                        if reverse == None:
+                            # Create the reversal 
+                            reverse = SermonDescrLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                            # Other adaptations
+                            bNeedSaving = False
+                            # Possibly copy note
+                            if obj.note != None and obj.note != "":
+                              reverse.note = obj.note
+                              bNeedSaving = True
+                            # Need saving? Then save
+                            if bNeedSaving:
+                              reverse.save()
+
+                # (7) 'projects'
                 projlist = form.cleaned_data['projlist']
                 sermo_proj_deleted = []
                 adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project", deleted=sermo_proj_deleted)
@@ -10308,7 +10394,7 @@ class ManuscriptEdit(BasicDetails):
         return sBack
 
     def get_form_kwargs(self, prefix):
-        # This is for ssglink
+        # This is for manulink
 
         oBack = None
         if prefix == "mlink":
@@ -14611,7 +14697,7 @@ class EqualGoldOverlapDownload(EqualGoldVisDownload):
     vistype = "overlap"
 
 
-# ================= EQUALGOLDLINK ======================
+# ================= MANUSCRIPTLINK ========================
 
 class ManuscriptLinkEdit(BasicDetails):
     model = ManuscriptLink
@@ -14630,6 +14716,7 @@ class ManuscriptLinkEdit(BasicDetails):
             src = instance.src
             # Figure out what the details form for this M is
             self.listview = reverse('manuscript_details', kwargs={'pk': src.id})
+            self.listviewtitle = "Manuscript"
         return None
 
     def add_to_context(self, context, instance):
@@ -14672,6 +14759,103 @@ class ManuscriptLinkListView(BasicList):
     bUseFilter = True  
     plural_name = "Manuscript links"
     sg_name = "Manuscript Link"
+    order_cols = ['src__idno', 'dst__idno', 'linktype'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True, 'main': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'id', 'keyList': 'dstlist', 'infield': 'id'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+
+        return sBack, sTitle
+
+
+# ================= SERMONDESCRLINK ======================
+
+class SermonDescrLinkEdit(BasicDetails):
+    model = SermonDescrLink
+    mForm = SermonDescrLinkForm
+    prefix = 'slink'
+    title = "Manifestation link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+    listview = None
+    listviewtitle = None
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this S is
+            self.listview = reverse('sermon_details', kwargs={'pk': src.id})
+            self.listviewtitle = "Manifestation"
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
+        context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,        'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,        'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'safe',  'label': "Source sermon manifestation:",  'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target sermon manifestation:",  'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",                    'value': instance.get_linktype_display(),   'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Note:",                         "value": instance.get_note(),               'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class SermonDescrLinkDetails(SermonDescrLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class SermonDescrLinkListView(BasicList):
+    """List manuscript link instances"""
+
+    model = SermonDescrLink
+    listform = SermonDescrLinkForm
+    has_select2 = True  # Check
+    prefix = "slink"
+    bUseFilter = True  
+    plural_name = "Sermon links"
+    sg_name = "Manifestation Link"
     order_cols = ['src__idno', 'dst__idno', 'linktype'] 
     order_default= order_cols
     order_heads = [
