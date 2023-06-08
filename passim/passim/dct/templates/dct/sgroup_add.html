@@ -1,0 +1,46 @@
+
+<form class="sgroup-main" targeturl="{% url 'home'  %}">
+  {% csrf_token %}
+  <div class="hidden">
+    <input type="text" id="id_sgroupaction" name="sgroupaction" value="-" />
+  </div>
+
+    <div id="sgroup-add" class="row collapse">
+      <div class="col-md-6 pull-right">
+        <table style="width: 100%;">
+          <tbody>
+            <tr>
+              <!-- Allow adding a new save group -->
+              <td style="width: 100%">{{sgroupForm.sgroupadd}}</td>
+            </tr>
+            <tr>
+              <td align="right">
+                <!-- Button to add/remove Save Groups -->
+                <a class="btn btn-xs jumbo-1" role="button" 
+                   href="{% url 'savegroup_list' %}"
+                   title="Add/remove/edit saved-item Group Names">
+                  <span class="glyphicon glyphicon-th-large"></span>
+                </a>
+
+                <!-- Button to cancel -->
+                <a id="msel_sgroupaddcancel" title="Cancel adding a save-group" 
+                    class="btn btn-sm jumbo-1" 
+                    onclick="ru.dct.do_sgroup(this, 'cancel_sgroup');">
+                  <span>Cancel</span>
+                </a>
+
+                <!-- Button to actually add the savegroup to the table -->
+                <a id="msel_sgroupadd" title="Add this save group to the table of saved items" 
+                    class="btn btn-sm jumbo-3" mode="add_sgroup"
+                    onclick="ru.dct.do_sgroup('.related-original .sgroup-main', 'add_sgroup');"  >
+                  <span>Insert save group</span>
+                </a>
+
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+</form>

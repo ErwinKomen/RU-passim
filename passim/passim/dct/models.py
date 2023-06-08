@@ -879,6 +879,10 @@ class SaveGroup(models.Model):
     # [1] obligatory name for this group
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
 
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
     def __str__(self):
         sBack = ""
         oErr = ErrHandle()
@@ -888,6 +892,48 @@ class SaveGroup(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("SaveGroup")
         return sBack
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_size_markdown(self):
+        """Get a markdown representation of the size of this group"""
+
+        size = 0
+        lHtml = []
+        size = self.group_saveditems.count()
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'>{}</span>".format(size))
+        else:
+            lHtml.append("0")
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        if self.name is None or self.name == "":
+            iLast = 1
+            obj = SaveGroup.objects.all().order_by("-id").first()
+            if not obj is None:
+                iLast = obj.id + 1
+            self.name = "Group #{}".format(iLast)
+        response = super(SaveGroup, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
+
 
 
 class SavedItem(models.Model):

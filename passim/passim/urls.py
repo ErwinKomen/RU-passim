@@ -322,11 +322,16 @@ urlpatterns = [
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
     url(r'^rset/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+
     url(r'^dct/list', SetDefListView.as_view(), name='setdef_list'),
     url(r'^dct/details(?:/(?P<pk>\d+))?/$', SetDefDetails.as_view(), name='setdef_details'),
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
     url(r'^dct/download(?:/(?P<pk>\d+))?/$', SetDefDownload.as_view(), name='setdef_download'),
+
+    url(r'^sgroup/list', SaveGroupListView.as_view(), name='savegroup_list'),
+    url(r'^sgroup/details(?:/(?P<pk>\d+))?/$', SaveGroupDetails.as_view(), name='savegroup_details'),
+    url(r'^sgroup/edit(?:/(?P<pk>\d+))?/$', SaveGroupEdit.as_view(), name='savegroup_edit'),
 
     # ------------ Stemmatology tool ---------------------------------------------------------------------
     url(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),

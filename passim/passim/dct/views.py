@@ -32,8 +32,8 @@ from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, 
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
-    SavedItem, SavedSearch, SelectItem, SavedVis
-from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm
+    SavedItem, SavedSearch, SelectItem, SavedVis, SaveGroup
+from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm, SaveGroupForm, SgroupSelForm
 from passim.approve.models import EqualChange, EqualApproval
 
 def get_application_name():
@@ -237,7 +237,8 @@ class MyPassimEdit(BasicDetails):
     mainitems = []
 
     form_list = [
-        {"prefix": "svdi", "formclass": RsetSelForm, "forminstance": None}
+        {"prefix": "svdi", "formclass": RsetSelForm, "forminstance": None},
+        {"prefix": "sgrp", "formclass": SgroupSelForm, "forminstance": None},
         ]
 
     selectbuttons = [
@@ -420,9 +421,27 @@ class MyPassimEdit(BasicDetails):
             sitemset['selbutton'] = True
             sitemset['selitemtype'] = "svdi"
             sitemset['selitemForm'] = self.form_list[0]['forminstance']
+
+            # Create custombuttons
+            lCustom = []
+            lCustom.append("<span>")
+            lCustom.append('<a class="btn btn-xs jumbo-1" role="button" data-toggle="collapse" data-target="#sgroup-add" ')
+            lCustom.append('title="Add/remove/edit saved-item Group Names">')
+            lCustom.append('<span class="glyphicon glyphicon-th-large"></span></a>')
+            lCustom.append("</span>")
+            custombuttons = "\n".join(lCustom)
+            sitemset['custombutton'] = custombuttons
+
+            # Create what is needed for the custom context
+            sgroupForm = self.form_list[1]['forminstance']
+            context = dict(profile=profile, sgroupForm=sgroupForm)
+            sitemset['customshow'] = render_to_string("dct/sgroup_add.html", context, self.request)
+
             rel_list =[]
 
-            qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('group__name')]
+            qs_sgrouplist.insert(0, None)
+            qs_sitemlist = instance.profile_saveditems.all().order_by('group__name', 'order', 'sitemtype')
 
             # Look into selections
             qs_sitemids = [x.id for x in qs_sitemlist]
@@ -435,41 +454,56 @@ class MyPassimEdit(BasicDetails):
             # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_sitemlist)
 
-            # Walk these sitemlist
-            for obj in qs_sitemlist:
-                # The [obj] is of type `SavedItem`
+            # at the top-level: walk the group list
+            for group_id in qs_sgrouplist:
+                # Look for all [saved items] in this group
+                if group_id is None:
+                    qs_sitemlist = instance.profile_saveditems.filter(group__isnull=True).order_by('order', 'sitemtype')
+                else:
+                    # Select the items in this group
+                    qs_sitemlist = instance.profile_saveditems.filter(group__id=group_id).order_by('order', 'sitemtype')
+                    # Add an item for the name of the group
+                    rel_item = []
 
-                rel_item = []
+                    if bMayEdit:
+                        # Actions that can be performed on this item
+                        add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
 
-                # The [item] depends on the sitemtype
-                item = None
-                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
-                if obj.sitemtype in itemset:
-                    item = getattr(obj, itemset[obj.sitemtype])
+                # Walk these sitemlist
+                for obj in qs_sitemlist:
+                    # The [obj] is of type `SavedItem`
 
-                # SavedItem: Order within the set of SavedItems
-                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+                    rel_item = []
 
-                # SavedItem: Type
-                add_one_item(rel_item, obj.get_sitemtype_display(), False)
+                    # The [item] depends on the sitemtype
+                    item = None
+                    itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+                    if obj.sitemtype in itemset:
+                        item = getattr(obj, itemset[obj.sitemtype])
 
-                # SavedItem: title of the manu/serm/ssg/coll
-                kwargs = None
-                #if obj.name != None and obj.name != "":
-                #    kwargs = dict(name=obj.name)
-                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
+                    # SavedItem: Order within the set of SavedItems
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
-                # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
-                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
+                    # SavedItem: Type
+                    add_one_item(rel_item, obj.get_sitemtype_display(), False)
 
-                if bMayEdit:
-                    # Actions that can be performed on this item
-                    add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
+                    # SavedItem: title of the manu/serm/ssg/coll
+                    kwargs = None
+                    #if obj.name != None and obj.name != "":
+                    #    kwargs = dict(name=obj.name)
+                    add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
 
-                sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
+                    # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
+                    add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
 
-                # Add this line to the list
-                rel_list.append(dict(id=obj.id, cols=rel_item, sel_info=sel_info))
+                    if bMayEdit:
+                        # Actions that can be performed on this item
+                        add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
+
+                    sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
+
+                    # Add this line to the list
+                    rel_list.append(dict(id=obj.id, cols=rel_item, sel_info=sel_info))
             
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
@@ -1272,6 +1306,135 @@ class SelectItemApply(BasicPart):
 
         context['data'] = data
         return context
+
+
+
+# ================== Views for the SaveGroup stuff =================
+
+
+class SaveGroupListView(BasicList):
+    """Listview of SaveGroup"""
+
+    model = SaveGroup
+    listform = SaveGroupForm
+    bUseFilter = True
+    prefix = "sgrp"
+    plural_name = "SaveGroups"
+    new_button = True
+    use_team_group = True
+    order_cols = ['name', 'saved', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Name',        'order': 'o=1','type': 'str', 'field': 'name',                      'linkdetails': True, 'main': True},
+        {'name': 'Date',        'order': 'o=2','type': 'str', 'custom': 'date', 'align': 'right',   'linkdetails': True},
+        {'name': 'Saved items', 'order': '',   'type': 'int', 'custom': 'count', 'align': 'right'},
+                ]
+    filters = [ 
+        {"name": "Name",       "id": "filter_name",      "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name',  'dbfield': 'name',      'keyS': 'name'},
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+
+        if custom == "date":
+            sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "owner":
+            sBack = instance.profile.user.username
+        elif custom == "count":
+            iCount = instance.group_saveditems.count()
+            sBack = "{}".format(iCount)
+
+        return sBack, sTitle
+
+    def get_own_list(self):
+        # Get the user
+        username = self.request.user.username
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        qs = Profile.objects.filter(user=user)
+        return qs
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+
+        # Show private datasets as well as those with scope "team", provided the person is in the team
+        ownlist = self.get_own_list()
+        fields['scope'] = Q(profile__in=ownlist)  
+
+        # Return the correct response
+        return fields, lstExclude, qAlternative
+
+
+class SaveGroupEdit(BasicDetails):
+    model = SaveGroup
+    mForm = SaveGroupForm
+    prefix = 'sgrp'
+    prefix_type = "simple"
+    title = "SaveGroup"
+    use_team_group = True
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
+            {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+            {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Determine what the permission level is of this collection for the current user
+        # (1) Is this user a different one than the one who created the collection?
+        profile_owner = instance.profile
+        profile_user = Profile.get_user_profile(self.request.user.username)
+        # (2) Set default permission
+        permission = "read"
+        if profile_owner.id == profile_user.id:
+            # (3) Any creator of the SaveGroup may write it
+            permission = "write"
+
+        context['permission'] = permission
+
+        # Return the context we have made
+        return context
+
+
+class SaveGroupDetails(SaveGroupEdit):
+    """The HTML variant of [SaveGroupEdit]"""
+
+    rtype = "html"
+
+    def before_save(self, form, instance):
+        bStatus = True
+        msg = ""
+        # Do we already have an instance?
+        if instance == None or instance.id == None:
+            # See if we have the profile id
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.profile = profile
+
+        # Do we have cleaned data?
+        if hasattr(form, "cleaned_data"):
+            cleaned = form.cleaned_data
+
+        # Return as usual
+        return bStatus, msg
+
 
 
 # =================== Model views for the DCT ========

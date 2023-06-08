@@ -56,6 +56,7 @@
             {% endif %}
             {% if related.selbutton %}
               <span class="related-select pull-right">
+
                 <!-- Button to switch selection on/off -->
                 <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
                   <!-- Show the possibility icons -->
@@ -136,6 +137,11 @@
                 {% endif %}
 
               </form>
+            {% endif %}
+
+            <!-- Room for custumisable stuff -->
+            {% if related.customshow %}
+              {{related.customshow}}
             {% endif %}
 
             <!-- List of related items -->

@@ -7265,7 +7265,7 @@ class UserEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             # Issue #435: user must be able to change: email, pw, name
-            {'type': 'plain', 'label': "Username:",     'value': instance.username,    'field_key': "username"},
+            {'type': 'plain', 'label': "Username:",     'value': instance.username}, # ,    'field_key': "username"},
             {'type': 'plain', 'label': "Email:",        'value': instance.email,       'field_key': "email"},
             {'type': 'plain', 'label': "First name:",   'value': instance.first_name,  'field_key': "first_name"},
             {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},

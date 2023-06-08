@@ -93,6 +93,25 @@ class ResearchSetOneWidget(ModelSelect2Widget):
         return qs
 
 
+class SaveGroupOneWidget(ModelSelect2Widget):
+    model = SaveGroup
+    search_fields = [ 'name__icontains' ]
+    type = None
+    qs = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.qs is None:
+            profile = self.attrs.pop('profile', '')
+            qs = SaveGroup.objects.filter(profile=profile)
+            self.qs = qs
+        else:
+            qs = self.qs
+        return qs
+
+
 # ================ FORMS ================================================
 
 class ResearchSetForm(BasicModelForm):
@@ -251,4 +270,76 @@ class RsetSelForm(BasicSimpleForm):
             oErr.DoError("rsetselform")
 
 
+class SgroupSelForm(BasicSimpleForm):
+    """Form to facilitate selecting a savegroup"""
+
+    sgroupone = ModelChoiceField(queryset=None, required=False)
+    sgroupadd = forms.CharField(label="Name", required=False, 
+            widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
+                    'placeholder': 'Name for the new Save Group...',  'style': 'width: 100%;'}))
+
+    def __init__(self, *args, **kwargs):
+        # NOTE: we do need to have the user here
+        self.user = kwargs.pop('user')
+        # Start by executing the standard handling
+        super(SgroupSelForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            # Get the profile from the username
+            if self.user is None:
+                # Just show this on the server log
+                oErr.Status("WARNING: SgroupSelForm: no user supplied")
+            else:
+                profile = self.user.user_profiles.first()
+                # Set the widgets correctly
+                self.fields['sgroupone'].widget = SaveGroupOneWidget(attrs={'profile': profile, 
+                            'data-placeholder': 'Select a save group...', 'style': 'width: 100%;', 'class': 'searching'})
+
+                # The rsetone information is needed for "selection-to-DCT" processing
+                self.fields['sgroupone'].queryset = SaveGroup.objects.filter(profile=profile)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SgroupSelForm")
+
+
+class SaveGroupForm(BasicModelForm):
+
+    class Meta:
+        model = SaveGroup
+        fields = ['name']
+        widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'placeholder': 'The name of this saved items group...'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Obligatory for this type of form!!!
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(SaveGroupForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = self.team_group
+
+            # Some fields are not required
+            self.fields['name'].required = False
+
+            # Make sure the profile is set correctly
+            # self.fields['profileid'].initial = profile.id
+
+            
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SaveGroupForm")
+        return None
 

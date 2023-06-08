@@ -448,7 +448,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                     # lstQ.append(s_q)
         # Combine the query parts in the appropriate order
         qfilter = qd.get("qfilter")
-        if qfilter is None or qfilter == "":
+        if qfilter is None or qfilter == "" or qfilter == "[]":
             for k,v in dictQ.items():
                 lstQ.append(v)
         else:
