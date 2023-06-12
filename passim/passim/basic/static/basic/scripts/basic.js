@@ -3002,6 +3002,69 @@ var ru = (function ($, ru) {
        */
       related_dragenter: function (ev) {
         var row = null,
+            prev = null,
+            groupid = 0,
+            children = null;
+
+        try {
+          // Prevend the default behaviour
+          ev.preventDefault();
+          // ev.dataTransfer.dropEffect = 'all';
+          // Get the row that is stored
+          row = loc_relatedRow;
+
+          // Check if this is a different row
+          if (row.attributes["rowid"] !== ev.target.parentNode.attributes["rowid"]) {
+            // We must be going over a TD with the right class
+            if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
+              // Get the <tr> children of the table
+              children = Array.from($(ev.target).closest("tbody").find("tr"));
+              // Check whether we are before or after the target
+              if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
+                // Target comes after
+                ev.target.parentNode.after(row);
+              } else {
+                // Target comes before
+                ev.target.parentNode.before(row);
+              }
+              // Show that changes can/need to be saved
+              $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+              // Figure out what my previous row is
+              prev = $(row).prev();
+              // Figure out what the groupid is of my previous row
+              if ($(prev).hasClass("savegroup")) {
+                groupid = $(prev).attr("rowid");
+              } else {
+                groupid = $(prev).attr("groupid");
+              }
+
+              // Group addition: if the previous row is in a group, then take over that one's groupid
+              if (groupid !== undefined) {
+                // Take over that one's groupid into my own
+                $(row).attr("groupid", groupid);
+              }
+            }
+
+            ru.basic.related_update(ev.target);
+          }
+
+
+        } catch (ex) {
+          private_methods.errMsg("related_dragenter", ex);
+        }
+      },
+
+      /**
+       * related_dragentergroup
+       *    Dragging one row over other rows
+       * See: https://www.therogerlab.com/how-can-i/javascript/reorder-html-table-rows-using-drag-and-drop.html
+       *
+       */
+      related_dragentergroup: function (ev) {
+        var row = null,
+            groupid = 0,
+            table = null,
+            gsize = 0,
             children = null;
 
         try {
@@ -3011,23 +3074,58 @@ var ru = (function ($, ru) {
           // Get the row that is stored
           row = loc_relatedRow;
           // We must be going over a TD with the right class
-          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
+          if (ev.target.nodeName.toLowerCase() === "th") {
             // Get the <tr> children of the table
-            children = Array.from($(ev.target).closest("tbody").find("tr"));
+            table = $(ev.target).closest("tbody");
+            children = Array.from($(table).find("tr"));
+            // Get the groupid
+            groupid = $(ev.target).closest("tr").attr("rowid");
             // Check whether we are before or after the target
             if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
               // Target comes after
               ev.target.parentNode.after(row);
-            } else {
-              // Target comes before
-              ev.target.parentNode.before(row);
+              // Adapt the groupid of this row
+              $(row).attr("groupid", groupid);
+
             }
             // Show that changes can/need to be saved
             $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
-          } 
+            ru.basic.related_update(ev.target);
+          }
         } catch (ex) {
-          private_methods.errMsg("related_dragenter", ex);
+          private_methods.errMsg("related_dragentergroup", ex);
+        }
+      },
+
+      related_update: function(elStart) {
+        var groups = null,
+            table = null,
+            row = null,
+            children = null;
+
+        try {
+          // We must be going over a TD with the right class
+          if (elStart.nodeName.toLowerCase() === "th" || elStart.nodeName.toLowerCase() === "td") {
+            // Walk the <tr> children of the table associated with a particular group
+            table = $(elStart).closest("tbody");
+            groups = $(table).find("tr.savegroup");
+            $(groups).each(function (idx, el) {
+              var groupid = 0,
+                  gsize = 0;
+
+              // what is the ID of this group?
+              groupid = $(el).attr("rowid");
+              // Adapt the number of items that are currently in this group
+              gsize = $(table).find("tr[groupid='" + groupid + "']").length;
+              $(el).find("span.gcount").html(gsize);
+            });
+
+          }
+
+
+        } catch (ex) {
+          private_methods.errMsg("related_update", ex);
         }
       },
 
@@ -3094,6 +3192,37 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("related_save", ex);
+        }
+      },
+
+      /**
+       * related_groupclick
+       *    Clicking a group
+       *
+       */
+      related_groupclick: function (elStart) {
+        var groupid = 0,
+            grouprows = null,
+            row = 0;
+
+        try {
+          // Get the groupid 
+          groupid = $(elStart).closest("tr").attr("rowid");
+          // Find the first row with this groupid
+          grouprows = $(elStart).closest("tbody").find("tr[groupid='" + groupid + "']");
+          row = grouprows.first();
+          if ($(row).length > 0) {
+            // Check if these rows need hiding or showing
+            if ($(row).hasClass("hidden")) {
+              // Need to show them
+              grouprows.removeClass("hidden");
+            } else {
+              // These rows need to be hidden
+              grouprows.addClass("hidden");
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_groupclick", ex);
         }
       },
 

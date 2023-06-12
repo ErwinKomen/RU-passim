@@ -439,7 +439,7 @@ class MyPassimEdit(BasicDetails):
 
             rel_list =[]
 
-            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('group__name')]
+            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('name')]
             qs_sgrouplist.insert(0, None)
             qs_sitemlist = instance.profile_saveditems.all().order_by('group__name', 'order', 'sitemtype')
 
@@ -464,10 +464,13 @@ class MyPassimEdit(BasicDetails):
                     qs_sitemlist = instance.profile_saveditems.filter(group__id=group_id).order_by('order', 'sitemtype')
                     # Add an item for the name of the group
                     rel_item = []
+                    sGroupName = SaveGroup.objects.filter(id=group_id).first().name
+                    iGroupSize = qs_sitemlist.count()
+                    rel_list.append(dict(isgroup=True, id=group_id, name=sGroupName, count=iGroupSize))
 
-                    if bMayEdit:
-                        # Actions that can be performed on this item
-                        add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
+                    #if bMayEdit:
+                    #    # Actions that can be performed on this item
+                    #    add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
 
                 # Walk these sitemlist
                 for obj in qs_sitemlist:
@@ -503,7 +506,7 @@ class MyPassimEdit(BasicDetails):
                     sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
 
                     # Add this line to the list
-                    rel_list.append(dict(id=obj.id, cols=rel_item, sel_info=sel_info))
+                    rel_list.append(dict(isgroup=False, id=obj.id, cols=rel_item, sel_info=sel_info))
             
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
