@@ -2217,6 +2217,33 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_sgroup
+       *    Add saved group, or cancel
+       *
+       */
+      do_sgroup: function (elStart, sAction) {
+        var sgrp_id = "#id_sgrp-sgroupadd",
+            elSgroup = null,
+            sGroupName = "";
+
+        try {
+          elSgroup = $(elStart).closest("form").find(sgrp_id).first();
+          switch (sAction) {
+            case "add_sgroup":
+              sGroupName = $(elSgroup).val();
+              break;
+            case "cancel_sgroup":
+              // Do not add a group, clear the input
+              $(elSgroup).val("");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("do_sgroup", ex);
+        }
+      },
+
+      /**
        * do_selitem
        *    Check or uncheck items for selection
        *

@@ -3159,22 +3159,36 @@ var ru = (function ($, ru) {
         var elTable = null,
             elForm = null,
             elHlist = null,
+            elGlist = null,
             elSavenew = null,
+            groupid = 0,
+            lst_grow = [],
             lst_row = [];
 
         try {
-          elTable = $(elStart).closest(".related-original").find("table tbody").first();
+          elTable = $(elStart).closest(".related-original").find("table.related tbody").first();
           if (elTable.length > 0 && prefix !== undefined && mode !== undefined) {
             // Get all the rows in their current order
             $(elTable).find("tr.form-row").each(function (idx, el) {
-              lst_row.push($(el).attr("rowid"));
+              // Exclude .savegroup
+              if (!$(el).hasClass("savegroup")) {
+                // Regular [hlist]
+                lst_row.push($(el).attr("rowid"));
+                // Grouping [glist]
+                groupid = $(el).attr("groupid");
+                if (groupid !== undefined) {
+                  lst_grow.push({ groupid: groupid, rowid: $(el).attr("rowid") });
+                }
+              }
             });
             // Get form, hlist, savenew
             elForm = $("#save_related_" + prefix);
             elHlist = $("#id_" + prefix + "-hlist");
+            elGlist = $("#id_" + prefix + "-glist");
             elSavenew = $("#id_" + prefix + "-savenew");
             // Set the parameters
             $(elHlist).val(JSON.stringify(lst_row));
+            $(elGlist).val(JSON.stringify(lst_grow));
             switch (mode) {
               case "save":
                 $(elSavenew).val("false");

@@ -19,6 +19,7 @@
               action="{% if related.instance.id %}{{related.detailsview}}{% endif %}">
           {% csrf_token %}
           <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
+          <input type="text" id="id_{{related.prefix}}-glist" name="{{related.prefix}}-glist" value="" />
           <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />
         </form>
       </div>
@@ -145,7 +146,7 @@
             {% endif %}
 
             <!-- List of related items -->
-            <table class="func-view compact-simple {{related.gridclass}}" 
+            <table class="func-view related compact-simple {{related.gridclass}}" 
                     style="width: 100%;">
               <thead>
                 <tr>
