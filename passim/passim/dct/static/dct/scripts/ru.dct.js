@@ -2222,21 +2222,89 @@ var ru = (function ($, ru) {
        *
        */
       do_sgroup: function (elStart, sAction) {
-        var sgrp_id = "#id_sgrp-sgroupadd",
+        var targeturl = "",
+            frm = null,
+            data = null,
+            table = null,
+            action = "",
             elSgroup = null,
+            sGroupNew = "",
             sGroupName = "";
 
         try {
-          elSgroup = $(elStart).closest("form").find(sgrp_id).first();
-          switch (sAction) {
-            case "add_sgroup":
-              sGroupName = $(elSgroup).val();
-              break;
-            case "cancel_sgroup":
-              // Do not add a group, clear the input
-              $(elSgroup).val("");
-              break;
-          }
+          frm = $(elStart).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the URL
+          targeturl = $(frm).attr("targeturl");
+
+          // Get the table
+          table = $(elStart).closest(".related-original").find("table.func-view.related.sel-table").first();
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "added":
+                        // Hide the interface
+                        $("#sgroup-add").addClass("collapse");
+                        $("#sgroup-add").removeClass("in");
+                        // Make sure that the savegroup name row is added to the table appropriately
+                        sGroupNew = response['sgroupnew'];
+                        // Add this to the table
+                        $(table).find("tbody:last-child").append(sGroupNew);
+                        break;
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+
 
         } catch (ex) {
           private_methods.errMsg("do_sgroup", ex);

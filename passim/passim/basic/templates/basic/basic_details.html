@@ -274,18 +274,23 @@
                         <tbody>
                           {% for relrow in related.rel_list %}
                             {% if relrow.isgroup %}
-                              <tr class="form-row savegroup" rowid="{{relrow.id}}">
+                              <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                                  mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
                                 <!-- Counter-->
                                 {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
                                 <!-- columns taken together -->
                                 <th colspan="{{related.columns|length}}" align="center" 
-                                    ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}}</th>
+                                    onclick="ru.basic.related_groupclick(this);"
+                                    ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}}
+                                  <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                                </th>
 
                               </tr>
                             {% else %}
 
-                              <tr class="form-row" rowid="{{relrow.id}}" groupid="0">
+                              <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}" 
+                                  rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
                                 <!-- Counter-->
                                 {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 

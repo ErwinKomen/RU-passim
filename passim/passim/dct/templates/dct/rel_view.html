@@ -20,6 +20,7 @@
           {% csrf_token %}
           <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
           <input type="text" id="id_{{related.prefix}}-glist" name="{{related.prefix}}-glist" value="" />
+          <input type="text" id="id_{{related.prefix}}-gnew" name="{{related.prefix}}-gnew" value="" />
           <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />
         </form>
       </div>
@@ -172,7 +173,8 @@
               <tbody>
                 {% for relrow in related.rel_list %}
                   {% if relrow.isgroup %}
-                    <tr class="form-row savegroup" rowid="{{relrow.id}}">
+                    <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                        mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
                       {% if related.selbutton %}
                         <!-- Possibly add select field (not used here, but neede to be incorporated) -->
                         <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">&nbsp;</td>
@@ -184,12 +186,15 @@
                       <!-- columns taken together -->
                       <th colspan="{{related.columns|length}}"
                           onclick="ru.basic.related_groupclick(this);"
-                          ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}} (<span class="gcount">{{relrow.count}}</span> item[s])</th>
+                          ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}} 
+                        <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                      </th>
 
                     </tr>
                   {% else %}
 
-                    <tr class="form-row" rowid="{{relrow.id}}" groupid="0">
+                    <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}" 
+                        rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
                       {% if related.selbutton %}
                         <!-- Possibly add select field-->
                         <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">

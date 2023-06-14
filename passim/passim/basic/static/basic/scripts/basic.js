@@ -3003,6 +3003,7 @@ var ru = (function ($, ru) {
       related_dragenter: function (ev) {
         var row = null,
             prev = null,
+            table = null,
             groupid = 0,
             children = null;
 
@@ -3018,7 +3019,8 @@ var ru = (function ($, ru) {
             // We must be going over a TD with the right class
             if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
               // Get the <tr> children of the table
-              children = Array.from($(ev.target).closest("tbody").find("tr"));
+              table = $(ev.target).closest("tbody");
+              children = Array.from($(table).find("tr"));
               // Check whether we are before or after the target
               if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
                 // Target comes after
@@ -3028,7 +3030,7 @@ var ru = (function ($, ru) {
                 ev.target.parentNode.before(row);
               }
               // Show that changes can/need to be saved
-              $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
+              $(table).closest("div").find(".related-save").removeClass("hidden");
               // Figure out what my previous row is
               prev = $(row).prev();
               // Figure out what the groupid is of my previous row
@@ -3042,6 +3044,15 @@ var ru = (function ($, ru) {
               if (groupid !== undefined) {
                 // Take over that one's groupid into my own
                 $(row).attr("groupid", groupid);
+                // if this group's elements are hidden, so must I be
+                if ($(table).find("tr.savegroup[groupid='" + groupid + "']").attr("mode") === "closed") {
+                  $(row).addClass("hidden");
+                } else {
+                  $(row).removeClass("hidden");
+                }
+              } else {
+                // I must always be visible
+                $(row).removeClass("hidden");
               }
             }
 
@@ -3080,14 +3091,31 @@ var ru = (function ($, ru) {
             children = Array.from($(table).find("tr"));
             // Get the groupid
             groupid = $(ev.target).closest("tr").attr("rowid");
+
+            console.log("Entering group: " + groupid);
+
             // Check whether we are before or after the target
             if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
               // Target comes after
               ev.target.parentNode.after(row);
-              // Adapt the groupid of this row
-              $(row).attr("groupid", groupid);
+              //// Adapt the groupid of this row
+              //$(row).attr("groupid", groupid);
 
+            } else {
+              // Need to break here and check what is the matter
+              gsize = gsize;
+              // Target ALSO comes after
+              ev.target.parentNode.after(row);
             }
+            // Adapt the groupid of this row
+            $(row).attr("groupid", groupid);
+            // if this group is 'closed', I must be hidden
+            if ($(ev.target).closest("tr").attr("mode") === "closed") {
+              $(row).addClass("hidden");
+            } else {
+              $(row).removeClass("hidden");
+            }
+
             // Show that changes can/need to be saved
             $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
@@ -3098,7 +3126,7 @@ var ru = (function ($, ru) {
         }
       },
 
-      related_update: function(elStart) {
+      related_update: function (elStart) {
         var groups = null,
             table = null,
             row = null,
@@ -3216,23 +3244,32 @@ var ru = (function ($, ru) {
        */
       related_groupclick: function (elStart) {
         var groupid = 0,
+            mode = "",
             grouprows = null,
+            grow = null,
             row = 0;
 
         try {
           // Get the groupid 
-          groupid = $(elStart).closest("tr").attr("rowid");
-          // Find the first row with this groupid
+          grow = $(elStart).closest("tr");
+          groupid = $(grow).attr("rowid");
+          // Get the mode
+          mode = $(grow).attr("mode");
+
+          // Get the rows in this group
           grouprows = $(elStart).closest("tbody").find("tr[groupid='" + groupid + "']");
-          row = grouprows.first();
-          if ($(row).length > 0) {
+          // row = grouprows.first();
+          if ($(grouprows).length > 0) {
             // Check if these rows need hiding or showing
-            if ($(row).hasClass("hidden")) {
-              // Need to show them
+            //if ($(row).hasClass("hidden")) {
+            if (mode == "closed") {
+                // Need to show them
               grouprows.removeClass("hidden");
+              $(grow).attr("mode", "open");
             } else {
               // These rows need to be hidden
               grouprows.addClass("hidden");
+              $(grow).attr("mode", "closed");
             }
           }
         } catch (ex) {

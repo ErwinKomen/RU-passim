@@ -1,8 +1,8 @@
 
-<form class="sgroup-main" targeturl="{% url 'home'  %}">
+<form class="sgroup-main" targeturl="{% url 'savegroup_apply' profile.id %}">
   {% csrf_token %}
   <div class="hidden">
-    <input type="text" id="id_sgroupaction" name="sgroupaction" value="-" />
+    <input type="text" id="id_sgroupaction" name="sgroupaction" value="add" />
   </div>
 
     <div id="sgroup-add" class="row collapse">
@@ -13,7 +13,7 @@
               <!-- Allow adding a new save group -->
               <td style="width: 100%">{{sgroupForm.sgroupadd}}</td>
             </tr>
-            <tr>
+            <tr class="">
               <td align="right">
                 <!-- Button to add/remove Save Groups -->
                 <a class="btn btn-xs jumbo-1" role="button" 
@@ -25,6 +25,7 @@
                 <!-- Button to cancel -->
                 <a id="msel_sgroupaddcancel" title="Cancel adding a save-group" 
                     class="btn btn-sm jumbo-1" 
+                   data-toggle="collapse" data-target="#sgroup-add"
                     onclick="ru.dct.do_sgroup(this, 'cancel_sgroup');">
                   <span>Cancel</span>
                 </a>
