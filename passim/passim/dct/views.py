@@ -466,7 +466,8 @@ class MyPassimEdit(BasicDetails):
                     rel_item = []
                     sGroupName = SaveGroup.objects.filter(id=group_id).first().name
                     iGroupSize = qs_sitemlist.count()
-                    rel_list.append(dict(isgroup=True, id=group_id, name=sGroupName, count=iGroupSize))
+                    url = reverse('savegroup_details', kwargs={'pk': group_id})
+                    rel_list.append(dict(isgroup=True, id=group_id, name=sGroupName, count=iGroupSize, url=url))
 
                     #if bMayEdit:
                     #    # Actions that can be performed on this item
@@ -1458,7 +1459,16 @@ class SaveGroupEdit(BasicDetails):
     prefix_type = "simple"
     title = "SaveGroup"
     use_team_group = True
+    listview = None
+    listviewtitle = "MyPassim"
     mainitems = []
+
+    def custom_init(self, instance):
+        # Set the listview target
+        self.listview = reverse("mypassim_details")
+        # Make sure upon deletion we also return to the same listview target
+
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -1485,6 +1495,8 @@ class SaveGroupEdit(BasicDetails):
             permission = "write"
 
         context['permission'] = permission
+
+        context['afterdelurl'] = self.listview
 
         # Return the context we have made
         return context

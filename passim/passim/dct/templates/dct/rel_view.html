@@ -187,7 +187,9 @@
                       <th colspan="{{related.columns|length}}"
                           onclick="ru.basic.related_groupclick(this);"
                           ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}} 
-                        <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                        {% if relrow.url %}<a href="{{relrow.url}}">{% endif %}
+                          <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                        {% if relrow.url %}</a>{% endif %}
                       </th>
 
                     </tr>
