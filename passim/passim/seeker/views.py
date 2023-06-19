@@ -7860,6 +7860,11 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
             context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
 
+            # Add any saved items of this type
+            if instance.settype == "pd":
+                context['mainitems'].append( {'type': 'plain',  'label': "Saved items:", 'value': instance.get_sitems(profile),
+                    'field_list': 'sitemlist'})
+
             # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
             if instance.settype == "hc" and context['is_app_editor']:
                 # If 'manu' is set, then this procedure is called from 'collhist_compare'

@@ -8701,6 +8701,50 @@ class Collection(models.Model):
         # REturn the result
         return qs
 
+    def get_sitems(self, profile):
+        """Get all saved items that would suit me, but have not yet been added to me"""
+
+        sBack = ""
+        oColTypeSitemType = dict(manu="manu", sermon="serm", super="ssg")
+        oErr = ErrHandle()
+        try:
+            coltype = self.type
+            # What is my type of collection?
+            sItemType = oColTypeSitemType.get(coltype)
+            if not sItemType is None:
+                # Get the contents of the current collection
+                current_ids = []
+                sDetails = ""
+                if coltype == "manu":
+                    current_ids = [x['manuscript__id'] for x in self.manuscript_col.all().values('manuscript__id')]
+                    sDetails = "manuscript_details"
+                elif coltype == "sermon":
+                    current_ids = [x['sermon__id'] for x in self.sermondescr_col.all().values('sermon__id')]
+                    sDetails = "sermon_details"
+                elif coltype == "super":
+                    current_ids = [x['super__id'] for x in self.super_col.all().values('super__id')]
+                    sDetails = "equalgold_details"
+                # Get all the Saved Items associated with my profile
+                qs = profile.profile_saveditems.filter(settype="pd", sitemtype=sItemType).exclude(id__in=current_ids)
+                # Convert this into a list
+                lHtml = []
+                for obj in qs:
+                    url = reverse(sDetails, kwargs = {'pk': obj.id})
+                    sLabel = "NietGevonden"
+                    if coltype == "manu":
+                        sLabel = "{}, {}, {}".format(obj.get_city(), obj.get_library(), obj.idno)
+                    elif coltype == "sermon":
+                        sLabel = "{}: {}".format(obj.msitem.codico.manuscript.idno, obj.get_locus())
+                    elif coltype == "super":
+                        sLabel = obj.get_passimcode_markdown()
+                    oItem = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLabel)
+                    lHtml.append(oItem)
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/get_sitems")
+        return sBack
+
     def get_size_markdown(self):
         """Count the items that belong to me, depending on my type
         
