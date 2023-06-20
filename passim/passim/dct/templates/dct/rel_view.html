@@ -19,6 +19,8 @@
               action="{% if related.instance.id %}{{related.detailsview}}{% endif %}">
           {% csrf_token %}
           <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
+          <input type="text" id="id_{{related.prefix}}-glist" name="{{related.prefix}}-glist" value="" />
+          <input type="text" id="id_{{related.prefix}}-gnew" name="{{related.prefix}}-gnew" value="" />
           <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />
         </form>
       </div>
@@ -145,7 +147,7 @@
             {% endif %}
 
             <!-- List of related items -->
-            <table class="func-view compact-simple {{related.gridclass}}" 
+            <table class="func-view related compact-simple {{related.gridclass}}" 
                     style="width: 100%;">
               <thead>
                 <tr>
@@ -170,44 +172,69 @@
               </thead>
               <tbody>
                 {% for relrow in related.rel_list %}
+                  {% if relrow.isgroup %}
+                    <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                        mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
+                      {% if related.selbutton %}
+                        <!-- Possibly add select field (not used here, but neede to be incorporated) -->
+                        <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">&nbsp;</td>
+                      {% endif %}
 
-                  <tr class="form-row" rowid="{{relrow.id}}">
-                    {% if related.selbutton %}
-                      <!-- Possibly add select field-->
-                      <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
-                        {{relrow.sel_info|safe}}
-                      </td>
-                    {% endif %}
+                      <!-- Counter-->
+                      {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
-                    <!-- Counter-->
-                    {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+                      <!-- columns taken together -->
+                      <th colspan="{{related.columns|length}}"
+                          onclick="ru.basic.related_groupclick(this);"
+                          ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}} 
+                        {% if relrow.url %}<a href="{{relrow.url}}">{% endif %}
+                          <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                        {% if relrow.url %}</a>{% endif %}
+                      </th>
 
-                    <!-- Remaining cells -->
-                    {% for relcol in relrow.cols %}
-                      <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                          class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
-                                  {% if relcol.draggable %}draggable{% endif %}"
-                          {% if relcol.align %}align="{{relcol.align}}"{% endif %}
-                          {% if relcol.draggable %}draggable="true"{% endif %}
-                          {% if relcol.draggable %}
-                            ondragstart="ru.basic.related_drag(event);" 
-                            ondragover="ru.basic.related_dragenter(event);" 
+                    </tr>
+                  {% else %}
+
+                    <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}" 
+                        rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
+                      {% if related.selbutton %}
+                        <!-- Possibly add select field-->
+                        <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
+                          {{relrow.sel_info|safe}}
+                        </td>
+                      {% endif %}
+
+                      <!-- Counter-->
+                      {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+
+                      <!-- Remaining cells -->
+                      {% for relcol in relrow.cols %}
+                        <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
+                            class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
+                                    {% if relcol.draggable %}draggable{% endif %}"
+                            {% if relcol.align %}align="{{relcol.align}}"{% endif %}
+                            {% if relcol.draggable %}draggable="true"{% endif %}
+                            {% if relcol.draggable %}
+                              ondragstart="ru.basic.related_drag(event);" 
+                              ondragover="ru.basic.related_dragenter(event);" 
+                            {% endif %}
+                            style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
+                            >
+                          {% if relcol.value %}
+                            {% if relcol.link %}
+                              <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                            {% else %}
+                              {{relcol.value|safe}}
+                            {% endif %}
                           {% endif %}
-                          style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
-                          >
-                        {% if relcol.value %}
-                          {% if relcol.link %}
-                            <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
-                          {% else %}
-                            {{relcol.value|safe}}
-                          {% endif %}
-                        {% endif %}
-                      </td>
-                    {% endfor %}
+                        </td>
+                      {% endfor %}
 
-                    <!-- Possible delete cell -->
+                      <!-- Possible delete cell -->
 
-                  </tr>
+                    </tr>
+
+                  {% endif %}
                 {% endfor %}
 
                 {% if related.editable and is_app_editor %}

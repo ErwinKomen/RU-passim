@@ -439,7 +439,7 @@ class MyPassimEdit(BasicDetails):
 
             rel_list =[]
 
-            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('group__name')]
+            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('name')]
             qs_sgrouplist.insert(0, None)
             qs_sitemlist = instance.profile_saveditems.all().order_by('group__name', 'order', 'sitemtype')
 
@@ -464,10 +464,14 @@ class MyPassimEdit(BasicDetails):
                     qs_sitemlist = instance.profile_saveditems.filter(group__id=group_id).order_by('order', 'sitemtype')
                     # Add an item for the name of the group
                     rel_item = []
+                    sGroupName = SaveGroup.objects.filter(id=group_id).first().name
+                    iGroupSize = qs_sitemlist.count()
+                    url = reverse('savegroup_details', kwargs={'pk': group_id})
+                    rel_list.append(dict(isgroup=True, id=group_id, name=sGroupName, count=iGroupSize, url=url))
 
-                    if bMayEdit:
-                        # Actions that can be performed on this item
-                        add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
+                    #if bMayEdit:
+                    #    # Actions that can be performed on this item
+                    #    add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
 
                 # Walk these sitemlist
                 for obj in qs_sitemlist:
@@ -503,7 +507,8 @@ class MyPassimEdit(BasicDetails):
                     sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
 
                     # Add this line to the list
-                    rel_list.append(dict(id=obj.id, cols=rel_item, sel_info=sel_info))
+                    group_id = "0" if group_id is None else group_id
+                    rel_list.append(dict(isgroup=False, id=obj.id, cols=rel_item, sel_info=sel_info, group_id=group_id))
             
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
@@ -801,7 +806,7 @@ class MyPassimEdit(BasicDetails):
         bChanges = False
         bDebug = True
         hlist_objects = [
-            {"prefix": "svitem",    "cls": SavedItem},
+            {"prefix": "svitem",    "cls": SavedItem, "grp": SaveGroup},
             {"prefix": "svsearch",  "cls": SavedSearch},
             ]
 
@@ -810,9 +815,80 @@ class MyPassimEdit(BasicDetails):
             for oHlist in hlist_objects:
                 prefix = oHlist.get("prefix")
                 cls = oHlist.get("cls")
+                grp = oHlist.get("grp")
                 arg_hlist = "{}-hlist".format(prefix)
+                arg_glist = "{}-glist".format(prefix)
                 arg_savenew = "{}-savenew".format(prefix)
-                if arg_hlist in self.qd and arg_savenew in self.qd:
+
+                # NOTE: it is either [hlist] or [glist], not both of them
+                if arg_glist in self.qd and not grp is None:
+                    glist = json.loads(self.qd[arg_glist])
+
+                    # Make sure we are not saving
+                    self.do_not_save = True
+                    # But that we do a new redirect
+                    self.newRedirect = True
+
+                    # Change the redirect URL
+                    if self.redirectpage == "":
+                        self.redirectpage = reverse('mypassim_details')
+
+                    # We also need to create a [hlist] to check existing
+                    hlist = []
+                    # What we have is the ordered list of SavedItem id's plus a possible SaveGroup id
+                    with transaction.atomic():
+                        # Make sure the orders are correct
+                        for idx, oItem in enumerate(glist):
+                            order = idx + 1
+                            groupid = oItem.get("groupid")
+                            item_id = oItem.get("rowid")
+
+                            # Keep track of the actually used items, in the mean time
+                            hlist.append(item_id)
+
+                            lstQ = [Q(profile=instance)]
+                            lstQ.append(Q(**{"id": item_id}))
+                            obj = cls.objects.filter(*lstQ).first()
+
+                            if isinstance(groupid, str): groupid = int(groupid)
+                            if groupid == 0:
+                                group = None
+                            else:
+                                lstQ = [Q(profile=instance)]
+                                lstQ.append(Q(**{"id": groupid}))
+                                group = grp.objects.filter(*lstQ).first()
+
+                            if obj != None:
+                                # The order should be correct
+                                if obj.order != order:
+                                    obj.order = order
+                                    obj.save()
+                                    bChanges = True
+                                # The group adherence should also be correct
+                                current_group_id = 0 if obj.group is None else obj.group.id
+                                if current_group_id != groupid:
+                                    # Assign the new group
+                                    obj.group = group
+                                    obj.save()
+                                    bChanges = True
+
+                    # See if any need to be removed
+                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    delete_id = []
+                    for item_id in existing_item_id:
+                        if not item_id in hlist:
+                            delete_id.append(item_id)
+                    if len(delete_id)>0:
+                        lstQ = [Q(profile=instance)]
+                        lstQ.append(Q(**{"id__in": delete_id}))
+                        cls.objects.filter(*lstQ).delete()
+                        bChanges = True
+
+                    if bChanges:
+                        # (6) Re-calculate the order
+                        cls.update_order(instance)
+
+                elif arg_hlist in self.qd and arg_savenew in self.qd:
                     # Interpret the list of information that we receive
                     hlist = json.loads(self.qd[arg_hlist])
                     # Interpret the savenew parameter
@@ -855,6 +931,7 @@ class MyPassimEdit(BasicDetails):
                     if bChanges:
                         # (6) Re-calculate the order
                         cls.update_order(instance)
+
             return True
         except:
             msg = oErr.get_error_message()
@@ -1382,7 +1459,16 @@ class SaveGroupEdit(BasicDetails):
     prefix_type = "simple"
     title = "SaveGroup"
     use_team_group = True
+    listview = None
+    listviewtitle = "MyPassim"
     mainitems = []
+
+    def custom_init(self, instance):
+        # Set the listview target
+        self.listview = reverse("mypassim_details")
+        # Make sure upon deletion we also return to the same listview target
+
+        return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -1410,6 +1496,8 @@ class SaveGroupEdit(BasicDetails):
 
         context['permission'] = permission
 
+        context['afterdelurl'] = self.listview
+
         # Return the context we have made
         return context
 
@@ -1434,6 +1522,64 @@ class SaveGroupDetails(SaveGroupEdit):
 
         # Return as usual
         return bStatus, msg
+
+
+class SaveGroupApply(BasicPart):
+    """Possibly add a new SaveGroup for this user"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+        bIsNewGroup = False
+        sHtml = ""
+       
+        try:
+            # Check validity and permissions
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
+
+            # We already know who we are
+            profile = self.obj
+
+            # Retrieve necessary parameters
+            sgroupadd = self.qd.get("sgrp-sgroupadd")
+            sgroupaction = self.qd.get("sgroupaction")
+
+            if sgroupaction == "add":
+                # We are going to add a SaveGroup
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(name__iexact=sgroupadd))
+                obj = SaveGroup.objects.filter(*lstQ).first()
+                # OLD and obsolete: obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
+                if obj is None:
+                    obj = SaveGroup.objects.create(
+                        profile=profile, name=sgroupadd)
+                    obj.save()
+                    bIsNewGroup = True
+                data['action'] = "added"
+
+                # Calculate what the savegroup HTML row looks like
+                if bIsNewGroup:
+                    context = dict(groupid=obj.id, groupname=sgroupadd)
+                    sHtml = render_to_string("dct/sgroup_new.html", context, self.request)
+                data['sgroupnew'] = sHtml
+
+            ## Possibly adapt the ordering of the saved items for this user
+            #if 'action' in data:
+            #    # Something has happened
+            #    SavedItem.update_order(profile)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SaveGroupApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 

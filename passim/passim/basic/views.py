@@ -2211,99 +2211,101 @@ class BasicDetails(DetailView):
                 context['object'] = instance
                 self.object = instance
 
-                # Do we have an existing object or are we creating?
-                if instance == None:
-                    # Saving a new item
-                    if self.use_team_group:
-                        frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                # Do we actually have an [mForm]??
+                if not mForm is None:
+                    # Do we have an existing object or are we creating?
+                    if instance == None:
+                        # Saving a new item
+                        if self.use_team_group:
+                            frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(initial, prefix=prefix)
+                        bNew = True
+                        self.add = True
+                    elif len(initial) == 0:
+                        # Create a completely new form, on the basis of the [instance] only
+                        if self.use_team_group:
+                            frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(prefix=prefix, instance=instance)
                     else:
-                        frm = mForm(initial, prefix=prefix)
-                    bNew = True
-                    self.add = True
-                elif len(initial) == 0:
-                    # Create a completely new form, on the basis of the [instance] only
-                    if self.use_team_group:
-                        frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(prefix=prefix, instance=instance)
-                else:
-                    # Editing an existing one
-                    if self.use_team_group:
-                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
-                # Both cases: validation and saving
-                if frm.is_valid():
-                    # The form is valid - do a preliminary saving
-                    obj = frm.save(commit=False)
-                    # Any checks go here...
-                    bResult, msg = self.before_save(form=frm, instance=obj)
-                    if bResult:
-                        # Now save it for real
-                        obj.save()
+                        # Editing an existing one
+                        if self.use_team_group:
+                            frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
+                    # Both cases: validation and saving
+                    if frm.is_valid():
+                        # The form is valid - do a preliminary saving
+                        obj = frm.save(commit=False)
+                        # Any checks go here...
+                        bResult, msg = self.before_save(form=frm, instance=obj)
+                        if bResult:
+                            # Now save it for real
+                            obj.save()
 
-                        # Make sure the form is actually saved completely
-                        # Issue #426: put it up here
-                        frm.save()
-                        instance = obj
+                            # Make sure the form is actually saved completely
+                            # Issue #426: put it up here
+                            frm.save()
+                            instance = obj
 
-                        # Log the SAVE action
-                        details = {'id': obj.id}
-                        details["savetype"] = "new" if bNew else "change"
-                        details["form"] = frm.__class__.__name__
-                        if frm.changed_data != None and len(frm.changed_data) > 0:
-                            details['changes'] = action_model_changes(frm, obj)
-                        self.action_add(obj, details, "save")
+                            # Log the SAVE action
+                            details = {'id': obj.id}
+                            details["savetype"] = "new" if bNew else "change"
+                            details["form"] = frm.__class__.__name__
+                            if frm.changed_data != None and len(frm.changed_data) > 0:
+                                details['changes'] = action_model_changes(frm, obj)
+                            self.action_add(obj, details, "save")
 
-                        # Issue #426: comment this
-                        ## Make sure the form is actually saved completely
-                        #frm.save()
-                        #instance = obj
+                            # Issue #426: comment this
+                            ## Make sure the form is actually saved completely
+                            #frm.save()
+                            #instance = obj
                     
-                        # Any action(s) after saving
-                        bResult, msg = self.after_save(frm, obj)
-                    else:
+                            # Any action(s) after saving
+                            bResult, msg = self.after_save(frm, obj)
+                        else:
 
-                        # EK: working on this.
-                        #     I've now put this exclusively in EqualGoldEdit's method after_save()
-                        #
-                        ## ADDED Take over any data from [instance] to [frm.data]
-                        ##       Provided these fields are in the form's [initial_fields]
-                        #if instance != None and hasattr(frm, "initial_fields"):
+                            # EK: working on this.
+                            #     I've now put this exclusively in EqualGoldEdit's method after_save()
+                            #
+                            ## ADDED Take over any data from [instance] to [frm.data]
+                            ##       Provided these fields are in the form's [initial_fields]
+                            #if instance != None and hasattr(frm, "initial_fields"):
 
-                        #    # Walk the fields that need to be taken from the instance
-                        #    for key in frm.initial_fields:
-                        #        value = getattr(instance, key)
+                            #    # Walk the fields that need to be taken from the instance
+                            #    for key in frm.initial_fields:
+                            #        value = getattr(instance, key)
 
-                        #        key_prf = '{}-{}'.format(frm.prefix, key)
-                        #        if isinstance(value, str) or isinstance(value, int):
-                        #            frm.data[key_prf] = value
-                        #        elif isinstance(value, object):
-                        #            frm.data[key_prf] = str(value.id)
+                            #        key_prf = '{}-{}'.format(frm.prefix, key)
+                            #        if isinstance(value, str) or isinstance(value, int):
+                            #            frm.data[key_prf] = value
+                            #        elif isinstance(value, object):
+                            #            frm.data[key_prf] = str(value.id)
                     
-                        if not msg is None:
-                            context['errors'] = {'save': msg }
-                elif frm.errors:
-                    # We need to pass on to the user that there are errors
-                    context['errors'] = frm.errors
-                    oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
+                            if not msg is None:
+                                context['errors'] = {'save': msg }
+                    elif frm.errors:
+                        # We need to pass on to the user that there are errors
+                        context['errors'] = frm.errors
+                        oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
 
-                # Check if this is a new one
-                if bNew:
-                    if self.is_basic:
-                        self.afternewurl = context['listview']
-                        if self.rtype == "html":
-                            # Make sure we do a page redirect
-                            self.newRedirect = True
-                            self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
-                    # Any code that should be added when creating a new [SermonGold] instance
-                    bResult, msg = self.after_new(frm, instance)
-                    if not bResult:
-                        # Removing is not possible
-                        context['errors'] = {'new': msg }
-                    # Check if an 'afternewurl' is specified
-                    if self.afternewurl != "":
-                        context['afternewurl'] = self.afternewurl
+                    # Check if this is a new one
+                    if bNew:
+                        if self.is_basic:
+                            self.afternewurl = context['listview']
+                            if self.rtype == "html":
+                                # Make sure we do a page redirect
+                                self.newRedirect = True
+                                self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
+                        # Any code that should be added when creating a new [SermonGold] instance
+                        bResult, msg = self.after_new(frm, instance)
+                        if not bResult:
+                            # Removing is not possible
+                            context['errors'] = {'new': msg }
+                        # Check if an 'afternewurl' is specified
+                        if self.afternewurl != "":
+                            context['afternewurl'] = self.afternewurl
                 
             else:
                 if mForm != None:
