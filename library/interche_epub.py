@@ -14,9 +14,13 @@ Example:
 """
 
 import sys, getopt, os.path, importlib
-import re
+import re, json
 from lxml import etree
+from django.template.loader import render_to_string
+import jinja2
+from jinja2 import Environment, FileSystemLoader
 
+# import settings
 
 trans_phonemic = [
     {"latin": "ae", "phoneme": "æ"},
@@ -140,6 +144,8 @@ def main(prgName, argv) :
 
         oArgs = dict(input=flInput, output=flOutput, method=method)
 
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+
         # Call the function that actually does the work
         if not interlinear2phonemic(oArgs):
             DoError("Could not complete conversion", True)
@@ -173,6 +179,8 @@ def interlinear2phonemic(oArgs):
         if "output" in oArgs: flOutput = oArgs["output"]
         if "method" in oArgs: method = oArgs['method']
 
+
+
         trans_phon = trans_phonemic
 
         # Check input file
@@ -184,8 +192,73 @@ def interlinear2phonemic(oArgs):
         
         # Read the text file into an array
         xmldoc = etree.parse(flInput)
-        
 
+        # Highest level: <interlinear-text>
+        interlinear_texts = []
+        docpr_id = 1
+        intl_texts = xmldoc.xpath("//interlinear-text")
+        for intl_text in intl_texts:
+            oText = {}
+            # Get the title, comment
+            title = intl_text.xpath("./item[@type='title']")[0].text
+            comment = intl_text.xpath("./item[@type='comment']")[0].text
+
+            oText['title'] = title
+            oText['comment'] = comment
+            oText['paragraphs'] = []
+
+            paragraphs = intl_text.xpath("./descendant::paragraph")
+            for paragraph in paragraphs:
+                oParagraph = dict(phrases=[])
+                # One 'paragraph' is a set of sentences
+                sentences = paragraph.xpath("./child::phrases/child::word")
+                for sentence in sentences:
+                    segnum = sentence.xpath("./item[@type='segnum']")[0].text
+                    oItem = dict(part_orig=segnum, part_trans="", part_morph="", docpr_id=docpr_id)
+                    docpr_id += 1
+                    freeform = sentence.xpath("./item[@type='gls']")[0].text
+                    oPhrase = dict(segnum=oItem, freeform=freeform, items=[])
+                    words = sentence.xpath("./descendant::word")
+                    for word in words:
+                        word_type = word.xpath("./item")[0].attrib['type']
+                        if word_type == "txt":
+                            part_orig = word.xpath("./item[@lang='ce']")[0].text
+                            part_trans = word.xpath("./item[@lang='ce-Latn']")[0].text
+                            part_morph = word.xpath("./item[@lang='en']")[0].text
+
+                            # Convert the latin che word
+                            part_trans = convert_word(part_trans)
+                        elif word_type == "punct":
+                            part_orig = word.xpath("./item[@lang='ce']")[0].text
+                            part_trans = ""
+                            part_morph = ""
+
+                        # Create the 'item'
+                        oItem = dict(part_orig=part_orig, part_trans=part_trans, 
+                                     part_morph=part_morph, docpr_id=docpr_id)
+                        docpr_id += 1
+                        oPhrase['items'].append(oItem)
+                    oParagraph['phrases'].append(oPhrase)
+                # Only append [oParagraph], if it has contents
+                if len(oParagraph['phrases']) > 0:
+                    oText['paragraphs'].append(oParagraph)
+
+            interlinear_texts.append(oText)
+        
+        sResult = json.dumps(interlinear_texts, indent=2)
+        iStop = 1
+
+        # Now use this as input to the [flexword.xml]
+        context = dict(interlinear_texts=interlinear_texts)
+
+        # Method #1
+        # sResult = render_to_string(template_name, context, None)
+
+        # Method #2: jinja-style
+        environment = Environment(loader=FileSystemLoader("templates/"))
+        template = environment.get_template("flexword.xml")
+        sResult = template.render(context)
+        
         # Find all the Interlinear lines in [ce-Latn]
         phoneme_lines = xmldoc.xpath("//m:t[parent::m:r[child::w:rPr/child::w:rStyle[contains(@w:val, 'ce-Latn')]]]", namespaces=namespaces)
         for el in phoneme_lines:
