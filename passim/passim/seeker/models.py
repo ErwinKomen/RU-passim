@@ -8497,6 +8497,35 @@ class Collection(models.Model):
         response = super(Collection, self).save(force_insert, force_update, using, update_fields)
         return response
 
+    def add_sitems(self, lst_item, coltype):
+        """Add items to this collection"""
+
+        oErr = ErrHandle()
+        try:
+            if len(lst_item) > 0:
+                with transaction.atomic():
+                    for obj in lst_item:
+                        # Check if it is not there yet
+                        if coltype == "sermo":
+                            added = self.sermondescr_col.filter(sermon=obj).first()
+                            if added is None:
+                                order = self.sermondescr_col.count() + 1
+                                added = CollectionSerm.objects.create(sermon=obj, collection=self, order=order)
+                        elif coltype == "manu":
+                            added = self.manuscript_col.filter(manuscript=obj).first()
+                            if added is None:
+                                order = self.manuscript_col.count() + 1
+                                added = CollectionMan.objects.create(manuscript=obj, collection=self, order=order)
+                        elif coltype == "super":
+                            added = self.super_col.filter(super=obj).first()
+                            if added is None:
+                                order = self.super_col.count() + 1
+                                added = CollectionSuper.objects.create(super=obj, collection=self, order=order)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/add_sitems")
+        return None
+
     def freqsermo(self):
         """Frequency in manifestation sermons"""
         freq = self.collections_sermon.all().count()
@@ -8702,44 +8731,59 @@ class Collection(models.Model):
         return qs
 
     def get_sitems(self, profile):
-        """Get all saved items that would suit me, but have not yet been added to me"""
+        """Get all collection items (M/S/SSG) that are also SavedItems (for me)"""
 
         sBack = ""
-        oColTypeSitemType = dict(manu="manu", sermon="serm", super="ssg")
+        oColTypeSitemType = dict(manu="manu", sermo="serm", super="ssg")
         oErr = ErrHandle()
         try:
             coltype = self.type
             # What is my type of collection?
             sItemType = oColTypeSitemType.get(coltype)
             if not sItemType is None:
-                # Get the contents of the current collection
+                # Get the id's of the M/S/SSG objects in the current collection
                 current_ids = []
+                qs = None
                 sDetails = ""
                 if coltype == "manu":
                     current_ids = [x['manuscript__id'] for x in self.manuscript_col.all().values('manuscript__id')]
                     sDetails = "manuscript_details"
-                elif coltype == "sermon":
+                    # Get all the Saved Items associated with my profile
+                    manu_ids = [x.manuscript.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                        manuscript__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = Manuscript.objects.filter(id__in=manu_ids)
+                elif coltype == "sermo":
                     current_ids = [x['sermon__id'] for x in self.sermondescr_col.all().values('sermon__id')]
                     sDetails = "sermon_details"
+                    # Get all the Saved Items associated with my profile
+                    sermo_ids = [x.sermon.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                        sermon__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = SermonDescr.objects.filter(id__in=sermo_ids)
                 elif coltype == "super":
                     current_ids = [x['super__id'] for x in self.super_col.all().values('super__id')]
                     sDetails = "equalgold_details"
-                # Get all the Saved Items associated with my profile
-                qs = profile.profile_saveditems.filter(settype="pd", sitemtype=sItemType).exclude(id__in=current_ids)
-                # Convert this into a list
-                lHtml = []
-                for obj in qs:
-                    url = reverse(sDetails, kwargs = {'pk': obj.id})
-                    sLabel = "NietGevonden"
-                    if coltype == "manu":
-                        sLabel = "{}, {}, {}".format(obj.get_city(), obj.get_library(), obj.idno)
-                    elif coltype == "sermon":
-                        sLabel = "{}: {}".format(obj.msitem.codico.manuscript.idno, obj.get_locus())
-                    elif coltype == "super":
-                        sLabel = obj.get_passimcode_markdown()
-                    oItem = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLabel)
-                    lHtml.append(oItem)
-                sBack = ", ".join(lHtml)
+                    # Get all the Saved Items associated with my profile
+                    super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                        equal__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = EqualGold.objects.filter(id__in=super_ids)
+                if not qs is None:
+                    # Convert this into a list
+                    lHtml = []
+                    for obj in qs:
+                        url = reverse(sDetails, kwargs = {'pk': obj.id})
+                        sLabel = "NietGevonden"
+                        if coltype == "manu":
+                            sLabel = "{}, {}, {}".format(obj.get_city(), obj.get_library(), obj.idno)
+                        elif coltype == "sermo":
+                            sLabel = "{}: {}".format(obj.msitem.codico.manuscript.idno, obj.get_locus())
+                        elif coltype == "super":
+                            sLabel = obj.get_passimcode_markdown()
+                        oItem = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLabel)
+                        lHtml.append(oItem)
+                    sBack = ", ".join(lHtml)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Collection/get_sitems")

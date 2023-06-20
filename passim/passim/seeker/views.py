@@ -7814,6 +7814,11 @@ class CollAnyEdit(BasicDetails):
 
             # Define the main items to show and edit
             context['mainitems'] = [
+                # Some items must be passed on
+                {'type': 'plain', 'label': "Type:",        'value': instance.type,      'field_key': 'type',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Owner id:",    'value': instance.owner.id,  'field_key': 'owner',   'empty': 'hide'},
+
+                # Regular visible fields
                 {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
                 {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
                 {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
@@ -7821,7 +7826,7 @@ class CollAnyEdit(BasicDetails):
                 ]
 
             # Optionally add Scope: but only for the actual *owner* of this one
-            if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+            if self.prefix in prefix_scope and not instance.owner is None and instance.owner.user == self.request.user:
                 context['mainitems'].append(
                 {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
@@ -7862,8 +7867,9 @@ class CollAnyEdit(BasicDetails):
 
             # Add any saved items of this type
             if instance.settype == "pd":
+                # The kind of list depends on the kind of dataset that I am
                 context['mainitems'].append( {'type': 'plain',  'label': "Saved items:", 'value': instance.get_sitems(profile),
-                    'field_list': 'sitemlist'})
+                    'field_list': 'sitemlist_{}'.format(instance.type)})
 
             # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
             if instance.settype == "hc" and context['is_app_editor']:
@@ -8114,6 +8120,14 @@ class CollAnyEdit(BasicDetails):
             col_proj_deleted = []
             adapt_m2m(CollectionProject, instance, "collection", projlist, "project", deleted=col_proj_deleted)
             project_dependant_delete(self.request, col_proj_deleted)
+
+            # (3) Process adding items from ['sitemlist_XXX']
+            sitemlist_sermo = form.cleaned_data['sitemlist_sermo']
+            instance.add_sitems(sitemlist_sermo, "sermo")
+            sitemlist_manu = form.cleaned_data['sitemlist_manu']
+            instance.add_sitems(sitemlist_manu, "manu")
+            sitemlist_super = form.cleaned_data['sitemlist_super']
+            instance.add_sitems(sitemlist_super, "super")
 
         except:
             msg = oErr.get_error_message()

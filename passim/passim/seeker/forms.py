@@ -413,6 +413,23 @@ class EdirefSgWidget(ModelSelect2MultipleWidget):
         return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
 
 
+class EqualGoldSitemWidget(ModelSelect2MultipleWidget):
+    model = EqualGold
+    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
+
+    def label_from_instance(self, obj):
+        # sLabel = obj.get_label(do_incexpl = False)
+        sLabel = obj.get_code()
+        return sLabel
+
+    def get_queryset(self):
+        if self.queryset is None:
+            qs = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code').distinct()
+        else:
+            qs = self.queryset
+        return qs
+
+
 class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
     model = EqualGold
     search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
@@ -1136,6 +1153,20 @@ class ResearchSetOneWidget(ModelSelect2Widget):
             self.qs = qs
         else:
             qs = self.qs
+        return qs
+
+
+class SermonWidget(ModelSelect2MultipleWidget):
+    model = SermonDescr
+    search_fields = [ 'msitem__codico__manuscript__idno__icontains', 'locus__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = SermonDescr.objects.filter(mtype='man').order_by('msitem__codico__manuscript__idno', 'locus').distinct()
         return qs
 
 
@@ -2528,6 +2559,14 @@ class CollectionForm(PassimModelForm):
     colscope    = ModelChoiceField(queryset=None, required=False, 
                 widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
 
+    sitemlist_gold = ModelMultipleChoiceField(queryset=None, required=False,
+                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+    sitemlist_sermo = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SermonWidget(attrs={'data-placeholder': 'Select multiple sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+    sitemlist_manu = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+    sitemlist_super = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=EqualGoldSitemWidget(attrs={'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2630,128 +2669,166 @@ class CollectionForm(PassimModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
-        username = self.username
-        team_group = self.team_group
-        profile = Profile.get_user_profile(username)
 
-        # Get the prefix
-        prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
-        # Some fields are not required
-        self.fields['name'].required = False
-        self.fields['owner'].required = False
-        self.fields['descrip'].required = False
-        self.fields['readonly'].required = False
-        self.fields['type'].required = False
-        self.fields['settype'].required = False
-        self.fields['scope'].required = False
-        self.fields['url'].required = False
-        self.fields['collone'].required = False
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+
+            # Get the prefix
+            prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['owner'].required = False
+            self.fields['descrip'].required = False
+            self.fields['readonly'].required = False
+            self.fields['type'].required = False
+            self.fields['settype'].required = False
+            self.fields['scope'].required = False
+            self.fields['url'].required = False
+            self.fields['collone'].required = False
         
-        self.fields['colscope'].queryset = FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
+            self.fields['colscope'].queryset = FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
 
-        self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
-        # Set the widgets correctly
-        self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
-                    'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['sitemlist_manu'].queryset = Manuscript.objects.none()
+            self.fields['sitemlist_sermo'].queryset = SermonDescr.objects.none()
+            self.fields['sitemlist_gold'].queryset = SermonGold.objects.none()
+            self.fields['sitemlist_super'].queryset = EqualGold.objects.none()
 
-        # The rsetone information is needed for "selection-to-DCT" processing
-        self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
+            # Set the widgets correctly
+            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
+                        'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
-        # Project2:
-        # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-        if profile is None:
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-        else:
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
-            self.fields['projlist'].queryset = profile.get_myprojects()
-        self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            # The rsetone information is needed for "selection-to-DCT" processing
+            self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
 
-        # SSG section
-        self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-        self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
-        self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
-        self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            # Project2:
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            if profile is None:
+                self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            else:
+                # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+                self.fields['projlist'].queryset = profile.get_myprojects()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
-        # S section
-        self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-        self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-        self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
+            # SSG section
+            self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
+            self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
+            self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
-        # M section
-        self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
-        self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-        self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            # S section
+            self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
 
-        if prefix == "priv" or prefix == "publ":
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
-                        'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
-        elif prefix == "hist":
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
-                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        else:
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
-        self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
+            if prefix == "priv" or prefix == "publ":
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
+                            'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+            elif prefix == "hist":
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
+                            'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            else:
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
+                            'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
-        if prefix == "any":
-            all_collections = Collection.objects.all().order_by('name')
-            self.fields['collist'].queryset = all_collections
-            self.fields['collone'].queryset = all_collections
+            self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
 
-        elif prefix == "hist":
-            # Historical collections
-            type = "super"
-            settype = "hc"
-            self.fields['collist'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
-            self.fields['collone'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
-            # Set the initial type
-            self.fields['type'].initial = type
-            self.initial['type'] = type
-            # Obligatory values for the querysets of m/s/sg/ssg
-            self.fields['collist_m'].queryset = Collection.objects.none()
-            self.fields['collist_s'].queryset = Collection.objects.none()
-            self.fields['collist_sg'].queryset = Collection.objects.none()
-            self.fields['collist_ssg'].queryset = Collection.objects.none()
-        else:
-            type = prefix.split("-")[0]
-            # self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')
-            self.fields['collist'].queryset = Collection.get_scoped_queryset('', username, team_group)
-            self.fields['collone'].queryset = Collection.objects.filter(type=type).order_by('name')
+            if prefix == "any":
+                all_collections = Collection.objects.all().order_by('name')
+                self.fields['collist'].queryset = all_collections
+                self.fields['collone'].queryset = all_collections
 
-            # Note: the collection filters must use the SCOPE of the collection
-            self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
-            self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
-            self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
-            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
-            
-
-            # Set the initial type - provided it fits
-            if self.initial.get("type", "") == "":
+            elif prefix == "hist":
+                # Historical collections
+                type = "super"
+                settype = "hc"
+                self.fields['collist'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+                self.fields['collone'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+                # Set the initial type
                 self.fields['type'].initial = type
                 self.initial['type'] = type
+                # Obligatory values for the querysets of m/s/sg/ssg
+                self.fields['collist_m'].queryset = Collection.objects.none()
+                self.fields['collist_s'].queryset = Collection.objects.none()
+                self.fields['collist_sg'].queryset = Collection.objects.none()
+                self.fields['collist_ssg'].queryset = Collection.objects.none()
             else:
-                # Make sure to retain its value
-                self.fields['type'].initial = self.initial.get("type", "")
+                type = prefix.split("-")[0]
+                # self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')
+                self.fields['collist'].queryset = Collection.get_scoped_queryset('', username, team_group)
+                self.fields['collone'].queryset = Collection.objects.filter(type=type).order_by('name')
 
-        self.fields['ownlist'].queryset = Profile.objects.all()
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
-            self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+                # Note: the collection filters must use the SCOPE of the collection
+                self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
+                self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
+                self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
+                self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            
+
+                # Set the initial type - provided it fits
+                if self.initial.get("type", "") == "":
+                    self.fields['type'].initial = type
+                    self.initial['type'] = type
+                else:
+                    # Make sure to retain its value
+                    self.fields['type'].initial = self.initial.get("type", "")
+
+            self.fields['ownlist'].queryset = Profile.objects.all()
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+
+                # The sitemset querysets need to take the profile as a starting point
+                current_ids = []
+                coltype = instance.type
+                if coltype == "manu":
+                    current_ids = [x['manuscript__id'] for x in instance.manuscript_col.all().values('manuscript__id')]
+                    manu_ids = [x.manuscript.id for x in profile.profile_saveditems.filter(sitemtype="manu").exclude(manuscript__id__in=current_ids)]
+                    qs = Manuscript.objects.filter(id__in=manu_ids)
+                    self.fields['sitemlist_manu'].queryset = qs
+                    self.fields['sitemlist_manu'].widget.queryset = qs
+                elif coltype == "sermo":
+                    current_ids = [x['sermon__id'] for x in instance.sermondescr_col.all().values('sermon__id')]
+                    sermo_ids = [x.sermon.id for x in profile.profile_saveditems.filter(sitemtype="serm").exclude(sermon__id__in=current_ids)]
+                    qs = SermonDescr.objects.filter(id__in=sermo_ids)
+                    self.fields['sitemlist_sermo'].queryset = qs
+                    self.fields['sitemlist_sermo'].widget.queryset = qs
+                elif coltype == "super":
+                    current_ids = [x['super__id'] for x in instance.super_col.all().values('super__id')]
+                    super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype="ssg").exclude(equal__id__in=current_ids)]
+                    qs = EqualGold.objects.filter(id__in=super_ids)
+                    self.fields['sitemlist_super'].queryset = qs
+                    self.fields['sitemlist_super'].widget.queryset = qs
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionForm/init")
+
+        # Nothing is returned from this __init__()
+        return None
 
 
 class SermonDescrSignatureForm(BasicModelForm):
