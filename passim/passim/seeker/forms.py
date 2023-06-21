@@ -1292,7 +1292,10 @@ class SermonGoldWidget(ModelSelect2MultipleWidget):
         return full
 
     def get_queryset(self):
-        return SermonGold.objects.all().order_by('siglist').distinct()
+        qs = self.queryset
+        if qs is None:
+            qs = SermonGold.objects.all().order_by('siglist').distinct()
+        return qs
 
 
 class ManualSignatureWidget(ModelSelect2MultipleWidget):
@@ -2835,6 +2838,10 @@ class CollectionForm(PassimModelForm):
                     qs = EqualGold.objects.filter(id__in=super_ids)
                     self.fields['sitemlist_super'].queryset = qs
                     self.fields['sitemlist_super'].widget.queryset = qs
+                elif coltype == "gold":
+                    qs = SermonGold.objects.none()
+                    self.fields['sitemlist_gold'].queryset = qs
+                    self.fields['sitemlist_gold'].widget.queryset = qs
 
 
         except:
