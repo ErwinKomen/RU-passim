@@ -815,6 +815,20 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return Manuscript.objects.exclude(mtype='tem').order_by('idno').distinct()
 
 
+class ManuscriptWidget(ModelSelect2MultipleWidget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains', 'lcity__name__icontains', 'library__name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset.order_by('lcity__name', 'library__name', 'idno')
+        #if qs == None:
+        #    qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
+        return qs
+
+
 class ManuidOneWidget(ModelSelect2Widget):
     model = Manuscript
     search_fields = [ 'idno__icontains', 'lcity__name__icontains', 'library__name__icontains']
@@ -2564,7 +2578,7 @@ class CollectionForm(PassimModelForm):
     sitemlist_sermo = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SermonWidget(attrs={'data-placeholder': 'Select multiple sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
     sitemlist_manu = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-placeholder': 'Select multiple manuscripts...', 'style': 'width: 100%;'}))
     sitemlist_super = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldSitemWidget(attrs={'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
     # SSG-specific
