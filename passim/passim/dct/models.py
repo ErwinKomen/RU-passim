@@ -935,7 +935,6 @@ class SaveGroup(models.Model):
         return response
 
 
-
 class SavedItem(models.Model):
     """A saved item can be a M/S/SSG or HC or PD"""
 

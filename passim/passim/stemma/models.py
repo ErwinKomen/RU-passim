@@ -86,43 +86,6 @@ class StemmaSet(models.Model):
                 order += 1
         return None
 
-    #def add_list(self, obj, setlisttype):
-    #    """Add a list of SSGs (either Manuscript or Collection) to the research set"""
-
-    #    oErr = ErrHandle()
-    #    bBack = True
-    #    try:
-    #        # Get the current size of the research set
-    #        iCount = self.stemmaset_setlists.count()
-    #        order = iCount + 1
-    #        setlist = None
-
-    #        # Action depends on the type of addition
-    #        if setlisttype == "manu":   # Add a manuscript
-    #            setlist = SetList.objects.filter(stemmaset=self, setlisttype=setlisttype, manuscript=obj).first()
-    #            if setlist is None:
-    #                setlist = SetList.objects.create(
-    #                    stemmaset=self, order=order, setlisttype=setlisttype,
-    #                    manuscript=obj, name="Added via add_list")
-    #            pass
-    #        elif setlisttype == "ssgd":   # Add a hc or pd
-    #            setlist = SetList.objects.filter(stemmaset=self, setlisttype=setlisttype, collection=obj).first()
-    #            if setlist is None:
-    #                setlist = SetList.objects.create(
-    #                    stemmaset=self, order=order, setlisttype=setlisttype,
-    #                    collection=obj, name="Added via add_list")
-
-    #        # If need be, calculate the contents
-    #        if not setlist is None:
-    #            self.update_ssglists()
-
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("StemmaSet/add_list")
-    #        bBack = False
-    #    # Return the status
-    #    return bBack
-
     def calculate_matches(self, ssglists):
         """Calculate the number of pm-matches for each list from ssglists"""
 
@@ -231,12 +194,41 @@ class StemmaSet(models.Model):
         # Return the PM that we have found
         return iBack
 
+    def get_analyze_markdown(self):
+        """Get a button to start the analyzing process for this StemmaSet"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            url = reverse("stemmaset_details", kwargs={'pk': self.id})
+            title = "Initiate the process of analyzing the stemmatological research set"
+            sBack = "<a href='{}' role='button' class='btn btn-xs jumbo-1' title='{}'><span class='glyphicon glyphicon-dashboard'></span></a>".format(
+                url, title)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSet/get_analyze_markdown")
+        return sBack
+
     def get_created(self):
         """REturn the creation date in a readable form"""
 
         # sDate = self.created.strftime("%d/%b/%Y %H:%M")
         sDate = get_crpp_date(self.created, True)
         return sDate
+
+    def get_name_markdown(self):
+        """Get the name of the stemmaset as well as a link to it"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            url = reverse("stemmaset_details", kwargs={'pk': self.id})
+            sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a><span>".format(
+                url, self.name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSet/get_name_markdown")
+        return sBack
 
     def get_notes_html(self):
         """Convert the markdown notes"""
@@ -296,58 +288,6 @@ class StemmaSet(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("StemmaSet/get_ssglists")
         return lBack
-
-    #def update_ssglists(self, force = False):
-    #    """Re-calculate the set of lists for this particular StemmaSet"""
-
-    #    oErr = ErrHandle()
-    #    bResult = True
-    #    lst_ssglists = []
-    #    try:
-    #        oPMlist = None
-    #        # Get the lists of SSGs for each list in the set
-    #        for idx, setlist in enumerate(self.stemmaset_setlists.all().order_by('order')):
-    #            # Check for the contents
-    #            if force or setlist.contents == "" or len(setlist.contents) < 3 or setlist.contents[0] == "[":
-    #                setlist.calculate_contents()
-
-    #            # Retrieve the SSG-list from the contents
-    #            oSsgList = json.loads(setlist.contents)
-
-    #            # If this is not the *first* setlist, calculate the number of matches with the first
-    #            if idx == 0:
-    #                oPMlist = copy.copy(oSsgList)
-    #            else:
-    #                # Calculate the matches
-    #                oSsgList['title']['matches'] = get_list_matches(oPMlist, oSsgList)
-    #            # Always pass on the default order
-    #            oSsgList['title']['order'] = idx + 1
-
-    #            # Add the list object to the list
-    #            lst_ssglists.append(oSsgList)
-
-    #        # Calculate the unique_matches for each list
-    #        lst_ssglists = self.calculate_matches(lst_ssglists)
-
-    #        # Put it in the StemmaSet and save it
-    #        self.contents = json.dumps(lst_ssglists)
-    #        self.save()
-
-    #        # All related SetDef items should be warned
-    #        with transaction.atomic():
-    #            for obj in SetDef.objects.filter(stemmaset=self.id):
-    #                contents = json.loads(obj.contents)
-    #                contents['recalc'] = True
-    #                obj.contents = json.dumps(contents)
-    #                obj.save()
-
-    #        # Return this list of lists
-    #        bResult = True
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("StemmaSet/update_ssglists")
-    #        bResult = False
-    #    return bResult
 
 
 class StemmaItem(models.Model):

@@ -35,6 +35,7 @@ from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_
     SavedItem, SavedSearch, SelectItem, SavedVis, SaveGroup
 from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm, SaveGroupForm, SgroupSelForm
 from passim.approve.models import EqualChange, EqualApproval
+from passim.stemma.models import StemmaItem, StemmaSet
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -697,6 +698,82 @@ class MyPassimEdit(BasicDetails):
                 dctdefset['columns'].append("")
             related_objects.append(copy.copy(dctdefset))
 
+            # [3] ===============================================================
+            # Get all 'StemmaSet' objects that belong to the current user (=profile)
+            stemmaset = dict(title="Stemmatizer research sets", prefix="stemma")  
+            if resizable: stemmaset['gridclass'] = "resizable dragdrop"
+            stemmaset['savebuttons'] = bMayEdit
+            stemmaset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_stemmalist = StemmaSet.objects.filter(profile=instance).order_by('name')
+            # Also store the count
+            stemmaset['count'] = qs_stemmalist.count()
+            stemmaset['instance'] = instance
+            stemmaset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+
+            # And store an introduction
+            lIntro = []
+            lIntro.append('View and work with stemmatizer research sets on the <em>development version</em> of ')
+            lIntro.append('the <a role="button" class="btn btn-xs jumbo-1" ')
+            lIntro.append('href="{}">Stemmatizer tool</a> page.'.format(reverse('stemmaset_list')))
+            sIntro = " ".join(lIntro)
+            stemmaset['introduction'] = sIntro
+
+            # These elements have an 'order' attribute, but...
+            #   ... but that order may *NOT be corrected here
+            # check_order(qs_stemmalist)
+
+            # Walk these stemmalist
+            order = 0
+            for obj in qs_stemmalist:
+                # The [obj] is of type `StemmaSet`
+
+                rel_item = []
+                order += 1
+
+                # TODO:
+                # Relevant columns for the Your visualisations are:
+                # 1 - name of the StemmaSet
+                # 2 - scope of the Stemma research set (priv/team/publ)
+                # 3 - size in terms of number of SSGs part of this set
+                # 4 - analyze button
+
+                # SetDef: Order within the set of Your visualizations
+                add_one_item(rel_item, order, False, align="right", draggable=True)
+
+                # Name: the name of this Stemmaset
+                add_one_item(rel_item, obj.get_name_markdown(), False, main=True)
+
+                # Analyze: button to analyze this one
+                add_one_item(rel_item, obj.get_analyze_markdown(), False, main=True)
+
+                # Scope: private, team or global
+                add_one_item(rel_item, obj.get_scope_display(), False)
+
+                # Size: number of StemmaItems part of this StemmaSet
+                size = "{}".format(obj.stemmaset_stemmaitems.count())
+                add_one_item(rel_item, size, False, align="right")
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("stemma", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            stemmaset['rel_list'] = rel_list
+            stemmaset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of the stemmatizer research set">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Analyze the stemmatological research set">Analyze</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Scope">Scope</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of items in this research set">Size</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                stemmaset['columns'].append("")
+            related_objects.append(copy.copy(stemmaset))
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("mypassimedit/get_related_objects")
@@ -788,6 +865,12 @@ class MyPassimEdit(BasicDetails):
 
             elif type == "mydct":
                 # A DCT should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "stemma":
+                # A Stemma research set should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
                     sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
