@@ -7181,6 +7181,41 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_size(self):
+        """Get HTML size in terms of SermonGold"""
+
+        lHtml = []
+        sBack = ""
+        oErr= ErrHandle()
+        try:
+            iSize = self.sgcount
+            lHtml.append("{}".format(iSize))
+            sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_size")
+        return sBack
+
+    def get_siglist(self):
+        """Get HTML list of signatures associated with me"""
+
+        lHtml = []
+        sBack = ""
+        oErr= ErrHandle()
+        try:
+            # Get all the associated signatures
+            qs = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code')
+            for sig in qs:
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                lHtml.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+            sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_siglist")
+        return sBack
+
     def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:

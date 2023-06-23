@@ -2756,6 +2756,7 @@ class BasicPart(View):
 
         oErr = ErrHandle()
         try:
+            response = JsonResponse(self.data)
             # Continue if authorized
             if self.checkAuthentication(request):
                 context = dict(object_id = pk, savedate=None)
@@ -2833,9 +2834,12 @@ class BasicPart(View):
                 self.data['typeaheads'] = json.dumps(lst_typeahead)
             
                 # Get the HTML response
-                sHtml = render_to_string(self.template_name, context, request)
-                sHtml = treat_bom(sHtml)
-                self.data['html'] = sHtml
+                if self.template_name is None:
+                    self.data['html'] = ""
+                else:
+                    sHtml = render_to_string(self.template_name, context, request)
+                    sHtml = treat_bom(sHtml)
+                    self.data['html'] = sHtml
             else:
                 self.data['html'] = "Please log in before continuing"
 

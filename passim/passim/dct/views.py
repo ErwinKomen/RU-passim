@@ -225,6 +225,7 @@ def dct_manulist(lst_manu, bDebug=False):
 
 
 
+
 # =================== MyPassim as model view attempt ======
 class MyPassimEdit(BasicDetails):
     model = Profile

@@ -339,6 +339,10 @@ urlpatterns = [
     url(r'^stemmaset/edit(?:/(?P<pk>\d+))?/$', StemmaSetEdit.as_view(), name='stemmaset_edit'),
     url(r'^stemmaset/add(?:/(?P<pk>\d+))?/$', StemmaSetAdd.as_view(), name='stemmaset_add'),
 
+    url(r'^stemmaset/dashboard(?:/(?P<pk>\d+))?/$', StemmaDashboard.as_view(), name='stemmaset_dashboard'),
+    url(r'^stemma/start(?:/(?P<pk>\d+))?/$', StemmaStart.as_view(), name='stemma_start'),
+    url(r'^stemma/progress(?:/(?P<pk>\d+))?/$', StemmaProgress.as_view(), name='stemma_progress'),
+
     # ------------ My Passim PRE -------------------------------------------------------------------------
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),

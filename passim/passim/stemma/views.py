@@ -20,6 +20,7 @@ from io import StringIO
 import copy
 import json
 import csv
+import os
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -33,9 +34,238 @@ from passim.stemma.models import StemmaItem, StemmaSet
 from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
 from passim.seeker.views import EqualGoldListView
+from passim.stemma.algorithms import lf_new4
+
+def get_application_name():
+    """Try to get the name of this application"""
+
+    # Walk through all the installed apps
+    for app in apps.get_app_configs():
+        # Check if this is a site-package
+        if "site-package" not in app.path:
+            # Get the name of this app
+            name = app.name
+            # Take the first part before the dot
+            project_name = name.split(".")[0]
+            return project_name
+    return "unknown"
+# Provide application-specific information
+PROJECT_NAME = get_application_name()
+app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_editor = "{}_editor".format(PROJECT_NAME.lower())
+app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
+app_developer = "{}_developer".format(PROJECT_NAME.lower())
+app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
+# stemma_editor = "stemma_editor"
+# stemma_user = "stemma_user"
+
+def get_application_context(request, context):
+    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context['is_stemma_editor'] = user_is_ingroup(request, stemma_editor) or context['is_app_moderator']
+    context['is_stemma_user'] = user_is_ingroup(request, stemma_user)
+    return context
 
 
-# =================== Model views for the DCT ========
+
+
+# =================== Alternative simple views ============
+
+def stemma_dashboard(request):
+    """Dashboard to facility Stemmatology analysis"""
+    assert isinstance(request, HttpRequest)
+
+    oErr = ErrHandle()
+    response = "error"
+    try:
+        # Gather info
+        context = {'title': 'Stemmatology Dashboard',
+                   'message': 'Radboud University PASSIM'
+                   }
+        template_name = 'stemma/syncstemma.html'
+        context = get_application_context(request, context)
+
+        # Add the information in the 'context' of the web page
+        response = render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("stemma_dashboard")
+    return response
+
+def stemma_analysis(oStatus=None):
+    """Perform a stemmatology analysis"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    oBack = dict(status="ok", msg="")
+
+    try:
+        # TODO: add code here and change to True
+        bResult = False
+
+        if oStatus != None: oStatus.set("finished", oBack)
+
+        # Note that we are indeed ready
+        bResult = True
+    except:
+        msg = oErr.get_error_message()
+        bResult = False
+    return bResult, msg
+
+
+
+class StemmaDashboard(BasicDetails):
+    model = StemmaSet
+    mForm = None
+    title = "Stemma dashboard"
+    mainitems = []
+    rtype = "html"
+    template_name = "stemma/syncstemma.html"
+
+    def add_to_context(self, context, instance):
+        oErr = ErrHandle()
+        try:
+            context['stemmaset_id'] = instance.id
+            # Get the name of the stemmaset
+            sName = instance.get_name_markdown()
+            context['stemmaset_name'] = sName
+            qs = instance.stemmaset_stemmaitems.all().order_by("order")
+            lst_ssgs = []
+            for obj in qs:
+                ssg = obj.equal
+                oSsgInfo = {}
+                oSsgInfo['author'] = ssg.get_author()
+                oSsgInfo['code'] = ssg.get_passimcode_markdown()
+                oSsgInfo['siglist'] = ssg.get_siglist()
+                oSsgInfo['size'] = ssg.get_size()
+                lst_ssgs.append(oSsgInfo)
+            context['stemmaset_ssgs'] = lst_ssgs
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaDashboard/add_to_context")
+
+        # Return the context we have made
+        return context
+    
+
+class StemmaStart(BasicPart):
+    """Start the analysis of the indicated stemmaset"""
+
+    MainModel = StemmaSet
+
+    def add_to_context(self, context):
+
+        # Gather all necessary data
+        data = {}
+
+        oErr = ErrHandle()
+        try:
+            # Get the object
+            instance = self.obj
+
+            # (1) Prepare the texts for analysis
+            sTexts, lst_codes = self.prepare_texts()
+
+            # (2) Save the text to a logical place
+            filename = os.path.abspath(os.path.join(MEDIA_DIR, "stemma", "stemmaset_{}.txt".format(instance.id)))
+            with open(filename, "w") as f:
+                f.write(sTexts)
+
+            # (3) Execute the perl script on this file
+            lf_new4(sTexts)
+
+            # FIll in the [data] part of the context with all necessary information
+            context['data'] = data
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaStart/add_to_context")
+        return context
+
+    def prepare_texts(self):
+        """Required format:
+        
+        * one witness, one line; 
+        * beginning "A          | " (for ms. "A"). 
+        * Ms. names must not be longer than 3 chars.
+        """
+
+        def get_code(number):
+            x_0 = number % 10
+            x_1 = number // 10 % 10 * 10
+            x_2 = number // 100 % 10 * 100
+            s_0 = chr(ord('A') + x_0)
+            s_1 = chr(ord('A') + x_1)
+            s_2 = chr(ord('A') + x_2)
+            sBack = "{}{}{}".format(s_2, s_1, s_0)
+            return sBack
+
+        sBack = ""
+        lst_codes = []
+        oErr = ErrHandle()
+        try:
+            lst_text = []
+            order = 0
+
+            # Get a view of all objects
+            qs = self.obj.stemmaset_stemmaitems.all().order_by("order")
+
+            # First element in the list is the number of items
+            lst_text.append("{}".format(qs.count()))
+
+            # Now iterate
+            for obj in qs:
+                # Transform number into code
+                code = get_code(order)
+                # Get the SSG from the obj
+                ssg = obj.equal
+                if not ssg is None:
+                    # Get the fulltext
+                    fulltext = ssg.srchfulltext
+                    sText = "{}       | {}".format(code, fulltext.replace("\n", " "))
+                    lst_text.append(sText)
+
+                    # Also keep track of what belongs to what
+                    lst_codes.append(dict(code=code, equal_id=ssg.id))
+                # Make room for the next text
+                order += 1
+            # Combine the text into one whole
+            sBack = "\n".join(lst_text)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaStart/prepare_texts")
+        return sBack, lst_codes
+
+
+class StemmaProgress(BasicPart):
+    """Start the analysis of the indicated stemmaset"""
+
+    MainModel = StemmaSet
+
+    def add_to_context(self, context):
+
+        # Gather all necessary data
+        data = {}
+
+        oErr = ErrHandle()
+        try:
+            # Get the object
+            instance = self.obj
+
+            # HERE IS WHERE THE PROGRESS OF THE ANALYSIS IS MONITORED
+
+            # FIll in the [data] part of the context with all necessary information
+            context['data'] = data
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaProgress/add_to_context")
+        return context
+
+
+# =================== Model views for STEMMATOLOGY ========
 
 
 class StemmaSetListView(BasicList):

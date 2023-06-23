@@ -200,7 +200,7 @@ class StemmaSet(models.Model):
         sBack = ""
         oErr = ErrHandle()
         try:
-            url = reverse("stemmaset_details", kwargs={'pk': self.id})
+            url = reverse("stemmaset_dashboard", kwargs={'pk': self.id})
             title = "Initiate the process of analyzing the stemmatological research set"
             sBack = "<a href='{}' role='button' class='btn btn-xs jumbo-1' title='{}'><span class='glyphicon glyphicon-dashboard'></span></a>".format(
                 url, title)

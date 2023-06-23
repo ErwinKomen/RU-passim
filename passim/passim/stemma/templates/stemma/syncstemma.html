@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+
+<div class="container body-content">
+  <h3>Stemmatology analysis</h3>
+  <div class="row">
+    <div class="col-md-12">
+      <p>This page monitors the analysis of stemmatology research set <span class="btn btn-xs jumbo-1">{{stemmaset_name|safe}}</span>.</p>
+      <h4>Authority files within this stemmatology research set</h4>
+      <table class="func-view" style="width: 100%;">
+        <thead>
+          <tr><th>#</th><th>Author</th><th>Passim code</th><th>Gryson/Clavis</th><th>size</th></tr>
+        </thead>
+        <tbody>
+          {% for ssg in stemmaset_ssgs %}
+            <tr>
+              <td valign="top">{{forloop.counter}}</td>
+              <td valign="top">{{ssg.author|safe}}</td>
+              <td valign="top">{{ssg.code|safe}}</td>
+              <td valign="top">{{ssg.siglist|safe}}</td>
+              <td valign="top" align="right">{{ssg.size|safe}}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="row"><div>&nbsp;</div></div>
+
+  {% if user.is_authenticated %}
+
+    <!-- Synchronizing stemma entries -->
+    <fieldset class="module aligned" >
+      <div class="row" style="border: 1px solid darkgray; padding-top: 15px;  padding-bottom: 15px;">
+        <div class="col-md-4">
+          <h3 class="straight" style="margin-top: 0px; margin-left: 10px;">Stemmatology analysis</h3>
+          <p style="margin-top: 0px; margin-left: 10px;">
+            This monitors the Stemmatology analysis executed on the stemmaset above.
+          </p>
+        </div>
+        <div class="col-md-8">
+          <form id="sync_form_stemma" method="POST">
+             {% csrf_token %}
+
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <div class="col-md-12">
+                <span><a id="sync_start_stemma" class="btn btn-primary btn-xs" 
+                    sync-start="{% url 'stemma_start' stemmaset_id %}" 
+                    sync-progress="{% url 'stemma_progress' stemmaset_id %}" 
+                    onclick="ru.passim.sync_start('stemma')">Start analysis of the stemmaset</a>
+                </span>
+              </div>
+            </div>
+
+            <div class="row">&nbsp;</div>
+            <div class="row">
+              <div class="col-md-12">
+                <span><a id="sync_start_stemma_old" class="btn btn-primary btn-xs" 
+                    sync-start="{% url 'sync_start' %}?synctype=stemma" 
+                    sync-progress="{% url 'sync_progress' %}?synctype=stemma" 
+                    onclick="ru.passim.sync_start('stemma')">OLD Start analysis</a>
+                </span>
+              </div>
+            </div>
+
+            <div class="row">
+              <div id="sync_progress_stemma" class="col-md-12" style="background-color: lightgoldenrodyellow;">
+                <!-- This is where the progress will be reported -->
+              </div>
+            </div>
+            <div id="sync_details_stemma" class="row"></div>
+          </form>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="row">&nbsp;</div>
+
+ 
+
+  {% else %}
+    <p>Since you are not logged in, no further processing of /entry information is possible.</p>
+  {% endif %}
+
+</div>
+
+
+{% endblock %}

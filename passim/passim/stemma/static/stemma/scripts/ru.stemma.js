@@ -9,7 +9,7 @@ var $ = jQuery;
     $(document).ready(function () {
       // Initialize event listeners
       // ru.dct.load_dct();
-      // ru.dct.init_selection();
+      ru.stemma.init_events();
 
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
@@ -447,7 +447,35 @@ var ru = (function ($, ru) {
         } catch (ex) {
           private_methods.errMsg("do_stemitem", ex);
         }
-      }
+      },
+
+      /**
+       * init_events
+       *    Things that must be done on page-load
+       *
+       */
+      init_events: function () {
+        var elAnalyse = "#sync_start_stemma";
+
+        try {
+          // Do we have a start stemma button?
+          if ($(elAnalyse).length > 0) {
+            if ($(elAnalyse).attr("disabled") !== undefined && $(elAnalyse).attr("disabled") === "disabled") {
+              // no need to do anything
+            } else {
+              // Yes, we do, so start the analysis
+              $(elAnalyse).click();
+              // Now disable the button
+              $(elAnalyse).attr("disabled", "disabled");
+              $(elAnalyse).removeClass("btn-primary");
+              $(elAnalyse).addClass("btn-info");
+            }
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("init_events", ex);
+        }
+      },
 
       // LAST POINT
     }
