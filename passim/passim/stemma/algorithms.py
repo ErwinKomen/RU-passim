@@ -3,9 +3,11 @@
 #!/usr/bin/env python
 import sys
 import re
+import json
 import difflib          # For perf
 
 from passim.utils import ErrHandle
+from passim.stemma.algdiff import diff
 
 
 # Debug level CHANGE
@@ -22,26 +24,41 @@ scoremax = 1
 ur = {}
 score = {}
 
+
+
 # standardisation
 
 def dodiff(a1, a2):
-    wordArrMs1 = a1[:]
-    wordArrMs2 = a2[:]
+    wordArrMs1 = a1
+    wordArrMs2 = a2
 
-    # Create the 2-dim array of differences between the two arrays
-    diffArray = list(difflib.ndiff(wordArrMs1, wordArrMs2))
-
+    oErr = ErrHandle()
     dist = 0
 
-    for hunk in diffArray:
-        sequenceArray = list(hunk)
-        distInHunk = 0
+    try:
 
-        for sequence in sequenceArray:
-            # Assigning a score to the pot. leitfehler in wlist()
-            word = sequence[2:]  # Extract the third element of the list
-            # Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
-            word = word[2:] if word.startswith(' ') else word[1:]
+        # Create the 2-dim array of differences between the two arrays
+        # diffArray = list(difflib.ndiff(wordArrMs1, wordArrMs2))
+        diffArray = diff(wordArrMs1, wordArrMs2)
+
+        for hunk in diffArray:
+            sequenceArray = list(hunk)
+            distInHunk = 0
+
+            sequence = []
+            sequence.append(sequenceArray[0])
+            sequence.append(sequenceArray[1])
+            sequence.append(sequenceArray[2:])
+
+            # sequence = [sequenceArray[0], [sequenceArray[1], sequenceArray[2:] ]
+
+            #for sequence in sequenceArray:
+            ## Assigning a score to the pot. leitfehler in wlist()
+            #word = sequence[2:]  # Extract the third element of the list
+            ## Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
+            #word = word[2:] if word.startswith(' ') else word[1:]
+
+            word = sequence[2]
             
             if '€' in word:
                 distInHunk = -2  # €-wildcard matches anything
@@ -52,7 +69,10 @@ def dodiff(a1, a2):
 
             distInHunk += 1
 
-        dist += distInHunk
+            dist += distInHunk
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("dodiff")
 
     return int(dist + 0.5)
 
@@ -73,15 +93,20 @@ def outdiff():
                 print(k, end=",")
         print()
 
-def rating(a1, a2, a3, word, otherWord):
-    a = [a1, a2, a3]
-    r = min(a)
+def rating(a1, a2, a3):
+    r = min(a1, a2, a3)
     return r
 
-def ratings(a1, a2, a3, word, otherWord):
-    a = [a1, a2, a3]
-    s = len(msLabelArray) - max(a) - min(a)
+def ratings(len_msLabelArray, a1, a2, a3, min_a):
+    max_a = max(a1, a2, a3)
+    s = len_msLabelArray - max_a - min_a
     return s
+
+def rating_rs(len_msLabelArray, a1, a2, a3):
+    r = min(a1, a2, a3)
+    max_a = max(a1, a2, a3)
+    s = len_msLabelArray - max_a - r
+    return r, s
 
 def vierer(word, otherWord, a1, a2, a3, t0, t1, t2, t3):
     if debug == 3:
@@ -125,12 +150,17 @@ def wlist(numOfMss, mssHash, msLabelArray):
                 otherMsLabel = msLabelArray[otherMsIndex]
 
                 for word in globalWordCountHash.keys():
-                    if re.search(r'...', word) and abs(mssWordCountHash[currMsLabel].get(word, 0) - mssWordCountHash[otherMsLabel].get(word, 0)) > 0 and mssWordCountHash[currMsLabel].get(word, 0) + mssWordCountHash[otherMsLabel].get(word, 0) < 2:
+                    #if word == "christus": 
+                    #    iStop = 1
+                    xcurr = mssWordCountHash[currMsLabel].get(word, 0)
+                    xother = mssWordCountHash[otherMsLabel].get(word, 0)
+                    # WAS: if re.search(r'...', word) and abs(mssWordCountHash[currMsLabel].get(word, 0) - mssWordCountHash[otherMsLabel].get(word, 0)) > 0 and mssWordCountHash[currMsLabel].get(word, 0) + mssWordCountHash[otherMsLabel].get(word, 0) < 2:
+                    if re.search(r'...', word) and abs(xcurr - xother) > 0 and (xcurr + xother) < 2:
                         if msIndex >= len(leit):
                             leit.append([])
-                        if otherMsIndex >= len(leit[msIndex]):
-                            leit[msIndex].append({})
-                        leit[msIndex][otherMsIndex][word] = 1
+                        if otherMsIndex >= len(leit[msIndex-1]):
+                            leit[msIndex-1].append({})
+                        leit[msIndex-1][otherMsIndex][word] = 1
                         if word not in globalLeit:
                             globalLeit[word] = 0
                         globalLeit[word] += 1
@@ -148,57 +178,95 @@ def wlist(numOfMss, mssHash, msLabelArray):
                                     LOG2.write(match.group(0) + ":" + str(mssWordCountHash[currMsLabel][word]) + " ")
                         LOG2.write("\n")
 
-        for word in globalLeit.keys():
+        # ========== DEBUG ==================
+        y = json.dumps(globalLeit, indent=2)
+        x = json.dumps(mssWordCountHash, indent=2)
+        # ===================================
+
+        numwords = len(globalLeit.keys())
+        len_msLabelArray = len(msLabelArray)
+        for idx1, word in enumerate(globalLeit.keys()):
+            # ========= DEbug ================
+            if debug > 0: 
+                # oErr.Status("wlist #1: {}/{} word = {}".format(idx1,numwords, word))
+                oErr.Status("wlist #1: {:.2f}%".format(idx1 * 100 / numwords))
+            # ================================
+
+            # Consider only leitfehler, if its global leitfehler counter is heigher than cut
             if globalLeit[word] > cut:
-                for otherWord in globalLeit.keys():
+                for idx2, otherWord in enumerate(globalLeit.keys()):
+
+                    # Consider only leitfehler, if its global leitfehler counter is heigher than cut
                     if globalLeit[otherWord] > cut and word < otherWord:
                         tab = [0, 0, 0, 0]
 
-                        # Both words occur together in no ms
-                        for msIndex in range(1, len(msLabelArray)):
+                        # Iterate over all mss and 
+                        # count the "relations" between the counter of word and otherWord in each ms
+                        for msIndex in range(1, len_msLabelArray):
                             currMsLabel = msLabelArray[msIndex]
+                            x_curr = (mssWordCountHash[currMsLabel].get(word,0) > 0)
+                            x_other = (mssWordCountHash[currMsLabel].get(otherWord,0) > 0)
 
-                            if mssWordCountHash[currMsLabel].get(word) and mssWordCountHash[currMsLabel].get(otherWord):
+                            if x_curr and x_other:
+                                # Both, word and otherWord are in the current ms
                                 tab[0] += 1
-                            elif mssWordCountHash[currMsLabel].get(word) and not mssWordCountHash[currMsLabel].get(otherWord):
+                            elif x_curr and not x_other:
+                                # Only word is in the the current ms
                                 tab[1] += 1
-                            elif not mssWordCountHash[currMsLabel].get(word) and mssWordCountHash[currMsLabel].get(otherWord):
+                            elif not x_curr and x_other:
+                                # Only otherWord is in the the current ms
                                 tab[2] += 1
                             else:
+                                # Neither word nor otherWord are in the the current ms
                                 tab[3] += 1
 
-                        if tab[0] == 0 and tab[1] > 0 and tab[2] > 0 and tab[3] > 0:
-                            if debug:
-                                vierer(word, otherWord, tab[1], tab[2], tab[3], *tab)
-                            r = rating(tab[1], tab[2], tab[3], word, otherWord)
-                            s = ratings(tab[1], tab[2], tab[3], word, otherWord)
+                        # Use four variables for speed
+                        t0 = tab[0]
+                        t1 = tab[1]
+                        t2 = tab[2]
+                        t3 = tab[3]
+
+                        # Both words occur together in no ms
+                        if t0 == 0 and t1 > 0 and t2 > 0 and t3 > 0:
+                            if debug == 3:
+                                vierer(word, otherWord, t1, t2, t3, *tab)
+                            r, s = rating_rs(len_msLabelArray, t1, t2, t3)
+
+                            #r = rating(t1, t2, t3)
+                            #s = ratings(len_msLabelArray, t1, t2, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
                         # Absence of word and presence of otherWord in no ms
-                        elif tab[1] == 0 and tab[0] > 0 and tab[2] > 0 and tab[3] > 0:
-                            if debug:
-                                vierer(word, otherWord, tab[0], tab[2], tab[3], *tab)
-                            r = rating(tab[0], tab[2], tab[3], word, otherWord)
-                            s = ratings(tab[0], tab[2], tab[3], word, otherWord)
+                        elif t1 == 0 and t0 > 0 and t2 > 0 and t3 > 0:
+                            if debug == 3:
+                                vierer(word, otherWord, t0, t2, t3, *tab)
+                            r, s = rating_rs(len_msLabelArray, t0, t2, t3)
+
+                            #r = rating(t0, t2, t3)
+                            #s = ratings(len_msLabelArray, t0, t2, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
                         # Presence of word and absence of otherWord in no ms
-                        elif tab[2] == 0 and tab[0] > 0 and tab[1] > 0 and tab[3] > 0:
-                            if debug:
-                                vierer(word, otherWord, tab[0], tab[1], tab[3], *tab)
-                            r = rating(tab[0], tab[1], tab[3], word, otherWord)
-                            s = ratings(tab[0], tab[1], tab[3], word, otherWord)
+                        elif t2 == 0 and t0 > 0 and t1 > 0 and t3 > 0:
+                            if debug == 3:
+                                vierer(word, otherWord, t0, t1, t3, *tab)
+                            r, s = rating_rs(len_msLabelArray, t0, t1, t3)
+
+                            #r = rating(t0, t1, t3)
+                            #s = ratings(len_msLabelArray, t0, t1, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
                         # Absence of word and otherWord in no ms
-                        elif tab[3] == 0 and tab[0] > 0 and tab[1] > 0 and tab[2] > 0:
-                            if debug:
-                                vierer(word, otherWord, tab[0], tab[1], tab[2], *tab)
-                            r = rating(tab[0], tab[1], tab[2], word, otherWord)
-                            s = ratings(tab[0], tab[1], tab[2], word, otherWord)
+                        elif t3 == 0 and t0 > 0 and t1 > 0 and t2 > 0:
+                            if debug == 3:
+                                vierer(word, otherWord, t0, t1, t2, *tab)
+                            r, s = rating_rs(len_msLabelArray, t0, t1, t2)
+
+                            #r = rating(t0, t1, t2)
+                            #s = ratings(len_msLabelArray, t0, t1, t2, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
@@ -226,9 +294,9 @@ def wlist(numOfMss, mssHash, msLabelArray):
 
             # if (globalLeit counter for this word * counter) not 0
             if globalLeit[word] * counter:
-                score[word] = ur[word] / counter
+                score[word] = ur.get(word,0) / counter
             else:
-                score[word] = ur[word]
+                score[word] = ur.get(word,0)
 
         # calculate scoremax   
         for word in ur.keys():
@@ -239,10 +307,11 @@ def wlist(numOfMss, mssHash, msLabelArray):
             with open("log", "w") as logfile:
                 sorted_keys = sorted(score, key=lambda k: score[k], reverse=True)
                 for k in sorted_keys:
-                    if ur[k] > 0 and score[k] > scoremax / 100:
+                    ur_val = ur.get(word,0)
+                    if ur_val > 0 and score[k] > scoremax / 100:
                         logfile.write("{}  --  {} - {} {}% \n")
                         logfile.write("".format(
-                            k, int(score[k]), ur[k], int(score[k] / scoremax * 100) ))
+                            k, int(score[k]), ur_val, int(score[k] / scoremax * 100) ))
 
         # we are okay
         bResult = True
@@ -259,6 +328,16 @@ def lf_new4(sTexts):
     mssHash = {}
     msLabelArray = []
     try:    
+
+        # ========== DEBUGGING =========
+        with open("arrayms1", "r") as fp:  wordArrayMs1 = json.load(fp)
+        with open("arrayms2", "r") as fp:  wordArrayMs2 = json.load(fp)
+
+        el = dodiff(wordArrayMs1, wordArrayMs2)
+
+        # ==============================
+
+
         lst_line = sTexts.split("\n")
 
         for line in lst_line:
@@ -295,8 +374,9 @@ def lf_new4(sTexts):
                 wordArrayMs2 = mssHash[msLabelArray[otherMsIndex]].split(' ')  # split content of the other ms into words
 
                 # diff
-                el = difflib.SequenceMatcher(None, wordArrayMs1, wordArrayMs2).ratio()
-                print(el, end=" ")
+                # el = difflib.SequenceMatcher(None, wordArrayMs1, wordArrayMs2).ratio()
+                el = dodiff(wordArrayMs1, wordArrayMs2)
+                print(" {} ".format(el), end=" ")
                 # matrix[msIndex+1][otherMsIndex+1] = el
                 # matrix[otherMsIndex+1][msIndex+1] = el
 
