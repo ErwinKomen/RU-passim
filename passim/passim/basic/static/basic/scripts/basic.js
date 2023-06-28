@@ -1183,6 +1183,7 @@ var ru = (function ($, ru) {
       filter_opt: function (el) {
         var elLabel = null,
             sNumber = "",
+            operator = null,
             iNumber = 0;
 
         try {
@@ -1190,7 +1191,8 @@ var ru = (function ($, ru) {
           sNumber = $(elLabel).text().trim();
           if (sNumber !== "") {
             iNumber = parseInt(sNumber, 10);
-            if (iNumber > 0 && iNumber <= loc_filter.length) {
+            operator = $(el).val();
+            if (iNumber > 0 && iNumber <= loc_filter.length && operator !== null) {
               // Find the element in loc_filter
               loc_filter[iNumber - 1]['operator'] = $(el).val();
             }
@@ -1300,6 +1302,8 @@ var ru = (function ($, ru) {
                       $(loc_filter[i].target).find(".filter-operator").html("");
                     }
                   }
+                  // Adapt the #qfilter
+                  $("#qfilter").val(JSON.stringify(loc_filter));
                 }
 
               } else {
@@ -3358,6 +3362,9 @@ var ru = (function ($, ru) {
 
             // Make sure to clear the filter builder
           loc_filter = [];
+
+          // Adapt the #qfilter
+          $("#qfilter").val(JSON.stringify(loc_filter));
 
           } catch (ex) {
             private_methods.errMsg("search_clear", ex);

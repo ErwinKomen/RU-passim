@@ -45,6 +45,7 @@ AUTHOR_TYPE = [('', 'All'), ('spe', 'Author defined'), ('non', 'No author define
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
 TRANSCR_OPERATOR = [('', '(make a choice)'), ('obl', 'Contains a transcription'), ('txt', 'Find AFs, filtering the full text transcription')]
+YESNO_ONLY = [('-', '-'), ('yes', 'Yes'), ('no', 'No')]
 
 
 # =================== HELPER FUNCTIONS ==========================
@@ -2441,12 +2442,18 @@ class UserForm(BasicModelForm):
 class ProfileForm(BasicModelForm):
     """Profile list and details"""
 
+    email_ta = forms.CharField(label=_("Email address"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Email address...', 'style': 'width: 100%;'}))
+    username_ta = forms.CharField(label=_("User name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'User name(s)...', 'style': 'width: 100%;'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     editlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    userlist   = ModelMultipleChoiceField(queryset=None, required=False,
+                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # Issue #435: facilitate changing [email, (user)name]
     newusername = forms.CharField(label=_("User name"), required=False,
@@ -2457,6 +2464,10 @@ class ProfileForm(BasicModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'First name...', 'style': 'width: 100%;'}))
     newlast_name = forms.CharField(label=_("Last name"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Last name...', 'style': 'width: 100%;'}))
+
+    # Facilitate turning someone into a passim editor
+    editrights = forms.ChoiceField(label=_("Edit rights"), required=False, 
+               widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Edit rights...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2484,6 +2495,9 @@ class ProfileForm(BasicModelForm):
             self.fields['editlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['deflist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['userlist'].queryset = User.objects.all().order_by('username')
+
+            self.fields['editrights'].choices = YESNO_ONLY
 
             # Initialize choices for linktype
             init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
@@ -2507,6 +2521,10 @@ class ProfileForm(BasicModelForm):
                 self.fields['newemail'].initial = instance.user.email
                 self.fields['newfirst_name'].initial = instance.user.first_name
                 self.fields['newlast_name'].initial = instance.user.last_name
+
+                glist = [x.name for x in instance.user.groups.all()]
+                sEditRights = "yes" if "passim_editor" in glist else "no"
+                self.fields['editrights'].initial = sEditRights
 
         except:
             msg = oErr.get_error_message()

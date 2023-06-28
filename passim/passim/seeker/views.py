@@ -7328,6 +7328,13 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'}
             ]
 
+        # If this is a moderator, add a button for editing rights
+        if context['is_app_moderator']:
+            oItem = dict(type='safe', label='Passim editor:')
+            oItem['value'] = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
+            oItem['field_key'] = 'editrights'
+            context['mainitems'].append(oItem)
+
         # Adapt the permission, if this is the actual user that is logged in
         if context['authenticated'] and not context['is_app_moderator']:
             # Check who this is
@@ -7387,6 +7394,20 @@ class ProfileEdit(BasicDetails):
             editlist = form.cleaned_data['editlist']
             adapt_m2m(ProjectEditor, instance, "profile", editlist, "project")
 
+            # (8) edit rights
+            editrights = form.cleaned_data.get('editrights')
+            if not editrights is None and editrights in ['yes', 'no']:
+                currentrights = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
+                if currentrights != editrights:
+                    editor_group = Group.objects.filter(name=app_editor).first()
+                    if not editor_group is None:
+                        if editrights == "yes":
+                            # Grant editing rights
+                            editor_group.user_set.add(instance.user)
+                        else:
+                            # Revoke editing rights
+                            editor_group.user_set.remove(instance.user)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileEdit/after_save")
@@ -7410,6 +7431,7 @@ class ProfileListView(BasicList):
     prefix = "prof"
     sg_name = "Profile"     
     plural_name = "Profiles"
+    has_select2 = True
     new_button = False      # Do not allow adding new ones here
     order_cols = ['user__username', '', 'ptype', 'affiliation', '', '']
     order_default = order_cols
@@ -7420,6 +7442,17 @@ class ProfileListView(BasicList):
         {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
         {'name': 'Project Approver',    'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
+
+    filters = [ {"name": "User name",   "id": "filter_username",    "enabled": False},
+                {"name": "Email",       "id": "filter_email",       "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'username',  'fkfield': 'user',  'keyS': 'username_ta', 'keyFk': 'username', 'keyList': 'userlist', 'infield': 'username' },
+            {'filter': 'email',     'fkfield': 'user',  'keyS': 'email_ta',    'keyFk': 'email' }
+         ]} 
+            #{'filter': 'project',   'fkfield': 'projects',    'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'}]},
+        ] 
 
     def initializations(self):
         # Make sure possible adaptations are executed

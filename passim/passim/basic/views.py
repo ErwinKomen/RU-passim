@@ -455,23 +455,27 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
             combi_q = None
             lFilters = json.loads(qfilter)
             if len(lFilters) > 0:
+                lst_name = []
                 for qf in lFilters:
-                    operator = qf.get("operator")
                     sName = qf.get("name")
-                    s_q = dictQ.get(sName)
-                    if not s_q is None:
-                        if operator == "start" or combi_q is None:
-                            combi_q = s_q
-                        elif operator == "and":
-                            combi_q = combi_q & (s_q)
-                        elif operator == "nand":
-                            combi_q = combi_q & (~ s_q)
-                        elif operator == "or":
-                            combi_q = combi_q | (s_q)
-                        elif operator == "nor":
-                            combi_q = combi_q | (~ s_q)
+                    if not sName in lst_name:
+                        lst_name.append(sName)
+                        operator = qf.get("operator")
+                        s_q = dictQ.get(sName)
+                        if not s_q is None:
+                            if operator == "start" or combi_q is None:
+                                combi_q = s_q
+                            elif operator == "and":
+                                combi_q = combi_q & (s_q)
+                            elif operator == "nand":
+                                combi_q = combi_q & (~ s_q)
+                            elif operator == "or":
+                                combi_q = combi_q | (s_q)
+                            elif operator == "nor":
+                                combi_q = combi_q | (~ s_q)
                 # Now set the lstQ
-                lstQ.append(combi_q)
+                if not combi_q is None:
+                    lstQ.append(combi_q)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("make_search_list")
