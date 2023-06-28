@@ -11316,7 +11316,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'manuid',        'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',          'fkfield': 'library__lcity|library__location',         
-                                                                             'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+                                                                             'keyS': 'cityloc_ta',    'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},  

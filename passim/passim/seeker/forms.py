@@ -1701,6 +1701,8 @@ class SearchManuForm(PassimModelForm):
     city        = forms.CharField(required=False)
     city_ta     = forms.CharField(label=_("City"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    cityloc_ta  = forms.CharField(label=_("City/Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'City/location...',  'style': 'width: 100%;'}))
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
@@ -1902,6 +1904,7 @@ class SearchManuForm(PassimModelForm):
                             country = obj.name
                     # Put them in the fields
                     self.fields['city_ta'].initial = city
+                    self.fields['cityloc_ta'].initial = city
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
