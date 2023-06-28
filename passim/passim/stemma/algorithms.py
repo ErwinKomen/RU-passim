@@ -7,7 +7,8 @@ import json
 import difflib          # For perf
 
 from passim.utils import ErrHandle
-from passim.stemma.algdiff import diff
+# from passim.stemma.algdiff import diff
+from passim.stemma.algdiffblock import diff
 
 
 # Debug level CHANGE
@@ -29,52 +30,76 @@ score = {}
 # standardisation
 
 def dodiff(a1, a2):
-    wordArrMs1 = a1
-    wordArrMs2 = a2
+    # Copy the two arrays passed to this function into the variables wordArrMs1 and wordArrMs2
+    wordArrMs1 = a1[:]
+    wordArrMs2 = a2[:]
 
     oErr = ErrHandle()
     dist = 0
+    response = None
 
     try:
 
+        # diff computes the smallest set of additions and deletions necessary to turn the first sequence into the second
+        # and returns a 2-dim array of differences (hunks with sequences);
+        # each difference is a list of 3 elements (-/+, position of the change, string), e.g.:
+        # [
+        #    [
+        #       ['-', 0, 'a']
+        #    ],
+        #    [
+        #       ['-', 8, 'n'],
+        #       ['+', 9, 'p']
+        #    ]
+        # ]        
+        
         # Create the 2-dim array of differences between the two arrays
         # diffArray = list(difflib.ndiff(wordArrMs1, wordArrMs2))
         diffArray = diff(wordArrMs1, wordArrMs2)
 
         for hunk in diffArray:
-            sequenceArray = list(hunk)
+            # sequenceArray = list(hunk)
+            sequenceArray = hunk
             distInHunk = 0
 
-            sequence = []
-            sequence.append(sequenceArray[0])
-            sequence.append(sequenceArray[1])
-            sequence.append(sequenceArray[2:])
+            #sequence = []
+            #sequence.append(sequenceArray[0])
+            #sequence.append(sequenceArray[1])
+            #sequence.append(sequenceArray[2:])
 
             # sequence = [sequenceArray[0], [sequenceArray[1], sequenceArray[2:] ]
 
-            #for sequence in sequenceArray:
-            ## Assigning a score to the pot. leitfehler in wlist()
-            #word = sequence[2:]  # Extract the third element of the list
-            ## Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
-            #word = word[2:] if word.startswith(' ') else word[1:]
+            for sequence in sequenceArray:
+                ## Assigning a score to the pot. leitfehler in wlist()
+                #word = sequence[2:]  # Extract the third element of the list
+                ## Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
+                #word = word[2:] if word.startswith(' ') else word[1:]
 
-            word = sequence[2]
-            
-            if '€' in word:
-                distInHunk = -2  # €-wildcard matches anything
-            
-            # Calibration to weight
-            if score.get(word) and scoremax * weight != 0:
-                distInHunk += score[word] / scoremax * weight
+                # assigning a score to the pot. leitfehler in wlist()
+                word = sequence[2]  # Get the third element of the list
+                # Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
+                word = re.sub(r'^. \d+ (.+)', r'\1', word)
 
-            distInHunk += 1
+
+                word = sequence[2]
+            
+                if '€' in word:
+                    distInHunk = -2  # €-wildcard matches anything
+            
+                # Calibration to weight
+                if score.get(word) and scoremax * weight != 0:
+                    distInHunk += score[word] / scoremax * weight
+
+                distInHunk += 1
 
             dist += distInHunk
+
+        response = int(dist + 0.5)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("dodiff")
 
-    return int(dist + 0.5)
+    return response
 
 def outdiff():
     a = "Zz"

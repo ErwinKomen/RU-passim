@@ -8,6 +8,28 @@ from passim.utils import ErrHandle
 def default_keyGen(value):
     return value
 
+def get_list_el(lst_this, idx):
+    """Get a list element if existing, else return None"""
+
+    ln = len(lst_this)
+    if idx >= ln - 1 or idx < 0:
+        response = None
+    else:
+        response = lst_this[idx]
+    return response
+
+def add_list_el(lst_this, idx, value):
+    """Add a list element at [idx]"""
+
+    ln = len(lst_this)
+    while idx >= ln:
+        lst_this.append(None)
+        # Calculate new length
+        ln = len(lst_this)
+
+    lst_this[idx] = value
+
+
 def _withPositionsOfInInterval(aCollection, start, end, keyGen):
     d = {}
     oErr = ErrHandle()
@@ -147,17 +169,24 @@ def _longestCommonSubsequence_helper(a, bMatches, counting, keyGen, prunedCount,
                         k = _replaceNextLargerWith(thresh, j, k)
 
                     if k is not None:
-                        if k:
-                            if k >= len(links):
-                                # links.append(links[k - 1] + [i, j])
-                                links.extend(links[k-1], [i,j])
-                            else:
-                                links[k] = links[k - 1] + [i, j]
+                        if k == 0:
+                            links[k] = [None, i, j]
                         else:
-                            # This means k=0
-                            links.extend([i, j])
-                            # OLD links.append([None, i, j])
-                            # OLD links[k] = [None, i, j]
+                            # Mimicking: links[k] = [ links[k-1], i, j]
+                            value = [ get_list_el(links, k-1), i, j ]
+                            add_list_el(links, k, value)
+                    #if k is not None:
+                    #    if k:
+                    #        if k >= len(links):
+                    #            # links.append(links[k - 1] + [i, j])
+                    #            links.extend(links[k-1], [i,j])
+                    #        else:
+                    #            links[k] = links[k - 1] + [i, j]
+                    #    else:
+                    #        # This means k=0
+                    #        links.extend([i, j])
+                    #        # OLD links.append([None, i, j])
+                    #        # OLD links[k] = [None, i, j]
 
         if thresh:
             if counting:
