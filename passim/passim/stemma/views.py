@@ -167,17 +167,21 @@ class StemmaStart(BasicPart):
             instance = self.obj
 
             # (1) Prepare the texts for analysis
+            instance.set_status("preparing")
             sTexts, lst_codes = self.prepare_texts()
 
-            # (2) Save the text to a logical place
-            filename = os.path.abspath(os.path.join(MEDIA_DIR, "stemma", "stemmaset_{}.txt".format(instance.id)))
-            with open(filename, "w") as f:
-                f.write(sTexts)
+            # (2) Execute the Leitfehler Algorithm on the combined fulltexts
+            instance.set_status("leitfehler")
+            lst_leitfehler = lf_new4(sTexts)
 
-            # (3) Execute the perl script on this file
-            lf_new4(sTexts)
+            # (3) Store the result within the StemmaSet object
+            instance.store_lf(lst_leitfehler)
+
+            # (4) Make sure to indicate that we are ready
+            instance.set_status("ready")
 
             # FIll in the [data] part of the context with all necessary information
+            data['status'] = "finished"
             context['data'] = data
         except:
             msg = oErr.get_error_message()
@@ -256,6 +260,8 @@ class StemmaProgress(BasicPart):
             instance = self.obj
 
             # HERE IS WHERE THE PROGRESS OF THE ANALYSIS IS MONITORED
+            data['type'] = "stemma"
+            data['status'] = instance.get_status()
 
             # FIll in the [data] part of the context with all necessary information
             context['data'] = data

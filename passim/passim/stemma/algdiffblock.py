@@ -1,10 +1,34 @@
+"""
+This is the Python equivalent of large part of perl [Algorithm-Diff-1.15]
+
+"""
 import copy
 from passim.utils import ErrHandle
 
 def default_keyGen(value):
     return value
 
+def get_list_el(lst_this, idx):
+    """Get a list element if existing, else return None"""
 
+    ln = len(lst_this)
+    if idx >= ln or idx < 0:
+        response = None
+    else:
+        response = lst_this[idx]
+    return response
+
+def add_list_el(lst_this, idx, value):
+    """Add a list element at [idx]"""
+
+    ln = len(lst_this)
+    while idx >= ln:
+        lst_this.append(None)
+        # Calculate new length
+        ln = len(lst_this)
+
+    lst_this[idx] = value
+    
 def _withPositionsOfInInterval(aCollection, start, end, keyGen, *args):
     """
     # Create a hash that maps each element of $aCollection to the set of positions
@@ -38,7 +62,7 @@ def _withPositionsOfInInterval(aCollection, start, end, keyGen, *args):
         oErr.DoError("_withPositionsOfInInterval")
     return response
 
-def _replaceNextLargerWith(array, aValue, high=None):
+def _replaceNextLargerWith(array, aValue, high=0):
     """
     # Find the place at which aValue would normally be inserted into the array. If
     # that place is already occupied by aValue, do nothing, and return undef. If
@@ -52,7 +76,8 @@ def _replaceNextLargerWith(array, aValue, high=None):
     oErr = ErrHandle()
     low = 0
     try:
-        high = high if high is not None else len(array) - 1
+        # high = high if high is not None else len(array) - 1
+        high = high or len(array) - 1
 
         # off the end?
         array_last = 0 if len(array) == 0 else array[-1]
@@ -67,10 +92,12 @@ def _replaceNextLargerWith(array, aValue, high=None):
         low = 0
         index = 0
         found = None
+        # NOTE: make sure to keep high and low FLOATING POINT
+        #       only turn [index] into integer, when it picks an element from [array]
         while low <= high:
-            index = (high + low) // 2
+            index = (high + low) / 2
 
-            found = array[index]
+            found = array[int(index)]
 
             if aValue == found:
                 return None
@@ -79,8 +106,19 @@ def _replaceNextLargerWith(array, aValue, high=None):
             else:
                 high = index - 1
 
+        # ============ Double check =========
+        #if not low.is_integer():
+        #    iStop = 1
+        # ===================================
+
+        # At this point low needs to be made integer
+        low = int(low)
+
         # now insertion point is in low.
+        if low == 4:
+            iStop = 1
         array[low] = aValue  # overwrite next larger
+
     except:
         msg = oErr.get_error_message()
         oErr.DoError("_replaceNextLargerWith")
@@ -106,53 +144,42 @@ def _longestCommonSubsequence(a, b, keyGen=None, *args):
     # Additional parameters, if any, will be passed to the key generation routine.
     """
 
-    def get_list_el(lst_this, idx):
-        """Get a list element if existing, else return None"""
+    def compare(a, b,*args):
+        return a == b
 
-        ln = len(lst_this)
-        if idx >= ln - 1 or idx < 0:
-            response = None
-        else:
-            response = lst_this[idx]
-        return response
-
-    def add_list_el(lst_this, idx, value):
-        """Add a list element at [idx]"""
-
-        ln = len(lst_this)
-        while idx >= ln:
-            lst_this.append(None)
-            # Calculate new length
-            ln = len(lst_this)
-
-        lst_this[idx] = value
+    def keyGen(a, *args):
+        return a
 
     oErr = ErrHandle()
     response = None
     try:
         # set up code refs
         # Note that these are optimized.
-        if keyGen is None:    # optimize for strings
-            keyGen = lambda x: x
-            compare = lambda a, b: a == b
-        else:
-            compare = lambda a, b: keyGen(a, *args) == keyGen(b, *args)
+
+        #if keyGen is None:    # optimize for strings
+        #    keyGen = lambda x: x
+        #    compare = lambda a, b: a == b
+        #else:
+        #    compare = lambda a, b: keyGen(a, *args) == keyGen(b, *args)
 
         aStart, aFinish, bStart, bFinish = 0, len(a) - 1, 0, len(b) - 1
-        matchVector = [None] * len(a)
-
+        # matchVector = [None] * len(a)
+        matchVector = []
+        
         # First we prune off any common elements at the beginning
         while aStart <= aFinish and bStart <= bFinish and compare(a[aStart], b[bStart], *args):
-            matchVector[aStart] = bStart
+            add_list_el(matchVector, aStart, bStart)
+            # matchVector[aStart] = bStart
             aStart += 1
             bStart += 1
 
         # now the end
         while aStart <= aFinish and bStart <= bFinish and compare(a[aFinish], b[bFinish], *args):
-            matchVector[aFinish] = bFinish
+            add_list_el(matchVector, aFinish, bFinish)
+            # matchVector[aFinish] = bFinish
             aFinish -= 1
             bFinish -= 1
-
+            
         # Now compute the equivalence classes of positions of elements
         bMatches = _withPositionsOfInInterval(b, bStart, bFinish, keyGen, *args)
         thresh = []
@@ -165,6 +192,8 @@ def _longestCommonSubsequence(a, b, keyGen=None, *args):
                 for j in bMatches[ai]:
                     # optimization: most of the time this will be true
                     if k and thresh[k] > j and thresh[k - 1] < j:
+                        if k == 4:
+                            iStop = 1
                         thresh[k] = j
                     else:
                         k = _replaceNextLargerWith(thresh, j, k)
@@ -172,7 +201,7 @@ def _longestCommonSubsequence(a, b, keyGen=None, *args):
                     # oddly, it's faster to always test this (CPU cache?).
                     if k is not None:
                         if k == 0:
-                            links[k] = [None, i, j]
+                            links.append( [None, i, j] )
                         else:
                             # Mimicking: links[k] = [ links[k-1], i, j]
                             value = [ get_list_el(links, k-1), i, j ]
@@ -181,9 +210,10 @@ def _longestCommonSubsequence(a, b, keyGen=None, *args):
         if thresh:
             link = links[-1]
             while link:
-                matchVector[link[1]] = link[2]
+                # matchVector[link[1]] = link[2]
+                add_list_el(matchVector, link[1], link[2])
                 link = link[0]
-
+                
         if args and args[0] == 'wantarray':
             response = matchVector
         else:
@@ -201,12 +231,6 @@ def traverse_sequences(a, b,  match=None, discard_a=None, discard_b=None,
 
     oErr = ErrHandle()
     try:
-        #callbacks = callbacks or {}
-        #matchCallback = callbacks.get('MATCH', lambda *args: None)
-        #discardACallback = callbacks.get('DISCARD_A', lambda *args: None)
-        #finishedACallback = callbacks.get('A_FINISHED')
-        #discardBCallback = callbacks.get('DISCARD_B', lambda *args: None)
-        #finishedBCallback = callbacks.get('B_FINISHED')
         matchVector = _longestCommonSubsequence(a, b, keyGen, *args)
 
         # Process all the lines in matchVector
@@ -263,92 +287,82 @@ def traverse_sequences(a, b,  match=None, discard_a=None, discard_b=None,
 
     return 1
 
-#def traverse_balanced(a, b, callbacks=None, keyGen=None, *args):
-#    oErr = ErrHandle()
-#    try:
-#        callbacks = callbacks or {}
-#        matchCallback = callbacks.get('MATCH', lambda *args: None)
-#        discardACallback = callbacks.get('DISCARD_A', lambda *args: None)
-#        discardBCallback = callbacks.get('DISCARD_B', lambda *args: None)
-#        changeCallback = callbacks.get('CHANGE')
-#        matchVector = _longestCommonSubsequence(a, b, keyGen, *args)
+def traverse_balanced(a, b, match=None, discard_a=None, discard_b=None, 
+                      change=None, keyGen=None, *args):
+    """
+    This function should still be debugged
+    """
 
-#        lastA = len(a) - 1
-#        lastB = len(b) - 1
-#        bi = 0
-#        ai = 0
-#        ma = -1
-#        mb = None
+    oErr = ErrHandle()
+    try:
+        matchVector = _longestCommonSubsequence(a, b, keyGen, *args)
 
-#        while True:
-#            while ma <= len(matchVector) - 1 and matchVector[ma] is None:
-#                ma += 1
+        lastA = len(a) - 1
+        lastB = len(b) - 1
+        bi = 0
+        ai = 0
+        ma = -1
+        mb = None
 
-#            if ma > len(matchVector) - 1:
-#                break
+        while True:
+            while ma <= len(matchVector) - 1 and matchVector[ma] is None:
+                ma += 1
 
-#            mb = matchVector[ma]
+            if ma > len(matchVector) - 1:
+                break
 
-#            while ai < ma or bi < mb:
-#                if ai < ma and bi < mb:
-#                    if changeCallback:
-#                        changeCallback(ai, bi, *args)
-#                    else:
-#                        discardACallback(ai, bi, *args)
-#                        discardBCallback(ai, bi, *args)
-#                    ai += 1
-#                    bi += 1
-#                elif ai < ma:
-#                    discardACallback(ai, bi, *args)
-#                    ai += 1
-#                else:
-#                    discardBCallback(ai, bi, *args)
-#                    bi += 1
+            mb = matchVector[ma]
 
-#            matchCallback(ai, bi, *args)
-#            ai += 1
-#            bi += 1
+            while ai < ma or bi < mb:
+                if ai < ma and bi < mb:
+                    if change:
+                        change(ai, bi, *args)
+                    else:
+                        discard_a(ai, bi, *args)
+                        discard_b(ai, bi, *args)
+                    ai += 1
+                    bi += 1
+                elif ai < ma:
+                    discard_a(ai, bi, *args)
+                    ai += 1
+                else:
+                    discard_b(ai, bi, *args)
+                    bi += 1
 
-#        while ai <= lastA or bi <= lastB:
-#            if ai <= lastA and bi <= lastB:
-#                if changeCallback:
-#                    changeCallback(ai, bi, *args)
-#                else:
-#                    discardACallback(ai, bi, *args)
-#                    discardBCallback(ai, bi, *args)
-#                ai += 1
-#                bi += 1
-#            elif ai <= lastA:
-#                discardACallback(ai, bi, *args)
-#                ai += 1
-#            else:
-#                discardBCallback(ai, bi, *args)
-#                bi += 1
-#    except:
-#        msg = oErr.get_error_message()
-#        oErr.DoError("traverse_balanced")
+            match(ai, bi, *args)
+            ai += 1
+            bi += 1
 
-#    return 1
+        while ai <= lastA or bi <= lastB:
+            if ai <= lastA and bi <= lastB:
+                if change:
+                    change(ai, bi, *args)
+                else:
+                    discard_a(ai, bi, *args)
+                    discard_b(ai, bi, *args)
+                ai += 1
+                bi += 1
+            elif ai <= lastA:
+                discard_a(ai, bi, *args)
+                ai += 1
+            else:
+                discard_b(ai, bi, *args)
+                bi += 1
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("traverse_balanced")
+
+    return 1
 
 def diff(a, b, *args):
     retval = []
     hunk = []
     
-    #def discard(idx):
-    #    hunk.append(['-', idx, a[idx]])
-    
-    #def add(idx):
-    #    hunk.append(['+', idx, b[idx]])
-    
-    #def match():
-    #    nonlocal hunk
-    #    if hunk:
-    #        retval.append(hunk)
-    #    hunk = []
 
     def match(x, y, *args):
         nonlocal retval, hunk
-        retval.append(hunk)
+        if len(hunk) > 0:
+            retval.append(hunk)
         hunk = []
 
     def discard_a(x, y, *args):
@@ -363,10 +377,9 @@ def diff(a, b, *args):
     response = None
     try:
         # Use my own match(), discard() and add() functions
-        # traverse_sequences(a, b, {'MATCH': match, 'DISCARD_A': discard_a, 'DISCARD_B': discard_b}, *args)
         traverse_sequences(a, b, match=match, discard_a=discard_a, discard_b=discard_b, *args)
 
-        # Call my own match function
+        # Call my own match function for the last time
         match(1, 2)
 
         response = retval if isinstance(retval, list) else [retval]
@@ -376,3 +389,4 @@ def diff(a, b, *args):
 
     return response
 
+# For sdiff(): see lf_erwin.pl

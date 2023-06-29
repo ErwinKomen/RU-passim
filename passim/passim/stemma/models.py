@@ -49,6 +49,12 @@ class StemmaSet(models.Model):
     #     E.g: private, team, global - default is 'private'
     scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv", max_length=5)
 
+    # [0-1] Place to store the Leitfehler data
+    data = models.TextField("Leitfehler data", null=True, blank=True)
+
+    # [1] Status of this stemmaset in calculations
+    status = models.CharField("Status", default="none", max_length=20)
+
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
@@ -288,6 +294,29 @@ class StemmaSet(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("StemmaSet/get_ssglists")
         return lBack
+
+    def get_status(self):
+        return self.status
+
+    def set_status(self, sStatus):
+        self.status = sStatus
+        self.save()
+
+    def store_lf(self, lst_data):
+        """Store data into the stemmaset"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            if not lst_data is None and isinstance(lst_data, list):
+                sData = json.dumps(lst_data, indent=2)
+                self.data = sData
+                self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("store_lf")
+            bResult = False
+        return bResult
 
 
 class StemmaItem(models.Model):

@@ -1,4 +1,7 @@
+"""
+Stemmatology app main entry for calculating Leitfehler
 
+"""
 
 #!/usr/bin/env python
 import sys
@@ -7,7 +10,6 @@ import json
 import difflib          # For perf
 
 from passim.utils import ErrHandle
-# from passim.stemma.algdiff import diff
 from passim.stemma.algdiffblock import diff
 
 
@@ -70,17 +72,15 @@ def dodiff(a1, a2):
             # sequence = [sequenceArray[0], [sequenceArray[1], sequenceArray[2:] ]
 
             for sequence in sequenceArray:
-                ## Assigning a score to the pot. leitfehler in wlist()
-                #word = sequence[2:]  # Extract the third element of the list
-                ## Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
-                #word = word[2:] if word.startswith(' ') else word[1:]
 
                 # assigning a score to the pot. leitfehler in wlist()
-                word = sequence[2]  # Get the third element of the list
-                # Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
-                word = re.sub(r'^. \d+ (.+)', r'\1', word)
 
+                # (1) OLD METHOD: combine into string and evaluate that
+                #word = " ".join(str(x) for x in sequence)
+                ## Remove +/- at the beginning and the digits (\d) of the position; leave only the char string
+                #word = re.sub(r'^. \d+ (.+)', r'\1', word)
 
+                # (2) NEW METHOD: just take the string part
                 word = sequence[2]
             
                 if '€' in word:
@@ -145,6 +145,7 @@ def wlist(numOfMss, mssHash, msLabelArray):
     bResult = False
     try:    
         cut = cut * numOfMss * numOfMss / 2500
+        cut = int(cut)
 
         mssWordCountHash = {}
         globalWordCountHash = {}
@@ -204,17 +205,30 @@ def wlist(numOfMss, mssHash, msLabelArray):
                         LOG2.write("\n")
 
         # ========== DEBUG ==================
-        y = json.dumps(globalLeit, indent=2)
-        x = json.dumps(mssWordCountHash, indent=2)
+        #y = json.dumps(globalLeit, indent=2)
+        #x = json.dumps(mssWordCountHash, indent=2)
         # ===================================
 
+
         numwords = len(globalLeit.keys())
+        chunksize = numwords // 20
         len_msLabelArray = len(msLabelArray)
+
+        # Preparation for speeding up
+        lst_wcHash = []
+        for msIndex in range(1, len_msLabelArray):
+            currMsLabel = msLabelArray[msIndex]
+            wcHash = mssWordCountHash[currMsLabel]
+            lst_wcHash.append(wcHash)
+
+        chunk = chunksize
         for idx1, word in enumerate(globalLeit.keys()):
             # ========= DEbug ================
             if debug > 0: 
                 # oErr.Status("wlist #1: {}/{} word = {}".format(idx1,numwords, word))
-                oErr.Status("wlist #1: {:.2f}%".format(idx1 * 100 / numwords))
+                if idx1 >= chunk:
+                    chunk += chunksize
+                    oErr.Status("wlist #1: {:.2f}%".format(idx1 * 100 / numwords))
             # ================================
 
             # Consider only leitfehler, if its global leitfehler counter is heigher than cut
@@ -223,33 +237,46 @@ def wlist(numOfMss, mssHash, msLabelArray):
 
                     # Consider only leitfehler, if its global leitfehler counter is heigher than cut
                     if globalLeit[otherWord] > cut and word < otherWord:
-                        tab = [0, 0, 0, 0]
+                        # Use four separate variables 
+                        t0, t1, t2, t3 = 0, 0, 0, 0
 
-                        # Iterate over all mss and 
-                        # count the "relations" between the counter of word and otherWord in each ms
-                        for msIndex in range(1, len_msLabelArray):
-                            currMsLabel = msLabelArray[msIndex]
-                            x_curr = (mssWordCountHash[currMsLabel].get(word,0) > 0)
-                            x_other = (mssWordCountHash[currMsLabel].get(otherWord,0) > 0)
+                        # - Iterate over all mss 
+                        # - count the "relations" between the counter of word and otherWord in each ms
+                        #for msIndex in range(1, len_msLabelArray):
+                        #    currMsLabel = msLabelArray[msIndex]
+                        #    wcHash = mssWordCountHash[currMsLabel]
+                        #    x_curr = (wcHash.get(word,0) > 0)
+                        #    x_other = (wcHash.get(otherWord,0) > 0)
+
+                        #    if x_curr and x_other:
+                        #        # Both, word and otherWord are in the current ms
+                        #        t0 += 1
+                        #    elif x_curr and not x_other:
+                        #        # Only word is in the the current ms
+                        #        t1 += 1
+                        #    elif not x_curr and x_other:
+                        #        # Only otherWord is in the the current ms
+                        #        t2 += 1
+                        #    else:
+                        #        # Neither word nor otherWord are in the the current ms
+                        #        t3 += 1
+                        for wcHash in lst_wcHash:
+                            x_curr = (wcHash.get(word,0) > 0)
+                            x_other = (wcHash.get(otherWord,0) > 0)
 
                             if x_curr and x_other:
                                 # Both, word and otherWord are in the current ms
-                                tab[0] += 1
+                                t0 += 1
                             elif x_curr and not x_other:
                                 # Only word is in the the current ms
-                                tab[1] += 1
+                                t1 += 1
                             elif not x_curr and x_other:
                                 # Only otherWord is in the the current ms
-                                tab[2] += 1
+                                t2 += 1
                             else:
                                 # Neither word nor otherWord are in the the current ms
-                                tab[3] += 1
+                                t3 += 1
 
-                        # Use four variables for speed
-                        t0 = tab[0]
-                        t1 = tab[1]
-                        t2 = tab[2]
-                        t3 = tab[3]
 
                         # Both words occur together in no ms
                         if t0 == 0 and t1 > 0 and t2 > 0 and t3 > 0:
@@ -257,8 +284,6 @@ def wlist(numOfMss, mssHash, msLabelArray):
                                 vierer(word, otherWord, t1, t2, t3, *tab)
                             r, s = rating_rs(len_msLabelArray, t1, t2, t3)
 
-                            #r = rating(t1, t2, t3)
-                            #s = ratings(len_msLabelArray, t1, t2, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
@@ -268,8 +293,6 @@ def wlist(numOfMss, mssHash, msLabelArray):
                                 vierer(word, otherWord, t0, t2, t3, *tab)
                             r, s = rating_rs(len_msLabelArray, t0, t2, t3)
 
-                            #r = rating(t0, t2, t3)
-                            #s = ratings(len_msLabelArray, t0, t2, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
@@ -279,8 +302,6 @@ def wlist(numOfMss, mssHash, msLabelArray):
                                 vierer(word, otherWord, t0, t1, t3, *tab)
                             r, s = rating_rs(len_msLabelArray, t0, t1, t3)
 
-                            #r = rating(t0, t1, t3)
-                            #s = ratings(len_msLabelArray, t0, t1, t3, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
@@ -290,8 +311,6 @@ def wlist(numOfMss, mssHash, msLabelArray):
                                 vierer(word, otherWord, t0, t1, t2, *tab)
                             r, s = rating_rs(len_msLabelArray, t0, t1, t2)
 
-                            #r = rating(t0, t1, t2)
-                            #s = ratings(len_msLabelArray, t0, t1, t2, r)
                             if r > 1:
                                 ur[word] = ur.get(word, 0) + (r - 1) ** 2 * s
                                 ur[otherWord] = ur.get(otherWord, 0) + (r - 1) ** 2 * s
@@ -352,24 +371,30 @@ def lf_new4(sTexts):
     numOfMss = 0
     mssHash = {}
     msLabelArray = []
+    lst_result = []
     try:    
 
         # ========== DEBUGGING =========
-        with open("arrayms1", "r") as fp:  wordArrayMs1 = json.load(fp)
-        with open("arrayms2", "r") as fp:  wordArrayMs2 = json.load(fp)
+        #with open("arrayms1", "r") as fp:  wordArrayMs1 = json.load(fp)
+        #with open("arrayms2", "r") as fp:  wordArrayMs2 = json.load(fp)
 
-        el = dodiff(wordArrayMs1, wordArrayMs2)
-
+        #el = dodiff(wordArrayMs1, wordArrayMs2)
+        #wordArrayMs1[100]
         # ==============================
 
 
         lst_line = sTexts.split("\n")
 
+        ## ========== DEBUGGING =========
+        #lst_line = lst_line[:3]
+        #lst_line[0] = "{}".format(2)
+        ## ==============================
+
         for line in lst_line:
             line = line.rstrip("\n")
             line = re.sub(r"[\,!\?\"]", "", line)  # remove punctuation
             # line = re.sub(r"\.", "", line)  # remove . ?
-            line = re.sub(r"\s[^\s]*\*[^\s]*", "€", line)  # convert word with a *-wildcard to €
+            line = re.sub(r"\s[^\s]*\*[^\s]*", " €", line)  # convert word with a *-wildcard to €
             line = line.rstrip()
 
             # label manuscripts (3 chars), or n chars make (n-1) dots in next line
@@ -393,21 +418,31 @@ def lf_new4(sTexts):
         print("\n" + msLabelArray[0])
 
         for msIndex in range(1, len(msLabelArray)):
-            print(msLabelArray[msIndex], end=" ")
+            # Start a new line
+            lst_row = []
+            # Add the row label to this
+            lst_row.append(msLabelArray[msIndex])
+            # print(msLabelArray[msIndex], end=" ")
+
             for otherMsIndex in range(msIndex):
-                wordArrayMs1 = mssHash[msLabelArray[msIndex]].split(' ')  # split content of this ms into words
-                wordArrayMs2 = mssHash[msLabelArray[otherMsIndex]].split(' ')  # split content of the other ms into words
-
+                # split content of these manuscripts into words
+                wordArrayMs1 = re.split(r'\s+', mssHash[msLabelArray[msIndex]])  
+                wordArrayMs2 = re.split(r'\s+', mssHash[msLabelArray[otherMsIndex]])
+                
                 # diff
-                # el = difflib.SequenceMatcher(None, wordArrayMs1, wordArrayMs2).ratio()
                 el = dodiff(wordArrayMs1, wordArrayMs2)
-                print(" {} ".format(el), end=" ")
-                # matrix[msIndex+1][otherMsIndex+1] = el
-                # matrix[otherMsIndex+1][msIndex+1] = el
+                # Add to this row
+                lst_row.append("{}".format(el))
+                # print(" {} ".format(el), end=" ")
 
-            print()
+            # print()
+            # Add the row to the overall result
+            lst_result.append(lst_row)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("lf_new4")
+
+    # Return the result
+    return lst_result
 
 # End of code
