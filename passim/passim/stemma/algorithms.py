@@ -138,7 +138,7 @@ def vierer(word, otherWord, a1, a2, a3, t0, t1, t2, t3):
         if t0 != 1 and t1 != 1 and t2 != 1 and t3 != 1:
             print(word + "/" + otherWord + " " + str(t0) + " " + str(t1) + " " + str(t2) + " " + str(t3) + " \n")
 
-def wlist(numOfMss, mssHash, msLabelArray):
+def wlist(numOfMss, mssHash, msLabelArray, oStatus = None):
     global cut, mssWordCountHash, globalWordCountHash, leit, globalLeit, ur, score, scoremax
 
     oErr = ErrHandle()
@@ -151,6 +151,10 @@ def wlist(numOfMss, mssHash, msLabelArray):
         globalWordCountHash = {}
         leit = []
         globalLeit = {}
+
+        # Possibly set status
+        if not oStatus is None:
+            if oStatus.set_status("lf_new4", "wlist: preparations") == "interrupt": return False
 
         for msIndex in mssHash.keys():
             msContent = mssHash[msIndex]
@@ -230,6 +234,10 @@ def wlist(numOfMss, mssHash, msLabelArray):
                     chunk += chunksize
                     oErr.Status("wlist #1: {:.2f}%".format(idx1 * 100 / numwords))
             # ================================
+            # Possibly set status
+            if not oStatus is None:
+                if oStatus.set_status("lf_new4", "wlist: word {} of {}".format(idx1, numwords)) == "interrupt": return False
+
 
             # Consider only leitfehler, if its global leitfehler counter is heigher than cut
             if globalLeit[word] > cut:
@@ -321,6 +329,10 @@ def wlist(numOfMss, mssHash, msLabelArray):
 
         # %ur counts and weights cases with only 3 combinations; %scoremax is its maximum
 
+        # Possibly set status
+        if not oStatus is None:
+            if oStatus.set_status("lf_new4", "wlist: wrapping up") == "interrupt": return False
+
         # ADDED calculate counter: number of occurences of word 
         for word in globalLeit.keys():
             counter = 0
@@ -362,9 +374,13 @@ def wlist(numOfMss, mssHash, msLabelArray):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("lf_new4")
+        bResult = False
+        # Communicate this to the status
+        if not oStatus is None:
+            oStatus.set_status("error", msg)
     return bResult
 
-def lf_new4(sTexts):
+def lf_new4(sTexts, oStatus=None):
     """Perform the LeitFehler algorithm on a list of lines"""
 
     oErr = ErrHandle()
@@ -382,6 +398,10 @@ def lf_new4(sTexts):
         #wordArrayMs1[100]
         # ==============================
 
+
+        # Possibly set status
+        if not oStatus is None:
+            if oStatus.set_status("lf_new4", "Preparing lines") == "interrupt": return lst_result
 
         lst_line = sTexts.split("\n")
 
@@ -408,11 +428,19 @@ def lf_new4(sTexts):
 
                 numOfMss += 1
 
-        bResult = wlist(numOfMss, mssHash, msLabelArray)
+        # Possibly set status
+        if not oStatus is None:
+            if oStatus.set_status("lf_new4", "Starting wlist") == "interrupt": return lst_result
+
+        bResult = wlist(numOfMss, mssHash, msLabelArray, oStatus)
 
         # remove to get a fast result without calculating the lff
 
         ##########
+
+        # Possibly set status
+        if not oStatus is None:
+            if oStatus.set_status("lf_new4", "Starting dodiff") == "interrupt": return lst_result
 
         print(len(msLabelArray))  # print length of array
         print("\n" + msLabelArray[0])
@@ -429,6 +457,11 @@ def lf_new4(sTexts):
                 wordArrayMs1 = re.split(r'\s+', mssHash[msLabelArray[msIndex]])  
                 wordArrayMs2 = re.split(r'\s+', mssHash[msLabelArray[otherMsIndex]])
                 
+                # Possibly set status
+                if not oStatus is None:
+                    if oStatus.set_status("lf_new4", "dodiff: {}, {} (len={})".format(
+                        msIndex, otherMsIndex, len(msLabelArray))) == "interrupt": return lst_result
+
                 # diff
                 el = dodiff(wordArrayMs1, wordArrayMs2)
                 # Add to this row

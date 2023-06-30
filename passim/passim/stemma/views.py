@@ -21,6 +21,7 @@ import copy
 import json
 import csv
 import os
+import time
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -30,7 +31,7 @@ from passim.basic.views import BasicList, BasicDetails, BasicPart, \
 #from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
 #    user_is_superuser, get_selectitem_info
 from passim.seeker.models import Profile
-from passim.stemma.models import StemmaItem, StemmaSet
+from passim.stemma.models import StemmaItem, StemmaSet, StemmaCalc
 from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
 from passim.seeker.views import EqualGoldListView
@@ -73,48 +74,6 @@ def get_application_context(request, context):
 
 # =================== Alternative simple views ============
 
-def stemma_dashboard(request):
-    """Dashboard to facility Stemmatology analysis"""
-    assert isinstance(request, HttpRequest)
-
-    oErr = ErrHandle()
-    response = "error"
-    try:
-        # Gather info
-        context = {'title': 'Stemmatology Dashboard',
-                   'message': 'Radboud University PASSIM'
-                   }
-        template_name = 'stemma/syncstemma.html'
-        context = get_application_context(request, context)
-
-        # Add the information in the 'context' of the web page
-        response = render(request, template_name, context)
-    except:
-        msg = oErr.get_error_message()
-        oErr.DoError("stemma_dashboard")
-    return response
-
-def stemma_analysis(oStatus=None):
-    """Perform a stemmatology analysis"""
-
-    oErr = ErrHandle()
-    bResult = True
-    msg = ""
-    oBack = dict(status="ok", msg="")
-
-    try:
-        # TODO: add code here and change to True
-        bResult = False
-
-        if oStatus != None: oStatus.set("finished", oBack)
-
-        # Note that we are indeed ready
-        bResult = True
-    except:
-        msg = oErr.get_error_message()
-        bResult = False
-    return bResult, msg
-
 
 
 class StemmaDashboard(BasicDetails):
@@ -128,7 +87,30 @@ class StemmaDashboard(BasicDetails):
     def add_to_context(self, context, instance):
         oErr = ErrHandle()
         try:
-            context['stemmaset_id'] = instance.id
+            # TODO: possibly remove 'stale' StemmaCalc objects??
+
+            # Create or get a new StemmaCalc object
+            obj = StemmaCalc.objects.filter(stemmaset=instance).first()
+            if obj is None:
+                # Create one
+                obj = StemmaCalc.objects.create(stemmaset=instance)
+            else:
+                # There already is one
+                sStatus = obj.get_status()
+                if not sStatus in ["ok", "ready", "finished"]:
+                    # Now reset the status
+                    obj.set_status("reset")
+                else:
+                    # Need a real reset
+                    # stop the current calculation
+                    obj.signal = "interrupt"
+                    obj.save()
+                    # Wait for three seconds
+                    time.sleep(4)
+                    # Now reset the status
+                    obj.set_status("reset")
+
+            context['stemmacalc_id'] = obj.id
             # Get the name of the stemmaset
             sName = instance.get_name_markdown()
             context['stemmaset_name'] = sName
@@ -154,34 +136,53 @@ class StemmaDashboard(BasicDetails):
 class StemmaStart(BasicPart):
     """Start the analysis of the indicated stemmaset"""
 
-    MainModel = StemmaSet
+    MainModel = StemmaCalc
 
     def add_to_context(self, context):
 
-        # Gather all necessary data
-        data = {}
+        # Initialize data return, just in case
+        data = {'status': 'error', 'message': 'interrupt'}
+        context['data'] = data
 
+        # Gather all necessary data
         oErr = ErrHandle()
         try:
-            # Get the object
+            # Get the StemmaCalc object
             instance = self.obj
 
             # (1) Prepare the texts for analysis
-            instance.set_status("preparing")
+            if instance.set_status("preparing") == "interrupt": return context
             sTexts, lst_codes = self.prepare_texts()
 
             # (2) Execute the Leitfehler Algorithm on the combined fulltexts
-            instance.set_status("leitfehler")
-            lst_leitfehler = lf_new4(sTexts)
+            if instance.set_status("leitfehler") == "interrupt": return context
+            lst_leitfehler = lf_new4(sTexts, instance)
 
             # (3) Store the result within the StemmaSet object
+            if instance.set_status("Store results") == "interrupt": return context
             instance.store_lf(lst_leitfehler)
 
             # (4) Make sure to indicate that we are ready
-            instance.set_status("ready")
+            if instance.set_status("ready") == "interrupt": return context
+
+            # (5) Collect the data into one table
+            lHtml = []
+            lHtml.append("<table><thead><tr><th>Label</th><th>numbers</th></tr>")
+            lHtml.append("<tbody>")
+            for oLeitRow in lst_leitfehler:
+                lHtml.append("<tr>")
+                lHtml.append("<td>{}</td>".format(oLeitRow[0]))
+                lHtml.append("<td>")
+                for item in oLeitRow[1:]:
+                    lHtml.append("{} ".format(item))
+                lHtml.append("</td>")
+                lHtml.append("</tr>")
+            lHtml.append("</tbody></table>")
+            sMsg = "\n".join(lHtml)
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"
+            data['message'] = sMsg
             context['data'] = data
         except:
             msg = oErr.get_error_message()
@@ -213,8 +214,11 @@ class StemmaStart(BasicPart):
             lst_text = []
             order = 0
 
+            # Get the stemmaset object
+            stemmaset = self.obj.stemmaset
+
             # Get a view of all objects
-            qs = self.obj.stemmaset_stemmaitems.all().order_by("order")
+            qs = stemmaset.stemmaset_stemmaitems.all().order_by("order")
 
             # First element in the list is the number of items
             lst_text.append("{}".format(qs.count()))
@@ -247,7 +251,7 @@ class StemmaStart(BasicPart):
 class StemmaProgress(BasicPart):
     """Start the analysis of the indicated stemmaset"""
 
-    MainModel = StemmaSet
+    MainModel = StemmaCalc
 
     def add_to_context(self, context):
 
@@ -256,12 +260,13 @@ class StemmaProgress(BasicPart):
 
         oErr = ErrHandle()
         try:
-            # Get the object
+            # Get the StemmaCalc object
             instance = self.obj
 
             # HERE IS WHERE THE PROGRESS OF THE ANALYSIS IS MONITORED
             data['type'] = "stemma"
             data['status'] = instance.get_status()
+            data['message'] = instance.get_message()
 
             # FIll in the [data] part of the context with all necessary information
             context['data'] = data

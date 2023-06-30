@@ -73,6 +73,7 @@ var ru = (function ($, ru) {
           { "label": "Notes",             "key": "srm_notes" },
           { "label": "Keywords",          "key": "kws" },
         ],
+        oSyncTimer = null,
         dummy = 1;
 
     // Private methods specification
@@ -455,7 +456,7 @@ var ru = (function ($, ru) {
        *
        */
       init_events: function () {
-        var elAnalyse = "#sync_start_stemma";
+        var elAnalyse = "#calc_start_stemma";
 
         try {
           // Do we have a start stemma button?
@@ -476,6 +477,160 @@ var ru = (function ($, ru) {
           private_methods.errMsg("init_events", ex);
         }
       },
+
+      /**
+       *  calc_start
+       *      Start calculations
+       *
+       */
+      calc_start: function (sSyncType) {
+        var progress_url = "",
+            start_url = "",
+            target_details = null,
+            target_progress = null,
+            elThis = null,
+            oJson = null,
+            frm = null,
+            data = null;
+
+        try {
+          // Get the URL to measure progress and to start
+          target_details = "#calc_details_" + sSyncType;
+          target_progress = "#calc_progress_" + sSyncType;
+          frm = "#calc_form_" + sSyncType;
+          elThis = "#calc_start_" + sSyncType;
+          start_url = $(elThis).attr("calc-start");
+          progress_url = $(elThis).attr("calc-progress");
+
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Set getting status updates in process
+          oJson = { 'status': 'started', 'message': '...' };
+          ru.stemma.oSyncTimer = window.setTimeout(function () { ru.stemma.calc_progress(sSyncType, oJson); }, 1000);
+
+          // Show that we are going to do something
+          $(target_progress).html("Waiting for the first response...");
+
+          // Start up the process
+          $.post(start_url, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                case "finished":
+                  // Show we are ready
+                  $(target_progress).html("READY!");
+                  $(target_details).html($(target_details).html() + "\nFinished!");
+                  // Make sure we stop nicely
+                  ru.stemma.calc_stop(sSyncType, response);
+                  break;
+                case "error":
+                  $(target_progress).html("Stopped by error");
+                  $(target_details).html(response.message);
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  private_methods.errMsg("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("calc_start", ex);
+        }
+      },
+
+      /**
+       *  calc_progress
+       *      Return the progress of calculation
+       *
+       */
+      calc_progress: function (sSyncType, options) {
+        var oData = {},
+            progress_url = "",
+            elThis = "",
+            target_details = null,
+            target_progress = null,
+            frm = null,
+            data = null;
+
+        try {
+          target_details = "#calc_details_" + sSyncType;
+          target_progress = "#calc_progress_" + sSyncType;
+          frm = "#calc_form_" + sSyncType;
+          elThis = "#calc_start_" + sSyncType;
+          progress_url = $(elThis).attr("calc-progress");
+
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Ask for progress information
+          $.post(progress_url, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "error":
+                  // Show we are ready
+                  $(target_progress).html("Error calculating: " + sSyncType);
+                  $(target_details).html(response.message);
+                  // Stop the progress calling
+                  window.clearInterval(ru.stemma.oSyncTimer);
+                  // Leave the routine, and don't return anymore
+                case "done":
+                case "ready":
+                case "finished":
+                  // Default action is to show the status
+                  $(target_progress).html(response.status);
+                  $(target_details).html(response.message);
+                  // Finish nicely
+                  ru.stemma.calc_stop(sSyncType, response, false);
+                  return;
+                default:
+                  // Default action is to show the status
+                  $(target_progress).html(response.status);
+                  $(target_details).html(response.message);
+                  // Set the timer to make another call
+                  oData = response
+                  ru.stemma.oSyncTimer = window.setTimeout(function () { ru.stemma.calc_progress(sSyncType, oData); }, 1000);
+                  break;
+              }
+            }
+          });
+        } catch (ex) {
+          private_methods.errMsg("calc_progress", ex);
+        }
+      },
+
+      /**
+       *  calc_stop
+       *      Finalize synchronisation
+       *
+       */
+      calc_stop: function (sSyncType, response) {
+        var elAnalyse = "#calc_start_stemma";
+
+        // Stop the progress calling
+        window.clearInterval(ru.stemma.oSyncTimer);
+
+        // Show we are ready
+        $("#calc_progress_" + sSyncType).html("Finished calculation: " + sSyncType + "<br>Last details:");
+        $("#calc_details_" + sSyncType).html(response.message);
+
+        // Now enable the button again
+        $(elAnalyse).removeAttr("disabled");
+        $(elAnalyse).addClass("btn-primary");
+        $(elAnalyse).removeClass("btn-info");
+      },
+
+
 
       // LAST POINT
     }

@@ -49,12 +49,6 @@ class StemmaSet(models.Model):
     #     E.g: private, team, global - default is 'private'
     scope = models.CharField("Scope", choices=build_abbr_list(COLLECTION_SCOPE), default="priv", max_length=5)
 
-    # [0-1] Place to store the Leitfehler data
-    data = models.TextField("Leitfehler data", null=True, blank=True)
-
-    # [1] Status of this stemmaset in calculations
-    status = models.CharField("Status", default="none", max_length=20)
-
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
@@ -295,12 +289,83 @@ class StemmaSet(models.Model):
             oErr.DoError("StemmaSet/get_ssglists")
         return lBack
 
-    def get_status(self):
-        return self.status
 
-    def set_status(self, sStatus):
-        self.status = sStatus
-        self.save()
+class StemmaCalc(models.Model):
+    """Calculations on one stemma set"""
+
+    # [1] Link to a particular Stemmaset
+    stemmaset = models.ForeignKey(StemmaSet, on_delete=models.CASCADE, related_name="stemmaset_calcs")
+
+    # [0-1] Place to store the Leitfehler data
+    data = models.TextField("Leitfehler data", null=True, blank=True)
+
+    # [1] Status of this stemmaset in calculations
+    status = models.CharField("Status", default="none", max_length=20)
+
+    # [0-1] Message that accompanies the status
+    message = models.TextField("Message", null=True, blank=True)
+
+    # [0-1] This is where the calculation process can be interrupted
+    signal = models.CharField("Signal", default="none", max_length=20)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        sBack = "stemmacalc_{}".format(self.id)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        response = super(StemmaCalc, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_status(self):
+        sBack = self.status
+        # Change behaviour when an interrupt has been pressed
+        if self.signal == "interrupt":
+            sBack = self.signal
+        return sBack
+
+    def get_message(self):
+        return self.message
+
+    def set_status(self, sStatus, message=None):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Double check for interrupt
+            if sStatus == "reset":
+                self.signal = "none"
+                self.status = "none"
+                self.message = "..."
+            elif self.signal == "interrupt":
+                self.status = "error"
+                self.message = "interrupted"
+                # Reset the signal
+                self.signal = "none"
+                sBack = "interrupt"
+            else:
+                self.status = sStatus
+                if not message is None:
+                    self.message = message
+                sBack = self.status
+            self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("set_status")
+        return sBack
 
     def store_lf(self, lst_data):
         """Store data into the stemmaset"""

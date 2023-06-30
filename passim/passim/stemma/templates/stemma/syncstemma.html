@@ -33,7 +33,7 @@
 
   {% if user.is_authenticated %}
 
-    <!-- Synchronizing stemma entries -->
+    <!-- Calculation of a StemmaSet -->
     <fieldset class="module aligned" >
       <div class="row" style="border: 1px solid darkgray; padding-top: 15px;  padding-bottom: 15px;">
         <div class="col-md-4">
@@ -43,37 +43,26 @@
           </p>
         </div>
         <div class="col-md-8">
-          <form id="sync_form_stemma" method="POST">
+          <form id="calc_form_stemma" method="POST">
              {% csrf_token %}
 
             <div class="row">&nbsp;</div>
             <div class="row">
               <div class="col-md-12">
-                <span><a id="sync_start_stemma" class="btn btn-primary btn-xs" 
-                    sync-start="{% url 'stemma_start' stemmaset_id %}" 
-                    sync-progress="{% url 'stemma_progress' stemmaset_id %}" 
-                    onclick="ru.passim.sync_start('stemma')">Start analysis of the stemmaset</a>
-                </span>
-              </div>
-            </div>
-
-            <div class="row">&nbsp;</div>
-            <div class="row">
-              <div class="col-md-12">
-                <span><a id="sync_start_stemma_old" class="btn btn-primary btn-xs" 
-                    sync-start="{% url 'sync_start' %}?synctype=stemma" 
-                    sync-progress="{% url 'sync_progress' %}?synctype=stemma" 
-                    onclick="ru.passim.sync_start('stemma')">OLD Start analysis</a>
+                <span><a id="calc_start_stemma" class="btn btn-primary btn-xs" 
+                    calc-start="{% url 'stemma_start' stemmacalc_id %}" 
+                    calc-progress="{% url 'stemma_progress' stemmacalc_id %}" 
+                    onclick="ru.stemma.calc_start('stemma')">Start analysis of the stemmaset</a>
                 </span>
               </div>
             </div>
 
             <div class="row">
-              <div id="sync_progress_stemma" class="col-md-12" style="background-color: lightgoldenrodyellow;">
+              <div id="calc_progress_stemma" class="col-md-12" style="background-color: lightgoldenrodyellow;">
                 <!-- This is where the progress will be reported -->
               </div>
             </div>
-            <div id="sync_details_stemma" class="row"></div>
+            <div id="calc_details_stemma" class="row"></div>
           </form>
         </div>
       </div>
