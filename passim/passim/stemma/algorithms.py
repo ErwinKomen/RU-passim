@@ -6,10 +6,12 @@ Stemmatology app main entry for calculating Leitfehler
 #!/usr/bin/env python
 import sys
 import re
+import os
 import json
 import difflib          # For perf
 
 from passim.utils import ErrHandle
+from passim.settings import MEDIA_DIR
 from passim.stemma.algdiffblock import diff
 
 
@@ -360,7 +362,8 @@ def wlist(numOfMss, mssHash, msLabelArray, oStatus = None):
         
         # Print score if debug=1
         if debug > 0:
-            with open("log", "w") as logfile:
+            logfilename = os.path.abspath(os.path.join(MEDIA_DIR, "stemma", "wlist.log"))
+            with open(logfilename, "w") as logfile:
                 sorted_keys = sorted(score, key=lambda k: score[k], reverse=True)
                 for k in sorted_keys:
                     ur_val = ur.get(word,0)
@@ -444,6 +447,7 @@ def lf_new4(sTexts, oStatus=None):
 
         print(len(msLabelArray))  # print length of array
         print("\n" + msLabelArray[0])
+        lst_result.append( [ msLabelArray[0] ] )
 
         for msIndex in range(1, len(msLabelArray)):
             # Start a new line
