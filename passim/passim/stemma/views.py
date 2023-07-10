@@ -23,7 +23,11 @@ import csv
 import os
 import time
 
-# ======= imports from my own application ======
+# ======= Partial implementation of Bio ================
+from Bio import Phylo
+from Bio.Phylo.TreeConstruction import *
+
+# ======= imports from my own application ==============
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart, \
@@ -156,7 +160,7 @@ class StemmaStart(BasicPart):
 
             # (2) Execute the Leitfehler Algorithm on the combined fulltexts
             if instance.set_status("leitfehler") == "interrupt": return context
-            lst_leitfehler = lf_new4(sTexts, instance)
+            lst_leitfehler, distMatrix = lf_new4(sTexts, instance)
 
             # (3) Store the result within the StemmaSet object
             if instance.set_status("Store results") == "interrupt": return context
@@ -179,6 +183,13 @@ class StemmaStart(BasicPart):
                 lHtml.append("</tr>")
             lHtml.append("</tbody></table>")
             sMsg = "\n".join(lHtml)
+
+            # (6) Convert into tree using FITCH
+            constructor = DistanceTreeConstructor()
+            tree = constructor.upgma(distMatrix)
+            #scorer = ParsimonyScorer()
+            #searcher = NNITreeSearcher(scorer)
+            #constructor = ParsimonyTreeConstructor(searcher)
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"

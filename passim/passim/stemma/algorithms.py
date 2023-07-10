@@ -391,6 +391,7 @@ def lf_new4(sTexts, oStatus=None):
     mssHash = {}
     msLabelArray = []
     lst_result = []
+    lst_matrix = []     # Matrix result for further processing
     try:    
 
         # ========== DEBUGGING =========
@@ -448,10 +449,12 @@ def lf_new4(sTexts, oStatus=None):
         print(len(msLabelArray))  # print length of array
         print("\n" + msLabelArray[0])
         lst_result.append( [ msLabelArray[0] ] )
+        lst_matrix.append( [ 0 ] )
 
         for msIndex in range(1, len(msLabelArray)):
             # Start a new line
             lst_row = []
+            lst_matrix_row = []
             # Add the row label to this
             lst_row.append(msLabelArray[msIndex])
             # print(msLabelArray[msIndex], end=" ")
@@ -471,15 +474,18 @@ def lf_new4(sTexts, oStatus=None):
                 # Add to this row
                 lst_row.append("{}".format(el))
                 # print(" {} ".format(el), end=" ")
+                # THe distance matrix should have it as a number
+                lst_matrix_row.append(el)
 
             # print()
             # Add the row to the overall result
             lst_result.append(lst_row)
+            lst_matrix.append(lst_matrix_row)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("lf_new4")
 
     # Return the result
-    return lst_result
+    return lst_result, lst_matrix
 
 # End of code
