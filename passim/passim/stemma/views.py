@@ -24,8 +24,8 @@ import os
 import time
 
 # ======= Partial implementation of Bio ================
-from Bio import Phylo
-from Bio.Phylo.TreeConstruction import *
+#from Bio import Phylo
+#from Bio.Phylo.TreeConstruction import *
 
 # ======= imports from my own application ==============
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -184,33 +184,33 @@ class StemmaStart(BasicPart):
             lHtml.append("</tbody></table>")
             sMsg = "\n".join(lHtml)
 
-            # (6) Convert into tree using FITCH
-            constructor = DistanceTreeConstructor()
-            dm = DistanceMatrix(distNames, distMatrix)
-            tree1 = constructor.upgma(dm)
-            print(tree1)
+            ## (6) Convert into tree using FITCH
+            #constructor = DistanceTreeConstructor()
+            #dm = DistanceMatrix(distNames, distMatrix)
+            #tree1 = constructor.upgma(dm)
+            #print(tree1)
 
-            constructor = DistanceTreeConstructor()
-            distMatrix2 = [
-                [0.0],
-                [1.6866,  0.0000],
-                [1.7198,  1.5232,  0.0000],
-                [1.6606,  1.4841,  0.7115,  0.0000],
-                [1.5243,  1.4465,  0.5958,  0.4631,  0.0000],
-                [1.6043,  1.4389,  0.6179,  0.5061,  0.3484,  0.0000],
-                [1.5905,  1.4629,  0.5583,  0.4710,  0.3083,  0.2692,  0.0000],
-            ]
-            distNames2 = ["Bo", "Mo", "Gi", "Or", "Go", "Ch", "Ad"]
-            dm2 = DistanceMatrix(distNames2, distMatrix2)
-            tree2 = constructor.upgma(dm2)
-            print(tree2)
+            #constructor = DistanceTreeConstructor()
+            #distMatrix2 = [
+            #    [0.0],
+            #    [1.6866,  0.0000],
+            #    [1.7198,  1.5232,  0.0000],
+            #    [1.6606,  1.4841,  0.7115,  0.0000],
+            #    [1.5243,  1.4465,  0.5958,  0.4631,  0.0000],
+            #    [1.6043,  1.4389,  0.6179,  0.5061,  0.3484,  0.0000],
+            #    [1.5905,  1.4629,  0.5583,  0.4710,  0.3083,  0.2692,  0.0000],
+            #]
+            #distNames2 = ["Bo", "Mo", "Gi", "Or", "Go", "Ch", "Ad"]
+            #dm2 = DistanceMatrix(distNames2, distMatrix2)
+            #tree2 = constructor.upgma(dm2)
+            #print(tree2)
 
-            scorer = ParsimonyScorer()
-            searcher = NNITreeSearcher(scorer)
-            constructor = ParsimonyTreeConstructor(searcher, tree1)
-            tree2 = constructor.upgma(dm)
-            tree3 = constructor.build_tree()
-            print(tree2)
+            #scorer = ParsimonyScorer()
+            #searcher = NNITreeSearcher(scorer)
+            #constructor = ParsimonyTreeConstructor(searcher, tree1)
+            #tree2 = constructor.upgma(dm)
+            #tree3 = constructor.build_tree()
+            #print(tree2)
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"
