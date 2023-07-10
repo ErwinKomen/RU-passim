@@ -34,7 +34,7 @@ from passim.basic.views import BasicList, BasicDetails, BasicPart, \
     app_uploader, app_editor, app_moderator, app_user, app_userplus, user_is_ingroup, user_is_superuser, user_is_authenticated
 #from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
 #    user_is_superuser, get_selectitem_info
-from passim.seeker.models import Profile
+from passim.seeker.models import Profile, EqualGold
 from passim.stemma.models import StemmaItem, StemmaSet, StemmaCalc
 from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
@@ -160,7 +160,7 @@ class StemmaStart(BasicPart):
 
             # (2) Execute the Leitfehler Algorithm on the combined fulltexts
             if instance.set_status("leitfehler") == "interrupt": return context
-            lst_leitfehler, distMatrix = lf_new4(sTexts, instance)
+            lst_leitfehler, distMatrix, distNames = lf_new4(sTexts, instance)
 
             # (3) Store the result within the StemmaSet object
             if instance.set_status("Store results") == "interrupt": return context
@@ -186,10 +186,31 @@ class StemmaStart(BasicPart):
 
             # (6) Convert into tree using FITCH
             constructor = DistanceTreeConstructor()
-            tree = constructor.upgma(distMatrix)
-            #scorer = ParsimonyScorer()
-            #searcher = NNITreeSearcher(scorer)
-            #constructor = ParsimonyTreeConstructor(searcher)
+            dm = DistanceMatrix(distNames, distMatrix)
+            tree1 = constructor.upgma(dm)
+            print(tree1)
+
+            constructor = DistanceTreeConstructor()
+            distMatrix2 = [
+                [0.0],
+                [1.6866,  0.0000],
+                [1.7198,  1.5232,  0.0000],
+                [1.6606,  1.4841,  0.7115,  0.0000],
+                [1.5243,  1.4465,  0.5958,  0.4631,  0.0000],
+                [1.6043,  1.4389,  0.6179,  0.5061,  0.3484,  0.0000],
+                [1.5905,  1.4629,  0.5583,  0.4710,  0.3083,  0.2692,  0.0000],
+            ]
+            distNames2 = ["Bo", "Mo", "Gi", "Or", "Go", "Ch", "Ad"]
+            dm2 = DistanceMatrix(distNames2, distMatrix2)
+            tree2 = constructor.upgma(dm2)
+            print(tree2)
+
+            scorer = ParsimonyScorer()
+            searcher = NNITreeSearcher(scorer)
+            constructor = ParsimonyTreeConstructor(searcher, tree1)
+            tree2 = constructor.upgma(dm)
+            tree3 = constructor.build_tree()
+            print(tree2)
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"

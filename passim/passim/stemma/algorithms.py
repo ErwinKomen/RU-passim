@@ -392,6 +392,7 @@ def lf_new4(sTexts, oStatus=None):
     msLabelArray = []
     lst_result = []
     lst_matrix = []     # Matrix result for further processing
+
     try:    
 
         # ========== DEBUGGING =========
@@ -480,12 +481,13 @@ def lf_new4(sTexts, oStatus=None):
             # print()
             # Add the row to the overall result
             lst_result.append(lst_row)
+            lst_matrix_row.append(0)
             lst_matrix.append(lst_matrix_row)
     except:
         msg = oErr.get_error_message()
         oErr.DoError("lf_new4")
 
     # Return the result
-    return lst_result, lst_matrix
+    return lst_result, lst_matrix, msLabelArray
 
 # End of code

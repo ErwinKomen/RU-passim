@@ -314,7 +314,7 @@ p {
 }
 
 
-/* Text visualisations */
+/* Text visualizations */
 .text-line .line-identifier {
     font-size: x-small;
     color: green;
@@ -1577,6 +1577,11 @@ input:checked + .switchslider:before {
   padding: 2px;
 }
 
+/* Removing pointer events for disabled buttons */
+button[disabled] {
+    pointer-events: none;
+}
+
 .sermonbutton {
     white-space:nowrap !important;
     background-color: white; 
@@ -1987,10 +1992,16 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     cursor: pointer;
 }
 
+.savegroup {
+
+}
+
 /* Stemmatology */
 .fullquote {
     color: red;
     font-size: smaller;
     vertical-align: super;
 }
+
+
 
