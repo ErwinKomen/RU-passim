@@ -14175,8 +14175,8 @@ class EqualGoldListView(BasicList):
     bUseFilter = True  
     plural_name = "Authority Files"
     sg_name = "Authority File"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
-    order_default= order_cols
+    order_cols = ['author__name', 'code', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
+    order_default= ['code', 'author__name', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype']
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
 
