@@ -7976,7 +7976,7 @@ class CollAnyEdit(BasicDetails):
             profile_user = Profile.get_user_profile(self.request.user.username)
             # (2) Set default permission
             permission = ""
-            if self.may_edit():
+            if self.may_edit(context):
                 if profile_owner.id == profile_user.id:
                     # (3) Any creator of the collection may write it
                     permission = "write"
