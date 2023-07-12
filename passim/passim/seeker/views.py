@@ -13811,7 +13811,7 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
-            x = instance.equal_goldsermons.all()
+            
             # Possibly read transcription if this is 'new'
             if 'transcription' in form.changed_data:
                 # Try to read the updated transcription
