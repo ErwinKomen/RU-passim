@@ -2105,7 +2105,7 @@ def scan_transcriptions():
         now_time = str(get_current_datetime())
         # next_time = str(get_current_datetime() + timedelta(hours=24))
         if next_time is None or now_time > next_time:
-            # Now execute the task
+            # (1) Now execute the scanning
             scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, SCAN_SUBDIR))
             lst_xml = glob.glob(scan_dir)
             for sFile in lst_xml:
@@ -2141,10 +2141,16 @@ def scan_transcriptions():
                             # Actually perform the update
                             obj.save()
 
+            # (2) Next task: scan the sgcount
+            with transaction.atomic():
+                for ssg in EqualGold.objects.all():
+                    ssg.set_sgcount()
+
 
             # Set new next time
             next_time = str(get_current_datetime() + timedelta(hours=24))
             Information.set_kvalue("next_stemma", next_time)
+
     except:
         msg = oErr.get_error_message()
         oErr.DoError("scan_transcriptions")

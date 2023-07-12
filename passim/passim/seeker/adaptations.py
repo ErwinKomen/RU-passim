@@ -41,7 +41,7 @@ adaptation_list = {
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
+        'hccount', 'scount', 'sgcount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
         'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors'],
@@ -964,6 +964,21 @@ def adapt_scount():
                 if scount != ssg.scount:
                     ssg.scount = scount
                     ssg.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_sgcount():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    
+    try:
+        # Walk all SSGs
+        with transaction.atomic():
+            for ssg in EqualGold.objects.all():
+                ssg.set_sgcount()
     except:
         bResult = False
         msg = oErr.get_error_message()
