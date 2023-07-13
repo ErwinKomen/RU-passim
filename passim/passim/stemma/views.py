@@ -40,6 +40,7 @@ from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
 from passim.seeker.views import EqualGoldListView
 from passim.stemma.algorithms import lf_new4
+from passim.stemma.external import myfitch
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -183,6 +184,9 @@ class StemmaStart(BasicPart):
                 lHtml.append("</tr>")
             lHtml.append("</tbody></table>")
             sMsg = "\n".join(lHtml)
+
+            # (6) Convert into tree using FITCH
+            tree1 = myfitch(distNames, distMatrix)
 
             ## (6) Convert into tree using FITCH
             #constructor = DistanceTreeConstructor()
