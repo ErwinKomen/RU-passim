@@ -2105,10 +2105,12 @@ def scan_transcriptions():
         now_time = str(get_current_datetime())
         # next_time = str(get_current_datetime() + timedelta(hours=24))
         if next_time is None or now_time > next_time:
+            print("It is time to scan for new transcriptions...")
             # (1) Now execute the scanning
             scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, SCAN_SUBDIR))
             lst_xml = glob.glob(scan_dir)
             for sFile in lst_xml:
+                # print("Looking at: [{}]".format(sFile))
                 # Treat this file
                 oTrans = read_transcription(sFile)
                 status = oTrans.get("status")
@@ -2142,9 +2144,16 @@ def scan_transcriptions():
                             obj.save()
 
             # (2) Next task: scan the sgcount
+            iCount = 0
+            idx = 0
+            print("Checking SG count for AF...")
             with transaction.atomic():
                 for ssg in EqualGold.objects.all():
-                    ssg.set_sgcount()
+                    idx += 1
+                    iChanges = ssg.set_sgcount()
+                    if iChanges > 0:
+                        iCount += iChanges
+                        print("# {} - sgcount: {}".format(idx, iCount))
 
 
             # Set new next time

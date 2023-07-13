@@ -476,6 +476,11 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 # Now set the lstQ
                 if not combi_q is None:
                     lstQ.append(combi_q)
+                # Now treat any other filters in dictQ
+                for k,v in dictQ.items():
+                    if not k in lst_name:
+                        lstQ.append(v)
+
     except:
         msg = oErr.get_error_message()
         oErr.DoError("make_search_list")

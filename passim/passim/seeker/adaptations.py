@@ -47,7 +47,7 @@ adaptation_list = {
     'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc']    
     }
 
 
@@ -1413,6 +1413,27 @@ def adapt_litref_check():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+
+def adapt_scope_hc():
+    """One-time change scope of HCs to public"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    try:
+        with transaction.atomic():
+            qs = Collection.objects.filter(settype="hc")
+            for obj_coll in qs:
+                if obj_coll.scope != "publ":
+                    obj_coll.scope = "publ"
+                    obj_coll.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 # =========== Part of literature_list ==================

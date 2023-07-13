@@ -2855,7 +2855,12 @@ class CollectionForm(PassimModelForm):
                     self.fields['sitemlist_sermo'].widget.queryset = qs
                 elif coltype == "super":
                     current_ids = [x['super__id'] for x in instance.super_col.all().values('super__id')]
-                    super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype="ssg").exclude(equal__id__in=current_ids)]
+                    saved_ids = [x['equal__id'] for x in profile.profile_saveditems.filter(sitemtype="ssg").values('equal__id')]
+                    super_ids = []
+                    for id in saved_ids:
+                        if not id in current_ids: 
+                            super_ids.append(id)
+                    # super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype="ssg").exclude(equal__id__in=current_ids)]
                     qs = EqualGold.objects.filter(id__in=super_ids)
                     self.fields['sitemlist_super'].queryset = qs
                     self.fields['sitemlist_super'].widget.queryset = qs

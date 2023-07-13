@@ -7859,7 +7859,9 @@ class CollAnyEdit(BasicDetails):
                 ]
 
             # Optionally add Scope: but only for the actual *owner* of this one
-            if self.prefix in prefix_scope and not instance.owner is None and instance.owner.user == self.request.user:
+            # Issue #599: don't offer scope for HC
+            if instance.settype != "hc" and self.prefix in prefix_scope and not instance.owner is None \
+                and instance.owner.user == self.request.user:
                 context['mainitems'].append(
                 {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 

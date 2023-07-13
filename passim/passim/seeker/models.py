@@ -7425,13 +7425,20 @@ class EqualGold(models.Model):
         return True
 
     def set_sgcount(self):
-        # Calculate and set the sgcount
-        sgcount = self.sgcount
-        iSize = self.equal_goldsermons.all().count()
-        if iSize != sgcount:
-            self.sgcount = iSize
-            self.save()
-        return True
+        iChanges = 0
+        oErr = ErrHandle()
+        try:
+            # Calculate and set the sgcount
+            sgcount = self.sgcount
+            iSize = self.equal_goldsermons.all().count()
+            if iSize != sgcount:
+                self.sgcount = iSize
+                self.save()
+                iChanges += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("set_sgcount")
+        return iChanges
 
     def set_ssgcount(self):
         # Calculate and set the ssgcount
@@ -8521,6 +8528,10 @@ class Collection(models.Model):
             ssg_id = self.super_col.all().values('super__id')
             authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
             self.ssgauthornum = authornum
+
+            # Issue #599: if this is or becomes settype 'hc', then the scopy must be 'public'
+            self.scope = "publ"
+
         # Adapt the save date
         self.saved = get_current_datetime()
 
@@ -8800,8 +8811,14 @@ class Collection(models.Model):
                     current_ids = [x['super__id'] for x in self.super_col.all().values('super__id')]
                     sDetails = "equalgold_details"
                     # Get all the Saved Items associated with my profile
-                    super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
-                        equal__id__in=current_ids)]
+                    saved_ids = [x['equal__id'] for x in profile.profile_saveditems.filter(sitemtype=sItemType).values('equal__id')]
+                    super_ids = []
+                    for id in saved_ids:
+                        if not id in current_ids: 
+                            super_ids.append(id)
+                    ## Old method: SQL problem
+                    #super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                    #    equal__id__in=current_ids)]
                     # Get the queryset of the Manuscripts that are left
                     qs = EqualGold.objects.filter(id__in=super_ids)
                 if not qs is None:
