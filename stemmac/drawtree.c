@@ -55,7 +55,7 @@ char* about_message =
 #endif
 #define INFINITY        (double) 9999999999.0
 
-Char outfilename[FNMLNGTH], outtreename[FNMLNGTH];
+Char outfilename[FNMLNGTH], outtreename[FNMLNGTH], outplotname[FNMLNGTH], infontname[FNMLNGTH];
 
 
 typedef enum {fixed, radial, along, middle} labelorient;
@@ -2333,7 +2333,7 @@ void plotlabels(char *fontname)
 }  /* plotlabels */
 
 
-void user_loop()
+void user_loop(boolean user_input)
 {
   /* loop to decide what to do */
 
@@ -2341,14 +2341,17 @@ void user_loop()
   char input_char;
 
   while (!canbeplotted) {
-    loopcount = 0;
-    do {
-      input_char=showparms();
-      firstscreens = false;
-      if ( input_char != 'Y')
-        getparms(input_char);
-      countup(&loopcount, 10);
-    } while (input_char != 'Y');
+    if (user_input) {
+
+      loopcount = 0;
+      do {
+        input_char = showparms();
+        firstscreens = false;
+        if (input_char != 'Y')
+          getparms(input_char);
+        countup(&loopcount, 10);
+      } while (input_char != 'Y');
+    }
     xscale = xunitspercm;
     yscale = yunitspercm;
     plotrparms(spp);
@@ -2437,7 +2440,7 @@ void setup_environment(int argc, Char *argv[])
 }  /* setup_environment */
 
 
-void setup_environment_alt(Char *progname, Char *treefile)
+void setup_environment_alt(Char *progname, Char *treefile, Char *fontfile)
 {
   /* Set up all kinds of fun stuff */
   node *q, *r;
@@ -2479,7 +2482,7 @@ void setup_environment_alt(Char *progname, Char *treefile)
   rotate = true;
   printf("Tree has been read.\n");
   printf("Loading the font ... \n");
-  loadfont(font, FONTFILE, progname);
+  loadfont(font, fontfile, progname);
   printf("Font loaded.\n");
   ansi = ANSICRT;
   ibmpc = IBMCRT;
@@ -3085,9 +3088,104 @@ void drawtree(
     return;
 }
 
+/*
+ * psdrawtree
+ *
+ * Transform the tree file [treefname] into a PostScript plotfile [plotfname]
+ * - Make use of the fontfile in [fontfname]
+ *
+*/
+boolean psdrawtree(Char *treefname, Char *fontfname, Char *plotfname) {
+  boolean bResult = true;
+  long stripedepth;
+  boolean wasplotted = false;
+  javarun = false;
+  int i;
+  char *thisarg;
+  boolean bDefault = true;
+  boolean bUserInput = false;
+  char **argv = null;
+  Char *this_plotfile = null;
 
+  init(0, argv);
+  progname = "drawtree";
+  grbg = NULL;
+
+  // The output file is specified
+  strcpy(outplotname, plotfname);
+  // The tree file is specified
+  strcpy(outtreename, treefname);
+
+  // Now perform the environment setup in a slightly different way
+  setup_environment_alt(progname, outtreename, fontfname);
+
+  user_loop(bUserInput);
+
+  if (!(winaction == quitnow)) {
+    // Open plotfiles in binary mode 
+    openfile(&plotfile, outplotname, "plot file", "wb", progname, pltfilename);
+    initplotter(spp, fontname);
+    numlines = dotmatrix ? ((long)floor(yunitspercm * ysize + 0.5) / strpdeep) : 1;
+    if (plotter != ibm)
+      printf("\nWriting plot file ...\n");
+    drawit(fontname, &xoffset, &yoffset, numlines, root);
+    finishplotter();
+    wasplotted = true;
+    FClose(plotfile);
+    printf("\nPlot written to file \"%s\"\n", pltfilename);
+  }
+
+  FClose(intree);
+  printf("\nDone.\n\n");
+#ifdef WIN32
+  phyRestoreConsoleAttributes();
+#endif
+
+  return bResult;
+}
 
 int main(int argc, Char *argv[])
+{
+  char *thisarg;
+  boolean bResult = false;
+  int i;
+
+  // Get the input and the output file parameters
+  i = 1;
+  while (i < argc) {
+    thisarg = argv[i];
+    if (thisarg[0] == '-') {
+      switch (thisarg[1]) {
+        case 'o':
+          // The output file is specified
+          strcpy(outplotname, argv[i + 1]);
+          i += 2;
+          break;
+        case 't':
+          // The tree file is specified
+          strcpy(outtreename, argv[i + 1]);
+          i += 2;
+          break;
+        case 'f':
+          // The tree file is specified
+          strcpy(infontname, argv[i + 1]);
+          i += 2;
+          break;
+        default:
+          i++;
+          break;
+      }
+    }
+  }
+
+  bResult = psdrawtree(outtreename, infontname, outplotname);
+
+
+  exxit(0);
+  return 1;
+}
+
+int main_original(int argc, Char *argv[])
 {
   long stripedepth;
   boolean wasplotted = false;
@@ -3095,6 +3193,8 @@ int main(int argc, Char *argv[])
   int i;
   char *thisarg;
   boolean bDefault = true;
+  boolean bUserInput = true;
+  Char *this_plotfile = null;
 #ifdef MAC
   char filename1[FNMLNGTH];
   OSErr retcode;
@@ -3116,9 +3216,13 @@ int main(int argc, Char *argv[])
   // Check if we are expecting default behaviour or not
   bDefault = (argc == 1);
 
+  // By default: plotfile
+  strcpy(outplotname, PLOTFILE);
+
   if (bDefault) {
     setup_environment(argc, argv);
   } else {
+    bUserInput = false;
     // Get the input and the output file parameters
     i = 1;
     while (i < argc) {
@@ -3127,12 +3231,17 @@ int main(int argc, Char *argv[])
         switch (thisarg[1]) {
           case 'o':
             // The output file is specified
-            strcpy(outfilename, argv[i + 1]);
+            strcpy(outplotname, argv[i + 1]);
             i += 2;
             break;
           case 't':
             // The tree file is specified
             strcpy(outtreename, argv[i + 1]);
+            i += 2;
+            break;
+          case 'f':
+            // The tree file is specified
+            strcpy(infontname, argv[i + 1]);
             i += 2;
             break;
           default:
@@ -3143,12 +3252,12 @@ int main(int argc, Char *argv[])
     }
 
     // Now perform the environment setup in a slightly different way
-    setup_environment_alt(argv[0], outtreename);
+    setup_environment_alt(argv[0], outtreename, infontname);
   }
 
 
 
-  user_loop();
+  user_loop(bUserInput);
     
  #ifdef JAVADEBUG    
     //JRMDebug
@@ -3192,7 +3301,7 @@ int main(int argc, Char *argv[])
 
   if (!(winaction == quitnow)) {
     // Open plotfiles in binary mode 
-    openfile(&plotfile, PLOTFILE, "plot file", "wb", argv[0], pltfilename);
+    openfile(&plotfile, outplotname, "plot file", "wb", argv[0], pltfilename);
     initplotter(spp,fontname);
     numlines = dotmatrix ? ((long)floor(yunitspercm * ysize + 0.5)/strpdeep) : 1;   
     if (plotter != ibm)
