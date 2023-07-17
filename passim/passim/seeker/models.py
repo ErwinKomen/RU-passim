@@ -3475,6 +3475,21 @@ class Comment(models.Model):
         return otypes[self.otype]
 
 
+class CommentRead(models.Model):
+    """Whenever a different user reads the comment of one user"""
+
+    # [1] The comment that has been read
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="comment_creads")
+    # [1] links to the user who read this comment
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_creads")
+    # [1] Date created = date when the comment has been read
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{} read comment id {}".format(self.profile.user.username, self.comment.id)
+        return sBack
+
+
 class Scribe(models.Model):
     """A codico (part of manuscript) can have one Scribe assigned to it """
 

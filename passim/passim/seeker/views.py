@@ -79,7 +79,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, CommentRead, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptLink, \
@@ -9941,6 +9941,13 @@ class CommentEdit(BasicDetails):
                 {'type': 'safe',  'label': "Link:",         'value': self.get_link(instance)}
                 ]
 
+            # Check if we need to indicate that the comment has been read
+            thisprofile = self.request.user.user_profiles.first()
+            qs = CommentRead.objects.filter(comment=instance, profile=thisprofile)
+            if qs.count() == 0:
+                # Add that we have read it
+                obj = CommentRead.objects.create(comment=instance, profile=thisprofile)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CommentEdit/add_to_context")
@@ -10043,6 +10050,14 @@ class CommentListView(BasicList):
                 sBack = instance.profile.user.username
             elif custom == "created":
                 sBack = instance.get_created()
+                # Check if it has not been read
+                thisprofile = self.request.user.user_profiles.first()
+                if instance.profile.id != thisprofile.id:
+                    # This is not the same user, so check if it has been read
+                    bRead = (CommentRead.objects.filter(comment=instance, profile=thisprofile).count() > 0)
+                    if not bRead:
+                        # Not read: so bolden it
+                        sBack = "<b>{}</b>".format(sBack)
             elif custom == "otype":
                 sBack = instance.get_otype()
             elif custom == "link":
