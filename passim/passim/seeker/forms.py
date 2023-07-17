@@ -4755,7 +4755,6 @@ class UserKwForm(BasicSimpleForm):
         return None
 
 
-
 class ManuscriptForm(PassimModelForm):
     country_ta  = forms.CharField(label=_("Country"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -5402,6 +5401,29 @@ class CommentForm(BasicModelForm):
 
         # Initialize querysets
         self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class CommentResponseForm(BasicModelForm):
+    """A form to facilitate providing a response to a comment"""
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CommentResponse
+        fields = ['content', 'profile', 'comment']
+        widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CommentResponseForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['profile'].required = False
+        self.fields['content'].required = False
 
         # Get the instance
         if 'instance' in kwargs:

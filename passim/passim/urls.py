@@ -276,6 +276,8 @@ urlpatterns = [
     url(r'^comment/list', CommentListView.as_view(), name='comment_list'),
     url(r'^comment/details(?:/(?P<pk>\d+))?/$', CommentDetails.as_view(), name='comment_details'),
     url(r'^comment/edit(?:/(?P<pk>\d+))?/$', CommentEdit.as_view(), name='comment_edit'),
+    url(r'^comment/response/details(?:/(?P<pk>\d+))?/$', CommentResponseDetails.as_view(), name='commentresponse_details'),
+    url(r'^comment/response/edit(?:/(?P<pk>\d+))?/$', CommentResponseEdit.as_view(), name='commentresponse_edit'),
 
     url(r'^bibrange/list', BibRangeListView.as_view(), name='bibrange_list'),
     url(r'^bibrange/details(?:/(?P<pk>\d+))?/$', BibRangeDetails.as_view(), name='bibrange_details'),

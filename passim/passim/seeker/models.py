@@ -3489,6 +3489,34 @@ class CommentRead(models.Model):
         sBack = "{} read comment id {}".format(self.profile.user.username, self.comment.id)
         return sBack
 
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
+
+class CommentResponse(models.Model):
+    """Whenever a different user reads the comment of one user"""
+
+    # [1] The comment that this response pertains to
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="comment_cresponses")
+    # [1] links to the user who makes this response
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_cresponses")
+    # [1] Date created = date when the user makes this response 
+    created = models.DateTimeField(default=get_current_datetime)
+    # [0-1] The text of the response itself
+    content = models.TextField("Response", null=True, blank=True)
+
+    def __str__(self):
+        sBack = "{} responds to comment id {}".format(self.profile.user.username, self.comment.id)
+        return sBack
+
+    def get_comment(self):
+        return self.content
+
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
 
 class Scribe(models.Model):
     """A codico (part of manuscript) can have one Scribe assigned to it """

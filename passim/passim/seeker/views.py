@@ -73,13 +73,13 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
-    UserForm, SermonDescrLinkForm
+    UserForm, SermonDescrLinkForm, CommentResponseForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, CommentRead, SermonEqualDist, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, CommentRead, CommentResponse, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptLink, \
@@ -9921,11 +9921,53 @@ class CommentEdit(BasicDetails):
     model = Comment        
     mForm = None        # We are not using a form here!
     prefix = 'com'
-    title = "UserCommentEdit"
+    title = "User Comment"
     new_button = False
     # no_delete = True
     permission = "readonly"
     mainitems = []
+
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
+
+        try:
+            arg_hlist = "cresp-hlist"
+            arg_savenew = "cresp-savenew"
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                # Interpret the savenew parameter
+                savenew = self.qd[arg_savenew]
+
+                # Make sure we are not saving
+                self.do_not_save = True
+                # But that we do a new redirect
+                self.newRedirect = True
+
+                # Change the redirect URL
+                if self.redirectpage == "":
+                    self.redirectpage = reverse('comment_details', kwargs={'pk': instance.id})
+
+                # See if any need to be removed
+                existing_item_id = [str(x.id) for x in CommentResponse.objects.filter(comment=instance)]
+                delete_id = []
+                for item_id in existing_item_id:
+                    if not item_id in hlist:
+                        delete_id.append(item_id)
+                if len(delete_id)>0:
+                    lstQ = [Q(comment=instance)]
+                    lstQ.append(Q(**{"id__in": delete_id}))
+                    CommentResponse.objects.filter(*lstQ).delete()
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/check_hlist")
+            return False
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -9947,6 +9989,13 @@ class CommentEdit(BasicDetails):
             if qs.count() == 0:
                 # Add that we have read it
                 obj = CommentRead.objects.create(comment=instance, profile=thisprofile)
+
+            # Figure out who I am
+            profile = self.request.user.user_profiles.first()
+            context['profile'] = profile
+
+            # provide a button for the user to add a response to the comment
+            context['after_details'] = render_to_string("seeker/comment_response.html", context, self.request)
 
         except:
             msg = oErr.get_error_message()
@@ -9984,6 +10033,152 @@ class CommentEdit(BasicDetails):
 class CommentDetails(CommentEdit):
     """Like Comment Edit, but then html output"""
     rtype = "html"
+
+    def custom_init(self, instance):
+        if not instance is None:
+            self.check_hlist(instance)
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(CommentDetails, self).add_to_context(context, instance)
+
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
+            oAdd = dict(value=value)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
+            rel_item.append(oAdd)
+            return True
+
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Authorization: only app-editors may edit!
+        bMayEdit = user_is_ingroup(self.request, team_group)
+            
+        # All PDs: show the content
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = ""
+        sort_start_int = ""
+        sort_end = ""
+        if bMayEdit:
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
+
+        oErr = ErrHandle()
+
+        try:
+
+            # Additional sections
+            context['sections'] = []
+
+            # [1] =============================================================
+            # Get all 'CommentResponse' objects that are part of this 'Comment'
+            responses = dict(title="Response(s) to this comment", prefix="cresp")
+            if resizable: responses['gridclass'] = "resizable"
+            responses['savebuttons'] = bMayEdit
+            responses['saveasbutton'] = True
+            responses['classes'] = ''
+
+            # Get a queryset with CommentResponse objects, newest first
+            qs_resp = instance.comment_cresponses.all().order_by('-created')
+
+            # Walk these collection sermons
+            for idx, obj in enumerate(qs_resp):
+                rel_item = []
+                # The item is the actual response
+                item = obj
+                order = idx + 1
+
+                # Response: Order from enumeration
+                add_one_item(rel_item, order, False, align="right", draggable=True)
+
+                # Response: person who responded
+                add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable) #, False)
+
+                # Response: The response itself
+                add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, main=True) #, False)
+
+                # Response: Date of the response
+                add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable) #, False)
+
+                # Actions that can be performed on this item
+                if bMayEdit:
+                    add_one_item(rel_item, self.get_actions())
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            responses['rel_list'] = rel_list
+            responses['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                ]
+            if bMayEdit:
+                responses['columns'].append("")
+            related_objects.append(responses)
+
+            # Lists of related objects
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_actions(self):
+        html = []
+        buttons = ['remove']    # This contains all the button names that need to be added
+
+        # Start the whole div
+        html.append("<div class='blinded'>")
+        
+        # Add components
+        if 'remove' in buttons: 
+            html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
+
+        # Finish up the div
+        html.append("&nbsp;</div>")
+
+        # COmbine the list into a string
+        sHtml = "\n".join(html)
+        # Return out HTML string
+        return sHtml
+
+    def get_field_value(self, type, instance, custom, kwargs=None):
+        sBack = ""
+
+        oErr = ErrHandle()
+        try:
+
+            if type == "cresp":
+                sBack, sTitle = "", ""
+                if custom == "person":
+                    sBack = instance.profile.user.username
+                elif custom == "content":
+                    sBack = instance.content
+                elif custom == "created":
+                    sBack = instance.get_created()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentDetails/get_field_value")
+
+        return sBack
     
 
 class CommentListView(BasicList):
@@ -10104,6 +10299,68 @@ class CommentListView(BasicList):
             msg = oErr.get_error_message()
             oErr.DoError("CommentListView/get_field_value")
         return sBack, sTitle
+
+
+class CommentResponseEdit(BasicDetails):
+    """The details of one comment"""
+
+    model = CommentResponse        
+    mForm = CommentResponseForm
+    prefix = 'comr'
+    prefix_type = "simple"
+    title = "Comment Response"
+    new_button = False
+    listview = None     # Initially no listview, but that listview will become the comment itself
+    listviewtitle = "User comment"
+    # no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+        # If this is an instance, then provide a link to the listview
+        if not instance is None and not instance.id is None:
+            self.listview = reverse('comment_details', kwargs={'pk': instance.comment.id})
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Figure out who I am
+            profile = self.request.user.user_profiles.first()
+
+            # If I have editing rights, no readonly
+            if not context['is_app_editor']:
+                self.permission = "readonly"
+
+            # Define the main items to show and edit
+            comment_id = None if instance.comment is None else instance.comment.id
+            profile_id = profile.id
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                # -------- HIDDEN field values ---------------
+                {'type': 'plain', 'label': "Comment id",    'value': comment_id,    'field_key': "comment", 'empty': 'hide'},
+                {'type': 'plain', 'label': "Profile id",    'value': profile_id,    'field_key': "profile", 'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_created(),    },
+                {'type': 'plain', 'label': "User name:",    'value': profile.user.username,     },
+                {'type': 'plain', 'label': "Response:",     'value': instance.content,   'field_key': "content"       }
+                ]
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponseEdit/add_to_context")
+
+        # Return the context we have made 
+        return context
+
+
+class CommentResponseDetails(CommentResponseEdit):
+    """Like CommentResponse Edit, but then html output"""
+    rtype = "html"
+    
+
+
 
 
 # ================= MANUSCRIPT =============================

@@ -1,0 +1,31 @@
+﻿
+{% if is_app_editor %}
+  <div class="row">&nbsp;</div>
+  <div id="comment_responding" class="row">
+    <div class="col-md-offset-1 col-md-3">
+      <span id="add_comment_response" >
+        <!-- Button for the addition -->
+        <a class="btn btn-xs jumbo-3" role="button" 
+            onclick="document.getElementById('create_new_response').submit();"             
+            >
+          <span class="glyphicon glyphicon-plus"></span>Add a response to this user comment
+        </a>
+      </span>
+    </div>
+  </div>
+
+  <!-- Room to have the form-link to create a response to the user comment -->
+  <div class="row">
+    <div class="hidden col-md-offset-6 col-md-6" >
+      <form id="create_new_response" action="{% url 'commentresponse_details' %}" method="post" >
+        {% csrf_token %}
+        <div class="hidden" >
+          <input type="text" name="comr-comment" value="{{comment.id}}" />
+          <input type="text" name="comr-profile" value="{{profile.id}}" />
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+{% endif %}
