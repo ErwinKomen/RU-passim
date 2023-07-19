@@ -1237,6 +1237,7 @@ def send_email(subject, profile, contents, add_team=False):
     """Send an email"""
 
     oErr = ErrHandle()
+    bResult = True
     try:
         # Set the sender
         mail_from = Information.get_kvalue("mail_from")
@@ -1266,7 +1267,8 @@ def send_email(subject, profile, contents, add_team=False):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("send_mail")
-    return True
+        bResult = False
+    return bResult
 
 def transcription_path(sType, instance, filename):
     """Upload TEI-P5 XML file to the right place,and remove old file if existing
@@ -3469,6 +3471,63 @@ class Comment(models.Model):
         # Always return positively!!!
         return True
 
+    def get_object(self):
+        """Get the object to which this comment belongs"""
+
+        oErr = ErrHandle()
+        obj = None
+        try:
+            otype = self.otype
+            if otype == "sermo":
+                obj = self.comments_sermon.first()
+            elif otype == "super":
+                obj = self.comments_super.first()
+            elif otype == "manu":
+                obj = self.comments_manuscript.first()
+            elif otype == "gold":
+                obj = self.comments_gold.first()
+            elif otype == "codi":
+                obj = self.comments_codi.first()
+            elif otype == "hc":
+                obj = self.comments_collection.first()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/get_object")
+
+        # Return what has been found
+        return obj
+
+    def get_object_url(self):
+        """Get the object to which this comment belongs"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details", "hc": "collhist_details"}
+        try:
+            otype = self.otype
+            if otype == "sermo":
+                obj = self.comments_sermon.first()
+            elif otype == "super":
+                obj = self.comments_super.first()
+            elif otype == "manu":
+                obj = self.comments_manuscript.first()
+            elif otype == "gold":
+                obj = self.comments_gold.first()
+            elif otype == "codi":
+                obj = self.comments_codi.first()
+            elif otype == "hc":
+                obj = self.comments_collection.first()
+            sBack = reverse(url_names[otype], kwargs={'pk': obj.id})
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/get_object_url")
+
+        # Return what has been found
+        return sBack
+
     def get_otype(self):
         otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
                       super="Authority file", codi="Codicological Unit", hc="Historical Collection")
@@ -3503,19 +3562,112 @@ class CommentResponse(models.Model):
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_cresponses")
     # [1] Date created = date when the user makes this response 
     created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
     # [0-1] The text of the response itself
     content = models.TextField("Response", null=True, blank=True)
+    # [1] There must be a status on the comment, so that we know whether it has been sent or not
+    status = models.TextField("Status", default = "empty")
 
     def __str__(self):
         sBack = "{} responds to comment id {}".format(self.profile.user.username, self.comment.id)
         return sBack
 
     def get_comment(self):
-        return self.content
+        """Get a summary of the original comment"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.comment is None:
+                comment = self.comment
+                url = comment.get_object_url()
+                sLink = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, comment.otype)
+                lHtml = []
+                lHtml.append("<table class='func-view'>")
+                lHtml.append("<tr><td>Timestamp:</td><td>{}</td></tr>".format(comment.get_created()))
+                lHtml.append("<tr><td>User name:</td><td>{}</td></tr>".format(comment.profile.user.username))
+                lHtml.append("<tr><td>About:</td><td>{}</td></tr>".format(sLink))
+                lHtml.append("<tr><td>Comment:</td><td>{}</td></tr>".format(comment.content))
+
+                lHtml.append("</table>")
+                sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponse/get_comment")
+        return sBack
+
+    def get_content(self):
+        """Get the content, possibly decyphering markdown"""
+        sBack = ""
+        if not self.content is None:
+            sBack = adapt_markdown(self.content, lowercase=False)
+        return sBack
 
     def get_created(self):
         sCreated = get_crpp_date(self.created, True)
         return sCreated
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_status(self):
+        """Provide a short status message"""
+
+        sBack = ""
+        if self.status == "empty":
+            sBack = "Initial"
+        elif self.status in ['sending', 'sent']:
+            sBack = "Response has been e-mailed on: {}".format(self.get_saved())
+        elif self.status == "changed":
+            sBack = "Response has changed, but has not been e-mailed to the user"
+        else:
+            sBack = self.status
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        # Be sure to change the status
+        if self.status == "sending":
+            self.status = "sent"
+        else:
+            self.status = "changed"
+
+        # print("CommentResponse, status #1 is: {}".format(self.status))
+
+        response = super(CommentResponse, self).save(force_insert, force_update, using, update_fields)
+
+        # print("CommentResponse, status #2 is: {}".format(self.status))
+
+        # Return the response when saving
+        return response
+
+    def send_by_email(self, recipient, contents):
+        """Send this comment by email to two addresses"""
+
+        oErr = ErrHandle()
+        bIncludeTeam = False
+        try:
+            # Sanity checks
+            if not recipient is None and not recipient.user.email is None:
+                html = []
+
+                # Send this mail
+                if send_email("Passim user comment response {}".format(self.id), recipient, contents, bIncludeTeam):
+
+                    # Adapt the status
+                    self.status = "sending"
+                    self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponse/send_by_email")
+
+        # Always return positively!!!
+        return True
 
 
 class Scribe(models.Model):

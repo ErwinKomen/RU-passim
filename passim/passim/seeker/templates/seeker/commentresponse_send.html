@@ -1,0 +1,13 @@
+﻿
+{% if is_app_editor %}
+  <!-- The form that facilitates sending the comment -->
+  <div class="row">
+    <div class="hidden col-md-offset-6 col-md-6" >
+      <form id="send_response" action="{% url 'commentresponse_send' pk=response_id %}" method="post" >
+        {% csrf_token %}
+      </form>
+    </div>
+  </div>
+
+
+{% endif %}

@@ -10061,6 +10061,8 @@ class CommentDetails(CommentEdit):
 
         # Authorization: only app-editors may edit!
         bMayEdit = user_is_ingroup(self.request, team_group)
+
+        # On top of that (see issue #601): only editors may see the comment responses!!
             
         # All PDs: show the content
         related_objects = []
@@ -10083,53 +10085,58 @@ class CommentDetails(CommentEdit):
             # Additional sections
             context['sections'] = []
 
-            # [1] =============================================================
-            # Get all 'CommentResponse' objects that are part of this 'Comment'
-            responses = dict(title="Response(s) to this comment", prefix="cresp")
-            if resizable: responses['gridclass'] = "resizable"
-            responses['savebuttons'] = bMayEdit
-            responses['saveasbutton'] = True
-            responses['classes'] = ''
-
-            # Get a queryset with CommentResponse objects, newest first
-            qs_resp = instance.comment_cresponses.all().order_by('-created')
-
-            # Walk these collection sermons
-            for idx, obj in enumerate(qs_resp):
-                rel_item = []
-                # The item is the actual response
-                item = obj
-                order = idx + 1
-
-                # Response: Order from enumeration
-                add_one_item(rel_item, order, False, align="right", draggable=True)
-
-                # Response: person who responded
-                add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable) #, False)
-
-                # Response: The response itself
-                add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, main=True) #, False)
-
-                # Response: Date of the response
-                add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable) #, False)
-
-                # Actions that can be performed on this item
-                if bMayEdit:
-                    add_one_item(rel_item, self.get_actions())
-
-                # Add this line to the list
-                rel_list.append(dict(id=obj.id, cols=rel_item))
-            
-            responses['rel_list'] = rel_list
-            responses['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
-                ]
+            # (see issue #601): only editors may see the comment responses!!
             if bMayEdit:
-                responses['columns'].append("")
-            related_objects.append(responses)
+                # [1] =============================================================
+                # Get all 'CommentResponse' objects that are part of this 'Comment'
+                responses = dict(title="Response(s) to this comment", prefix="cresp")
+                if resizable: responses['gridclass'] = "resizable"
+                responses['savebuttons'] = bMayEdit
+                responses['saveasbutton'] = True
+                responses['classes'] = ''
+
+                # Get a queryset with CommentResponse objects, newest first
+                qs_resp = instance.comment_cresponses.all().order_by('-created')
+
+                # Walk these collection sermons
+                for idx, obj in enumerate(qs_resp):
+                    rel_item = []
+                    # The item is the actual response
+                    item = obj
+                    order = idx + 1
+
+                    # Get the URL to this response
+                    url = reverse('commentresponse_details', kwargs={'pk': obj.id})
+
+                    # Response: Order from enumeration
+                    add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
+
+                    # Response: person who responded
+                    add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url) #, False)
+
+                    # Response: The response itself
+                    add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, main=True) #, False)
+
+                    # Response: Date of the response
+                    add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url) #, False)
+
+                    # Actions that can be performed on this item
+                    if bMayEdit:
+                        add_one_item(rel_item, self.get_actions())
+
+                    # Add this line to the list
+                    rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+                responses['rel_list'] = rel_list
+                responses['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                    ]
+                if bMayEdit:
+                    responses['columns'].append("")
+                related_objects.append(responses)
 
             # Lists of related objects
             context['related_objects'] = related_objects
@@ -10301,6 +10308,8 @@ class CommentListView(BasicList):
         return sBack, sTitle
 
 
+# ================= COMMENT RESPONSE =============================
+
 class CommentResponseEdit(BasicDetails):
     """The details of one comment"""
 
@@ -10333,6 +10342,8 @@ class CommentResponseEdit(BasicDetails):
             if not context['is_app_editor']:
                 self.permission = "readonly"
 
+            # print("CommentResponseEdit: add_to_context status #1 = {}".format(instance.status))
+
             # Define the main items to show and edit
             comment_id = None if instance.comment is None else instance.comment.id
             profile_id = profile.id
@@ -10342,10 +10353,21 @@ class CommentResponseEdit(BasicDetails):
                 {'type': 'plain', 'label': "Comment id",    'value': comment_id,    'field_key': "comment", 'empty': 'hide'},
                 {'type': 'plain', 'label': "Profile id",    'value': profile_id,    'field_key': "profile", 'empty': 'hide'},
                 # --------------------------------------------
-                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_created(),    },
+                {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment(),    },
+                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_saved(),      },
                 {'type': 'plain', 'label': "User name:",    'value': profile.user.username,     },
-                {'type': 'plain', 'label': "Response:",     'value': instance.content,   'field_key': "content"       }
+                {'type': 'plain', 'label': "Response:",     'value': instance.get_content(),   'field_key': "content"       },
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_status(),     },
+                {'type': 'safe',  'label': "",              'value': self.get_button(instance), },
                 ]
+
+            #print("CommentResponseEdit: add_to_context status #2 = {}".format(instance.status))
+
+            # Note: this must always be here, to be ready
+            # provide a button for the user to add a response to the comment
+            context['response_id'] = instance.id
+            context['after_details'] = render_to_string("seeker/commentresponse_send.html", context, self.request)
+            # print("CommentResponseEdit: add_to_context status #3 = {}".format(instance.status))
 
         except:
             msg = oErr.get_error_message()
@@ -10354,13 +10376,88 @@ class CommentResponseEdit(BasicDetails):
         # Return the context we have made 
         return context
 
+    def get_button(self, instance):
+        """Get a button to send this response, if needed
+        
+        NOTE: the BUTTON <a>...</a> is here, and gets displayed in the 'Edit' section
+              the FORM <form>...</form> that is called 'create_new_response' is loaded in 'after_details'
+        """
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if instance.status == "changed":
+                # The user should send it
+                lHtml = []
+                lHtml.append('<a class="btn btn-xs jumbo-3" role="button" ')
+                lHtml.append('   onclick="document.getElementById(\'send_response\').submit();">')
+                lHtml.append('<span class="glyphicon glyphicon-plus"></span>')
+                lHtml.append('Email this response</a>')
+                sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("")
+        return sBack
+
 
 class CommentResponseDetails(CommentResponseEdit):
     """Like CommentResponse Edit, but then html output"""
     rtype = "html"
-    
 
 
+class CommentResponseSend(CommentResponseDetails):
+    """Actually send the response to a comment"""
+
+    initRedirect = True
+
+    def custom_init(self, instance):
+        data = dict(status="ok")
+        url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details", "hc": "collhist_details"}
+        obj_names = {"manu": "Manuscript", "sermo": "Sermon",
+                     "gold": "Sermon Gold", "super": "Authority file",
+                     "codi": "Codicological unit", "hc": "Historical collection"}
+       
+        oErr = ErrHandle()
+        try:
+            # Figure out where to go to after processing this
+            self.redirectpage = reverse('commentresponse_details', kwargs={'pk': instance.id})
+
+            if not instance is None and user_is_ingroup(self.request, app_editor):
+
+                comment = instance.comment
+                if not comment is None and not comment.content is None:
+                    # Whenever this commentresponses is saved, it should be sent to:
+                    recipient = comment.profile
+
+                    # Get the object from the comment
+                    obj = comment.get_object()
+                    otype = comment.otype
+                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id})
+
+                    # Determine the context for the response email
+                    context = {}
+                    context['objurl'] = self.request.build_absolute_uri(objurl)
+                    context['objname'] = obj_names[otype]
+                    context['comdate'] = comment.get_created()
+                    context['user'] = comment.profile.user
+                    context['objcontent'] = comment.content
+                    context['respdate'] = instance.get_saved()
+                    context['respcontent'] = instance.get_content()
+
+                    # Now create the appropriate response email
+                    contents = render_to_string('seeker/commentresponse_mail.html', context, self.request)
+
+                    # And here is to the method that sends it
+                    instance.send_by_email(recipient, contents)
+
+                    print("CommentResponseSend: done")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponseSend")
+
+        return None
 
 
 # ================= MANUSCRIPT =============================
