@@ -11,10 +11,11 @@ from passim.settings import MEDIA_ROOT
 from passim.utils import ErrHandle
 
 
+
 def myfitch(distNames, distMatrix):
     """
     Given an array of names and a matrix, execute the FITCH algorithm.
-    This returns a tree.
+    This returns a tree (newick style).
     """
 
     def get_dist_string(lNames, lMatrix):
@@ -87,6 +88,54 @@ def myfitch(distNames, distMatrix):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("myfitch")
+
+    # Return what we have gathered
+    return sBack
+
+
+def mydrawtree(sTree):
+    """
+    Given a newick type tree in a string, use the DRAWTREE algorithm 
+      to convert this into a SVG
+    """
+
+    sBack = ""
+    oErr = ErrHandle()
+    try:
+        treefile = None
+
+        # Think of a name where to save this
+        with open("{}_tree.txt".format(tempfile.NamedTemporaryFile(dir=MEDIA_ROOT, mode="w").name), "w") as f:
+            treefile = os.path.abspath(f.name)
+            f.write(sTree)
+        # Determine the POSTSCRIPT file name
+        outputfile = treefile.replace("_tree.txt", "_tree.ps")
+
+        # The fontfile should be taken from media stemma
+        fontfile = os.path.abspath(os.path.join(MEDIA_ROOT, "stemma", "fontfile"))
+
+
+        # Identify the library, depending on the platform
+        if platform.system() == "Windows":
+            sLibrary = "d:/data files/vs2010/projects/RU-passim/stemmac/drawtree.dll"
+        else:
+            sLibrary = "/var/www/passim/live/repo/stemmac/bin/drawtree.so"
+        psdrawtree = cdll.LoadLibrary(sLibrary).psdrawtree
+        psdrawtree.restype = c_bool  # C-type boolean
+        psdrawtree.argtypes = [POINTER(c_char),POINTER(c_char),POINTER(c_char)]
+
+        response = psdrawtree(treefile.encode(), fontfile.encode(), outputfile.encode())
+
+        # Is the response okay?
+        if response:
+            # Response is okay: read the result
+            with open(outputfile, "r") as f:
+                # Not sure if any string conversion needs to take place...
+                sBack = f.read()
+        
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("mydrawtree")
 
     # Return what we have gathered
     return sBack

@@ -352,3 +352,6 @@ ModelManifest.xml
 /stemmac/drawtree.exe
 /stemmac/draw2.exe
 /stemmac/intree
+/stemmac/drawtree.lib
+/stemmac/drawtree.exp
+/stemmac/drawtree.dll

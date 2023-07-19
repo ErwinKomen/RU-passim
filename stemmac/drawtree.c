@@ -142,7 +142,7 @@ void   improvtravn(node *);
 void   coordimprov(double *, double *);
 void   calculate(void);
 void   rescale(void);
-void   user_loop(void);
+void   user_loop(boolean);
 void setup_environment(int argc, Char *argv[]);
 void polarize(node *p, double *xx, double *yy);
 void   makebox(char *, double *, double *, double *, long);
@@ -3095,6 +3095,9 @@ void drawtree(
  * - Make use of the fontfile in [fontfname]
  *
 */
+#if defined(_WIN32)
+__declspec(dllexport)
+#endif
 boolean psdrawtree(Char *treefname, Char *fontfname, Char *plotfname) {
   boolean bResult = true;
   long stripedepth;

@@ -40,7 +40,7 @@ from passim.stemma.forms import StemmaSetForm, EqualSelectForm
 from passim.seeker.views import stemma_editor, stemma_user
 from passim.seeker.views import EqualGoldListView
 from passim.stemma.algorithms import lf_new4
-from passim.stemma.external import myfitch
+from passim.stemma.external import myfitch, mydrawtree
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -187,6 +187,9 @@ class StemmaStart(BasicPart):
 
             # (6) Convert into tree using FITCH
             tree1 = myfitch(distNames, distMatrix)
+
+            # (7) Convert the tree into PostScript
+            tree2 = mydrawtree(tree1)
 
             ## (6) Convert into tree using FITCH
             #constructor = DistanceTreeConstructor()

@@ -4,6 +4,7 @@ The drawtree.py program derives directly from the C-equivalent drawtree.c
 """
 
 import math
+import newick
 # My own stuff
 from utils import ErrHandle
 
@@ -300,6 +301,12 @@ def setup_environment_alt(progname, treefile, plotfile):
         with open(treefile, "rb") as f:
             tree_text = f.read()
     
+        # Convert it into proper text
+        tree_text = tree_text.decode("utf-8")
+
+        # Try to read the tree as a newick tree
+        trees = newick.loads(tree_text)
+
         # Read the tree
         print("Reading tree ... \n", end = '')
         firsttree = True
