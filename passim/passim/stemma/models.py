@@ -299,6 +299,9 @@ class StemmaCalc(models.Model):
     # [0-1] Place to store the Leitfehler data
     data = models.TextField("Leitfehler data", null=True, blank=True)
 
+    # [0-1] The SVG output for visualizing this set
+    svg = models.TextField("SVG", blank=True, null=True)
+
     # [1] Status of this stemmaset in calculations
     status = models.CharField("Status", default="none", max_length=20)
 

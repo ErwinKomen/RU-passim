@@ -9,6 +9,7 @@ from ctypes import *
 
 from passim.settings import MEDIA_ROOT
 from passim.utils import ErrHandle
+from passim.stemma.convert import ps2svg_string
 
 
 
@@ -128,11 +129,16 @@ def mydrawtree(sTree):
 
         # Is the response okay?
         if response:
+            sPostscript = ""
             # Response is okay: read the result
             with open(outputfile, "r") as f:
                 # Not sure if any string conversion needs to take place...
-                sBack = f.read()
-        
+                sPostscript = f.read()
+
+            # Now the postscript needs to be converted into SVG
+            sSvg = ps2svg_string(sPostscript)
+            # This will be returned
+            sBack = sSvg
     except:
         msg = oErr.get_error_message()
         oErr.DoError("mydrawtree")

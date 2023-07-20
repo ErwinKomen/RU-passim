@@ -186,38 +186,22 @@ class StemmaStart(BasicPart):
             sMsg = "\n".join(lHtml)
 
             # (6) Convert into tree using FITCH
-            tree1 = myfitch(distNames, distMatrix)
+            if instance.set_status("Fitch") == "interrupt": return context
+            str_tree = myfitch(distNames, distMatrix)
 
-            # (7) Convert the tree into PostScript
-            tree2 = mydrawtree(tree1)
+            # (7) Convert the tree into SVG
+            if instance.set_status("Drawtree") == "interrupt": return context
+            str_svg = mydrawtree(str_tree)
 
-            ## (6) Convert into tree using FITCH
-            #constructor = DistanceTreeConstructor()
-            #dm = DistanceMatrix(distNames, distMatrix)
-            #tree1 = constructor.upgma(dm)
-            #print(tree1)
+            # (8) Add the SVG to the output to be shown
+            iStart = str_svg.find("<svg")
+            if iStart >= 0:
+                str_svg = str_svg[iStart:]
+            data['svg'] = str_svg
 
-            #constructor = DistanceTreeConstructor()
-            #distMatrix2 = [
-            #    [0.0],
-            #    [1.6866,  0.0000],
-            #    [1.7198,  1.5232,  0.0000],
-            #    [1.6606,  1.4841,  0.7115,  0.0000],
-            #    [1.5243,  1.4465,  0.5958,  0.4631,  0.0000],
-            #    [1.6043,  1.4389,  0.6179,  0.5061,  0.3484,  0.0000],
-            #    [1.5905,  1.4629,  0.5583,  0.4710,  0.3083,  0.2692,  0.0000],
-            #]
-            #distNames2 = ["Bo", "Mo", "Gi", "Or", "Go", "Ch", "Ad"]
-            #dm2 = DistanceMatrix(distNames2, distMatrix2)
-            #tree2 = constructor.upgma(dm2)
-            #print(tree2)
-
-            #scorer = ParsimonyScorer()
-            #searcher = NNITreeSearcher(scorer)
-            #constructor = ParsimonyTreeConstructor(searcher, tree1)
-            #tree2 = constructor.upgma(dm)
-            #tree3 = constructor.build_tree()
-            #print(tree2)
+            # (9) Also make sure to save the SVG output to the Stemmaset object
+            instance.svg = str_svg
+            instance.save()
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"
@@ -429,6 +413,7 @@ class StemmaSetEdit(BasicDetails):
                 {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
                 {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
                 {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
+                {'type': 'safe',  'label': "Analyze:",      'value': instance.get_analyze_markdown()},
                 ]
 
 

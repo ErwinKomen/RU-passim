@@ -488,6 +488,7 @@ var ru = (function ($, ru) {
             start_url = "",
             target_details = null,
             target_progress = null,
+            target_result = null,
             elThis = null,
             oJson = null,
             frm = null,
@@ -497,6 +498,7 @@ var ru = (function ($, ru) {
           // Get the URL to measure progress and to start
           target_details = "#calc_details_" + sSyncType;
           target_progress = "#calc_progress_" + sSyncType;
+          target_result = "#calc_result_" + sSyncType;
           frm = "#calc_form_" + sSyncType;
           elThis = "#calc_start_" + sSyncType;
           start_url = $(elThis).attr("calc-start");
@@ -525,6 +527,12 @@ var ru = (function ($, ru) {
                   // Show we are ready
                   $(target_progress).html("READY!");
                   $(target_details).html($(target_details).html() + "\nFinished!");
+
+                  // If we have results, show them
+                  if ($(target_result).length > 0 && response.svg !== undefined) {
+                    $(target_result).html(response.svg);
+                  }
+
                   // Make sure we stop nicely
                   ru.stemma.calc_stop(sSyncType, response);
                   break;
