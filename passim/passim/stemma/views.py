@@ -188,10 +188,13 @@ class StemmaStart(BasicPart):
             # (6) Convert into tree using FITCH
             if instance.set_status("Fitch") == "interrupt": return context
             str_tree = myfitch(distNames, distMatrix)
+            instance.store_data("fitch", str_tree)
 
             # (7) Convert the tree into SVG
             if instance.set_status("Drawtree") == "interrupt": return context
-            str_svg = mydrawtree(str_tree)
+            str_svg, str_ps = mydrawtree(str_tree)
+            instance.store_data("ps", str_ps)
+            instance.store_data("svg", str_svg)
 
             # (8) Add the SVG to the output to be shown
             iStart = str_svg.find("<svg")
@@ -298,6 +301,50 @@ class StemmaProgress(BasicPart):
             oErr.DoError("StemmaProgress/add_to_context")
         return context
 
+
+class StemmaDownload(BasicPart):
+    """Generic treatment of Visualization downloads for SSGs"""
+
+    MainModel = StemmaCalc
+    template_name = "stemma/download_status.html"
+    action = "download"
+    dtype = "hist-svg"
+    vistype = ""
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        oErr = ErrHandle()
+
+        try:
+            if dtype == "json":
+                # Retrieve the actual data from self.data
+                sData = self.obj.data
+            elif dtype == "hist-svg":
+                pass
+            elif dtype == "hist-png":
+                pass
+            elif dtype == "ps":
+                # Retrieve the postscript data 
+                oData = json.loads(self.obj.data)
+                sData = oData['ps']
+                # Note: this would still need to be processed in BASIC
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaDownload/get_data")
+
+        return sData
 
 # =================== Model views for STEMMATOLOGY ========
 

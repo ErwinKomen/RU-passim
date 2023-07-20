@@ -345,6 +345,7 @@ urlpatterns = [
     url(r'^stemmaset/dashboard(?:/(?P<pk>\d+))?/$', StemmaDashboard.as_view(), name='stemmaset_dashboard'),
     url(r'^stemmacalc/start(?:/(?P<pk>\d+))?/$', StemmaStart.as_view(), name='stemma_start'),
     url(r'^stemmacalc/progress(?:/(?P<pk>\d+))?/$', StemmaProgress.as_view(), name='stemma_progress'),
+    url(r'^stemmacalc/download(?:/(?P<pk>\d+))?/$', StemmaDownload.as_view(), name='stemma_download'),
 
     # ------------ My Passim PRE -------------------------------------------------------------------------
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),

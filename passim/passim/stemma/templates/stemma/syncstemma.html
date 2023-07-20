@@ -1,5 +1,14 @@
 {% extends "layout.html" %}
 
+{% block scripts %}
+    {% load staticfiles %}
+    <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
+    <script src="{% static 'basic/scripts/basic.js' %}"></script>
+    <script src="{% static 'basic/scripts/html2canvas.js' %}"></script>
+    <script src="{% static 'basic/scripts/htmlsvg2canvas.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 
 
@@ -46,6 +55,11 @@
           <form id="calc_form_stemma" method="POST">
              {% csrf_token %}
 
+            <div id="downloadcenter" class="hidden">
+              <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+              <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+            </div>
+
             <div class="row">&nbsp;</div>
             <div class="row">
               <div class="col-md-12">
@@ -63,10 +77,17 @@
               </div>
             </div>
             <div id="calc_details_stemma" class="row"></div>
+            <div class="row">
+              <div class="col-md-offset-6 col-md-6" align="right">
+                {% include 'stemma/download.html' with downloadid="stemma" urlname="stemma_download" object_id=stemmacalc_id %}
+              </div>
+            </div>
           </form>
 
-          <div id="calc_result_stemma">
-            <!-- This is where the SVG will arrive -->
+          <div class="row">
+            <div id="calc_result_stemma" class="col-md-12">
+              <!-- This is where the SVG will arrive -->
+            </div>
           </div>
         </div>
       </div>

@@ -377,12 +377,31 @@ class StemmaCalc(models.Model):
         oErr = ErrHandle()
         try:
             if not lst_data is None and isinstance(lst_data, list):
-                sData = json.dumps(lst_data, indent=2)
+                oData = dict(leitfehler=lst_data)
+                sData = json.dumps(oData, indent=2)
                 self.data = sData
                 self.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("store_lf")
+            bResult = False
+        return bResult
+
+    def store_data(self, key, sData):
+        """Store string data into the stemmaset"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            if not sData is None and sData != "":
+                oData = json.loads(self.data)
+                oData[key] = sData
+                sData = json.dumps(oData, indent=2)
+                self.data = sData
+                self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("store_data")
             bResult = False
         return bResult
 

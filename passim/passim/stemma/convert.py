@@ -21,10 +21,14 @@ def ps2svg(sFile):
     # Return what we have gathered
     return sBack
 
+sSvgNamespaces = 'xmlns:dc="http://purl.org/dc/elements/1.1/" \
+     xmlns:cc="http://creativecommons.org/ns#" \
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" \
+     xmlns:svg="http://www.w3.org/2000/svg"'
+
 sIntro = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\
 <!-- Passim research project (https://www.ru.nl) -->\
-<svg xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" \
-     xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" \
+<svg xmlns="http://www.w3.org/2000/svg" \
      viewBox="0 0 780 1020" height="1020" width="780" \
      xml:space="preserve" id="svg2" version="1.1">\
   <g transform="matrix(1.3333333,0,0,-1.3333333,0,1020)" id="g10">\

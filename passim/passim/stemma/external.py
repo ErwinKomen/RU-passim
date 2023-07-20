@@ -101,6 +101,7 @@ def mydrawtree(sTree):
     """
 
     sBack = ""
+    sPostscript = ""
     oErr = ErrHandle()
     try:
         treefile = None
@@ -144,5 +145,5 @@ def mydrawtree(sTree):
         oErr.DoError("mydrawtree")
 
     # Return what we have gathered
-    return sBack
+    return sBack, sPostscript
 
