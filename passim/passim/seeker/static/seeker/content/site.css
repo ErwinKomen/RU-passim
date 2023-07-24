@@ -373,6 +373,7 @@ a:not(.btn) span.glyphicon-remove {
 
 .visborder {
     border: 1px solid blue;
+    margin-top: 10px;
 }
 
 svg {
@@ -2007,5 +2008,7 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     vertical-align: super;
 }
 
-
+svg tspan:hover {
+    fill: red;
+}
 
