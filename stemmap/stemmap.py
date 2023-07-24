@@ -16,6 +16,7 @@ import csv, json
 # My own stuff
 import utils
 from drawtree import psdrawtree
+from convert import ps2svg
 
 # Make available error handling
 errHandle = utils.ErrHandle()
@@ -56,6 +57,14 @@ def main(prgName, argv) :
         # Continue with the program
         errHandle.Status('Input is "' + flInput + '"')
         errHandle.Status('Output is "' + flOutput + '"')
+
+        # INTERMEDIATE
+        # Take output and convert to SVG
+        svg_text = ps2svg(flOutput)
+        flSvg = "{}.svg".format( flOutput)
+        with open(flSvg, "w", encoding="utf-8") as f:
+            f.write(svg_text)
+
 
         # Call the function that does the job
         oArgs = {'input': flInput, 'output': flOutput}
