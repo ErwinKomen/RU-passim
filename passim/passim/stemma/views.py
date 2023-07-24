@@ -165,25 +165,14 @@ class StemmaStart(BasicPart):
 
             # (3) Store the result within the StemmaSet object
             if instance.set_status("Store results") == "interrupt": return context
-            instance.store_lf(lst_leitfehler)
+            instance.store_lf(lst_leitfehler, distNames)
 
             # (4) Make sure to indicate that we are ready
             if instance.set_status("ready") == "interrupt": return context
 
             # (5) Collect the data into one table
-            lHtml = []
-            lHtml.append("<table><thead><tr><th>Label</th><th>numbers</th></tr>")
-            lHtml.append("<tbody>")
-            for oLeitRow in lst_leitfehler:
-                lHtml.append("<tr>")
-                lHtml.append("<td>{}</td>".format(oLeitRow[0]))
-                lHtml.append("<td>")
-                for item in oLeitRow[1:]:
-                    lHtml.append("{} ".format(item))
-                lHtml.append("</td>")
-                lHtml.append("</tr>")
-            lHtml.append("</tbody></table>")
-            sMsg = "\n".join(lHtml)
+            sTable = instance.get_lf_table()
+            if instance.set_status("leitfehler", sTable) == "interrupt": return context
 
             # (6) Convert into tree using FITCH
             if instance.set_status("Fitch") == "interrupt": return context
@@ -208,7 +197,7 @@ class StemmaStart(BasicPart):
 
             # FIll in the [data] part of the context with all necessary information
             data['status'] = "finished"
-            data['message'] = sMsg
+            data['message'] = sTable
             context['data'] = data
         except:
             msg = oErr.get_error_message()

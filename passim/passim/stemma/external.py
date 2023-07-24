@@ -12,6 +12,20 @@ from passim.utils import ErrHandle
 from passim.stemma.convert import ps2svg_string
 
 
+def garbage_remove(sFile):
+    """Check if this file (still) exists, and if so, remove it"""
+
+    bResult = True
+    oErr = ErrHandle()
+    try:
+        if not sFile is None:
+            if os.path.exists(sFile):
+                os.remove(sFile)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("garbage_remove")
+        bResult = False
+    return bResult
 
 def myfitch(distNames, distMatrix):
     """
@@ -57,6 +71,9 @@ def myfitch(distNames, distMatrix):
         return sBack
 
     sBack = ""
+    inputfile = None
+    outputfile = None
+    outtreefile = None
     oErr = ErrHandle()
     try:
         # Convert the names + matrix into a string for C-fitch
@@ -85,10 +102,19 @@ def myfitch(distNames, distMatrix):
             with open(outtreefile, "r") as f:
                 # Not sure if any string conversion needs to take place...
                 sBack = f.read()
+
+        # Remove everything nicely
+        garbage_remove(inputfile)
+        garbage_remove(outputfile)
+        garbage_remove(outtreefile)
         
     except:
         msg = oErr.get_error_message()
         oErr.DoError("myfitch")
+        # Try remove everything
+        garbage_remove(inputfile)
+        garbage_remove(outputfile)
+        garbage_remove(outtreefile)
 
     # Return what we have gathered
     return sBack
@@ -102,6 +128,8 @@ def mydrawtree(sTree):
 
     sBack = ""
     sPostscript = ""
+    treefile = None
+    outputfile = None
     oErr = ErrHandle()
     try:
         treefile = None
@@ -140,9 +168,17 @@ def mydrawtree(sTree):
             sSvg = ps2svg_string(sPostscript)
             # This will be returned
             sBack = sSvg
+
+        # Remove everything nicely
+        garbage_remove(treefile)
+        garbage_remove(outputfile)
+
     except:
         msg = oErr.get_error_message()
         oErr.DoError("mydrawtree")
+        # Try remove garbage
+        garbage_remove(treefile)
+        garbage_remove(outputfile)
 
     # Return what we have gathered
     return sBack, sPostscript

@@ -327,6 +327,56 @@ class StemmaCalc(models.Model):
         # Return the response when saving
         return response
 
+    def get_lf(self):
+        """Try to get the Leitfehler data"""
+
+        lst_back = []
+        lst_names = []
+        oErr = ErrHandle()
+        try:
+            if not self.data is None and self.data != "":
+                oData = json.loads(self.data)
+                lst_back = oData.get("leitfehler", [])
+                lst_names = oData.get("names", [])
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_lf")
+        return lst_back, lst_names
+
+    def get_lf_table(self):
+        """Get the Leitfehler as a table"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the table and list of names
+            lst_leitfehler, lst_names = self.get_lf()
+            if len(lst_leitfehler) > 0 and len(lst_names) > 0:
+
+                # Collect the data into one table
+                lHtml = []
+                lHtml.append("<table><thead><tr><th>Name</th><th>Label</th><th>numbers</th></tr>")
+                lHtml.append("<tbody>")
+                for idx, oLeitRow in enumerate(lst_leitfehler):
+                    sName = lst_names[idx]
+                    lHtml.append("<tr>")
+                    lHtml.append("<td>{}</td>".format(oLeitRow[0]))
+                    lHtml.append("<td>")
+                    for item in oLeitRow[1:]:
+                        lHtml.append("{} ".format(item))
+                    lHtml.append("</td>")
+                    lHtml.append("</tr>")
+                lHtml.append("</tbody></table>")
+                sBack = "\n".join(lHtml)
+
+                # Also store the table in the message
+                self.message = sBack
+                self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_lf_table")
+        return sBack
+
     def get_saved(self):
         """REturn the saved date in a readable form"""
 
@@ -363,6 +413,8 @@ class StemmaCalc(models.Model):
                 self.status = sStatus
                 if not message is None:
                     self.message = message
+                elif sStatus == "preparing":
+                    self.message = ""
                 sBack = self.status
             self.save()
         except:
@@ -370,14 +422,14 @@ class StemmaCalc(models.Model):
             oErr.DoError("set_status")
         return sBack
 
-    def store_lf(self, lst_data):
+    def store_lf(self, lst_data, lst_names):
         """Store data into the stemmaset"""
 
         bResult = True
         oErr = ErrHandle()
         try:
             if not lst_data is None and isinstance(lst_data, list):
-                oData = dict(leitfehler=lst_data)
+                oData = dict(leitfehler=lst_data, names=lst_names)
                 sData = json.dumps(oData, indent=2)
                 self.data = sData
                 self.save()
