@@ -157,7 +157,7 @@ class StemmaStart(BasicPart):
 
             # (1) Prepare the texts for analysis
             if instance.set_status("preparing") == "interrupt": return context
-            sTexts, lst_codes = self.prepare_texts()
+            sTexts, lst_codes, lst_names = self.prepare_texts()
 
             # (2) Execute the Leitfehler Algorithm on the combined fulltexts
             if instance.set_status("leitfehler") == "interrupt": return context
@@ -165,7 +165,7 @@ class StemmaStart(BasicPart):
 
             # (3) Store the result within the StemmaSet object
             if instance.set_status("Store results") == "interrupt": return context
-            instance.store_lf(lst_leitfehler, distNames)
+            instance.store_lf(lst_leitfehler, lst_names)
 
             # (4) Make sure to indicate that we are ready
             if instance.set_status("ready") == "interrupt": return context
@@ -224,6 +224,7 @@ class StemmaStart(BasicPart):
 
         sBack = ""
         lst_codes = []
+        lst_names = []
         oErr = ErrHandle()
         try:
             lst_text = []
@@ -252,6 +253,11 @@ class StemmaStart(BasicPart):
 
                     # Also keep track of what belongs to what
                     lst_codes.append(dict(code=code, equal_id=ssg.id))
+
+                    # Get the passim code of this SSG
+                    sName = ssg.get_code()
+                    lst_names.append(sName)
+
                 # Make room for the next text
                 order += 1
             # Combine the text into one whole
@@ -260,7 +266,7 @@ class StemmaStart(BasicPart):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("StemmaStart/prepare_texts")
-        return sBack, lst_codes
+        return sBack, lst_codes, lst_names
 
 
 class StemmaProgress(BasicPart):

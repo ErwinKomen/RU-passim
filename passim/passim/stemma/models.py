@@ -355,11 +355,12 @@ class StemmaCalc(models.Model):
 
                 # Collect the data into one table
                 lHtml = []
-                lHtml.append("<table><thead><tr><th>Name</th><th>Label</th><th>numbers</th></tr>")
+                lHtml.append("<table class='func-view'><thead><tr><th>Name</th><th>Label</th><th>numbers</th></tr>")
                 lHtml.append("<tbody>")
                 for idx, oLeitRow in enumerate(lst_leitfehler):
                     sName = lst_names[idx]
                     lHtml.append("<tr>")
+                    lHtml.append("<td>{}</td>".format(sName))
                     lHtml.append("<td>{}</td>".format(oLeitRow[0]))
                     lHtml.append("<td>")
                     for item in oLeitRow[1:]:
