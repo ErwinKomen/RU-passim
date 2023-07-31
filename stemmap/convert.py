@@ -23,7 +23,10 @@ def ps2svg(sFile):
 
 sIntro = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\
 <!-- Created with Liquid Technologies Online Tools 1.0 (https://www.liquid-technologies.com) -->\
-<svg xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 1020" height="1020" width="780" xml:space="preserve" id="svg2" version="1.1">\
+<svg xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" \
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg" \
+     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 1020" \
+     height="1020" width="780" xml:space="preserve" id="svg2" version="1.1">\
   <metadata id="metadata8">\
     <rdf:RDF>\
       <cc:Work rdf:about="">\
