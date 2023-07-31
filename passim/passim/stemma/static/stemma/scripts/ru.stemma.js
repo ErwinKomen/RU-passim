@@ -41,6 +41,10 @@ var ru = (function ($, ru) {
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
         loc_language = [],
+        loc_isPointerDown = false,
+        loc_pointerOrigin = { x: 0, y: 0 },
+        loc_viewBox = { x: 0, y: 0, width: 0, height: 0 },
+        loc_newViewBox = {x:0, y:0},
         KEYS = {
           BACKSPACE: 8, TAB: 9, ENTER: 13, SHIFT: 16, CTRL: 17, ALT: 18, ESC: 27, SPACE: 32, PAGE_UP: 33, PAGE_DOWN: 34,
           END: 35, HOME: 36, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, DELETE: 46
@@ -173,6 +177,20 @@ var ru = (function ($, ru) {
           sHtml = sHtml + ex.message;
         }
         $("#" + loc_divErr).html(sHtml);
+      },
+
+      getPointFromEvent: function(event) {
+        var point = {x:0, y:0};
+        // If event is triggered by a touch event, we get the position of the first finger
+        if (event.targetTouches) {
+          point.x = event.targetTouches[0].clientX;
+          point.y = event.targetTouches[0].clientY;
+        } else {
+          point.x = event.clientX;
+          point.y = event.clientY;
+        }
+  
+        return point;
       },
 
       /** 
@@ -473,6 +491,8 @@ var ru = (function ($, ru) {
             }
           }
 
+
+
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
@@ -623,7 +643,9 @@ var ru = (function ($, ru) {
        *
        */
       calc_stop: function (sSyncType, response) {
-        var elAnalyse = "#calc_start_stemma";
+        var elAnalyse = "#calc_start_stemma",
+            ar_param = null,
+            svg = $("svg").first()[0];
 
         // Stop the progress calling
         window.clearInterval(ru.stemma.oSyncTimer);
@@ -636,6 +658,157 @@ var ru = (function ($, ru) {
         $(elAnalyse).removeAttr("disabled");
         $(elAnalyse).addClass("btn-primary");
         $(elAnalyse).removeClass("btn-info");
+
+        // Install the onwheel event
+        $("svg").on("wheel", ru.stemma.zoom_wheel);
+        // Panning events
+        // If browser supports pointer events
+        if (window.PointerEvent) {
+          svg.addEventListener('pointerdown', ru.stemma.onPointerDown); // Pointer is pressed
+          svg.addEventListener('pointerup', ru.stemma.onPointerUp); // Releasing the pointer
+          svg.addEventListener('pointerleave', ru.stemma.onPointerUp); // Pointer gets out of the SVG area
+          svg.addEventListener('pointermove', ru.stemma.onPointerMove); // Pointer is moving
+        } else {
+          // Add all mouse events listeners fallback
+          svg.addEventListener('mousedown', ru.stemma.onPointerDown); // Pressing the mouse
+          svg.addEventListener('mouseup', ru.stemma.onPointerUp); // Releasing the mouse
+          svg.addEventListener('mouseleave', ru.stemma.onPointerUp); // Mouse gets out of the SVG area
+          svg.addEventListener('mousemove', ru.stemma.onPointerMove); // Mouse is moving
+
+          // Add all touch events listeners fallback
+          svg.addEventListener('touchstart', ru.stemma.onPointerDown); // Finger is touching the screen
+          svg.addEventListener('touchend', ru.stemma.onPointerUp); // Finger is no longer touching the screen
+          svg.addEventListener('touchmove', ru.stemma.onPointerMove); // Finger is moving
+        }
+
+        // Make sure to save the original values from the viewbox
+        ar_param = svg.getAttribute('viewBox').split(' ').map(Number);
+        loc_viewBox['width'] = ar_param[2];
+        loc_viewBox['height'] = ar_param[3];
+      },
+
+      /* onPointerDown 
+       *
+       */
+      onPointerDown: function(event) {
+        try {
+          loc_isPointerDown = true; // We set the pointer as down
+
+          // We get the pointer position on click/touchdown so we can get the value once the user starts to drag
+          var pointerPosition = private_methods.getPointFromEvent(event);
+          loc_pointerOrigin.x = pointerPosition.x;
+          loc_pointerOrigin.y = pointerPosition.y;
+        } catch (ex) {
+          private_methods.errMsg("onPointerDown", ex);
+        }
+      },
+
+      /* onPointerUp 
+       *
+       */
+      onPointerUp: function (event) {
+        try {
+          // The pointer is no longer considered as down
+          loc_isPointerDown = false;
+
+          // We save the viewBox coordinates based on the last pointer offsets
+          loc_viewBox.x = loc_newViewBox.x;
+          loc_viewBox.y = loc_newViewBox.y;
+        } catch (ex) {
+          private_methods.errMsg("onPointerUp", ex);
+        }
+      },
+
+      /* onPointerMove
+       *
+       */
+      onPointerMove: function (event) {
+        var svg = $("svg").first()[0];
+
+        try {
+          // Only run this function if the pointer is down
+          if (!loc_isPointerDown) {
+            return;
+          }
+          // This prevent user to do a selection on the page
+          event.preventDefault();
+
+          // Get the pointer position
+          var pointerPosition = private_methods.getPointFromEvent(event);
+
+          // We calculate the distance between the pointer origin and the current position
+          // The viewBox x & y values must be calculated from the original values and the distances
+          loc_newViewBox.x = loc_viewBox.x - (pointerPosition.x - loc_pointerOrigin.x);
+          loc_newViewBox.y = loc_viewBox.y - (pointerPosition.y - loc_pointerOrigin.y);
+
+          // We create a string with the new viewBox values
+          // The X & Y values are equal to the current viewBox minus the calculated distances
+          var viewBoxString = `${loc_newViewBox.x} ${loc_newViewBox.y} ${loc_viewBox.width} ${loc_viewBox.height}`;
+          // We apply the new viewBox values onto the SVG
+          svg.setAttribute('viewBox', viewBoxString);
+
+        } catch (ex) {
+          private_methods.errMsg("onPointerMove", ex);
+        }
+      },
+
+      /* zoom_wheel 
+       *
+       */
+      zoom_wheel: function (event) {
+        var ar_point = null,
+            ar_wh = null,
+            d_point = {},
+            d_wh = {},
+            xPropW = 0, yPropH = 0,
+            width, height,
+            width2, height2,
+            viewBoxString = "",
+            svg = $("svg").first()[0];
+
+        try {
+
+          // Prevent default handling
+          event.preventDefault();
+
+          // set the scaling factor (and make sure it's at least 10%)
+          let scale = event.originalEvent.deltaY / 1000;
+          scale = Math.abs(scale) < .1 ? .1 * event.deltaY / Math.abs(event.deltaY) : scale;
+
+          // get point in SVG space
+          let pt = new DOMPoint(event.originalEvent.clientX, event.originalEvent.clientY);
+          // pt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+          // get viewbox transform
+          ar_point = svg.getAttribute('viewBox').split(' ').map(Number);
+          loc_viewBox.x = ar_point[0];
+          loc_viewBox.y = ar_point[1];
+          loc_viewBox.width = ar_point[2];
+          loc_viewBox.height = ar_point[3];
+          //d_point['x'] = ar_point[0];
+          //d_point['y'] = ar_point[1];
+          //width = ar_point[2];
+          //height = ar_point[3];
+          // let [x, y, width, height] = svg.getAttribute('viewBox').split(' ').map(Number);
+
+          // get pt.x as a proportion of width and pt.y as proportion of height
+          xPropW = (pt.x - loc_viewBox.x) / loc_viewBox.width;
+          yPropH = (pt.y - loc_viewBox.y) / loc_viewBox.height;
+
+          // calc new width and height, new x2, y2 (using proportions and new width and height)
+          loc_newViewBox.width = loc_viewBox.width + loc_viewBox.width * scale;
+          loc_newViewBox.height = loc_viewBox.height + loc_viewBox.height * scale;
+          loc_newViewBox.x = pt.x - xPropW * loc_newViewBox.width;
+          loc_newViewBox.y = pt.y - yPropH * loc_newViewBox.height;
+
+          viewBoxString = `${loc_newViewBox.x} ${loc_newViewBox.y} ${loc_newViewBox.width} ${loc_newViewBox.height}`;
+          // We apply the new viewBox values onto the SVG
+          svg.setAttribute('viewBox', viewBoxString);
+
+          // svg.setAttribute('viewBox', `${x2} ${y2} ${width2} ${height2}`);
+        } catch (ex) {
+          private_methods.errMsg("zoom_wheel", ex);
+        }
       },
 
 

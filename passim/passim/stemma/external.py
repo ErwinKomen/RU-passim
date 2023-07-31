@@ -9,7 +9,7 @@ from ctypes import *
 
 from passim.settings import MEDIA_ROOT
 from passim.utils import ErrHandle
-from passim.stemma.convert import ps2svg_string
+from passim.stemma.convert import ps2svg_string, ps2svg_simple
 
 
 def garbage_remove(sFile):
@@ -165,7 +165,8 @@ def mydrawtree(sTree):
                 sPostscript = f.read()
 
             # Now the postscript needs to be converted into SVG
-            sSvg = ps2svg_string(sPostscript)
+            # sSvg = ps2svg_string(sPostscript)
+            sSvg = ps2svg_simple(sPostscript)
             # This will be returned
             sBack = sSvg
 
