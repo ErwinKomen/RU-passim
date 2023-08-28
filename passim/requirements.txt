@@ -1,12 +1,10 @@
 # Requirements for PASSIM
-# Date: 24/jul/2023
+# Date: 28/aug/2023
 # 
-# Python version this works for: 3.8.10
+# Python version this works for: 3.10.12
 #
 # For a better overview of dependencies: install pipdeptree
 
-chardet==3.0.4
-demjson==2.2.4
 django==2.2.24
 django-extensions==3.1.0
 django-redis==4.11.0
@@ -17,14 +15,15 @@ Markdown==3.3.4
 openpyxl==2.6.2
 PyGraph==0.2.1
 xmltodict==0.12.0
+# chardet - not needed
+# demjson - overtaken by the built-in JSON (import json)
 
-# Note: the correct numpy version must be used for a couple of packages
-#       and the *order* of installing these packages is significant!
-numpy==1.21.1
-  pandas==1.3.1
-  scipy==1.7.1
-  scikit-learn==0.24.2
-  sklearn==0.0
+# Note: the correct numpy version must be use for a couple of packages
+numpy==1.22.1
+  pandas==2.0.3
+  scipy==1.9.3
+  scikit-learn==1.3.0
+  sklearn               # Don't specify version number here
   
 # Note: pillow might install a version of reportlab too new  
 pillow==6.2.2
@@ -36,7 +35,7 @@ pillow==6.2.2
 requests==2.26.0
   pyparsing==2.4.7
     pydotplus==2.0.2
-    Pyzotero==1.4.24    
+    Pyzotero==1.5.10  
 
 # Note: this is used by the documentation .rst files
 #       (it does install a lot of packages)

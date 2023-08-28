@@ -35,7 +35,6 @@ import base64
 import json
 import csv, re
 import requests
-import demjson
 import openpyxl
 import sqlite3
 import glob

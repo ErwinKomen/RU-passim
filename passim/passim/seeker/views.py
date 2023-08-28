@@ -39,7 +39,6 @@ import copy
 import json
 import csv, re
 import requests
-import demjson
 import openpyxl
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
@@ -3114,7 +3113,9 @@ def get_cnrs_manuscripts(city, library):
             # Decypher the response
             if r.status_code == 200:
                 # Return positively
-                reply = demjson.decode(r.text.replace("\t", " "))
+                # reply = demjson.decode(r.text.replace("\t", " "))
+                sText = r.text.replace("\t", "")
+                reply = json.loads(sText)
                 if reply != None and "items" in reply:
                     results = []
                     for item in reply['items']:
@@ -3158,7 +3159,9 @@ def get_manuscripts(request):
             return False
         if r.status_code == 200:
             # Return positively
-            reply = demjson.decode(r.text.replace("\t", " "))
+            # reply = demjson.decode(r.text.replace("\t", " "))
+            sText = r.text.replace("\t", "")
+            reply = json.loads(sText)
             if reply != None and "items" in reply:
                 results = []
                 for item in reply['items']:
