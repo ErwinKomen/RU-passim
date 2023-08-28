@@ -23,7 +23,8 @@ numpy==1.22.1
   pandas==2.0.3
   scipy==1.9.3
   scikit-learn==1.3.0
-  sklearn               # Don't specify version number here
+# Note: 'import sklearn' is no longer possible as separate package
+#       'from sklearn import XXX' works with just 'import scikit-learn'
   
 # Note: pillow might install a version of reportlab too new  
 pillow==6.2.2
