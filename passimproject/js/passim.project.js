@@ -27,6 +27,11 @@ var ru = (function ($, ru) {
   ru.passimproject = (function ($, config) {
     // Define variables for ru.collbank here
     var loc_divErr = "passim_err",
+        lst_seconds = ["one", "two", "three", "four", "five", "six", "seven"],
+        loc_newUrl = "https://www.ru.nl/en/research/research-projects/passim-project",
+        loc_interval = null,
+        loc_seconds = 3,
+        loc_take_new_url = false,
         base_url = "",
         oSyncTimer = null;
 
@@ -38,6 +43,30 @@ var ru = (function ($, ru) {
        */
       methodNotVisibleFromOutside: function () {
         return "something";
+      },
+      updateSecs: function() {
+        var sText = "";
+
+        try {
+          // Calculate the new seconds
+          loc_seconds--;
+          if (loc_seconds < 0) {
+            clearInterval(loc_interval);
+            // Do the redirect
+            document.location.href = loc_newUrl;
+          } else {
+            // Show where we are
+            sText = 'in <b id="seconds" style="color: red;">' + lst_seconds[loc_seconds] + '</b> seconds...';
+            document.getElementById("seconds").innerHTML = sText;
+
+            //// More showing...
+            //sText = 'within ' + lst_seconds[loc_seconds + 1] + ' seconds';
+            //document.getElementById("plain").innerHTML = sText;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("updateSecs", ex);
+        }
       },
       errClear: function() {
         $("#" + loc_divErr).html("");
@@ -52,50 +81,26 @@ var ru = (function ($, ru) {
     return {
 
       init_event_listeners: function () {
+        var moveid = "#page_moved",
+            msg = "The Passim project page has moved. You will be redirected in <span id=\"seconds\">...</span>";
 
-        /*
-        // Make sure #footinfo stays on bottom if it gets too high
-        $("a[data-toggle=tab]").on("click", function (ev) {
-          var elLi = null,
-              elUl = null;
-
-          elLi = $(this).closest("li");
-          elUl = $(elLi).closest("ul");
-          $(elUl).children("li").removeClass("active");
-          $(elLi).addClass("active");
-
-          // ev.preventDefault();
-          // ev.stopPropagation();
-          // return true;
-        });
-        */
-        /*
-        // Make sure #footinfo stays on bottom if it gets too high
-        $("a[data-toggle=tab]").on("mouseup", function (e) {
-          var elLi = null,
-              elUl = null;
-
-          e.preventDefault();
-          $(this).tab('show');
-          elLi = $(this).closest("li");
-          elUl = $(elLi).closest("ul");
-          $(elUl).children("li").removeClass("active");
-          $(elLi).addClass("active");
-        });
-
-        /*
-        $('li a').unbind("click").on("click", function (e) {
-          $('a').removeClass('active');
-          $(this).parent().addClass('active');
-
-          e.preventDefault();
-          e.stopPropagation();
-          $(this).tab('show');
-          // return true;
-        });
-        /**/
+        // Call the countdown-timer
+        if (loc_take_new_url) {
+          // Add the has moved message
+          $(moveid).html(msg);
+          // Start counting down
+          ru.passimproject.countdownTimer();
+        }
       },
 
+      countdownTimer: function () {
+        var one_second = 1000;
+        try {
+          loc_interval = setInterval(function () { private_methods.updateSecs(); }, one_second);
+        } catch (ex) {
+          private_methods.errMsg("countdownTimer", ex);
+        }
+      }
 
     };
   }($, ru.config));
