@@ -6,7 +6,7 @@
 Passim Utilties
 ===============
 
-This documentation explains how to use several Passim Utilities, such as the Python class ``BasicListView``. 
+This documentation explains how to use several Passim Utilities, such as the Python classes ``BasicList``, ``BasicDetails`` and ``BasicPart``. 
 
 Contents:
 

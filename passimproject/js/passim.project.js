@@ -31,7 +31,7 @@ var ru = (function ($, ru) {
         loc_newUrl = "https://www.ru.nl/en/research/research-projects/passim-project",
         loc_interval = null,
         loc_seconds = 3,
-        loc_take_new_url = false,
+        loc_take_new_url = true,
         base_url = "",
         oSyncTimer = null;
 
