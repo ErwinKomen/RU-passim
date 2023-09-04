@@ -10048,14 +10048,18 @@ class CommentDetails(CommentEdit):
         # Start by executing the standard handling
         super(CommentDetails, self).add_to_context(context, instance)
 
-        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
-            oAdd = dict(value=value)
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None, editable=None, 
+                         colspan=None, html=None):
+            oAdd = dict(value=value, editable=False)
             if resizable: oAdd['initial'] = 'small'
             if title != None: oAdd['title'] = title
             if align != None: oAdd['align'] = align
             if link != None: oAdd['link'] = link
             if main != None: oAdd['main'] = main
             if draggable != None: oAdd['draggable'] = draggable
+            if not colspan is None: oAdd['colspan'] = colspan
+            if not editable is None: oAdd['editable'] = editable
+            if not html is None: oAdd['html'] = html
             rel_item.append(oAdd)
             return True
 
@@ -10064,6 +10068,7 @@ class CommentDetails(CommentEdit):
 
         # Authorization: only app-editors may edit!
         bMayEdit = user_is_ingroup(self.request, team_group)
+        bEditableResponse = user_is_superuser(self.request) # True
 
         # On top of that (see issue #601): only editors may see the comment responses!!
             
@@ -10090,56 +10095,118 @@ class CommentDetails(CommentEdit):
 
             # (see issue #601): only editors may see the comment responses!!
             if bMayEdit:
-                # [1] =============================================================
-                # Get all 'CommentResponse' objects that are part of this 'Comment'
-                responses = dict(title="Response(s) to this comment", prefix="cresp")
-                if resizable: responses['gridclass'] = "resizable"
-                responses['savebuttons'] = bMayEdit
-                responses['saveasbutton'] = True
-                responses['classes'] = ''
 
-                # Get a queryset with CommentResponse objects, newest first
-                qs_resp = instance.comment_cresponses.all().order_by('-created')
+                # The choice is between an editable and a non-editable response
+                if not bEditableResponse:
 
-                # Walk these collection sermons
-                for idx, obj in enumerate(qs_resp):
-                    rel_item = []
-                    # The item is the actual response
-                    item = obj
-                    order = idx + 1
+                    # [1] =============================================================
+                    # Get all 'CommentResponse' objects that are part of this 'Comment'
+                    responses = dict(title="Response(s) to this comment", prefix="cresp")
+                    if resizable: responses['gridclass'] = "resizable"
+                    responses['savebuttons'] = bMayEdit
+                    responses['saveasbutton'] = True
+                    responses['classes'] = ''
+                
+                    rel_list =[]
+                    # Get a queryset with CommentResponse objects, newest first
+                    qs_resp = instance.comment_cresponses.all().order_by('-created')
 
-                    # Get the URL to this response
-                    url = reverse('commentresponse_details', kwargs={'pk': obj.id})
+                    # Walk these collection sermons
+                    for idx, obj in enumerate(qs_resp):
+                        rel_item = []
+                        # The item is the actual response
+                        item = obj
+                        order = idx + 1
 
-                    # Response: Order from enumeration
-                    add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
+                        # Get the URL to this response
+                        url = reverse('commentresponse_details', kwargs={'pk': obj.id})
 
-                    # Response: person who responded
-                    add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url) #, False)
+                        # Response: Order from enumeration
+                        add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
 
-                    # Response: The response itself
-                    add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, main=True) #, False)
+                        # Response: person who responded
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url) #, False)
 
-                    # Response: Date of the response
-                    add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url) #, False)
+                        # Response: The response itself
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, main=True) #, False)
 
-                    # Actions that can be performed on this item
-                    if bMayEdit:
-                        add_one_item(rel_item, self.get_actions())
+                        # Response: Date of the response
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url) #, False)
 
-                    # Add this line to the list
-                    rel_list.append(dict(id=obj.id, cols=rel_item))
+                        # Actions that can be performed on this item
+                        if bMayEdit:
+                            add_one_item(rel_item, self.get_actions())
+
+                        # Add this line to the list
+                        rel_list.append(dict(id=obj.id, cols=rel_item))
             
-                responses['rel_list'] = rel_list
-                responses['columns'] = [
-                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                    '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
-                    '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
-                    '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
-                    ]
-                if bMayEdit:
-                    responses['columns'].append("")
-                related_objects.append(responses)
+                    responses['rel_list'] = rel_list
+                    responses['columns'] = [
+                        '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                        '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                        ]
+                    if bMayEdit:
+                        responses['columns'].append("")
+                    related_objects.append(responses)
+
+                else:
+                    # [2] =============================================================
+                    # EXPERIMENT: editable individual responses
+                    #
+                    # Get all 'CommentResponse' objects that are part of this 'Comment'
+                    ediresps = dict(title="Response(s) to this comment", prefix="cresp")
+                    if resizable: ediresps['gridclass'] = "resizable"
+                    ediresps['savebuttons'] = bMayEdit
+                    ediresps['saveasbutton'] = True
+                    ediresps['classes'] = ''
+                    ediresps['editable'] = True
+
+                    rel_list =[]
+                    # Get a queryset with CommentResponse objects, newest first
+                    qs_resp = instance.comment_cresponses.all().order_by('-created')
+
+                    # Walk these collection sermons
+                    for idx, obj in enumerate(qs_resp):
+                        rel_item = []
+                        # The item is the actual response
+                        item = obj
+                        order = idx + 1
+
+                        # Get the URL to this response
+                        url = reverse('commentresponse_details', kwargs={'pk': obj.id})
+
+                        # Response: Order from enumeration
+                        add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
+
+                        # Response: person who responded
+                        sHtml = self.get_editable_form(obj)
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url, editable=True, colspan=3, html=sHtml) 
+
+                        # Response: The response itself
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, editable=True,  main=True) 
+
+                        # Response: Date of the response
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url, editable=True, ) 
+
+                        # Actions that can be performed on this item
+                        if bMayEdit:
+                            add_one_item(rel_item, self.get_actions())
+
+                        # Add this line to the list
+                        rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+                    ediresps['rel_list'] = rel_list
+                    ediresps['columns'] = [
+                        '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                        '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                        ]
+                    if bMayEdit:
+                        ediresps['columns'].append("")
+                    related_objects.append(ediresps)
 
             # Lists of related objects
             context['related_objects'] = related_objects
@@ -10169,6 +10236,16 @@ class CommentDetails(CommentEdit):
         sHtml = "\n".join(html)
         # Return out HTML string
         return sHtml
+
+    def get_editable_form(self, obj):
+        """Get HTML with a <form> to define the editable fields' values"""
+
+        template_name ="seeker/comment_edit.html"
+        edifields = ['profile', 'content' ]
+        form = CommentResponseForm(instance=obj, prefix="cresp")
+        context = dict(form=form, instance=obj, edifields=edifields)
+        sBack = render_to_string(template_name, context, self.request)
+        return sBack
 
     def get_field_value(self, type, instance, custom, kwargs=None):
         sBack = ""

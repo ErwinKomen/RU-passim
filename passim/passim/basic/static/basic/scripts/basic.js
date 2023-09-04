@@ -3282,6 +3282,37 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * rel_row_edit
+       *    Start or finish editing of this row
+       *
+       */
+      rel_row_edit: function (elStart, sAction, editcols) {
+        var elRow = null,
+            targeturl = "",
+            elRelated = "#related-constituents",
+            bNeedOpen = false;
+
+        try {
+          // Get to the row
+          elRow = $(elStart).closest("tr");
+          // Action switching
+          switch (sAction) {
+            case "open":    // Hide summary view and enter edit view
+              $(elRow).find(".rel-view-mode, .rel-edit-open").addClass("hidden");
+              $(elRow).find(".rel-edit-mode, .rel-edit-close").removeClass("hidden");
+              break;
+            case "close":   // Hide edit view and enter summary view
+              $(elRow).find(".rel-view-mode, .rel-edit-open").removeClass("hidden");
+              $(elRow).find(".rel-edit-mode, .rel-edit-close").addClass("hidden");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("rel_row_edit", ex);
+        }
+      },
+
+      /**
        * search_reset
        *    Clear the information in the form's fields and then do a submit
        *

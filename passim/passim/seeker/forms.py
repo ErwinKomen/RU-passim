@@ -5415,7 +5415,8 @@ class CommentResponseForm(BasicModelForm):
 
         model = CommentResponse
         fields = ['content', 'profile', 'comment', 'visible']
-        widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'})
+        widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
