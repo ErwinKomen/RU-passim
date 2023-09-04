@@ -31,7 +31,7 @@ var ru = (function ($, ru) {
         loc_newUrl = "https://www.ru.nl/en/research/research-projects/passim-project",
         loc_interval = null,
         loc_seconds = 3,
-        loc_take_new_url = true,
+        loc_take_new_url = "direct",  // options: direct, delay, none
         base_url = "",
         oSyncTimer = null;
 
@@ -43,6 +43,10 @@ var ru = (function ($, ru) {
        */
       methodNotVisibleFromOutside: function () {
         return "something";
+      },
+      do_redirect: function() {
+        // Do the redirect
+        document.location.href = loc_newUrl;
       },
       updateSecs: function() {
         var sText = "";
@@ -85,11 +89,18 @@ var ru = (function ($, ru) {
             msg = "The Passim project page has moved. You will be redirected in <span id=\"seconds\">...</span>";
 
         // Call the countdown-timer
-        if (loc_take_new_url) {
-          // Add the has moved message
-          $(moveid).html(msg);
-          // Start counting down
-          ru.passimproject.countdownTimer();
+        switch (loc_take_new_url) {
+          case "direct":
+            private_methods.do_redirect();
+            break;
+          case "delay":
+            // Add the has moved message
+            $(moveid).html(msg);
+            // Start counting down
+            ru.passimproject.countdownTimer();
+            break;
+          case "none":
+            break;
         }
       },
 
