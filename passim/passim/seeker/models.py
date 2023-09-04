@@ -243,13 +243,15 @@ def adapt_latin(val):
     val = val.replace('...', u'\u2026')
     return val
 
-def adapt_markdown(val, lowercase=True):
+def adapt_markdown(val, lowercase=True, keep_para=False):
     sBack = ""
     if val != None:
         val = val.replace("***", "\*\*\*")
-        sBack = mark_safe(markdown(val, safe_mode='escape'))
-        sBack = sBack.replace("<p>", "")
-        sBack = sBack.replace("</p>", "")
+        sBack = markdown(val, safe_mode='escape')
+        sBack = mark_safe(sBack)
+        if not keep_para:
+            sBack = sBack.replace("<p>", "")
+            sBack = sBack.replace("</p>", "")
         if lowercase:
             sBack = sBack.lower()
         #print(sBack)
@@ -3565,6 +3567,8 @@ class CommentResponse(models.Model):
     saved = models.DateTimeField(default=get_current_datetime)
     # [0-1] The text of the response itself
     content = models.TextField("Response", null=True, blank=True)
+    # [1] Visibility of this response in the overview
+    visible = models.BooleanField("Visible in overview", default=False)
     # [1] There must be a status on the comment, so that we know whether it has been sent or not
     status = models.TextField("Status", default = "empty")
 
@@ -3600,7 +3604,11 @@ class CommentResponse(models.Model):
         """Get the content, possibly decyphering markdown"""
         sBack = ""
         if not self.content is None:
-            sBack = adapt_markdown(self.content, lowercase=False)
+            NL = '\n'
+            if "\r\n" in self.content:
+                NL = "\r\n"
+            sContent = self.content.replace(NL, "  {}".format(NL))
+            sBack = adapt_markdown(sContent, lowercase=False, keep_para=True)
         return sBack
 
     def get_created(self):
@@ -3628,6 +3636,15 @@ class CommentResponse(models.Model):
             sBack = self.status
         return sBack
 
+    def get_visible(self):
+        sBack = "-"
+        if not self.visible is None:
+            if self.visible:
+                sBack = "Response *IS* visible in the overview"
+            else:
+                sBack = "Response is *NOT* visible in the overview"
+        return sBack
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the save date
         self.saved = get_current_datetime()
@@ -3635,7 +3652,15 @@ class CommentResponse(models.Model):
         if self.status == "sending":
             self.status = "sent"
         else:
-            self.status = "changed"
+            # Compare with previous version
+            previous = CommentResponse.objects.filter(id=self.id).first()
+            if previous is None:
+                self.status = "changed"
+            else:
+                previous_content = previous.content
+                previous_content = "" if previous_content is None else previous_content
+                if previous_content != self.content:
+                    self.status = "changed"
 
         # print("CommentResponse, status #1 is: {}".format(self.status))
 

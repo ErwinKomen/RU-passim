@@ -5414,7 +5414,7 @@ class CommentResponseForm(BasicModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = CommentResponse
-        fields = ['content', 'profile', 'comment']
+        fields = ['content', 'profile', 'comment', 'visible']
         widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'})
                  }
 

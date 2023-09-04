@@ -10201,12 +10201,13 @@ class CommentListView(BasicList):
     plural_name = "User Comments"
     paginate_by = 20
     has_select2 = True
-    order_cols = ['created', 'profile__user__username', 'otype', '']
+    order_cols = ['created', 'profile__user__username', '', 'otype', '']
     order_default = ['-created', 'profile__user__username', 'otype']
     order_heads = [
         {'name': 'Timestamp',   'order': 'o=1', 'type': 'str', 'custom': 'created', 'main': True, 'linkdetails': True},
         {'name': 'User name',   'order': 'o=2', 'type': 'str', 'custom': 'username'},
-        {'name': 'Item Type',   'order': 'o=3', 'type': 'str', 'custom': 'otype'},
+        {'name': 'Response',    'order': '',    'type': 'str', 'custom': 'response'},
+        {'name': 'Item Type',   'order': 'o=4', 'type': 'str', 'custom': 'otype'},
         {'name': 'Link',        'order': '',    'type': 'str', 'custom': 'link'},
         ]
     filters = [ {"name": "Item type",   "id": "filter_otype",       "enabled": False},
@@ -10263,6 +10264,11 @@ class CommentListView(BasicList):
                     if not bRead:
                         # Not read: so bolden it
                         sBack = "<b>{}</b>".format(sBack)
+            elif custom == "response":
+                sBack = "-"
+                last = instance.comment_cresponses.last()
+                if not last is None:
+                    sBack = last.get_created()
             elif custom == "otype":
                 sBack = instance.get_otype()
             elif custom == "link":
@@ -10358,8 +10364,10 @@ class CommentResponseEdit(BasicDetails):
                 # --------------------------------------------
                 {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment(),    },
                 {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_saved(),      },
-                {'type': 'plain', 'label': "User name:",    'value': profile.user.username,     },
-                {'type': 'plain', 'label': "Response:",     'value': instance.get_content(),   'field_key': "content"       },
+                {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
+                {'type': 'safe',  'label': "Response:",     'value': instance.get_content(),   'field_key': "content"       },
+                {'type': 'plain', 'label': "Visible:",      'value': instance.get_visible(),   'field_key': "visible",
+                 'title': 'Indicate whether the response may be visible to other users in the Overview' },
                 {'type': 'plain', 'label': "Status:",       'value': instance.get_status(),     },
                 {'type': 'safe',  'label': "",              'value': self.get_button(instance), },
                 ]
@@ -10369,7 +10377,9 @@ class CommentResponseEdit(BasicDetails):
             # Note: this must always be here, to be ready
             # provide a button for the user to add a response to the comment
             context['response_id'] = instance.id
-            context['after_details'] = render_to_string("seeker/commentresponse_send.html", context, self.request)
+            # Only show if there is content
+            if not instance.content is None and not instance.content == "":
+                context['after_details'] = render_to_string("seeker/commentresponse_send.html", context, self.request)
             # print("CommentResponseEdit: add_to_context status #3 = {}".format(instance.status))
 
         except:
