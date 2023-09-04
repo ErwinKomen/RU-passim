@@ -10197,6 +10197,12 @@ class SermonDescr(models.Model):
             if bAutoCorrect and self.bibleref != sBack:
                 self.bibleref = sBack
                 self.save()
+        else:
+            # There should be no references
+            if not self.bibleref is None and self.bibleref != "":
+                self.bibleref = ""
+                self.save()
+                sBack = self.bibleref
 
         # Return what we have
         return sBack
