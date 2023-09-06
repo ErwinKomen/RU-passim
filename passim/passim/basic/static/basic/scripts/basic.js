@@ -1803,7 +1803,7 @@ var ru = (function ($, ru) {
                 // Find the 'Search' button
                 button = $(this).closest("form").find("a[role=button]").last();
                 // Check for the inner text
-                if ($(button)[0].innerText === "Search") {
+                if (button.length > 0 && $(button)[0].innerText === "Search") {
                   // Found it
                   $(button).click();
                   evt.preventDefault();
@@ -3288,7 +3288,10 @@ var ru = (function ($, ru) {
        */
       rel_row_edit: function (elStart, sAction, editcols) {
         var elRow = null,
+            frm = null,
+            data = [],
             targeturl = "",
+            targetid = "",
             elRelated = "#related-constituents",
             bNeedOpen = false;
 
@@ -3302,8 +3305,47 @@ var ru = (function ($, ru) {
               $(elRow).find(".rel-edit-mode, .rel-edit-close").removeClass("hidden");
               break;
             case "close":   // Hide edit view and enter summary view
-              $(elRow).find(".rel-view-mode, .rel-edit-open").removeClass("hidden");
-              $(elRow).find(".rel-edit-mode, .rel-edit-close").addClass("hidden");
+              // Get the form that needs to be used for this row
+              frm = $(elRow).find("form").first();
+              data = frm.serializeArray();
+              targeturl = $(frm).attr("target");
+              targetid = $(elRow).find(".err-msg").first();
+              // Issue a post
+              $.post(targeturl, data, function (response) {
+                // Action depends on the response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ready":
+                    case "ok":
+                      // Show the HTML target
+                      $(targetid).html(response['html']);
+                      // Possibly do some initialisations again??
+
+                      $(elRow).find(".rel-view-mode, .rel-edit-open").removeClass("hidden");
+                      $(elRow).find(".rel-edit-mode, .rel-edit-close").addClass("hidden");
+
+                      // Make sure events are re-established
+                      // ru.passim.seeker.init_events();
+                      ru.basic.init_typeahead();
+                      break;
+                    case "error":
+                      // Show the error
+                      if ('msg' in response) {
+                        if (typeof (response.msg) === "string") {
+                          $(targetid).html(response.msg);
+                        } else {
+                          $(targetid).html(JSON.stringify(response.msg));
+                        }
+                      } else {
+                        $(targetid).html("An error has occurred (basic search_start)");
+                      }
+                      break;
+                  }
+                }
+              });
+
               break;
           }
 

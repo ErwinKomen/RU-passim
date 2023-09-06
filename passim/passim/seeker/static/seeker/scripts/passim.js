@@ -1019,7 +1019,7 @@ var ru = (function ($, ru) {
                 // Find the 'Search' button
                 button = $(this).closest("form").find("a[role=button]").last();                
                 // Check for the inner text
-                if ($(button)[0].innerText === "Search") {
+                if (button.length > 0 && $(button)[0].innerText === "Search") {
                   // Found it
                   $(button).click();
                   evt.preventDefault();
