@@ -320,7 +320,7 @@
 
                 <!-- Row with buttons-->
                 <div class="row">
-                  <div class="col-md-offset-2 col-md-8 text-right">
+                  <div class="col-md-offset-2 col-md-7 text-right">
                     {% if usersearch != "" %}
                       <span class="clipboard-confirm" style="color:red;"></span>
                       <a role="button" class="btn btn-sm jumbo-1 clipboard-copy" 
@@ -346,7 +346,15 @@
                       </span>
                     {% endif %}
                   </div>
-                  <div class="col-md-2 text-right">
+                  <div class="col-md-3 text-right">
+                    <span class='form-group' id='paginate_by'>
+                      <select class='btn-sm' name="paginate_by" style="width: inherit; display: inline-block; font-size: 11px;"
+                              title="Number of items to be shown on one page">
+                        {% for pag in paginateValues %}
+                          <option {% if pag == paginateSize %} selected {% endif %}>{{pag}}</option>
+                        {% endfor %}
+                      </select>
+                    </span>
                     <!-- Room to reset the search criteria -->
                     <span>
                       <a role="button" class="btn btn-sm jumbo-1 clear-button" title="Clear search criteria" onclick="ru.basic.search_clear(this);" >Clear</a>

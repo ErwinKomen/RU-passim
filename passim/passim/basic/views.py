@@ -25,6 +25,7 @@ from django.views.generic import ListView, View
 import json
 import fnmatch
 import os
+import re
 import base64
 import csv
 import openpyxl
@@ -43,7 +44,8 @@ from passim.basic.models import UserSearch
 # Some constants that can be used
 paginateSize = 20
 paginateSelect = 15
-paginateValues = (100, 50, 20, 10, 5, 2, 1, )
+paginateValues =  (100, 50, 20 )    # See issue #603. Old: (100, 50, 20, 10, 5, 2, 1, )
+PaginateMax = 100                   # Don't allow larger than 100
 
 # Global debugging 
 bDebug = False
@@ -202,6 +204,16 @@ def isempty(value):
         else:
             response = (len(value) == 0)
     return response
+
+def get_number(s_input):
+    """Get the first consecutive number from the string"""
+
+    temp = re.findall(r'\d+', s_input)
+    if len(temp) == 0:
+        iBack = -1
+    else:
+        iBack = int(temp[0])
+    return iBack
 
 def has_obj_value(field, obj, model_name=None):
     if field == None:
@@ -926,7 +938,7 @@ class BasicList(ListView):
     This listview inherits the standard listview and adds a few automatic matters
     """
 
-    paginate_by = 15
+    paginate_by = paginateSize # 15
     entrycount = 0
     qd = None
     bFilter = False
@@ -1020,7 +1032,7 @@ class BasicList(ListView):
         context['paginateValues'] = paginateValues
 
         if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
+            context['paginateSize'] = int(self.get_paginate_size()) #  int(initial['paginate_by'])
         else:
             context['paginateSize'] = paginateSize
 
@@ -1349,7 +1361,22 @@ class BasicList(ListView):
         """
         Paginate by specified value in default class property value.
         """
-        return self.paginate_by
+        paginate_by = self.get_paginate_size()
+        return paginate_by
+
+    def get_paginate_size(self):
+        """Get the correct size of the pages"""
+        initial = self.request.POST if self.request.POST else self.request.GET
+        page_size = initial.get('paginate_by', self.paginate_by)
+        # Double check the value that we have received
+        iNumber = get_number(page_size)
+        if iNumber < 0 or iNumber > PaginateMax:
+            # Just take the default number
+            page_size = self.paginate_by
+        else:
+            # Yes, take this number
+            page_size = str(iNumber)
+        return page_size
 
     def get_basketqueryset(self):
         """User-specific function to get a queryset based on a basket"""
