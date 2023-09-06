@@ -208,11 +208,14 @@ def isempty(value):
 def get_number(s_input):
     """Get the first consecutive number from the string"""
 
-    temp = re.findall(r'\d+', s_input)
-    if len(temp) == 0:
-        iBack = -1
+    if isinstance(s_input, int):
+        iBack = s_input
     else:
-        iBack = int(temp[0])
+        temp = re.findall(r'\d+', s_input)
+        if len(temp) == 0:
+            iBack = -1
+        else:
+            iBack = int(temp[0])
     return iBack
 
 def has_obj_value(field, obj, model_name=None):
