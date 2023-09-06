@@ -3535,6 +3535,17 @@ class Comment(models.Model):
                       super="Authority file", codi="Codicological Unit", hc="Historical Collection")
         return otypes[self.otype]
 
+    def get_responses(self, viewable=True):
+        """Get thos commentresponse items, that are viewable"""
+
+        qs = self.comment_cresponses.filter(visible=True)
+        lst_responses = []
+        for obj in qs:
+            oResponse = dict(created=obj.get_created(), content=obj.content, status=obj.status)
+            oResponse['person'] = obj.profile.user.username
+            lst_responses.append(oResponse)
+        return lst_responses
+
 
 class CommentRead(models.Model):
     """Whenever a different user reads the comment of one user"""
