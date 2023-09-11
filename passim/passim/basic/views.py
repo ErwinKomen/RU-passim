@@ -2175,6 +2175,10 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
+    def get_abs_uri(self, sName, obj):
+        sBack =  "{}{}".format(self.request.get_host(), reverse(sName, kwargs={'pk': obj.id}))
+        return sBack
+
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
 

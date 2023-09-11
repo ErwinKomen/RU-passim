@@ -165,3 +165,18 @@ td.ruler {
     font-size: 40px;
 }
 
+/* Stable URI */
+.stable-uri {
+
+}
+.stable-uri img {
+    cursor: pointer;
+    height: 18px;
+    width: 23px;
+    padding-left: 8px;
+    position: relative;
+    top: -4px;
+}
+.stable-uri .stable {
+    font-size: xx-small;
+}

@@ -4708,6 +4708,10 @@ class SermonEdit(BasicDetails):
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
+
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('sermon_details', instance)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/add_to_context")
@@ -7953,6 +7957,11 @@ class CollAnyEdit(BasicDetails):
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)    
 
+            # Possible add URI
+            if instance.settype == "hc":
+                # Make stable URI available
+                context['stable_uri'] = self.get_abs_uri('collhist_details', instance)
+
             # Any dataset may optionally be elevated to a historical collection
             # BUT: only if a person has permission
             if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
@@ -10830,6 +10839,9 @@ class ManuscriptEdit(BasicDetails):
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
+
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('manuscript_details', instance)
 
         except:
             msg = oErr.get_error_message()
@@ -13714,6 +13726,9 @@ class EqualGoldEdit(BasicDetails):
 
             # Signal that we have select2
             context['has_select2'] = True
+
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('equalgold_details', instance)
 
             # Test if the code to "add a new sermon gold" may be safely added or not
             if instance.moved is None:

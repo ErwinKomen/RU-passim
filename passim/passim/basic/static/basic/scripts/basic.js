@@ -1098,22 +1098,40 @@ var ru = (function ($, ru) {
       copy_to_clipboard: function (el) {
         var elSpan = null,
             copyText = null,
+            textarea = null,
             range = null,
+            selector = null,
+            tmp = "tmp_stable",
             sText = "";
 
         try {
           // Get the span
           elSpan = $(el).closest("div").find("textarea").first();
-          copyText = document.getElementById("search_copy");
-          copyText.select();
-          copyText.setSelectionRange(0, 99999);
-          document.execCommand("copy");
+          if (elSpan.length === 0) {
+            elSpan = $(el).closest("div").find("span.stable").first();
+            textarea = document.getElementById(tmp);
+            if (textarea === undefined || textarea === null) {
+              textarea = document.createElement("textarea");
+              textarea.id = tmp;
+              document.body.appendChild(textarea);
+            }
+            textarea.style.height = 0;
+            textarea.value = $(elSpan).text().trim();
+            selector = document.querySelector("#" + tmp);
+            selector.select();
+            document.execCommand("copy");
+          } else {
+            copyText = document.getElementById("search_copy");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            document.execCommand("copy");
 
-          // Set the range correctly
-          range = document.createRange();
-          range.selectNode(copyText);
-          window.getSelection().addRange(range);
-          document.execCommand("copy");
+            // Set the range correctly
+            range = document.createRange();
+            range.selectNode(copyText);
+            window.getSelection().addRange(range);
+            document.execCommand("copy");
+          }
 
           // sText = $(el).attr("targeturl");
 

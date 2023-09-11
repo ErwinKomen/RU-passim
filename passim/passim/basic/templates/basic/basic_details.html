@@ -35,9 +35,23 @@
                  title="{{buttonspec.title}}">{{buttonspec.label|safe}}</a>
             {% endfor %}
           </div>
+
+          <!-- Possible stable URI -->
+          <div class="col-md-3 col-md-offset-4">
+            {% if stable_uri %}
+              <div class="panel panel-default stable-uri">
+                <!-- Copy to clipboard -->
+                <span title="{{stable_uri}}">Stable URI:</span><br />
+                <span class="stable">{{stable_uri}}</span>
+                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this);"
+                     title="Copy stable URI to clipboard">
+              </div>
+            {% endif %}
+          </div>
           
           <!-- Button for User comments-->
-          <div class="col-md-2 col-md-offset-7 text-right dropdown">
+          <div class="col-md-2 text-right dropdown">
+
             {% if comment_button %}
               <!-- Comment button -->            
               <a class="btn btn-s jumbo-1"
