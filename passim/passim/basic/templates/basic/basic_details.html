@@ -17,7 +17,7 @@
 {% endblock %}
 
 {% block content %}
-  <div>
+  <div class="scrolltop-allow">
     {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
       <div class="panel panel-none" style="margin-top: 15px;">      
@@ -430,6 +430,11 @@
         </p>
       </div>
     {% endif %}
+    <div class="scrolltop-container">
+      <a class="" href="#top" title="Scroll back to top">
+        <span class="glyphicon glyphicon-triangle-top"></span>
+      </a>
+    </div>
   </div>
 
 
