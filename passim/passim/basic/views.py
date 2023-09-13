@@ -436,26 +436,30 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 if has_list_value(keyList, oFields):
                     s_q_lst = ""
                     enable_filter(filter_type, head_id)
-                    if infield == None: infield = "id"
-                    code_list = [getattr(x, infield) for x in oFields[keyList]]
-                    if fkfield:
-                        # Now we need to look at the id's
-                        if len(arFkField) > 1:
-                            # THere are more foreign keys: combine in logical or
-                            s_q_lst = ""
-                            for fkfield in arFkField:
-                                if s_q_lst == "":
-                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                                else:
-                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                        else:
-                            # Just one foreign key
-                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                    elif keyType == "fieldchoice":
-                        s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
-                    elif dbfield:
-                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
-                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
+                    # Check if this is a Q-expression already
+                    if isinstance(oFields[keyList], Q):
+                        s_q = oFields[keyList]
+                    else:
+                        if infield == None: infield = "id"
+                        code_list = [getattr(x, infield) for x in oFields[keyList]]
+                        if fkfield:
+                            # Now we need to look at the id's
+                            if len(arFkField) > 1:
+                                # THere are more foreign keys: combine in logical or
+                                s_q_lst = ""
+                                for fkfield in arFkField:
+                                    if s_q_lst == "":
+                                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                                    else:
+                                        s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                            else:
+                                # Just one foreign key
+                                s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        elif keyType == "fieldchoice":
+                            s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
+                        elif dbfield:
+                            s_q_lst = Q(**{"{}__in".format(infield): code_list})
+                        s_q = s_q_lst if s_q == "" else s_q | s_q_lst
 
                 # Possibly add the result to the list
                 if s_q != "": 

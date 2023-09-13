@@ -5662,6 +5662,9 @@ class SermonListView(BasicList):
                     # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                     kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")) # Thanks to LILAC, strip: .values('id')
                     fields['kwlist'] = kwlist
+                # Create Q expression that includes related ones
+                kwlist = ( Q(id__in=kwlist) | Q(equalgolds__keywords__id__in=kwlist) )
+                fields['kwlist'] = kwlist
             
             # Check if a list of projects is given
             if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
