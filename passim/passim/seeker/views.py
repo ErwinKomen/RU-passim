@@ -11659,12 +11659,29 @@ class ManuscriptCodico(ManuscriptDetails):
                     else:
                         # This is a common manuscript (or a template, but I'm not sure that should be allowed)
                         delete_lst = []
+                        preceding_lst = []
                         current_lst = [x.id for x in manu.manuscriptcodicounits.all().order_by('order')]
+                        prev_id = None
                         for id in current_lst:
                             if id not in codico_lst:
                                 delete_lst.append(id)
+                                preceding_lst.append(prev_id)
+                            prev_id = id
+
                         # Remove the codico's that need deletion
                         if len(delete_lst) > 0:
+                            # First: re-attach the MsItems in this list to the 'previous' codico
+                            for idx, stale in enumerate(delete_lst):
+                                # Check out if there is a Codico preceding this stale one
+                                prev_id = preceding_lst[idx]
+                                if not prev_id is None:
+                                    prev = Codico.objects.filter(id=prev_id).first()
+                                    # Attach all 'previous' MsItems to the new codico
+                                    for item in MsItem.objects.filter(codico_id=stale):
+                                        item.codico = prev
+                                        item.save()
+
+                            # Second: remove the stale Codico's in one go
                             Codico.objects.filter(id__in=delete_lst).delete()
 
                         # Double check the order of the items
@@ -11689,6 +11706,7 @@ class ManuscriptCodico(ManuscriptDetails):
                             if msitem.order != order:
                                 do_order.append(dict(obj=msitem, order=order))
                             order += 1
+
                         with transaction.atomic():
                             for oItemOrder in do_order:
                                 obj = oItemOrder['obj']

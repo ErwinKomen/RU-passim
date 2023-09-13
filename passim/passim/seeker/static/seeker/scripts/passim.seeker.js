@@ -146,7 +146,7 @@ var ru = (function ($, ru) {
             srm_codi = {};
 
         try {
-          // Creae a lis of thecurrent hierarchy
+          // Create a lis of the current hierarchy
           $(elRoot).find(".codico-unit > table").each(function (idx, el) {
             var codico_id = "";
 

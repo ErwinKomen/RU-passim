@@ -54,7 +54,7 @@
           <tbody>
             {% for item in codico.kvlist %}
             
-              <tr class="view-row {% if not forloop.first %}hidden_NOT codico-unit-{{codico.codico_id}} {% endif %}">
+              <tr class="view-row {% if not forloop.first %}codico-unit-{{codico.codico_id}} {% endif %}">
                 <!-- Name of this codico-field -->
                 <td valign="top" class='tdnowrap' {% if forloop.first %}style="min-width: 100px;"{% endif %} >{{item.label}}</td>
 
