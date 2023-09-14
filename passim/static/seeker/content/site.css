@@ -314,7 +314,7 @@ p {
 }
 
 
-/* Text visualisations */
+/* Text visualizations */
 .text-line .line-identifier {
     font-size: x-small;
     color: green;
@@ -1575,6 +1575,11 @@ input:checked + .switchslider:before {
   margin-top: 0px;
   vertical-align: top;
   padding: 2px;
+}
+
+/* Removing pointer events for disabled buttons */
+button[disabled] {
+    pointer-events: none;
 }
 
 .sermonbutton {
