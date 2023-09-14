@@ -38,7 +38,7 @@ class UserSearch(models.Model):
         verbose_name = "User search"
         verbose_name_plural = "User searches"
 
-    def add_search(view, param_list, username):
+    def add_search(view, param_list, username, qfilter=None):
         """Add or adapt search query based on the listview"""
 
         oErr = ErrHandle()
@@ -47,8 +47,10 @@ class UserSearch(models.Model):
             # DOuble check
             if len(param_list) == 0:
                 return obj
-
-            params = json.dumps(sorted(param_list))
+            oParams = dict(param_list=sorted(param_list), qfilter=[])
+            if not qfilter is None:
+                oParams['qfilter'] = qfilter
+            params = json.dumps(oParams)
             if view[-1] == "/":
                 view = view[:-1]
             history = {}
@@ -95,13 +97,17 @@ class UserSearch(models.Model):
         try:
             obj = UserSearch.objects.filter(id=search_id).first()
             if obj != None:
-                param_list = json.loads(obj.params)
-                for param_str in param_list:
-                    arParam = param_str.split("=")
-                    if len(arParam) == 2:
-                        k = arParam[0]
-                        v = arParam[1]
-                        qd[k] = v
+                oParams = json.loads(obj.params)
+                param_list = oParams.get("param_list")
+                qfilter = oParams.get("qfilter", [])
+                if not param_list is None:
+                    for param_str in param_list:
+                        arParam = param_str.split("=")
+                        if len(arParam) == 2:
+                            k = arParam[0]
+                            v = arParam[1]
+                            qd[k] = v
+                qd['qfilter'] = qfilter
         except:
             msg = oErr.get_error_message()
             oErr.DoError("UserSearch/load_parameters")

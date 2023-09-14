@@ -39,7 +39,6 @@ import copy
 import json
 import csv, re
 import requests
-import demjson
 import openpyxl
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
@@ -67,28 +66,29 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
     SermonDescrSignatureForm, SermonGoldKeywordForm, SermonGoldLitrefForm, EqualGoldLinkForm, EqualGoldForm, \
     ReportEditForm, SourceEditForm, ManuscriptProvForm, LocationForm, LocationRelForm, OriginForm, \
-    LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, SermonDescrKeywordForm, KeywordForm, \
+    LibraryForm, ManuscriptExtForm, ManuscriptLitrefForm, ManuscriptLinkForm, SermonDescrKeywordForm, KeywordForm, \
     ManuscriptKeywordForm, DaterangeForm, ProjectForm, SermonDescrCollectionForm, CollectionForm, \
     SuperSermonGoldForm, SermonGoldCollectionForm, ManuscriptCollectionForm, CollectionLitrefForm, \
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
-    UserForm
+    UserForm, SermonDescrLinkForm, CommentResponseForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
-    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, SermonEqualDist, \
+    ProvenanceMan, Provenance, Daterange, CollOverlap, BibRange, Feast, Comment, CommentRead, CommentResponse, SermonEqualDist, \
     Basket, BasketMan, BasketGold, BasketSuper, Litref, LitrefMan, LitrefCol, LitrefSG, EdirefSG, Report, SermonDescrGold, \
     Visit, Profile, Keyword, SermonSignature, Status, Library, Collection, CollectionSerm, \
-    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
+    CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, ManuscriptLink, \
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
-    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, \
+    Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, SermonDescrLink, \
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
-    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription
+    choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
+    LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
+from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -130,6 +130,8 @@ app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_developer = "{}_developer".format(PROJECT_NAME.lower())
 app_moderator = "{}_moderator".format(PROJECT_NAME.lower())
 enrich_editor = "enrich_editor"
+stemma_editor = "stemma_editor"
+stemma_user = "stemma_user"
 
 def get_usercomments(type, instance, profile):
     """Get a HTML list of comments made by this user and possible users in the same group"""
@@ -153,6 +155,8 @@ def get_application_context(request, context):
     context['is_app_editor'] = user_is_ingroup(request, app_editor)
     context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
     context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context['is_stemma_editor'] = user_is_ingroup(request, stemma_editor) or context['is_app_moderator']
+    context['is_stemma_user'] = user_is_ingroup(request, stemma_user)
     return context
 
 def treat_bom(sHtml):
@@ -724,10 +728,12 @@ def home(request, errortype=None):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -753,6 +759,9 @@ def home(request, errortype=None):
     # Gather pie-chart data
     context['pie_data'] = get_pie_data()
 
+    # Possibly start getting new Stemmatology results
+    scan_transcriptions()
+
     # Render and return the page
     return render(request, template_name, context)
 
@@ -767,7 +776,9 @@ def contact(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Contact", True)
@@ -781,7 +792,8 @@ def more(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "More", True)
@@ -797,10 +809,11 @@ def technical(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Technical", True)
@@ -816,10 +829,11 @@ def guide(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Guide", True)
@@ -833,7 +847,8 @@ def bibliography(request):
                 'year':datetime.now().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Add the edition references (abreviated and full)
 
@@ -895,7 +910,8 @@ def about(request):
                 'year':get_current_datetime().year,
                 'pfx': APP_PREFIX,
                 'site_url': admin.site.site_url}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
 
     # Calculate statistics
     sites = {}
@@ -935,7 +951,8 @@ def short(request):
     context = {'title': 'Short overview',
                'message': 'Radboud University passim short intro',
                'year': get_current_datetime().year}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request, template, context)
 
 def nlogin(request):
@@ -944,7 +961,8 @@ def nlogin(request):
     context =  {    'title':'Not logged in', 
                     'message':'Radboud University passim utility.',
                     'year':get_current_datetime().year,}
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    context = get_application_context(request, context)
+    # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
 
 # ================ OTHER VIEW HELP FUNCTIONS ============================
@@ -958,11 +976,12 @@ def sync_passim(request):
                'message': 'Radboud University PASSIM'
                }
     template_name = 'seeker/syncpassim.html'
-    context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
-    context['is_superuser'] = user_is_superuser(request)
+    context = get_application_context(request, context)
+    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
+    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
+    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    #context['is_superuser'] = user_is_superuser(request)
 
     # Add the information in the 'context' of the web page
     return render(request, template_name, context)
@@ -3094,7 +3113,9 @@ def get_cnrs_manuscripts(city, library):
             # Decypher the response
             if r.status_code == 200:
                 # Return positively
-                reply = demjson.decode(r.text.replace("\t", " "))
+                # reply = demjson.decode(r.text.replace("\t", " "))
+                sText = r.text.replace("\t", "")
+                reply = json.loads(sText)
                 if reply != None and "items" in reply:
                     results = []
                     for item in reply['items']:
@@ -3138,7 +3159,9 @@ def get_manuscripts(request):
             return False
         if r.status_code == 200:
             # Return positively
-            reply = demjson.decode(r.text.replace("\t", " "))
+            # reply = demjson.decode(r.text.replace("\t", " "))
+            sText = r.text.replace("\t", "")
+            reply = json.loads(sText)
             if reply != None and "items" in reply:
                 results = []
                 for item in reply['items']:
@@ -4408,12 +4431,19 @@ class SermonEdit(BasicDetails):
                                          form=BibRangeForm, min_num=0,
                                          fk_name = "sermon",
                                          extra=0, can_delete=True, can_order=False)
+    SlinkFormSet = inlineformset_factory(SermonDescr, SermonDescrLink,
+                                         form=SermonDescrLinkForm, min_num=0,
+                                         fk_name = "src",
+                                         extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [{'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
-                       {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
-                       {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
-                       {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
-                       {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'}] 
+    formset_objects = [
+        {'formsetClass': StossgFormSet, 'prefix': 'stossg', 'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SDkwFormSet,   'prefix': 'sdkw',   'readonly': False, 'noinit': True, 'linkfield': 'sermon'},                       
+        {'formsetClass': SDcolFormSet,  'prefix': 'sdcol',  'readonly': False, 'noinit': True, 'linkfield': 'sermo'},
+        {'formsetClass': SDsignFormSet, 'prefix': 'sdsig',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SbrefFormSet,  'prefix': 'sbref',  'readonly': False, 'noinit': True, 'linkfield': 'sermon'},
+        {'formsetClass': SlinkFormSet,  'prefix': 'slink',  'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_REL }], 'clean': True},
+        ] 
 
     stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'fulltext',
                         'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
@@ -4452,6 +4482,11 @@ class SermonEdit(BasicDetails):
             if self.object != None:
                 # Make sure that the sermon is known
                 oBack = dict(sermon_id=self.object.id)
+        elif prefix == "slink":
+            if self.object != None:
+                # Make sure to return the ID of the Manuscript
+                oBack = dict(sermon_id=self.object.id)
+
         return oBack
            
     def add_to_context(self, context, instance):
@@ -4582,12 +4617,15 @@ class SermonEdit(BasicDetails):
                     {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
                     # AltPageNumber HIER
                     #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
+                    {'type': 'line',  'label': "Related sermon manifestations:",  'value': instance.get_sermolinks_markdown(), 
+                        'multiple': True,  'field_list': 'slinklist',   'fso': self.formset_objects[5]},
+
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
             # IN all cases
             mainitems_SSG = {'type': 'line',    'label': "Authority file links:",  'value': self.get_superlinks_markdown(instance), 
                  'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[0], 
-                 'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssgdist_template'}
+                 'inline_selection': 'ru.passim.ssglink_template',   'template_selection': 'ru.passim.ssg_template'}
             context['mainitems'].append(mainitems_SSG)
             # Notes:
             # Collections: provide a link to the Sermon-listview, filtering on those Sermons that are part of one particular collection
@@ -4670,6 +4708,10 @@ class SermonEdit(BasicDetails):
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
+
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('sermon_details', instance)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/add_to_context")
@@ -4699,12 +4741,20 @@ class SermonEdit(BasicDetails):
             # Get the text
             if not instance.fulltext is None and instance.fulltext != "":
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Get URL of deleting transcription
+                transdelurl = reverse('sermon_transdel', kwargs={'pk': instance.id})
+                sInfo = instance.fullinfo
+                oInfo = {}
+                if not sInfo is None:
+                    oInfo = json.loads(sInfo)
+                wordcount = oInfo.get("wordcount", 0)
                 # Combine with button click + default hidden
-                html = []
-                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
-                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-                # Combine
-                sBack = "\n".join(html)
+                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                               delete_message="",
+                               wordcount=wordcount,
+                               transdelurl=transdelurl,
+                               fulltext=sText)
+                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
@@ -4906,6 +4956,42 @@ class SermonEdit(BasicDetails):
                                 form.instance.chvslist = newchvs
                             form.instance.intro = newintro
                             form.instance.added = newadded
+
+                    elif prefix == "slink":
+                        # Process the link from S to S
+                        newsermo = cleaned.get("newsermo")
+                        if not newsermo is None:
+                            # There also must be a linktype
+                            if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                                linktype = cleaned['newlinktype']
+                                # Get optional parameters
+                                note = cleaned.get('note', None)
+                                # Check existence
+                                obj = SermonDescrLink.objects.filter(src=instance, dst=newsermo, linktype=linktype).first()
+                                if obj == None:
+                                    sermo = SermonDescr.objects.filter(id=newsermo.id).first()
+                                    if sermo != None:
+
+                                        # Set the right parameters for creation later on
+                                        form.instance.linktype = linktype
+                                        form.instance.dst = sermo
+                                        if note != None and note != "": 
+                                            form.instance.note = note
+
+                                        # Double check reverse
+                                        if linktype in LINK_BIDIR_MANU:
+                                            rev_link = SermonDescrLink.objects.filter(src=sermo, dst=instance).first()
+                                            if rev_link == None:
+                                                # Add it
+                                                rev_link = SermonDescrLink.objects.create(src=sermo, dst=instance, linktype=linktype)
+                                            else:
+                                                # Double check the linktype
+                                                if rev_link.linktype != linktype:
+                                                    rev_link.linktype = linktype
+                                            if note != None and note != "": 
+                                                rev_link.note = note
+                                            rev_link.save()
+                        # Note: it will get saved with form.save()
                             
 
                 else:
@@ -4965,8 +5051,10 @@ class SermonEdit(BasicDetails):
                         project = profile_projects.first().project
                         instance.projects.add(project)
                     else:
-                        # It would seem that this kind of check is needed anyway...
-                        bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
+                        # Action should not be performed if this is a template
+                        if instance.mtype != 'tem':
+                            # It would seem that this kind of check is needed anyway...
+                            bBack, msg = evaluate_projlist(profile, instance, projlist, "Sermon manifestation")
 
         except:
             msg = oErr.get_error_message()
@@ -5006,7 +5094,42 @@ class SermonEdit(BasicDetails):
                 collist_s = form.cleaned_data['collist_s']
                 adapt_m2m(CollectionSerm, instance, "sermon", collist_s, "collection")
 
-                # (6) 'projects'
+                # (6) Related sermon manifestation links...
+                slinklist = form.cleaned_data['slinklist']
+                sermo_added = []
+                sermo_deleted = []
+                adapt_m2m(SermonDescrLink, instance, "src", slinklist, "dst", 
+                          extra = ['linktype', 'note'], related_is_through=True,
+                          added=sermo_added, deleted=sermo_deleted)
+                # Check for partial links in 'deleted'
+                for obj in sermo_deleted:
+                    # This if-clause is not needed: anything that needs deletion should be deleted
+                    # if obj.linktype in LINK_BIDIR:
+                    # First find and remove the other link
+                    reverse = SermonDescrLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse != None:
+                        reverse.delete()
+                    # Then remove myself
+                    obj.delete()
+                # Make sure to add the reverse link in the bidirectionals
+                for obj in sermo_added:
+                    if obj.linktype in LINK_BIDIR_MANU:
+                        # Find the reversal
+                        reverse = SermonDescrLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                        if reverse == None:
+                            # Create the reversal 
+                            reverse = SermonDescrLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                            # Other adaptations
+                            bNeedSaving = False
+                            # Possibly copy note
+                            if obj.note != None and obj.note != "":
+                              reverse.note = obj.note
+                              bNeedSaving = True
+                            # Need saving? Then save
+                            if bNeedSaving:
+                              reverse.save()
+
+                # (7) 'projects'
                 projlist = form.cleaned_data['projlist']
                 sermo_proj_deleted = []
                 adapt_m2m(SermonDescrProject, instance, "sermon", projlist, "project", deleted=sermo_proj_deleted)
@@ -5042,7 +5165,10 @@ class SermonEdit(BasicDetails):
                     # Are we okay?
                     sStatus = oTranscription.get("status", "")
                     sText = oTranscription.get("text", "")
+                    iWordcount = oTranscription.get("wordcount", 0)
+                    oFullInfo = dict(wordcount=iWordcount)
                     if sStatus == "ok" and sText != "":
+                        instance.fullinfo = json.dumps(oFullInfo)
                         instance.fulltext = sText
                         instance.save()
 
@@ -5163,6 +5289,30 @@ class SermonDetails(SermonEdit):
         return True, ""
 
 
+class SermonTransDel(SermonDetails):
+    """Remove the fulltrans from this sermon"""
+
+    initRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Check ... something
+            if not instance is None:
+                # Make sure to set the correct redirect page
+                self.redirectpage = reverse("sermon_details", kwargs={'pk': instance.id})
+                # Remove the transcription
+                instance.srchfulltext = None
+                instance.fulltext = None
+                instance.transcription = None
+                instance.save()
+                # Now it's all been deleted
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonTransDel/custom_init")
+        return None
+
+
 class SermonUserKeyword(SermonDetails):
     """This version only looks at one kind of data: the ukwlist"""
 
@@ -5248,7 +5398,7 @@ class SermonListView(BasicList):
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
-                  'sectiontitle', 'title', '','','', 'stype']
+                  'srchsectiontitle', 'srchtitle', '','','', 'stype']
     order_default = order_cols
     order_heads = [
         {'name': 'Attr. author', 'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True,
@@ -5307,8 +5457,8 @@ class SermonListView(BasicList):
         {'section': '', 'filterlist': [
             {'filter': 'incipit',       'dbfield': 'srchincipit',       'keyS': 'incipit',  'regex': adapt_regex_incexp},
             {'filter': 'explicit',      'dbfield': 'srchexplicit',      'keyS': 'explicit', 'regex': adapt_regex_incexp},
-            {'filter': 'title',         'dbfield': 'title',             'keyS': 'srch_title'},
-            {'filter': 'sectiontitle',  'dbfield': 'sectiontitle',      'keyS': 'srch_sectiontitle'},
+            {'filter': 'title',         'dbfield': 'srchtitle',         'keyS': 'srch_title'},
+            {'filter': 'sectiontitle',  'dbfield': 'srchsectiontitle',  'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
             {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
@@ -5512,6 +5662,9 @@ class SermonListView(BasicList):
                     # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
                     kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")) # Thanks to LILAC, strip: .values('id')
                     fields['kwlist'] = kwlist
+                # Create Q expression that includes related ones
+                kwlist = ( Q(id__in=kwlist) | Q(equalgolds__keywords__id__in=kwlist) )
+                fields['kwlist'] = kwlist
             
             # Check if a list of projects is given
             if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
@@ -5547,6 +5700,22 @@ class SermonListView(BasicList):
                 else:
                     # Reset the authortype
                     fields['authortype'] = ""
+
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(msitem__codico__codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(msitem__codico__codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(msitem__codico__codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(msitem__codico__codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
+
 
             # Adapt according to the 'free' fields
             free_term = fields.get("free_term", "")
@@ -6664,9 +6833,10 @@ class BibRangeListView(BasicList):
             lstQ = []
             lstQ.append(Q(bibrangeverses__bkchvs__gte=start))
             lstQ.append(Q(bibrangeverses__bkchvs__lte=einde))
-            sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
+            # sermonlist = [x.id for x in BibRange.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibrefbk'] = Q(id__in=sermonlist)
+            # fields['bibrefbk'] = Q(id__in=sermonlist)
+            fields['bibrefbk'] = Q(bibrangeverses__bkchvs__gte=start) & Q(bibrangeverses__bkchvs__lte=einde)
 
         return fields, lstExclude, qAlternative
 
@@ -7105,7 +7275,7 @@ class UserEdit(BasicDetails):
         # Define the main items to show and edit
         context['mainitems'] = [
             # Issue #435: user must be able to change: email, pw, name
-            {'type': 'plain', 'label': "Username:",     'value': instance.username,    'field_key': "username"},
+            {'type': 'plain', 'label': "Username:",     'value': instance.username}, # ,    'field_key': "username"},
             {'type': 'plain', 'label': "Email:",        'value': instance.email,       'field_key': "email"},
             {'type': 'plain', 'label': "First name:",   'value': instance.first_name,  'field_key': "first_name"},
             {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},
@@ -7168,6 +7338,13 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'}
             ]
 
+        # If this is a moderator, add a button for editing rights
+        if context['is_app_moderator']:
+            oItem = dict(type='safe', label='Passim editor:')
+            oItem['value'] = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
+            oItem['field_key'] = 'editrights'
+            context['mainitems'].append(oItem)
+
         # Adapt the permission, if this is the actual user that is logged in
         if context['authenticated'] and not context['is_app_moderator']:
             # Check who this is
@@ -7227,6 +7404,20 @@ class ProfileEdit(BasicDetails):
             editlist = form.cleaned_data['editlist']
             adapt_m2m(ProjectEditor, instance, "profile", editlist, "project")
 
+            # (8) edit rights
+            editrights = form.cleaned_data.get('editrights')
+            if not editrights is None and editrights in ['yes', 'no']:
+                currentrights = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
+                if currentrights != editrights:
+                    editor_group = Group.objects.filter(name=app_editor).first()
+                    if not editor_group is None:
+                        if editrights == "yes":
+                            # Grant editing rights
+                            editor_group.user_set.add(instance.user)
+                        else:
+                            # Revoke editing rights
+                            editor_group.user_set.remove(instance.user)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ProfileEdit/after_save")
@@ -7250,6 +7441,7 @@ class ProfileListView(BasicList):
     prefix = "prof"
     sg_name = "Profile"     
     plural_name = "Profiles"
+    has_select2 = True
     new_button = False      # Do not allow adding new ones here
     order_cols = ['user__username', '', 'ptype', 'affiliation', '', '']
     order_default = order_cols
@@ -7260,6 +7452,17 @@ class ProfileListView(BasicList):
         {'name': 'Affiliation', 'order': 'o=4', 'type': 'str', 'custom': 'affiliation', 'main': True, 'linkdetails': True},
         {'name': 'Project Approver',    'order': '',    'type': 'str', 'custom': 'projects'},
         {'name': 'Groups',      'order': '',    'type': 'str', 'custom': 'groups'}]
+
+    filters = [ {"name": "User name",   "id": "filter_username",    "enabled": False},
+                {"name": "Email",       "id": "filter_email",       "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'username',  'fkfield': 'user',  'keyS': 'username_ta', 'keyFk': 'username', 'keyList': 'userlist', 'infield': 'username' },
+            {'filter': 'email',     'fkfield': 'user',  'keyS': 'email_ta',    'keyFk': 'email' }
+         ]} 
+            #{'filter': 'project',   'fkfield': 'projects',    'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'}]},
+        ] 
 
     def initializations(self):
         # Make sure possible adaptations are executed
@@ -7654,6 +7857,11 @@ class CollAnyEdit(BasicDetails):
 
             # Define the main items to show and edit
             context['mainitems'] = [
+                # Some items must be passed on
+                {'type': 'plain', 'label': "Type:",        'value': instance.type,      'field_key': 'type',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Owner id:",    'value': instance.owner.id,  'field_key': 'owner',   'empty': 'hide'},
+
+                # Regular visible fields
                 {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
                 {'type': 'safe',  'label': "Saved item:",  'value': saveditem_button          },
                 {'type': 'plain', 'label': "Description:", 'value': instance.descrip, 'field_key': 'descrip'},
@@ -7661,7 +7869,9 @@ class CollAnyEdit(BasicDetails):
                 ]
 
             # Optionally add Scope: but only for the actual *owner* of this one
-            if self.prefix in prefix_scope and instance.owner.user == self.request.user:
+            # Issue #599: don't offer scope for HC
+            if instance.settype != "hc" and self.prefix in prefix_scope and not instance.owner is None \
+                and instance.owner.user == self.request.user:
                 context['mainitems'].append(
                 {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
@@ -7700,13 +7910,19 @@ class CollAnyEdit(BasicDetails):
             context['mainitems'].append( {'type': 'plain', 'label': "Created:", 'value': instance.get_created_user}) 
             context['mainitems'].append( {'type': 'line',  'label': "Size:", 'value': size_value})
 
+            # Add any saved items of this type
+            if instance.settype == "pd":
+                # The kind of list depends on the kind of dataset that I am
+                context['mainitems'].append( {'type': 'plain',  'label': "Saved items:", 'value': instance.get_sitems(profile),
+                    'field_list': 'sitemlist_{}'.format(instance.type)})
+
             # If this is a historical collection,and an app-editor gets here, add a link to a button to create a manuscript
             if instance.settype == "hc" and context['is_app_editor']:
                 # If 'manu' is set, then this procedure is called from 'collhist_compare'
                 if self.manu == None:
                     context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
             # Historical collections may have literature references
-            if instance.settype == "hc" and len(self.formset_objects[0]) > 0:
+            if instance.settype == "hc" and len(self.formset_objects) > 0 and len(self.formset_objects[0]) > 0:
                 oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
                 if context['is_app_editor']:
                     oLitref['multiple'] = True
@@ -7744,6 +7960,11 @@ class CollAnyEdit(BasicDetails):
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)    
 
+            # Possible add URI
+            if instance.settype == "hc":
+                # Make stable URI available
+                context['stable_uri'] = self.get_abs_uri('collhist_details', instance)
+
             # Any dataset may optionally be elevated to a historical collection
             # BUT: only if a person has permission
             if instance.settype == "pd" and self.prefix in prefix_elevate and instance.type in prefix_elevate and \
@@ -7772,7 +7993,7 @@ class CollAnyEdit(BasicDetails):
             profile_user = Profile.get_user_profile(self.request.user.username)
             # (2) Set default permission
             permission = ""
-            if self.may_edit():
+            if self.may_edit(context):
                 if profile_owner.id == profile_user.id:
                     # (3) Any creator of the collection may write it
                     permission = "write"
@@ -7949,6 +8170,14 @@ class CollAnyEdit(BasicDetails):
             col_proj_deleted = []
             adapt_m2m(CollectionProject, instance, "collection", projlist, "project", deleted=col_proj_deleted)
             project_dependant_delete(self.request, col_proj_deleted)
+
+            # (3) Process adding items from ['sitemlist_XXX']
+            sitemlist_sermo = form.cleaned_data['sitemlist_sermo']
+            instance.add_sitems(sitemlist_sermo, "sermo")
+            sitemlist_manu = form.cleaned_data['sitemlist_manu']
+            instance.add_sitems(sitemlist_manu, "manu")
+            sitemlist_super = form.cleaned_data['sitemlist_super']
+            instance.add_sitems(sitemlist_super, "super")
 
         except:
             msg = oErr.get_error_message()
@@ -8509,16 +8738,21 @@ class CollHistDetails(CollHistEdit):
     def custom_init(self, instance):
         # First do the original custom init
         response = super(CollHistDetails, self).custom_init(instance)
-        # Now continue
-        if instance.settype != "hc":
-            # Someone does as if this is a historical collection...
-            # Determine what kind of dataset/collection this is
-            if instance.owner == Profile.get_user_profile(self.request.user.username):
-                # Private dataset
-                self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
-            else:
-                # Public dataset
-                self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+
+        if not instance is None:
+            # Now continue
+            if instance.settype != "hc":
+                # Someone does as if this is a historical collection...
+                # Determine what kind of dataset/collection this is
+                if instance.owner == Profile.get_user_profile(self.request.user.username):
+                    # Private dataset
+                    self.redirectpage = reverse("collpriv_details", kwargs={'pk': instance.id})
+                else:
+                    # Public dataset
+                    self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id})
+
+            # Check for hlist saving
+            self.check_hlist(instance)
         return None
 
     def add_to_context(self, context, instance):
@@ -9702,11 +9936,53 @@ class CommentEdit(BasicDetails):
     model = Comment        
     mForm = None        # We are not using a form here!
     prefix = 'com'
-    title = "UserCommentEdit"
+    title = "User Comment"
     new_button = False
     # no_delete = True
     permission = "readonly"
     mainitems = []
+
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
+
+        try:
+            arg_hlist = "cresp-hlist"
+            arg_savenew = "cresp-savenew"
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                # Interpret the savenew parameter
+                savenew = self.qd[arg_savenew]
+
+                # Make sure we are not saving
+                self.do_not_save = True
+                # But that we do a new redirect
+                self.newRedirect = True
+
+                # Change the redirect URL
+                if self.redirectpage == "":
+                    self.redirectpage = reverse('comment_details', kwargs={'pk': instance.id})
+
+                # See if any need to be removed
+                existing_item_id = [str(x.id) for x in CommentResponse.objects.filter(comment=instance)]
+                delete_id = []
+                for item_id in existing_item_id:
+                    if not item_id in hlist:
+                        delete_id.append(item_id)
+                if len(delete_id)>0:
+                    lstQ = [Q(comment=instance)]
+                    lstQ.append(Q(**{"id__in": delete_id}))
+                    CommentResponse.objects.filter(*lstQ).delete()
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/check_hlist")
+            return False
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -9721,6 +9997,20 @@ class CommentEdit(BasicDetails):
                 {'type': 'plain', 'label': "Item type:",    'value': instance.get_otype()},
                 {'type': 'safe',  'label': "Link:",         'value': self.get_link(instance)}
                 ]
+
+            # Check if we need to indicate that the comment has been read
+            thisprofile = self.request.user.user_profiles.first()
+            qs = CommentRead.objects.filter(comment=instance, profile=thisprofile)
+            if qs.count() == 0:
+                # Add that we have read it
+                obj = CommentRead.objects.create(comment=instance, profile=thisprofile)
+
+            # Figure out who I am
+            profile = self.request.user.user_profiles.first()
+            context['profile'] = profile
+
+            # provide a button for the user to add a response to the comment
+            context['after_details'] = render_to_string("seeker/comment_response.html", context, self.request)
 
         except:
             msg = oErr.get_error_message()
@@ -9758,6 +10048,236 @@ class CommentEdit(BasicDetails):
 class CommentDetails(CommentEdit):
     """Like Comment Edit, but then html output"""
     rtype = "html"
+
+    def custom_init(self, instance):
+        if not instance is None:
+            self.check_hlist(instance)
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Start by executing the standard handling
+        super(CommentDetails, self).add_to_context(context, instance)
+
+        def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None, editable=None, 
+                         colspan=None, html=None):
+            oAdd = dict(value=value, editable=False)
+            if resizable: oAdd['initial'] = 'small'
+            if title != None: oAdd['title'] = title
+            if align != None: oAdd['align'] = align
+            if link != None: oAdd['link'] = link
+            if main != None: oAdd['main'] = main
+            if draggable != None: oAdd['draggable'] = draggable
+            if not colspan is None: oAdd['colspan'] = colspan
+            if not editable is None: oAdd['editable'] = editable
+            if not html is None: oAdd['html'] = html
+            rel_item.append(oAdd)
+            return True
+
+        username = self.request.user.username
+        team_group = app_editor
+
+        # Authorization: only app-editors may edit!
+        bMayEdit = user_is_ingroup(self.request, team_group)
+        bEditableResponse = user_is_superuser(self.request) # True
+
+        # On top of that (see issue #601): only editors may see the comment responses!!
+            
+        # All PDs: show the content
+        related_objects = []
+        lstQ = []
+        rel_list =[]
+        resizable = True
+        index = 1
+        sort_start = ""
+        sort_start_int = ""
+        sort_end = ""
+        if bMayEdit:
+            sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+            sort_end = '</span>'
+
+        oErr = ErrHandle()
+
+        try:
+
+            # Additional sections
+            context['sections'] = []
+
+            # (see issue #601): only editors may see the comment responses!!
+            if bMayEdit:
+
+                # The choice is between an editable and a non-editable response
+                if not bEditableResponse:
+
+                    # [1] =============================================================
+                    # Get all 'CommentResponse' objects that are part of this 'Comment'
+                    responses = dict(title="Response(s) to this comment", prefix="cresp")
+                    if resizable: responses['gridclass'] = "resizable"
+                    responses['savebuttons'] = bMayEdit
+                    responses['saveasbutton'] = True
+                    responses['classes'] = ''
+                
+                    rel_list =[]
+                    # Get a queryset with CommentResponse objects, newest first
+                    qs_resp = instance.comment_cresponses.all().order_by('-created')
+
+                    # Walk these collection sermons
+                    for idx, obj in enumerate(qs_resp):
+                        rel_item = []
+                        # The item is the actual response
+                        item = obj
+                        order = idx + 1
+
+                        # Get the URL to this response
+                        url = reverse('commentresponse_details', kwargs={'pk': obj.id})
+
+                        # Response: Order from enumeration
+                        add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
+
+                        # Response: person who responded
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url) #, False)
+
+                        # Response: The response itself
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, main=True) #, False)
+
+                        # Response: Date of the response
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url) #, False)
+
+                        # Actions that can be performed on this item
+                        if bMayEdit:
+                            add_one_item(rel_item, self.get_actions())
+
+                        # Add this line to the list
+                        rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+                    responses['rel_list'] = rel_list
+                    responses['columns'] = [
+                        '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                        '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                        ]
+                    if bMayEdit:
+                        responses['columns'].append("")
+                    related_objects.append(responses)
+
+                else:
+                    # [2] =============================================================
+                    # EXPERIMENT: editable individual responses
+                    #
+                    # Get all 'CommentResponse' objects that are part of this 'Comment'
+                    ediresps = dict(title="Response(s) to this comment", prefix="cresp")
+                    if resizable: ediresps['gridclass'] = "resizable"
+                    ediresps['savebuttons'] = bMayEdit
+                    ediresps['saveasbutton'] = True
+                    ediresps['classes'] = ''
+                    ediresps['editable'] = True
+
+                    rel_list =[]
+                    # Get a queryset with CommentResponse objects, newest first
+                    qs_resp = instance.comment_cresponses.all().order_by('-created')
+
+                    # Walk these collection sermons
+                    for idx, obj in enumerate(qs_resp):
+                        rel_item = []
+                        # The item is the actual response
+                        item = obj
+                        order = idx + 1
+
+                        # Get the URL to this response
+                        url = reverse('commentresponse_details', kwargs={'pk': obj.id})
+
+                        # Response: Order from enumeration
+                        add_one_item(rel_item, order, False, align="right", link=url, draggable=True)
+
+                        # Response: person who responded
+                        sHtml = self.get_editable_form(obj)
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "person"), resizable, link=url, editable=True, colspan=3, html=sHtml) 
+
+                        # Response: The response itself
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "content"), resizable, link=url, editable=True,  main=True) 
+
+                        # Response: Date of the response
+                        add_one_item(rel_item, self.get_field_value("cresp", item, "created"), resizable, link=url, editable=True, ) 
+
+                        # Actions that can be performed on this item
+                        if bMayEdit:
+                            add_one_item(rel_item, self.get_actions())
+
+                        # Add this line to the list
+                        rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+                    ediresps['rel_list'] = rel_list
+                    ediresps['columns'] = [
+                        '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                        '{}<span title="Person">Person</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Response">Response</span>{}'.format(sort_start, sort_end), 
+                        '{}<span title="Date of the response">Date</span>{}'.format(sort_start, sort_end)
+                        ]
+                    if bMayEdit:
+                        ediresps['columns'].append("")
+                    related_objects.append(ediresps)
+
+            # Lists of related objects
+            context['related_objects'] = related_objects
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentDetails/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_actions(self):
+        html = []
+        buttons = ['remove']    # This contains all the button names that need to be added
+
+        # Start the whole div
+        html.append("<div class='blinded'>")
+        
+        # Add components
+        if 'remove' in buttons: 
+            html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
+
+        # Finish up the div
+        html.append("&nbsp;</div>")
+
+        # COmbine the list into a string
+        sHtml = "\n".join(html)
+        # Return out HTML string
+        return sHtml
+
+    def get_editable_form(self, obj):
+        """Get HTML with a <form> to define the editable fields' values"""
+
+        template_name ="seeker/comment_edit.html"
+        edifields = ['profile', 'content' ]
+        form = CommentResponseForm(instance=obj, prefix="cresp")
+        context = dict(form=form, instance=obj, edifields=edifields)
+        sBack = render_to_string(template_name, context, self.request)
+        return sBack
+
+    def get_field_value(self, type, instance, custom, kwargs=None):
+        sBack = ""
+
+        oErr = ErrHandle()
+        try:
+
+            if type == "cresp":
+                sBack, sTitle = "", ""
+                if custom == "person":
+                    sBack = instance.profile.user.username
+                elif custom == "content":
+                    sBack = instance.content
+                elif custom == "created":
+                    sBack = instance.get_created()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentDetails/get_field_value")
+
+        return sBack
     
 
 class CommentListView(BasicList):
@@ -9770,12 +10290,13 @@ class CommentListView(BasicList):
     plural_name = "User Comments"
     paginate_by = 20
     has_select2 = True
-    order_cols = ['created', 'profile__user__username', 'otype', '']
+    order_cols = ['created', 'profile__user__username', '', 'otype', '']
     order_default = ['-created', 'profile__user__username', 'otype']
     order_heads = [
         {'name': 'Timestamp',   'order': 'o=1', 'type': 'str', 'custom': 'created', 'main': True, 'linkdetails': True},
         {'name': 'User name',   'order': 'o=2', 'type': 'str', 'custom': 'username'},
-        {'name': 'Item Type',   'order': 'o=3', 'type': 'str', 'custom': 'otype'},
+        {'name': 'Response',    'order': '',    'type': 'str', 'custom': 'response'},
+        {'name': 'Item Type',   'order': 'o=4', 'type': 'str', 'custom': 'otype'},
         {'name': 'Link',        'order': '',    'type': 'str', 'custom': 'link'},
         ]
     filters = [ {"name": "Item type",   "id": "filter_otype",       "enabled": False},
@@ -9824,6 +10345,19 @@ class CommentListView(BasicList):
                 sBack = instance.profile.user.username
             elif custom == "created":
                 sBack = instance.get_created()
+                # Check if it has not been read
+                thisprofile = self.request.user.user_profiles.first()
+                if instance.profile.id != thisprofile.id:
+                    # This is not the same user, so check if it has been read
+                    bRead = (CommentRead.objects.filter(comment=instance, profile=thisprofile).count() > 0)
+                    if not bRead:
+                        # Not read: so bolden it
+                        sBack = "<b>{}</b>".format(sBack)
+            elif custom == "response":
+                sBack = "-"
+                last = instance.comment_cresponses.last()
+                if not last is None:
+                    sBack = last.get_created()
             elif custom == "otype":
                 sBack = instance.get_otype()
             elif custom == "link":
@@ -9872,6 +10406,162 @@ class CommentListView(BasicList):
         return sBack, sTitle
 
 
+# ================= COMMENT RESPONSE =============================
+
+class CommentResponseEdit(BasicDetails):
+    """The details of one comment"""
+
+    model = CommentResponse        
+    mForm = CommentResponseForm
+    prefix = 'comr'
+    prefix_type = "simple"
+    title = "Comment Response"
+    new_button = False
+    listview = None     # Initially no listview, but that listview will become the comment itself
+    listviewtitle = "User comment"
+    # no_delete = True
+    mainitems = []
+
+    def custom_init(self, instance):
+        # If this is an instance, then provide a link to the listview
+        if not instance is None and not instance.id is None:
+            self.listview = reverse('comment_details', kwargs={'pk': instance.comment.id})
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            # Figure out who I am
+            profile = self.request.user.user_profiles.first()
+
+            # If I have editing rights, no readonly
+            if not context['is_app_editor']:
+                self.permission = "readonly"
+
+            # print("CommentResponseEdit: add_to_context status #1 = {}".format(instance.status))
+
+            # Define the main items to show and edit
+            comment_id = None if instance.comment is None else instance.comment.id
+            profile_id = profile.id
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                # -------- HIDDEN field values ---------------
+                {'type': 'plain', 'label': "Comment id",    'value': comment_id,    'field_key': "comment", 'empty': 'hide'},
+                {'type': 'plain', 'label': "Profile id",    'value': profile_id,    'field_key': "profile", 'empty': 'hide'},
+                # --------------------------------------------
+                {'type': 'safe',  'label': "Comment:",      'value': instance.get_comment(),    },
+                {'type': 'plain', 'label': "Timestamp:",    'value': instance.get_saved(),      },
+                {'type': 'plain', 'label': "User name:",    'value': instance.profile.user.username,     },
+                {'type': 'safe',  'label': "Response:",     'value': instance.get_content(),   'field_key': "content"       },
+                {'type': 'plain', 'label': "Visible:",      'value': instance.get_visible(),   'field_key': "visible",
+                 'title': 'Indicate whether the response may be visible to other users in the Overview' },
+                {'type': 'plain', 'label': "Status:",       'value': instance.get_status(),     },
+                {'type': 'safe',  'label': "",              'value': self.get_button(instance), },
+                ]
+
+            #print("CommentResponseEdit: add_to_context status #2 = {}".format(instance.status))
+
+            # Note: this must always be here, to be ready
+            # provide a button for the user to add a response to the comment
+            context['response_id'] = instance.id
+            # Only show if there is content
+            if not instance.content is None and not instance.content == "":
+                context['after_details'] = render_to_string("seeker/commentresponse_send.html", context, self.request)
+            # print("CommentResponseEdit: add_to_context status #3 = {}".format(instance.status))
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponseEdit/add_to_context")
+
+        # Return the context we have made 
+        return context
+
+    def get_button(self, instance):
+        """Get a button to send this response, if needed
+        
+        NOTE: the BUTTON <a>...</a> is here, and gets displayed in the 'Edit' section
+              the FORM <form>...</form> that is called 'create_new_response' is loaded in 'after_details'
+        """
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if instance.status == "changed":
+                # The user should send it
+                lHtml = []
+                lHtml.append('<a class="btn btn-xs jumbo-3" role="button" ')
+                lHtml.append('   onclick="document.getElementById(\'send_response\').submit();">')
+                lHtml.append('<span class="glyphicon glyphicon-plus"></span>')
+                lHtml.append('Email this response</a>')
+                sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("")
+        return sBack
+
+
+class CommentResponseDetails(CommentResponseEdit):
+    """Like CommentResponse Edit, but then html output"""
+    rtype = "html"
+
+
+class CommentResponseSend(CommentResponseDetails):
+    """Actually send the response to a comment"""
+
+    initRedirect = True
+
+    def custom_init(self, instance):
+        data = dict(status="ok")
+        url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details", "hc": "collhist_details"}
+        obj_names = {"manu": "Manuscript", "sermo": "Sermon",
+                     "gold": "Sermon Gold", "super": "Authority file",
+                     "codi": "Codicological unit", "hc": "Historical collection"}
+       
+        oErr = ErrHandle()
+        try:
+            # Figure out where to go to after processing this
+            self.redirectpage = reverse('commentresponse_details', kwargs={'pk': instance.id})
+
+            if not instance is None and user_is_ingroup(self.request, app_editor):
+
+                comment = instance.comment
+                if not comment is None and not comment.content is None:
+                    # Whenever this commentresponses is saved, it should be sent to:
+                    recipient = comment.profile
+
+                    # Get the object from the comment
+                    obj = comment.get_object()
+                    otype = comment.otype
+                    objurl = reverse(url_names[otype], kwargs={'pk': obj.id})
+
+                    # Determine the context for the response email
+                    context = {}
+                    context['objurl'] = self.request.build_absolute_uri(objurl)
+                    context['objname'] = obj_names[otype]
+                    context['comdate'] = comment.get_created()
+                    context['user'] = comment.profile.user
+                    context['objcontent'] = comment.content
+                    context['respdate'] = instance.get_saved()
+                    context['respcontent'] = instance.get_content()
+
+                    # Now create the appropriate response email
+                    contents = render_to_string('seeker/commentresponse_mail.html', context, self.request)
+
+                    # And here is to the method that sends it
+                    instance.send_by_email(recipient, contents)
+
+                    print("CommentResponseSend: done")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponseSend")
+
+        return None
+
+
 # ================= MANUSCRIPT =============================
 
 class ManuscriptEdit(BasicDetails):
@@ -9903,27 +10593,23 @@ class ManuscriptEdit(BasicDetails):
                                          form=ManuscriptExtForm, min_num=0,
                                          fk_name = "manuscript",
                                          extra=0, can_delete=True, can_order=False)    
-    # Kan weg
-    MprojFormSet = inlineformset_factory(Manuscript, ManuscriptProject,
-                                         form=ManuscriptProjectForm, min_num=0,
-                                         fk_name = "manuscript",
+    MlinkFormSet = inlineformset_factory(Manuscript, ManuscriptLink,
+                                         form=ManuscriptLinkForm, min_num=0,
+                                         fk_name = "src",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = [# {'formsetClass': MdrFormSet,   'prefix': 'mdr',   'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
-                       {'formsetClass': MprojFormSet, 'prefix': 'mproj', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}
-                       ]
+    formset_objects = [
+        {'formsetClass': McolFormSet,  'prefix': 'mcol',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MlitFormSet,  'prefix': 'mlit',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MprovFormSet, 'prefix': 'mprov', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MextFormSet,  'prefix': 'mext',  'readonly': False, 'noinit': True, 'linkfield': 'manuscript'},
+        {'formsetClass': MlinkFormSet, 'prefix': 'mlink', 'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_PARTIAL }], 'clean': True},
+        #{'formsetClass': MprojFormSet, 'prefix': 'mproj', 'readonly': False, 'noinit': True, 'linkfield': 'manuscript'}
+        ]
     
     form_objects = [{'form': ManuReconForm, 'prefix': 'mrec', 'readonly': False}]
 
-    stype_edi_fields = [# 'name', 'support', 'extent', 'format', 
-                        # 'CollectionMan', 'collist',
-                        # 'ProvenanceMan', 'mprovlist'
-                        # 'Daterange', 'datelist',
-                        'library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
+    stype_edi_fields = ['library', 'lcountry', 'lcity', 'idno', 'origin', 'source', #'project', # PROJECT_MOD_HERE
                         'hierarchy',
                         'LitrefMan', 'litlist',
                         'ManuscriptExt', 'extlist']
@@ -10016,8 +10702,10 @@ class ManuscriptEdit(BasicDetails):
                     # Project2 HIER
                     {'type': 'plain', 'label': "Project:", 'value': instance.get_project_markdown2()},
 
-                    {'type': 'plain', 'label': "Provenances:",  'value': self.get_provenance_markdown(instance), 
-                        'multiple': True, 'field_list': 'mprovlist', 'fso': self.formset_objects[2] }
+                    {'type': 'plain', 'label': "Provenances:",          'value': self.get_provenance_markdown(instance), 
+                        'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
+                    {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
+                        'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -10127,8 +10815,14 @@ class ManuscriptEdit(BasicDetails):
                 # Get the codico details URL
                 url = reverse("codico_details", kwargs={'pk': codico.id})
                 url_manu = reverse("manuscript_details", kwargs={'pk': codico.manuscript.id})
+                # Get the list of manuscripts that use this codico
+                manu_recons = []
+                for recon in codico.codicoreconstructions.filter(manuscript__mtype='rec'):
+                    url_recon = reverse("manuscript_details", kwargs={'pk': recon.manuscript.id})
+                    manu_recons.append(url_recon)
                 # Add the information to the codico list
-                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), codico_id=codico.id) )
+                codico_list.append( dict(url=url, url_manu=url_manu, kvlist=self.get_kvlist(codico, instance), 
+                                         codico_id=codico.id, recons=manu_recons) )
             context['codico_list'] = codico_list
 
             # Make sure to add the mtype to the context
@@ -10148,6 +10842,9 @@ class ManuscriptEdit(BasicDetails):
 
             # Store the after_details in the context
             context['after_details'] = "\n".join(lhtml)
+
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('manuscript_details', instance)
 
         except:
             msg = oErr.get_error_message()
@@ -10223,6 +10920,17 @@ class ManuscriptEdit(BasicDetails):
         context = dict(codi=codico)
         sBack = render_to_string("seeker/codi_provs.html", context, self.request)
         return sBack
+
+    def get_form_kwargs(self, prefix):
+        # This is for manulink
+
+        oBack = None
+        if prefix == "mlink":
+            if self.object != None:
+                # Make sure to return the ID of the Manuscript
+                oBack = dict(manu_id=self.object.id)
+
+        return oBack
 
     def get_provenance_markdown(self, instance):
         """Calculate a collapsible table view of the provenances for this manuscript, for Manu details view"""
@@ -10340,13 +11048,48 @@ class ManuscriptEdit(BasicDetails):
                     newurl = cleaned.get('newurl')
                     if newurl:
                         form.instance.url = newurl
-                elif prefix == "mproj":
-                    proj_new = cleaned.get("proj_new")
-                    if proj_new != None:
-                        form.instance.project = proj_new
+                #elif prefix == "mproj":
+                #    proj_new = cleaned.get("proj_new")
+                #    if proj_new != None:
+                #        form.instance.project = proj_new
 
                     # Note: it will get saved with [sub]form.save()
 
+                elif prefix == "mlink":
+                    # Process the link from M to M
+                    newmanu = cleaned.get("newmanu")
+                    if not newmanu is None:
+                        # There also must be a linktype
+                        if 'newlinktype' in cleaned and cleaned['newlinktype'] != "":
+                            linktype = cleaned['newlinktype']
+                            # Get optional parameters
+                            note = cleaned.get('note', None)
+                            # Check existence
+                            obj = ManuscriptLink.objects.filter(src=instance, dst=newmanu, linktype=linktype).first()
+                            if obj == None:
+                                manu = Manuscript.objects.filter(id=newmanu.id).first()
+                                if manu != None:
+
+                                    # Set the right parameters for creation later on
+                                    form.instance.linktype = linktype
+                                    form.instance.dst = manu
+                                    if note != None and note != "": 
+                                        form.instance.note = note
+
+                                    # Double check reverse
+                                    if linktype in LINK_BIDIR_MANU:
+                                        rev_link = ManuscriptLink.objects.filter(src=manu, dst=instance).first()
+                                        if rev_link == None:
+                                            # Add it
+                                            rev_link = ManuscriptLink.objects.create(src=manu, dst=instance, linktype=linktype)
+                                        else:
+                                            # Double check the linktype
+                                            if rev_link.linktype != linktype:
+                                                rev_link.linktype = linktype
+                                        if note != None and note != "": 
+                                            rev_link.note = note
+                                        rev_link.save()
+                    # Note: it will get saved with form.save()
 
             else:
                 errors.append(form.errors)
@@ -10407,6 +11150,42 @@ class ManuscriptEdit(BasicDetails):
             # (5) 'provenances'Select a provenance...
             mprovlist = form.cleaned_data['mprovlist']
             adapt_m2m(ProvenanceMan, instance, "manuscript", mprovlist, "provenance", extra=['note'], related_is_through = True)
+
+            # (6) Related manuscript links...
+            mlinklist = form.cleaned_data['mlinklist']
+            manu_added = []
+            manu_deleted = []
+            adapt_m2m(ManuscriptLink, instance, "src", mlinklist, "dst", 
+                      extra = ['linktype', 'note'], related_is_through=True,
+                      added=manu_added, deleted=manu_deleted)
+            # Check for partial links in 'deleted'
+            for obj in manu_deleted:
+                # This if-clause is not needed: anything that needs deletion should be deleted
+                # if obj.linktype in LINK_BIDIR:
+                # First find and remove the other link
+                reverse = ManuscriptLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                if reverse != None:
+                    reverse.delete()
+                # Then remove myself
+                obj.delete()
+            # Make sure to add the reverse link in the bidirectionals
+            for obj in manu_added:
+                if obj.linktype in LINK_BIDIR_MANU:
+                    # Find the reversal
+                    reverse = ManuscriptLink.objects.filter(src=obj.dst, dst=obj.src, linktype=obj.linktype).first()
+                    if reverse == None:
+                        # Create the reversal 
+                        reverse = ManuscriptLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Possibly copy note
+                        if obj.note != None and obj.note != "":
+                          reverse.note = obj.note
+                          bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                          reverse.save()
+
 
             # (6) 'projects'
             projlist = form.cleaned_data['projlist']
@@ -10883,12 +11662,29 @@ class ManuscriptCodico(ManuscriptDetails):
                     else:
                         # This is a common manuscript (or a template, but I'm not sure that should be allowed)
                         delete_lst = []
+                        preceding_lst = []
                         current_lst = [x.id for x in manu.manuscriptcodicounits.all().order_by('order')]
+                        prev_id = None
                         for id in current_lst:
                             if id not in codico_lst:
                                 delete_lst.append(id)
+                                preceding_lst.append(prev_id)
+                            prev_id = id
+
                         # Remove the codico's that need deletion
                         if len(delete_lst) > 0:
+                            # First: re-attach the MsItems in this list to the 'previous' codico
+                            for idx, stale in enumerate(delete_lst):
+                                # Check out if there is a Codico preceding this stale one
+                                prev_id = preceding_lst[idx]
+                                if not prev_id is None:
+                                    prev = Codico.objects.filter(id=prev_id).first()
+                                    # Attach all 'previous' MsItems to the new codico
+                                    for item in MsItem.objects.filter(codico_id=stale):
+                                        item.codico = prev
+                                        item.save()
+
+                            # Second: remove the stale Codico's in one go
                             Codico.objects.filter(id__in=delete_lst).delete()
 
                         # Double check the order of the items
@@ -10913,6 +11709,7 @@ class ManuscriptCodico(ManuscriptDetails):
                             if msitem.order != order:
                                 do_order.append(dict(obj=msitem, order=order))
                             order += 1
+
                         with transaction.atomic():
                             for oItemOrder in do_order:
                                 obj = oItemOrder['obj']
@@ -11013,7 +11810,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'manuid',        'dbfield': 'idno',                   'keyS': 'idno',          'keyList': 'manuidlist', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'library__lcountry',      'keyS': 'country_ta',    'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',          'fkfield': 'library__lcity|library__location',         
-                                                                             'keyS': 'city_ta',       'keyId': 'city',        'keyFk': "name"},
+                                                                             'keyS': 'cityloc_ta',    'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'library',                'keyS': 'libname_ta',    'keyId': 'library',     'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'manuscriptcodicounits__provenances__location|manuscriptcodicounits__provenances',  
              'keyS': 'prov_ta',       'keyId': 'prov',        'keyFk': "name"},  
@@ -11290,148 +12087,159 @@ class ManuscriptListView(BasicList):
         #prjlist = None # old
         projlist = None
 
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        oErr = ErrHandle()
+        try:
+
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
        
-        # Check if a list of projects is given
-        if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
-            # Get the list
-            projlist = fields['projlist']
+            # Check if a list of projects is given
+            if 'projlist' in fields and fields['projlist'] != None and len(fields['projlist']) > 0:
+                # Get the list
+                projlist = fields['projlist']
 
-        ## Check if the prjlist is identified
-        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-        #    # Get the default project
-        #    qs = Project.objects.all()
-        #    if qs.count() > 0:
-        #        prj_default = qs.first()
-        #        qs = Project.objects.filter(id=prj_default.id)
-        #        fields['prjlist'] = qs
-        #        prjlist = qs
-
-        # Check if an overlap percentage is specified
-        if 'overlap' in fields and fields['overlap'] != None:
-            # Get the overlap
-            overlap = fields.get('overlap', "0")
-            # Use an overt truth 
-            fields['overlap'] = Q(mtype="man")
-            if 'collist_hist' in fields and fields['collist_hist'] != None:
-                coll_list = fields['collist_hist']
-                if len(coll_list) > 0:
-                    # Yes, overlap specified
-                    if isinstance(overlap, int):
-                        # Make sure the string is interpreted as an integer
-                        overlap = int(overlap)
-                        # Now add a Q expression
-                        fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
-
-                        # Make sure to actually *calculate* the overlap between the different collections and manuscripts
-                
-                        # (1) Possible manuscripts only filter on: mtype=man, prjlist
-                        lstQ = []
-                        # if prjlist != None: lstQ.append(Q(project__in=prjlist))
-                        lstQ.append(Q(mtype="man"))
-                        lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
-                        manu_list = Manuscript.objects.filter(*lstQ)
-
-                        # We also need to have the profile
-                        profile = Profile.get_user_profile(self.request.user.username)
-                        # Now calculate the overlap for all
-                        with transaction.atomic():
-                            for coll in coll_list:
-                                for manu in manu_list:
-                                    ptc = CollOverlap.get_overlap(profile, coll, manu)
-                if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
-                    # The base manuscripts with which the comparison goes
-                    base_manu_list = fields['cmpmanuidlist']
-                    if len(base_manu_list) > 0:
+            # Check if an overlap percentage is specified
+            if 'overlap' in fields and fields['overlap'] != None:
+                # Get the overlap
+                overlap = fields.get('overlap', "0")
+                # Use an overt truth 
+                fields['overlap'] = Q(mtype="man")
+                if 'collist_hist' in fields and fields['collist_hist'] != None:
+                    coll_list = fields['collist_hist']
+                    if len(coll_list) > 0:
                         # Yes, overlap specified
                         if isinstance(overlap, int):
                             # Make sure the string is interpreted as an integer
                             overlap = int(overlap)
                             # Now add a Q expression
-                            # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
-                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
 
-                            # (1) Get a list of SSGs associated with these manuscripts
-                            base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
-                            base_ssg_list = [x['id'] for x in base_ssg_list]
-                            base_count = len(base_ssg_list)
+                            # Make sure to actually *calculate* the overlap between the different collections and manuscripts
                 
-                            # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                            # (1) Possible manuscripts only filter on: mtype=man, prjlist
                             lstQ = []
                             # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                             lstQ.append(Q(mtype="man"))
-                            lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                            lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
 
                             # We also need to have the profile
                             profile = Profile.get_user_profile(self.request.user.username)
                             # Now calculate the overlap for all
-                            manu_include = []
                             with transaction.atomic():
-                                for manu in manu_list:
-                                    # Get a list of SSG id's associated with this particular manuscript
-                                    manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
-                                    if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
-                                        # Add this manuscript to the list 
-                                        if not manu.id in manu_include:
-                                            manu_include.append(manu.id)
-                            fields['cmpmanuidlist'] = None
-                            fields['cmpmanu'] = Q(id__in=manu_include)
+                                for coll in coll_list:
+                                    for manu in manu_list:
+                                        ptc = CollOverlap.get_overlap(profile, coll, manu)
+                    if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
+                        # The base manuscripts with which the comparison goes
+                        base_manu_list = fields['cmpmanuidlist']
+                        if len(base_manu_list) > 0:
+                            # Yes, overlap specified
+                            if isinstance(overlap, int):
+                                # Make sure the string is interpreted as an integer
+                                overlap = int(overlap)
+                                # Now add a Q expression
+                                # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                                # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+
+                                # (1) Get a list of SSGs associated with these manuscripts
+                                base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
+                                base_ssg_list = [x['id'] for x in base_ssg_list]
+                                base_count = len(base_ssg_list)
+                
+                                # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
+                                lstQ = []
+                                # if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                                lstQ.append(Q(mtype="man"))
+                                lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
+                                manu_list = Manuscript.objects.filter(*lstQ)
+
+                                # We also need to have the profile
+                                profile = Profile.get_user_profile(self.request.user.username)
+                                # Now calculate the overlap for all
+                                manu_include = []
+                                with transaction.atomic():
+                                    for manu in manu_list:
+                                        # Get a list of SSG id's associated with this particular manuscript
+                                        manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
+                                        if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
+                                            # Add this manuscript to the list 
+                                            if not manu.id in manu_include:
+                                                manu_include.append(manu.id)
+                                fields['cmpmanuidlist'] = None
+                                fields['cmpmanu'] = Q(id__in=manu_include)
+
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(manuscriptcodicounits__codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(manuscriptcodicounits__codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(manuscriptcodicounits__codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(manuscriptcodicounits__codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
 
 
-        # Adapt the bible reference list
-        bibrefbk = fields.get("bibrefbk", "")
-        if bibrefbk != None and bibrefbk != "":
-            bibrefchvs = fields.get("bibrefchvs", "")
+            # Adapt the bible reference list
+            bibrefbk = fields.get("bibrefbk", "")
+            if bibrefbk != None and bibrefbk != "":
+                bibrefchvs = fields.get("bibrefchvs", "")
 
-            # Get the start and end of this bibref
-            start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+                # Get the start and end of this bibref
+                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
 
-            # Find out which manuscripts have sermons having references in this range
-            lstQ = []
-            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-            lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-            manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
+                # Find out which manuscripts have sermons having references in this range
+                lstQ = []
+                lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                lstQ.append(Q(manuitems__itemsermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                manulist = [x.id for x in Manuscript.objects.filter(*lstQ).order_by('id').distinct()]
 
-            fields['bibrefbk'] = Q(id__in=manulist)
+                fields['bibrefbk'] = Q(id__in=manulist)
 
-        # Make sure we only show manifestations
-        # fields['mtype'] = 'man'
-        # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
+            # Make sure we only show manifestations
+            # fields['mtype'] = 'man'
+            # Make sure we show MANUSCRIPTS (identifiers) as well as reconstructions
 
-        # Make sure we only use the Authority Files with accepted modifications
-        # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def')        
-        # With this condition we make sure ALL manuscripts are in de unfiltered listview
-        print (fields['passimcode'])
-        if fields['passimcode'] != '':
-            fields['atype'] = 'acc'
+            # Make sure we only use the Authority Files with accepted modifications
+            # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def')        
+            # With this condition we make sure ALL manuscripts are in de unfiltered listview
+            print (fields['passimcode'])
+            if fields['passimcode'] != '':
+                fields['atype'] = 'acc'
        
-        lstExclude = [ Q(mtype='tem') ]
+            lstExclude = [ Q(mtype='tem') ]
         
-        # Adapt the search for empty authors
-        # Hoe komen we aan dat authortype? Waar komt die bij sermon list view vandaan? EK vragen
-        if 'authortype' in fields:
-            authortype = fields['authortype']
-            if authortype == "non":
-                # lstExclude = []
-                lstExclude.append(Q(manuitems__itemsermons__author__isnull=False))
-            elif authortype == "spe":
-                # lstExclude = []
-                lstExclude.append(Q(manuitems__itemsermons__author__isnull=True))
-            else:
-                # Reset the authortype
-                fields['authortype'] = ""   
+            # Adapt the search for empty authors
+            # Hoe komen we aan dat authortype? Waar komt die bij sermon list view vandaan? EK vragen
+            if 'authortype' in fields:
+                authortype = fields['authortype']
+                if authortype == "non":
+                    # lstExclude = []
+                    lstExclude.append(Q(manuitems__itemsermons__author__isnull=False))
+                elif authortype == "spe":
+                    # lstExclude = []
+                    lstExclude.append(Q(manuitems__itemsermons__author__isnull=True))
+                else:
+                    # Reset the authortype
+                    fields['authortype'] = ""   
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
@@ -12079,29 +12887,41 @@ class CodicoListView(BasicList):
         lstExclude=None
         qAlternative = None
 
-        # prjlist = None
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        oErr = ErrHandle()
+        try:
 
-        ## Check if the prjlist is identified
-        #if fields['prjlist'] == None or len(fields['prjlist']) == 0:
-        #    # Get the default project
-        #    qs = Project.objects.all()
-        #    if qs.count() > 0:
-        #        prj_default = qs.first()
-        #        qs = Project.objects.filter(id=prj_default.id)
-        #        fields['prjlist'] = qs
-        #        prjlist = qs
+            # prjlist = None
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
+
+            # Process the date range stuff
+            date_from = fields.get("date_from")
+            date_until = fields.get("date_until")
+            if not date_from is None and not date_until is None:
+                # Both dates are specified: include looking for overlap
+                qThis_a = Q(codico_dateranges__yearstart__gte=date_from)
+                qThis_b = Q(codico_dateranges__yearstart__lte=date_until)
+                qThis_c = Q(codico_dateranges__yearfinish__lte=date_until)
+                qThis_d = Q(codico_dateranges__yearfinish__gte=date_from)
+                qThis_1 =  ( qThis_a &  ( qThis_b |  qThis_c ) )
+                qThis_2 =  ( qThis_c &  ( qThis_d |  qThis_a ) )
+                qThis = ( qThis_1 | qThis_2 )
+                fields['date_from'] = qThis
+                fields['date_until'] = ""
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CodicoListView/adapt_search")
 
         return fields, lstExclude, qAlternative
 
@@ -12824,6 +13644,10 @@ class EqualGoldEdit(BasicDetails):
             # Add transcription file, if possible
             if user_is_ingroup(self.request, app_editor):
                 context['mainitems'].append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+
+                # Make sure the spectypes are checked
+                instance.check_links()
+
             # some more items
             mainitems_add = [
                 # Hier project    
@@ -12932,6 +13756,9 @@ class EqualGoldEdit(BasicDetails):
             # Signal that we have select2
             context['has_select2'] = True
 
+            # Make stable URI available
+            context['stable_uri'] = self.get_abs_uri('equalgold_details', instance)
+
             # Test if the code to "add a new sermon gold" may be safely added or not
             if instance.moved is None:
                 self.new_button = True
@@ -12962,15 +13789,23 @@ class EqualGoldEdit(BasicDetails):
             # Get the text
             if not instance.fulltext is None and instance.fulltext != "":
                 sText = instance.get_fulltext_markdown("actual", lowercase=False)
+                # Get URL of deleting transcription
+                transdelurl = reverse('equalgold_transdel', kwargs={'pk': instance.id})
+                sInfo = instance.fullinfo
+                oInfo = {}
+                if not sInfo is None:
+                    oInfo = json.loads(sInfo)
+                wordcount = oInfo.get("wordcount", 0)
                 # Combine with button click + default hidden
-                html = []
-                html.append("<div><a class='btn btn-xs jumbo-1' role='button' data-toggle='collapse' data-target='#trans_fulltext'>Show/hide</a></div>")
-                html.append("<div class='collapse' id='trans_fulltext'>{}</div>".format(sText))
-                # Combine
-                sBack = "\n".join(html)
+                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                               delete_message="",
+                               wordcount=wordcount,
+                               transdelurl=transdelurl,
+                               fulltext=sText)
+                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("EqualGold/get_transcription")
+            oErr.DoError("EqualGoldEdit/get_transcription")
         return sBack
 
     def get_goldset_html(goldlist):
@@ -13481,7 +14316,7 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
-
+            
             # Possibly read transcription if this is 'new'
             if 'transcription' in form.changed_data:
                 # Try to read the updated transcription
@@ -13489,7 +14324,10 @@ class EqualGoldEdit(BasicDetails):
                 # Are we okay?
                 sStatus = oTranscription.get("status", "")
                 sText = oTranscription.get("text", "")
+                iWordcount = oTranscription.get("wordcount", 0)
+                oFullInfo = dict(wordcount=iWordcount)
                 if sStatus == "ok" and sText != "":
+                    instance.fullinfo = json.dumps(oFullInfo)
                     instance.fulltext = sText
                     instance.save()
 
@@ -13523,6 +14361,12 @@ class EqualGoldEdit(BasicDetails):
 
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
+
+    #def custom_init(self, instance):
+    #    # Make sure the spectypes are checked
+    #    if not instance is None:
+    #        instance.check_links()
+    #    return None
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -13768,6 +14612,30 @@ class EqualGoldDetails(EqualGoldEdit):
         return bBack, msg
 
 
+class EqualGoldTransDel(EqualGoldDetails):
+    """Remove the fulltrans from this SSG"""
+
+    initRedirect = True
+
+    def custom_init(self, instance):
+        oErr = ErrHandle()
+        try:
+            # Check ... something
+            if not instance is None:
+                # Make sure to set the correct redirect page
+                self.redirectpage = reverse("equalgold_details", kwargs={'pk': instance.id})
+                # Remove the transcription
+                instance.srchfulltext = None
+                instance.fulltext = None
+                instance.transcription = None
+                instance.save()
+                # Now it's all been deleted
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldTransDel/custom_init")
+        return None
+
+
 class EqualGoldUserKeyword(EqualGoldDetails):
     """This version only looks at one kind of data: the ukwlist"""
 
@@ -13812,8 +14680,8 @@ class EqualGoldListView(BasicList):
     bUseFilter = True  
     plural_name = "Authority Files"
     sg_name = "Authority File"
-    order_cols = ['code', 'author', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
-    order_default= order_cols
+    order_cols = ['author__name', 'code', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype'] 
+    order_default= ['code', 'author__name', 'firstsig', 'srchincipit', '', 'scount', 'sgcount', 'ssgcount', 'hccount', 'stype']
     order_heads = [
         {'name': 'Author',                  'order': 'o=1', 'type': 'str', 'custom': 'author', 'linkdetails': True},
 
@@ -13826,15 +14694,15 @@ class EqualGoldListView(BasicList):
         {'name': 'Incipit ... Explicit',    'order': 'o=4', 'type': 'str', 'custom': 'incexpl', 'main': True, 'linkdetails': True,
          'title': "The incipit...explicit that has been chosen for this Authority file"},        
         {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
-        {'name': 'Manifestations',          'order': 'o=5'   , 'type': 'int', 'custom': 'scount',
+        {'name': 'Manifestations',          'order': 'o=6'   , 'type': 'int', 'custom': 'scount',
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
-        {'name': 'Contains',                'order': 'o=6'   , 'type': 'int', 'custom': 'size',
+        {'name': 'Contains',                'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Links',                   'order': 'o=7'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
-        {'name': 'Hist. Coll.',             'order': 'o=8'   , 'type': 'int', 'custom': 'hccount',
+        {'name': 'Hist. Coll.',             'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
-        {'name': 'Status',                  'order': 'o=9',   'type': 'str', 'custom': 'status'}        
+        {'name': 'Status',                  'order': 'o=10',   'type': 'str', 'custom': 'status'}        
         ]
     filters = [
         {"name": "Author",          "id": "filter_author",            "enabled": False},
@@ -13848,6 +14716,7 @@ class EqualGoldListView(BasicList):
         {"name": "Manifestation count", "id": "filter_scount",        "enabled": False},
         {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
+        {"name": "Transcription",   "id": "filter_transcr",           "enabled": False},        
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -13865,19 +14734,21 @@ class EqualGoldListView(BasicList):
            
            # {'filter': 'number',    'dbfield': 'number',            'keyS': 'number',
            #  'title': 'The per-author-sermon-number (these numbers are assigned automatically and have no significance)'},
-            {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'},
+            {'filter': 'scount',    'dbfield': 'soperator',         'keyS': 'soperator'         },
             {'filter': 'scount',    'dbfield': 'scount',            'keyS': 'scount',
-             'title': 'The number of sermons (manifestations) belonging to this Authority file'},
-            {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'},
+             'title': 'The number of sermons (manifestations) belonging to this Authority file' },
+            {'filter': 'transcr',   'dbfield': 'foperator',         'keyS': 'foperator'         },
+            {'filter': 'transcr',   'dbfield': 'srchfulltext',      'keyS': 'srchfulltext'      },
+            {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'       },
             {'filter': 'ssgcount',  'dbfield': 'ssgcount',          'keyS': 'ssgcount',
-             'title': 'The number of links an Authority file has to other Authority files'},
+             'title': 'The number of links an Authority file has to other Authority files'      },
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures',    'help': 'signature',
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code'},
-            {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'}            
+            {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'lstprojlist', 'infield': 'name'}            
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
@@ -14120,6 +14991,20 @@ class EqualGoldListView(BasicList):
         if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
             # Action depends on the operator
             fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
+
+        foperator = fields.get('foperator')
+        srchfulltext = fields.get('srchfulltext')
+        if not foperator is None and foperator != "":
+            # Choices are: "obl" and "txt"
+            if foperator == "obl":
+                # Just check whether a text is there or not
+                fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
+            else:
+                # Well, if we are really looking for the full text, we don't have to do anything
+                pass
+        elif not srchfulltext is None and srchfulltext != "":
+            # This just means that we are really looking for the full text
+            pass
         
         # Make sure we only show the SSG/AF's that have accepted modifications
         # (fields['atype'] = 'acc'), so exclude the others:
@@ -14372,6 +15257,198 @@ class EqualGoldTransDownload(EqualGoldVisDownload):
 class EqualGoldOverlapDownload(EqualGoldVisDownload):
     """Overlap graph"""
     vistype = "overlap"
+
+
+# ================= MANUSCRIPTLINK ========================
+
+class ManuscriptLinkEdit(BasicDetails):
+    model = ManuscriptLink
+    mForm = ManuscriptLinkForm
+    prefix = 'mlink'
+    title = "Manuscript link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this M is
+            self.listview = reverse('manuscript_details', kwargs={'pk': src.id})
+            self.listviewtitle = "Manuscript"
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
+        context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,        'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,        'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'safe',  'label': "Source manuscript:",    'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target manuscript:",    'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",            'value': instance.get_linktype_display(),   'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Note:",                 "value": instance.get_note(),               'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class ManuscriptLinkDetails(ManuscriptLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class ManuscriptLinkListView(BasicList):
+    """List manuscript link instances"""
+
+    model = ManuscriptLink
+    listform = ManuscriptLinkForm
+    has_select2 = True  # Check
+    prefix = "mlink"
+    bUseFilter = True  
+    plural_name = "Manuscript links"
+    sg_name = "Manuscript Link"
+    order_cols = ['src__idno', 'dst__idno', 'linktype'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True, 'main': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'id', 'keyList': 'dstlist', 'infield': 'id'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+
+        return sBack, sTitle
+
+
+# ================= SERMONDESCRLINK ======================
+
+class SermonDescrLinkEdit(BasicDetails):
+    model = SermonDescrLink
+    mForm = SermonDescrLinkForm
+    prefix = 'slink'
+    title = "Manifestation link"
+    new_button = False
+    mainitems = []
+    use_team_group = False
+    history_button = False
+    listview = None
+    listviewtitle = None
+
+    def custom_init(self, instance):
+        # Is this an instance?
+        if not instance is None and not instance.src is None:
+            # Figure out what the SRC is
+            src = instance.src
+            # Figure out what the details form for this S is
+            self.listview = reverse('sermon_details', kwargs={'pk': src.id})
+            self.listviewtitle = "Manifestation"
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        src_id = None if instance.src is None else instance.src.id
+        dst_id = None if instance.dst is None else instance.dst.id
+        context['mainitems'] = [
+            # -------- HIDDEN field values ---------------
+            {'type': 'plain', 'label': "Source id",     'value': src_id,        'field_key': "src", 'empty': 'hide'},
+            {'type': 'plain', 'label': "Target id",     'value': dst_id,        'field_key': "dst", 'empty': 'hide'},
+            # --------------------------------------------
+            {'type': 'safe',  'label': "Source sermon manifestation:",  'value': instance.src.get_view(True) },
+            {'type': 'safe',  'label': "Target sermon manifestation:",  'value': instance.dst.get_view(True) },
+            {'type': 'plain', 'label': "Link type:",                    'value': instance.get_linktype_display(),   'field_key': 'linktype'},
+            {'type': 'plain', 'label': "Note:",                         "value": instance.get_note(),               'field_key': 'note'},
+            ]
+
+        # Signal that we have select2
+        context['has_select2'] = True
+
+        # Return the context we have made
+        return context
+
+
+class SermonDescrLinkDetails(SermonDescrLinkEdit):
+    """The Details variant of Edit"""
+
+    rtype = "html"
+
+
+class SermonDescrLinkListView(BasicList):
+    """List manuscript link instances"""
+
+    model = SermonDescrLink
+    listform = SermonDescrLinkForm
+    has_select2 = True  # Check
+    prefix = "slink"
+    bUseFilter = True  
+    plural_name = "Sermon links"
+    sg_name = "Manifestation Link"
+    order_cols = ['src__idno', 'dst__idno', 'linktype'] 
+    order_default= order_cols
+    order_heads = [
+        {'name': 'Source AF',       'order': 'o=1', 'type': 'str', 'custom': 'src',         'linkdetails': True},
+        {'name': 'Target AF',       'order': 'o=2', 'type': 'str', 'custom': 'dst',         'linkdetails': True, 'main': True},
+        {'name': 'Link type',       'order': 'o=3', 'type': 'str', 'custom': 'linktype',    'linkdetails': True},
+        ]
+    filters = [
+        {"name": "Source",      "id": "filter_source",      "enabled": False},
+        {"name": "Target",      "id": "filter_target",      "enabled": False},
+        {"name": "Link type",   "id": "filter_linktype",    "enabled": False},
+               ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'source',      'fkfield': 'src',   'keyS': 'source',   'keyFk': 'id', 'keyList': 'srclist', 'infield': 'id'},
+            {'filter': 'target',      'fkfield': 'dst',   'keyS': 'target',   'keyFk': 'id', 'keyList': 'dstlist', 'infield': 'id'},
+            {'filter': 'linktype',    'dbfield': 'linktype',    'keyList': 'linktypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
+            ]},
+        ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+        if custom == "src":
+            sBack = instance.src.get_passimcode()
+        elif custom == "dst":
+            sBack = instance.dst.get_passimcode()
+        elif custom == "linktype":
+            sBack = instance.get_linktype_display()
+
+        return sBack, sTitle
 
 
 # ================= EQUALGOLDLINK ======================
@@ -15468,7 +16545,7 @@ class BasketUpdate(BasicPart):
 
             # Note: only operations in either of these two lists will be executed
             lst_basket_target = ["create", "add", "remove", "reset"]
-            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "dctlaunch"]
+            lst_basket_source = ["collcreate", "colladd", "rsetcreate", "rsetadd", "dctlaunch"]
 
             # Get our profile
             profile = Profile.get_user_profile(self.request.user.username)
@@ -15606,6 +16683,19 @@ class BasketUpdate(BasicPart):
                         name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
                         rset.name = name
                         rset.save()
+                    elif operation == "rsetadd":
+                        # Get the rsetone parameter
+                        if 'manuForm' in context:
+                            manuForm = context['manuForm']
+                            # Get the value: the ID
+                            rsetone_id = manuForm['rsetone'].value()
+                            if not rsetone_id is None or rsetone_id == "":
+                                # Get the researchset
+                                rset = ResearchSet.objects.filter(id=rsetone_id).first()
+                                # Set parameters to show upon return
+                                rseturl = reverse('researchset_details', kwargs={'pk': rset.id})
+                                rsetname = rset.name
+                                context['data'] = dict(collurl=rseturl, collname=rsetname)
                     elif operation == "dctlaunch":
                         # Save the current basket as a research-set that needs to receive a name
                         rset = ResearchSet.objects.create(
@@ -15633,8 +16723,8 @@ class BasketUpdate(BasicPart):
                                                            setlisttype="manu",
                                                            manuscript=item.manu)
 
-                        # Make sure to redirect to this instance -- but only for RSETCREATE and DCTLAUNCH
-                        if operation == "rsetcreate":
+                        # Make sure to redirect to this instance -- but only for RSETCREATE, RSETADD and DCTLAUNCH
+                        if operation in ["rsetcreate"]:
                             self.redirectpage = reverse('researchset_details', kwargs={'pk': rset.id})
                         elif operation == "dctlaunch":
                             # Get the default DCT for this ad-hoc ResearchSet

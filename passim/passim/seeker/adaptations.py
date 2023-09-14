@@ -12,6 +12,7 @@ from passim.settings import MEDIA_DIR
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
+from passim.basic.models import UserSearch
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -34,18 +35,19 @@ from passim.reader.views import read_kwcategories
 adaptation_list = {
     "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
                         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions'],
+                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
+                        'supplyname', 'usersearch_params'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
-        'hccount', 'scount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
+        'hccount', 'scount', 'sgcount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
-        'huwa_edilit_remove'],
+        'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check']    
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc']    
     }
 
 
@@ -358,6 +360,60 @@ def adapt_doublecodico():
     except:
         bResult = False
         msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_supplyname():
+    """Convert SUPPLY A NAME to an empty string"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Walk all codico's
+        with transaction.atomic():
+            for codico in Codico.objects.all():
+                if codico.name == "SUPPLY A NAME":
+                    codico.name = ""
+                    codico.save()
+        # Walk all manuscripts
+        with transaction.atomic():
+            for manu in Manuscript.objects.all():
+                if manu.name == "SUPPLY A NAME":
+                    manu.name = ""
+                    manu.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adapt_supplyname")
+        bResult = False
+    return bResult, msg
+
+def adapt_usersearch_params():
+    """Convert SUPPLY A NAME to an empty string"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Walk all UserSearch objects
+        with transaction.atomic():
+            for obj in UserSearch.objects.all():
+                # Get the 'params' string
+                sParams = obj.params
+                if sParams != "":
+                    oParams = json.loads(sParams)
+                    # Check if this is a dictionary or a list
+                    if isinstance(oParams, list):
+                        # It is a list - transform it
+                        oParams = dict(param_list = oParams, qfilter = [])
+                        obj.params = json.dumps(oParams)
+                        # Now save it
+                        obj.save()
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("adapt_usersearch_params")
+        bResult = False
     return bResult, msg
 
 def add_codico_to_manuscript(manu):
@@ -913,6 +969,21 @@ def adapt_scount():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_sgcount():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    
+    try:
+        # Walk all SSGs
+        with transaction.atomic():
+            for ssg in EqualGold.objects.all():
+                ssg.set_sgcount()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 def adapt_ssgcount():
     oErr = ErrHandle()
     bResult = True
@@ -1159,6 +1230,54 @@ def adapt_huwa_edilit_remove():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_searchable():
+    # Issue #522: mono-projectal SSGs must have atype 'acc'
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    fields_sermondescr = ['incipit', 'explicit', 'fulltext', 'title', 'subtitle', 'sectiontitle']
+    fields_equalgold = ['incipit', 'explicit', 'fulltext']
+    fields_sermongold = ['incipit', 'explicit']
+
+    def adapt_value(obj, field):
+        # Need to know the name of the [srch] field
+        srchfield = "srch{}".format(field)         
+        # Get current value of that srch-field           
+        srch_current = getattr(obj, srchfield)
+        if srch_current is None: srch_current = ""
+        # Get value as it should be
+        srch_new = get_searchable(getattr(obj, field))
+        # Compare and correct
+        if srch_current != srch_new:
+            setattr(obj, srchfield, srch_new)
+            obj.save()
+
+    try:
+        # Process SermonDescr
+        with transaction.atomic():
+            for obj in SermonDescr.objects.all():
+                for field in fields_sermondescr:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+        # Process EqualGold
+        with transaction.atomic():
+            for obj in EqualGold.objects.all():
+                for field in fields_equalgold:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+        # Process SermonGold
+        with transaction.atomic():
+            for obj in SermonGold.objects.all():
+                for field in fields_sermongold:
+                    # Adapt value if needed
+                    adapt_value(obj, field)
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
 
 
 # =========== Part of provenance_list ==================
@@ -1294,6 +1413,27 @@ def adapt_litref_check():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+
+def adapt_scope_hc():
+    """One-time change scope of HCs to public"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    name = "Passim"
+    try:
+        with transaction.atomic():
+            qs = Collection.objects.filter(settype="hc")
+            for obj_coll in qs:
+                if obj_coll.scope != "publ":
+                    obj_coll.scope = "publ"
+                    obj_coll.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 # =========== Part of literature_list ==================

@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+
+{% block scripts %}
+    {% load staticfiles %}
+    <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
+    <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
+    <script src="{% static 'basic/scripts/basic.js' %}"></script>
+    <script src="{% static 'basic/scripts/html2canvas.js' %}"></script>
+    <script src="{% static 'basic/scripts/htmlsvg2canvas.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="container body-content">
+  <h3>Stemmatology analysis</h3>
+  <div class="row">
+    <div class="col-md-12">
+      <p>This page monitors the analysis of stemmatology research set <span class="btn btn-xs jumbo-1">{{stemmaset_name|safe}}</span>.</p>
+      <h4>Authority files within this stemmatology research set</h4>
+      <table class="func-view" style="width: 100%;">
+        <thead>
+          <tr><th>#</th><th>Author</th><th>Passim code</th><th>Gryson/Clavis</th><th>size</th></tr>
+        </thead>
+        <tbody>
+          {% for ssg in stemmaset_ssgs %}
+            <tr>
+              <td valign="top">{{forloop.counter}}</td>
+              <td valign="top">{{ssg.author|safe}}</td>
+              <td valign="top">{{ssg.code|safe}}</td>
+              <td valign="top">{{ssg.siglist|safe}}</td>
+              <td valign="top" align="right">{{ssg.size|safe}}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="row"><div>&nbsp;</div></div>
+
+  {% if user.is_authenticated %}
+
+    <!-- Calculation of a StemmaSet -->
+    <fieldset class="module aligned" >
+      <div style="border: 1px solid darkgray; padding-top: 15px;  padding-bottom: 15px;">
+        <div class="row" >
+          <div class="col-md-12">
+            <h3 class="straight" style="margin-top: 0px; margin-left: 10px;">Stemmatology analysis</h3>
+            <p style="margin-top: 0px; margin-left: 10px;">
+              This monitors the Stemmatology analysis executed on the stemmaset above.
+            </p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-12">
+            <form id="calc_form_stemma" method="POST">
+               {% csrf_token %}
+
+              <div id="downloadcenter" class="hidden">
+                <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+                <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
+              </div>
+
+              <div class="row">&nbsp;</div>
+              <div class="row noform">
+                <div class="col-md-12">
+                  <span><a id="calc_start_stemma" class="btn btn-primary btn-xs" 
+                      calc-start="{% url 'stemma_start' stemmacalc_id %}" 
+                      calc-progress="{% url 'stemma_progress' stemmacalc_id %}" 
+                      onclick="ru.stemma.calc_start('stemma')">Start analysis of the stemmaset</a>
+                  </span>
+                </div>
+              </div>
+
+              <div class="row noform">
+                <div class="col-md-12">
+                  <div id="calc_progress_stemma" style="background-color: lightgoldenrodyellow;">
+                    <!-- This is where the progress will be reported -->
+                  </div>
+                </div>
+              </div>
+              <div class="row noform">
+                <div id="calc_details_stemma" class="col-md-12"></div>
+              </div>
+              <div class="row noform">
+                <div class="col-md-offset-6 col-md-6" align="right">
+                  {% include 'stemma/download.html' with downloadid="stemma" urlname="stemma_download" object_id=stemmacalc_id %}
+                </div>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </div>
+      <div class="">
+        <div id="calc_result_stemma" class="visborder">
+          <!-- This is where the SVG will arrive -->
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="row">&nbsp;</div>
+
+ 
+
+  {% else %}
+    <p>Since you are not logged in, no further processing of /entry information is possible.</p>
+  {% endif %}
+
+</div>
+
+
+{% endblock %}

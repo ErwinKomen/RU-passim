@@ -1,0 +1,48 @@
+<!-- facilitate adding a SSG/AF to a StemmaSet -->
+<div>
+  <a role="button" class="btn btn-xs jumbo-3" data-target=".related-original" data-toggle="collapse">Add an Authority File</a>
+</div>
+<div class="related-original collapse">
+  <form class="stemitem-main" targeturl="{% url 'stemmaset_add' instance.id %}">
+    {% csrf_token %}
+    <div class="hidden">
+      <input type="text" id="id_stemitemaction" name="stemitemaction" value="-" />
+    </div>
+
+    {% if stemitemForm.ssgone %}
+      <div id="stemitem-one" class="row">
+        <div class="col-md-12 pull-right">
+          <table style="width: 100%;">
+            <tbody>
+              <tr>
+                <!-- Allow selecting from available SSGs/AFs that contain transcription -->
+                <td style="width: 100%">{{stemitemForm.ssgone}}</td>
+              </tr>
+              <tr>
+                <td align="right">
+                  <!-- Button to cancel -->
+                  <a id="msel_rsetaddcancel" title="Cancel adding to a research set" 
+                      class="btn btn-sm jumbo-1" 
+                      onclick="ru.stemma.do_stemitem(this, 'cancel_item');">
+                    <span>Cancel</span>
+                  </a>
+
+                  <!-- Button to actually add to the chosen research set -->
+                  <a id="msel_rsetadd" title="Add selected items to a research set" 
+                      class="btn btn-sm jumbo-3" mode="add_item"
+                      onclick="ru.stemma.do_stemitem('.related-original .stemitem-main', 'add_item');"  >
+                    <span>Add to this stemma set</span>
+                  </a>
+
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+    {% endif %}
+
+  </form>
+</div>

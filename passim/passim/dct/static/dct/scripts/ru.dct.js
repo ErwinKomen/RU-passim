@@ -1998,6 +1998,127 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_savedsearch
+       *    Add or remove saved item request
+       *
+       */
+      do_savedsearch: function (elStart, sAction) {
+        var frm = null,
+            targeturl = "",
+            action = "",
+            searchid = "#savedsearchdetails",
+            resultid = "#savedsearchresult",
+            data = null;
+
+        try {
+          // Get to the form
+          frm = $(elStart).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the URL
+          targeturl = $(elStart).attr("targeturl");
+
+          // Show the waiting symbol
+          $(searchid).removeClass("in");
+          $(searchid).addClass("collapse");
+          $(resultid).html(loc_sWaiting);
+          $(resultid).removeClass("hidden");
+
+          // Double check
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  action = response['action'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else if (action !== undefined && action !== "") {
+                    switch (action) {
+                      case "deleted":
+                      case "removed":
+                        //// $(elStart).css("color", "gray");
+                        //$(elStart).removeClass("sitem-button-selected");
+                        //$(elStart).addClass("sitem-button");
+                        //$(elStart).html('<span class="glyphicon glyphicon-star-empty"></span>');
+                        //$(elStart).attr("title", "Add to your saved items");
+                        // Change the sitem action to be taken
+                        $("#id_sitemaction").val("add");
+                        break;
+                      case "script":
+                        // Provide warning that user attempted to enter a script name
+                        $(resultid).html("<span style='color: red'>SCRIPT??</span>");
+                        $(searchid).removeClass("collapse");
+                        $(searchid).addClass("in");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 8000);
+                        break;
+                      case "empty":
+                        // Give warning that name is empty
+                        $(resultid).html("<span style='color: red'>NAME??</span>");
+                        $(searchid).removeClass("collapse");
+                        $(searchid).addClass("in");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 8000);
+                        break;
+                      case "added":
+                        $(resultid).html("<span style='color: red'>saved</span>");
+                        setTimeout(function () {
+                          $(resultid).addClass("hidden");
+                        }, 3000);
+                        break;
+                    }
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+
+        } catch (ex) {
+          private_methods.errMsg("do_savedsearch", ex);
+        }
+      },
+
+      /**
        * do_saveditem
        *    Add or remove saved item request
        *
@@ -2096,6 +2217,105 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_sgroup
+       *    Add saved group, or cancel
+       *
+       */
+      do_sgroup: function (elStart, sAction) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            table = null,
+            action = "",
+            elSgroup = null,
+            sGroupNew = "",
+            sGroupName = "";
+
+        try {
+          frm = $(elStart).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Get the URL
+          targeturl = $(frm).attr("targeturl");
+
+          // Get the table
+          table = $(elStart).closest(".related-original").find("table.func-view.related.sel-table").first();
+
+          if (sAction === "add_sgroup") {
+
+            // Double check
+            $.post(targeturl, data, function (response) {
+              // Action depends on the response
+              if (response === undefined || response === null || !("status" in response)) {
+                private_methods.errMsg("No status returned");
+              } else {
+                switch (response.status) {
+                  case "ready":
+                  case "ok":
+                    // Should have a new target URL
+                    targeturl = response['targeturl'];
+                    action = response['action'];
+                    if (targeturl !== undefined && targeturl !== "") {
+                      // Go open that targeturl
+                      window.location = targeturl;
+                    } else if (action !== undefined && action !== "") {
+                      switch (action) {
+                        case "added":
+                          // Hide the interface
+                          $("#sgroup-add").addClass("collapse");
+                          $("#sgroup-add").removeClass("in");
+                          // Make sure that the savegroup name row is added to the table appropriately
+                          sGroupNew = response['sgroupnew'];
+                          // Add this to the table
+                          $(table).find("tbody:last-child").append(sGroupNew);
+                          break;
+                      }
+                    }
+                    break;
+                  case "error":
+                    if ("html" in response) {
+                      // Show the HTML in the targetid
+                      $(err).html(response['html']);
+                      // If there is an error, indicate this
+                      if (response.status === "error") {
+                        if ("msg" in response) {
+                          if (typeof response['msg'] === "object") {
+                            lHtml = []
+                            lHtml.push("Errors:");
+                            $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                            $(err).html(lHtml.join("<br />"));
+                          } else {
+                            $(err).html("Error: " + response['msg']);
+                          }
+                        } else {
+                          $(err).html("<code>There is an error</code>");
+                        }
+                      }
+                    } else {
+                      // Send a message
+                      $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                    }
+                    break;
+                  default:
+                    // Something went wrong -- show the page or not?
+                    $(err).html("The status returned is unknown: " + response.status);
+                    break;
+                }
+
+              }
+            });
+
+          }
+
+
+
+        } catch (ex) {
+          private_methods.errMsg("do_sgroup", ex);
+        }
+      },
+
+      /**
        * do_selitem
        *    Check or uncheck items for selection
        *
@@ -2113,6 +2333,10 @@ var ru = (function ($, ru) {
             data = null;
 
         try {
+          // Figure out what we are doing
+          if ($(elSelItemDct).length === 0) {
+            // Need to change this stuff
+          }
           // In general: hide the -rset
           $(elSelItemRset).addClass("hidden");
 
@@ -2285,10 +2509,10 @@ var ru = (function ($, ru) {
                     if (selitemcount !== undefined) {
                       if (selitemcount <= 0) {
                         $(".selcount").html("");
-                        $("h3 .select-execute button").attr("disabled", true);
+                        $(".select-execute button").attr("disabled", true);
                       } else {
                         $(".selcount").html(selitemcount);
-                        $("h3 .select-execute button").attr("disabled", false);
+                        $(".select-execute button").attr("disabled", false);
                       }
                     }
                   }
@@ -2458,6 +2682,83 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("load_dct", ex);
+        }
+      },
+
+      /**
+       * sel_button
+       *    Show or hide the select column
+       *
+       */
+      sel_button: function (elStart) {
+        var elTable = null,
+            elS = null,
+            elH = null,
+            elRelated = null,
+            selcount = "",
+            mode = "";
+
+        try {
+          // Find out which mode I am in
+          mode = ($(elStart).hasClass("jumbo-1")) ? "hide" : "show";
+
+          // Figure out what the selection count is
+          selcount = $(".selcount").first().html().trim();
+
+          // Find the table
+          elTable = $("table.func-view").first();
+          // Find the <h3> element
+          elH = $(elStart).closest("h4");
+          // Find the related container
+          elRelated = $(elStart).closest(".related-original");
+          // Either hide or show the .select-column
+          switch (mode) {
+            case "hide":
+              // Turn into showing
+              $(elTable).find(".select-column").removeClass("hidden");
+              // Change the button into 'showing'
+              $(elStart).removeClass("jumbo-1");
+              $(elStart).addClass("jumbo-3");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").removeClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(elRelated).find(".selcount").addClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              } else {
+                $(elH).find(".select-execute button").attr("disabled", false);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("show");
+              break;
+            case "show":
+              // Turn into hiding
+              $(elTable).find(".select-column").addClass("hidden");
+              // Change the button into 'hiding'
+              $(elStart).removeClass("jumbo-3");
+              $(elStart).addClass("jumbo-1");
+              // Set proper execution button visibility
+              $(elH).find(".select-execute").addClass("hidden");
+
+              // make sure .selcount changes correctly
+              $(elRelated).find(".selcount").removeClass("showing");
+
+              // Should it be disabled or not?
+              if (selcount === undefined || selcount === "") {
+                $(elH).find(".select-execute button").attr("disabled", true);
+              }
+              // Set the correct 's' parameter
+              elS = document.getElementsByName("s");
+              $(elS).val("hide");
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("sel_button", ex);
         }
       },
 

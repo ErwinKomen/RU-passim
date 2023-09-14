@@ -25,6 +25,7 @@ from django.views.generic import ListView, View
 import json
 import fnmatch
 import os
+import re
 import base64
 import csv
 import openpyxl
@@ -43,7 +44,8 @@ from passim.basic.models import UserSearch
 # Some constants that can be used
 paginateSize = 20
 paginateSelect = 15
-paginateValues = (100, 50, 20, 10, 5, 2, 1, )
+paginateValues =  (100, 50, 20 )    # See issue #603. Old: (100, 50, 20, 10, 5, 2, 1, )
+PaginateMax = 100                   # Don't allow larger than 100
 
 # Global debugging 
 bDebug = False
@@ -203,6 +205,19 @@ def isempty(value):
             response = (len(value) == 0)
     return response
 
+def get_number(s_input):
+    """Get the first consecutive number from the string"""
+
+    if isinstance(s_input, int):
+        iBack = s_input
+    else:
+        temp = re.findall(r'\d+', s_input)
+        if len(temp) == 0:
+            iBack = -1
+        else:
+            iBack = int(temp[0])
+    return iBack
+
 def has_obj_value(field, obj, model_name=None):
     if field == None:
         response = False
@@ -284,6 +299,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
     try:
         # (1) Create default lstQ
         lstQ = []
+        dictQ = {}
 
         # (2) Reset the filters in the list we get
         for item in filters: item['enabled'] = False
@@ -305,6 +321,7 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 filter_type = get_value(search_item, "filter")
                 code_function = get_value(search_item, "code")
                 regex_function = get_value(search_item, "regex")
+                full_filter_id = "filter_{}".format(filter_type)
                 s_q = ""
                 arFkField = []
                 if fkfield != None:
@@ -419,29 +436,70 @@ def make_search_list(filters, oFields, search_list, qd, lstExclude):
                 if has_list_value(keyList, oFields):
                     s_q_lst = ""
                     enable_filter(filter_type, head_id)
-                    if infield == None: infield = "id"
-                    code_list = [getattr(x, infield) for x in oFields[keyList]]
-                    if fkfield:
-                        # Now we need to look at the id's
-                        if len(arFkField) > 1:
-                            # THere are more foreign keys: combine in logical or
-                            s_q_lst = ""
-                            for fkfield in arFkField:
-                                if s_q_lst == "":
-                                    s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                                else:
-                                    s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                        else:
-                            # Just one foreign key
-                            s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
-                    elif keyType == "fieldchoice":
-                        s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
-                    elif dbfield:
-                        s_q_lst = Q(**{"{}__in".format(infield): code_list})
-                    s_q = s_q_lst if s_q == "" else s_q | s_q_lst
+                    # Check if this is a Q-expression already
+                    if isinstance(oFields[keyList], Q):
+                        s_q = oFields[keyList]
+                    else:
+                        if infield == None: infield = "id"
+                        code_list = [getattr(x, infield) for x in oFields[keyList]]
+                        if fkfield:
+                            # Now we need to look at the id's
+                            if len(arFkField) > 1:
+                                # THere are more foreign keys: combine in logical or
+                                s_q_lst = ""
+                                for fkfield in arFkField:
+                                    if s_q_lst == "":
+                                        s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                                    else:
+                                        s_q_lst |= Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                            else:
+                                # Just one foreign key
+                                s_q_lst = Q(**{"{}__{}__in".format(fkfield, infield): code_list})
+                        elif keyType == "fieldchoice":
+                            s_q_lst = Q(**{"{}__in".format(dbfield): code_list})
+                        elif dbfield:
+                            s_q_lst = Q(**{"{}__in".format(infield): code_list})
+                        s_q = s_q_lst if s_q == "" else s_q | s_q_lst
 
                 # Possibly add the result to the list
-                if s_q != "": lstQ.append(s_q)
+                if s_q != "": 
+                    dictQ[full_filter_id] = s_q
+                    # lstQ.append(s_q)
+        # Combine the query parts in the appropriate order
+        qfilter = qd.get("qfilter")
+        if qfilter is None or qfilter == "" or qfilter == "[]":
+            for k,v in dictQ.items():
+                lstQ.append(v)
+        else:
+            combi_q = None
+            lFilters = json.loads(qfilter)
+            if len(lFilters) > 0:
+                lst_name = []
+                for qf in lFilters:
+                    sName = qf.get("name")
+                    if not sName in lst_name:
+                        lst_name.append(sName)
+                        operator = qf.get("operator")
+                        s_q = dictQ.get(sName)
+                        if not s_q is None:
+                            if operator == "start" or combi_q is None:
+                                combi_q = s_q
+                            elif operator == "and":
+                                combi_q = combi_q & (s_q)
+                            elif operator == "nand":
+                                combi_q = combi_q & (~ s_q)
+                            elif operator == "or":
+                                combi_q = combi_q | (s_q)
+                            elif operator == "nor":
+                                combi_q = combi_q | (~ s_q)
+                # Now set the lstQ
+                if not combi_q is None:
+                    lstQ.append(combi_q)
+                # Now treat any other filters in dictQ
+                for k,v in dictQ.items():
+                    if not k in lst_name:
+                        lstQ.append(v)
+
     except:
         msg = oErr.get_error_message()
         oErr.DoError("make_search_list")
@@ -887,7 +945,7 @@ class BasicList(ListView):
     This listview inherits the standard listview and adds a few automatic matters
     """
 
-    paginate_by = 15
+    paginate_by = paginateSize # 15
     entrycount = 0
     qd = None
     bFilter = False
@@ -934,6 +992,7 @@ class BasicList(ListView):
     col_wrap = ""
     sel_mode = ""
     param_list = []
+    qfilter = []
     qs = None
     page_function = "ru.basic.search_paged_start"
 
@@ -980,7 +1039,7 @@ class BasicList(ListView):
         context['paginateValues'] = paginateValues
 
         if 'paginate_by' in initial:
-            context['paginateSize'] = int(initial['paginate_by'])
+            context['paginateSize'] = int(self.get_paginate_size()) #  int(initial['paginate_by'])
         else:
             context['paginateSize'] = paginateSize
 
@@ -1161,6 +1220,7 @@ class BasicList(ListView):
         context['filters'] = self.filters
         context['fsections'] = fsections
         context['list_fields'] = self.list_fields
+        context['qfilter'] = self.qfilter
 
         # Add any typeaheads that should be initialized
         context['typeaheads'] = json.dumps( self.lst_typeaheads)
@@ -1200,10 +1260,12 @@ class BasicList(ListView):
         else:
             context['usersearch'] = "{}://{}{}?usersearch={}".format(
                 self.request.scheme, self.request.get_host(), self.request.path, self.usersearch_id)
+        context['usersearch_id'] = self.usersearch_id
 
         # Allow others to add to context
         context = self.add_to_context(context, initial)
-        x = context['is_app_editor'] and context['new_button']
+        # x = context['is_app_editor'] and context['new_button']
+
         # Return the calculated context
         return context
 
@@ -1306,7 +1368,22 @@ class BasicList(ListView):
         """
         Paginate by specified value in default class property value.
         """
-        return self.paginate_by
+        paginate_by = self.get_paginate_size()
+        return paginate_by
+
+    def get_paginate_size(self):
+        """Get the correct size of the pages"""
+        initial = self.request.POST if self.request.POST else self.request.GET
+        page_size = initial.get('paginate_by', self.paginate_by)
+        # Double check the value that we have received
+        iNumber = get_number(page_size)
+        if iNumber < 0 or iNumber > PaginateMax:
+            # Just take the default number
+            page_size = self.paginate_by
+        else:
+            # Yes, take this number
+            page_size = str(iNumber)
+        return page_size
 
     def get_basketqueryset(self):
         """User-specific function to get a queryset based on a basket"""
@@ -1342,6 +1419,13 @@ class BasicList(ListView):
                 bHasListFilters = len([x for x in get if self.prefix in x and get[x] != ""]) > 0
                 if not bHasListFilters:
                     self.basketview = ("usebasket" in get and get['usebasket'] == "True")
+            # At least get the qFilter
+            qfilter = get.get("qfilter")
+            if qfilter is None or qfilter == "":
+                qfilter = []
+            else:
+                qfilter = json.loads(qfilter)
+            self.qFilter = qfilter
 
             # Initial setting of qs
             qs = self.model.objects.none()
@@ -1379,20 +1463,28 @@ class BasicList(ListView):
                     oFields = thisForm.cleaned_data
 
                     # Set the param_list variable
-                    self.param_list = []
+                    # self.param_list = []
+                    param_list = []
                     lookfor = "{}-".format(prefix)
                     for k,v in self.qd.items():
                         if lookfor in k and not isempty(v):
-                            self.param_list.append("{}={}".format(k,v))
+                            # self.param_list.append("{}={}".format(k,v))
+                            param_list.append("{}={}".format(k,v))
+
+                    if 'qfilter' in self.qd:
+                        self.qfilter = self.qd.get("qfilter")
 
                     # Store the paramlist - but only if this is not a repetition
                     if "usersearch" in self.qd:
                         # Make sure we have the user search number
                         self.usersearch_id = self.qd.get("usersearch")
                     else:
-                        oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username)
+                        # oSearch = UserSearch.add_search(request.path, self.param_list, request.user.username, self.qfilter)
+                        oSearch = UserSearch.add_search(request.path, param_list, request.user.username, self.qfilter)
                         if oSearch != None:
                             self.usersearch_id = oSearch.id
+                    # Make sure to add the usersearch into the paramlist
+                    self.param_list.append("usersearch={}".format(self.usersearch_id))
                 
                     # Allow user to adapt the list of search fields
                     oFields, lstExclude, qAlternative = self.adapt_search(oFields)
@@ -1514,6 +1606,7 @@ class BasicList(ListView):
 
     def view_queryset(self, qs):
         return None
+
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             # Do not allow to get a good response
@@ -1530,6 +1623,7 @@ class BasicList(ListView):
             if usersearch_id != None:
                 get = UserSearch.load_parameters(usersearch_id, get)
             self.qd = get
+            self.param_list = []
 
             # Then check if we have a redirect or not
             if self.redirectpage == "":
@@ -1574,6 +1668,8 @@ class BasicDetails(DetailView):
     backbutton = True
     bNeedReload = False     # Needed to signal a Ctrl+F5 reload for JS
     custombuttons = []
+    selectbuttons = []
+    sel_button = None
     newRedirect = False     # Redirect the page name to a correct one after creating
     initRedirect = False    # Perform redirect right after initializations
     use_team_group = False
@@ -1835,6 +1931,10 @@ class BasicDetails(DetailView):
         context['add_text'] = self.add_text
         context['backbutton'] = self.backbutton
 
+        # Selection buttons
+        if len(self.selectbuttons) > 0:
+            context['selectbuttons'] = self.selectbuttons
+
         if self.is_basic and context.get('afterdelurl') == None :
             if self.afterdelurl != None:
                 context['afterdelurl'] = self.afterdelurl
@@ -2079,6 +2179,10 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
+    def get_abs_uri(self, sName, obj):
+        sBack =  "{}{}".format(self.request.get_host(), reverse(sName, kwargs={'pk': obj.id}))
+        return sBack
+
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
 
@@ -2154,99 +2258,101 @@ class BasicDetails(DetailView):
                 context['object'] = instance
                 self.object = instance
 
-                # Do we have an existing object or are we creating?
-                if instance == None:
-                    # Saving a new item
-                    if self.use_team_group:
-                        frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                # Do we actually have an [mForm]??
+                if not mForm is None:
+                    # Do we have an existing object or are we creating?
+                    if instance == None:
+                        # Saving a new item
+                        if self.use_team_group:
+                            frm = mForm(initial, prefix=prefix, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(initial, prefix=prefix)
+                        bNew = True
+                        self.add = True
+                    elif len(initial) == 0:
+                        # Create a completely new form, on the basis of the [instance] only
+                        if self.use_team_group:
+                            frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(prefix=prefix, instance=instance)
                     else:
-                        frm = mForm(initial, prefix=prefix)
-                    bNew = True
-                    self.add = True
-                elif len(initial) == 0:
-                    # Create a completely new form, on the basis of the [instance] only
-                    if self.use_team_group:
-                        frm = mForm(prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(prefix=prefix, instance=instance)
-                else:
-                    # Editing an existing one
-                    if self.use_team_group:
-                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
-                    else:
-                        frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
-                # Both cases: validation and saving
-                if frm.is_valid():
-                    # The form is valid - do a preliminary saving
-                    obj = frm.save(commit=False)
-                    # Any checks go here...
-                    bResult, msg = self.before_save(form=frm, instance=obj)
-                    if bResult:
-                        # Now save it for real
-                        obj.save()
+                        # Editing an existing one
+                        if self.use_team_group:
+                            frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance, username=username, team_group=team_group, userplus=userplus)
+                        else:
+                            frm = mForm(initial, self.request.FILES, prefix=prefix, instance=instance)
+                    # Both cases: validation and saving
+                    if frm.is_valid():
+                        # The form is valid - do a preliminary saving
+                        obj = frm.save(commit=False)
+                        # Any checks go here...
+                        bResult, msg = self.before_save(form=frm, instance=obj)
+                        if bResult:
+                            # Now save it for real
+                            obj.save()
 
-                        # Make sure the form is actually saved completely
-                        # Issue #426: put it up here
-                        frm.save()
-                        instance = obj
+                            # Make sure the form is actually saved completely
+                            # Issue #426: put it up here
+                            frm.save()
+                            instance = obj
 
-                        # Log the SAVE action
-                        details = {'id': obj.id}
-                        details["savetype"] = "new" if bNew else "change"
-                        details["form"] = frm.__class__.__name__
-                        if frm.changed_data != None and len(frm.changed_data) > 0:
-                            details['changes'] = action_model_changes(frm, obj)
-                        self.action_add(obj, details, "save")
+                            # Log the SAVE action
+                            details = {'id': obj.id}
+                            details["savetype"] = "new" if bNew else "change"
+                            details["form"] = frm.__class__.__name__
+                            if frm.changed_data != None and len(frm.changed_data) > 0:
+                                details['changes'] = action_model_changes(frm, obj)
+                            self.action_add(obj, details, "save")
 
-                        # Issue #426: comment this
-                        ## Make sure the form is actually saved completely
-                        #frm.save()
-                        #instance = obj
+                            # Issue #426: comment this
+                            ## Make sure the form is actually saved completely
+                            #frm.save()
+                            #instance = obj
                     
-                        # Any action(s) after saving
-                        bResult, msg = self.after_save(frm, obj)
-                    else:
+                            # Any action(s) after saving
+                            bResult, msg = self.after_save(frm, obj)
+                        else:
 
-                        # EK: working on this.
-                        #     I've now put this exclusively in EqualGoldEdit's method after_save()
-                        #
-                        ## ADDED Take over any data from [instance] to [frm.data]
-                        ##       Provided these fields are in the form's [initial_fields]
-                        #if instance != None and hasattr(frm, "initial_fields"):
+                            # EK: working on this.
+                            #     I've now put this exclusively in EqualGoldEdit's method after_save()
+                            #
+                            ## ADDED Take over any data from [instance] to [frm.data]
+                            ##       Provided these fields are in the form's [initial_fields]
+                            #if instance != None and hasattr(frm, "initial_fields"):
 
-                        #    # Walk the fields that need to be taken from the instance
-                        #    for key in frm.initial_fields:
-                        #        value = getattr(instance, key)
+                            #    # Walk the fields that need to be taken from the instance
+                            #    for key in frm.initial_fields:
+                            #        value = getattr(instance, key)
 
-                        #        key_prf = '{}-{}'.format(frm.prefix, key)
-                        #        if isinstance(value, str) or isinstance(value, int):
-                        #            frm.data[key_prf] = value
-                        #        elif isinstance(value, object):
-                        #            frm.data[key_prf] = str(value.id)
+                            #        key_prf = '{}-{}'.format(frm.prefix, key)
+                            #        if isinstance(value, str) or isinstance(value, int):
+                            #            frm.data[key_prf] = value
+                            #        elif isinstance(value, object):
+                            #            frm.data[key_prf] = str(value.id)
                     
-                        if not msg is None:
-                            context['errors'] = {'save': msg }
-                elif frm.errors:
-                    # We need to pass on to the user that there are errors
-                    context['errors'] = frm.errors
-                    oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
+                            if not msg is None:
+                                context['errors'] = {'save': msg }
+                    elif frm.errors:
+                        # We need to pass on to the user that there are errors
+                        context['errors'] = frm.errors
+                        oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
 
-                # Check if this is a new one
-                if bNew:
-                    if self.is_basic:
-                        self.afternewurl = context['listview']
-                        if self.rtype == "html":
-                            # Make sure we do a page redirect
-                            self.newRedirect = True
-                            self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
-                    # Any code that should be added when creating a new [SermonGold] instance
-                    bResult, msg = self.after_new(frm, instance)
-                    if not bResult:
-                        # Removing is not possible
-                        context['errors'] = {'new': msg }
-                    # Check if an 'afternewurl' is specified
-                    if self.afternewurl != "":
-                        context['afternewurl'] = self.afternewurl
+                    # Check if this is a new one
+                    if bNew:
+                        if self.is_basic:
+                            self.afternewurl = context['listview']
+                            if self.rtype == "html":
+                                # Make sure we do a page redirect
+                                self.newRedirect = True
+                                self.redirectpage = reverse("{}_details".format(self.basic_name), kwargs={'pk': instance.id})
+                        # Any code that should be added when creating a new [SermonGold] instance
+                        bResult, msg = self.after_new(frm, instance)
+                        if not bResult:
+                            # Removing is not possible
+                            context['errors'] = {'new': msg }
+                        # Check if an 'afternewurl' is specified
+                        if self.afternewurl != "":
+                            context['afternewurl'] = self.afternewurl
                 
             else:
                 if mForm != None:
@@ -2305,11 +2411,14 @@ class BasicPart(View):
     arErr = []              # errors   
     template_name = None    # The template to be used
     template_err_view = None
+    permission = True
     form_validated = True   # Used for POST form validation
     savedate = None         # When saving information, the savedate is returned in the context
     add = False             # Are we adding a new record or editing an existing one?
     obj = None              # The instance of the MainModel
     action = ""             # The action to be undertaken
+    method = None           # GET or POST
+    rtype = "json"          # JSON response (alternative: html)    
     MainModel = None        # The model that is mainly used for this form
     form_objects = []       # List of forms to be processed
     formset_objects = []    # List of formsets to be processed
@@ -2320,6 +2429,7 @@ class BasicPart(View):
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
     
     def post(self, request, pk=None):
+        self.method = "POST"
         # A POST request means we are trying to SAVE something
         self.initializations(request, pk)
         # Initialize typeahead list
@@ -2685,6 +2795,7 @@ class BasicPart(View):
         
     def get(self, request, pk=None): 
         self.data['status'] = 'ok'
+        self.method = "GET"
         # Perform the initializations that need to be made anyway
         self.initializations(request, pk)
         # Initialize typeahead list
@@ -2692,11 +2803,13 @@ class BasicPart(View):
 
         oErr = ErrHandle()
         try:
+            response = JsonResponse(self.data)
             # Continue if authorized
             if self.checkAuthentication(request):
                 context = dict(object_id = pk, savedate=None)
                 context['prevpage'] = self.previous
                 context['authenticated'] = user_is_authenticated(request)
+                context['permission'] = self.permission
                 context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
                 context['is_app_editor'] = user_is_ingroup(request, app_editor)
                 # Walk all the form objects
@@ -2768,17 +2881,28 @@ class BasicPart(View):
                 self.data['typeaheads'] = json.dumps(lst_typeahead)
             
                 # Get the HTML response
-                sHtml = render_to_string(self.template_name, context, request)
-                sHtml = treat_bom(sHtml)
-                self.data['html'] = sHtml
+                if self.template_name is None:
+                    self.data['html'] = ""
+                else:
+                    sHtml = render_to_string(self.template_name, context, request)
+                    sHtml = treat_bom(sHtml)
+                    self.data['html'] = sHtml
             else:
                 self.data['html'] = "Please log in before continuing"
+
+            # Determine the response type
+            if self.rtype == "json":
+                response = JsonResponse(self.data)
+            else:
+                # This takes self.template_name...
+                sHtml = self.data['html']
+                response = HttpResponse(sHtml)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BasicPart/get")
 
         # Return the information
-        return JsonResponse(self.data)
+        return response
 
     def userpermissions(self, sType = "w"):
         """Basic check for valid user permissions"""

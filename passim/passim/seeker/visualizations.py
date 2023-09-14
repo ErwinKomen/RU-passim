@@ -5,6 +5,7 @@ Definition of visualization views for the SEEKER app.
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
 from django.template.loader import render_to_string
+from django.urls import reverse
 import pandas as pd 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -28,6 +29,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
    LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED
 from passim.stylo.corpus import Corpus
 from passim.stylo.analysis import bootstrapped_distance_matrices, hierarchical_clustering, distance_matrix
+from passim.dct.models import SavedVis
 
 # ======= from RU-Basic ========================
 from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
@@ -154,6 +156,7 @@ class EqualGoldOverlap(BasicPart):
     """Network of textual overlap between SSGs"""
 
     MainModel = EqualGold
+    template_name = "dct/vis_details.html"
 
     def add_to_context(self, context):
 
@@ -168,15 +171,15 @@ class EqualGoldOverlap(BasicPart):
                 # Don't do anything
                 return context
 
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
             # Define the linktype and spectype
             for obj in FieldChoice.objects.filter(field="seeker.spectype"):
                 spec_dict[obj.abbr]= obj.english_name
             for obj in FieldChoice.objects.filter(field="seeker.linktype"):
                 link_dict[obj.abbr]= obj.english_name
-
-            # Need to figure out who I am
-            profile = Profile.get_user_profile(self.request.user.username)
-            instance = self.obj
 
             # The networkslider determines whether we are looking for 1st degree, 2nd degree or more
             networkslider = self.qd.get("network_overlap_slider", "1")            
@@ -226,7 +229,9 @@ class EqualGoldOverlap(BasicPart):
             # Create the buttons for the historical collections
             hist_list=[{'id': k, 'name': v} for k,v in hist_set.items()]
             hist_list = sorted(hist_list, key=lambda x: x['name']);
-            context = dict(hist_list = hist_list)
+            # Add to context!
+            # context = dict(hist_list = hist_list)
+            context['hist_list'] = hist_list
             hist_buttons = render_to_string(graph_template, context, self.request)
 
             # Add the information to the context in data
@@ -239,6 +244,33 @@ class EqualGoldOverlap(BasicPart):
                                    max_group=max_group,
                                    networkslider=networkslider,
                                    legend="AF overlap network")
+
+            # Check if we have a 'savedvis' parameter
+            savedvis_id = self.qd.get("savedvis")
+            if not savedvis_id is None:
+                # Get the saved visualization
+                savedvis = SavedVis.objects.filter(id=savedvis_id).first()
+                if not savedvis is None:
+                    # Pass on the parameters
+                    context['data']['options'] = savedvis.options
+                    context['overlap_options'] = savedvis.options
+                    context['visname'] = savedvis.name
+
+            if self.method == "GET":
+                # We need to return HTML
+                self.rtype = "html"
+                # TO be added for GET calls: backbutton, listview, params, topleftbuttons
+                if context.get('object') == None:
+                    context['object'] = instance
+                context['backbutton'] = True
+                context['listview'] = reverse('equalgold_details', kwargs={'pk': instance.id})
+                # Also indicate that we only want the OVERLAP
+                context['only_overlap'] = True
+
+                # And then the actual overlap drawing
+                context['equalgold_overlap'] = reverse("equalgold_overlap", kwargs={'pk': instance.id})
+                context['after_details'] = render_to_string('dct/super_overlap.html', context, self.request)
+
             
         except:
             msg = oErr.get_error_message()
@@ -358,10 +390,10 @@ class EqualGoldOverlap(BasicPart):
 
 
 class EqualGoldTrans(BasicPart):
-    """Prepare for a network graph"""
-
+    """Prepare for a network graph depicting transmission"""
 
     MainModel = EqualGold
+    template_name = "dct/vis_details.html"
 
     def add_to_context(self, context):
 
@@ -432,6 +464,33 @@ class EqualGoldTrans(BasicPart):
             ssg_corpus.status = "ready"
             ssg_corpus.save()
 
+            # Check if we have a 'savedvis' parameter
+            savedvis_id = self.qd.get("savedvis")
+            if not savedvis_id is None:
+                # Get the saved visualization
+                savedvis = SavedVis.objects.filter(id=savedvis_id).first()
+                if not savedvis is None:
+                    # Pass on the parameters
+                    context['data']['options'] = savedvis.options
+                    context['trans_options'] = savedvis.options
+                    context['visname'] = savedvis.name
+
+            if self.method == "GET":
+                # We need to return HTML
+                self.rtype = "html"
+                # TO be added for GET calls: backbutton, listview, params, topleftbuttons
+                if context.get('object') == None:
+                    context['object'] = instance
+                context['backbutton'] = True
+                context['listview'] = reverse('equalgold_details', kwargs={'pk': instance.id})
+                # Also indicate that we only want the OVERLAP
+                context['only_transmission'] = True
+
+                # And then the actual overlap drawing
+                context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
+                context['after_details'] = render_to_string('dct/super_trans.html', context, self.request)
+
+            
 
         except:
             msg = oErr.get_error_message()

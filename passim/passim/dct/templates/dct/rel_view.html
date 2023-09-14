@@ -19,69 +19,191 @@
               action="{% if related.instance.id %}{{related.detailsview}}{% endif %}">
           {% csrf_token %}
           <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
+          <input type="text" id="id_{{related.prefix}}-glist" name="{{related.prefix}}-glist" value="" />
+          <input type="text" id="id_{{related.prefix}}-gnew" name="{{related.prefix}}-gnew" value="" />
           <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />
         </form>
       </div>
 
       <div class="related-original">
         <div class="col-md-12">
-          <div class="col-md-12">
-            <h4>
-              <span>{{related.title}}</span>
-              {% if related.custombutton %}
-                <span class="pull-right">
-                  {{related.custombutton|safe}}
-                </span>
-              {% endif %}
-              {% if related.savebuttons %}
-                <span class="hidden related-save pull-right">
-                  <span style="font-size: x-small;">
-                    <i>(Changes are not yet saved, and not reflected above)</i>
-                    <span class="hidden waiting">
-                      <span>Processing changes...</span><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
-                    </span>
+          {% if related.introduction %}
+          <p>{{related.introduction|safe}}</p>
+          {% endif %}
+
+          <h4 class="sel-button">
+            <span>{{related.title}}</span>
+            {% if related.custombutton %}
+              <span class="pull-right">
+                {{related.custombutton|safe}}
+              </span>
+            {% endif %}
+            {% if related.savebuttons %}
+              <span class="hidden related-save pull-right">
+                <span style="font-size: x-small;">
+                  <i>(Changes are not yet saved, and not reflected above)</i>
+                  <span class="hidden waiting">
+                    <span>Processing changes...</span><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
                   </span>
-                  <a class="btn btn-xs jumbo-1" title="Cancel changes" 
-                      onclick="ru.basic.related_cancel(this);">Cancel</a>
-                  <a class="btn btn-xs jumbo-4" title="Save changes" 
-                      onclick="ru.basic.related_save(this, '{{related.prefix}}', 'save');">Save</a>
-                  {% if related.saveasbutton %}
-                  <a class="btn btn-xs jumbo-4" title="Save changes to a new {{titlesg}}" 
-                      onclick="ru.basic.related_save(this, '{{related.prefix}}', 'savenew');">Save as...</a>
-                  {% endif %}
                 </span>
-              {% endif %}
-            </h4>
+                <a class="btn btn-xs jumbo-1" title="Cancel changes" 
+                    onclick="ru.basic.related_cancel(this);">Cancel</a>
+                <a class="btn btn-xs jumbo-4" title="Save changes" 
+                    onclick="ru.basic.related_save(this, '{{related.prefix}}', 'save');">Save</a>
+                {% if related.saveasbutton %}
+                <a class="btn btn-xs jumbo-4" title="Save changes to a new {{titlesg}}" 
+                    onclick="ru.basic.related_save(this, '{{related.prefix}}', 'savenew');">Save as...</a>
+                {% endif %}
+              </span>
+            {% endif %}
+            {% if related.selbutton %}
+              <span class="related-select pull-right">
 
-            <!-- Check if there is any contents -->
-            {% if related.rel_list|length == 0 %}
-              <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
-            {% else %}
-              <!-- List of related items -->
-              <table class="func-view compact-simple {{related.gridclass}}" 
-                      style="width: 100%;">
-                <thead>
-                  <tr>
-                    {% if related.use_counter %}
-                      <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
-                    {% endif %}
-                    {% for col in related.columns %}
-                      <th class="tdnowrap">
-                        {% if col.sortable %}
-                          <span class="sortable">
-                            <span class="glyphicon glyphicon-sort"></span>
-                          </span>
-                        {% else %}
-                        {% endif %}
-                        {{col|safe}}
+                <!-- Button to switch selection on/off -->
+                <span class="select-execute {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
+                  <!-- Show the possibility icons -->
+                  <button class="btn btn-xs jumbo-4" role="button" mode="clear_sel"
+                          title="Unselect everything" >
+                    <span class="glyphicon glyphicon-refresh" ></span>
+                  </button>
+                  {% for selbut in selectbuttons %}
+                    <button class="btn btn-xs {{selbut.button}}" role="button" title="{{selbut.title}}"
+                            {% if selbut.mode %}mode="{{selbut.mode}}"{% else %}data-toggle="collapse" data-target="{{selbut.datatarget}}" {% endif %} >
+                      <span class="glyphicon {{selbut.glyphicon}}" ></span>
+                    </button>
+                  {% endfor %}
+                </span>
+                <span>
+                  <a class="btn btn-xs {% if selMode and selMode == 'show' %}jumbo-3{% else %}jumbo-1{% endif %}" role="button"
+                      onclick="ru.dct.sel_button(this);"
+                      title="Enter or leave multiple-row selection mode">
+                    <span class="glyphicon glyphicon-list"></span>
+                    <span class="selcount {% if selMode and selMode == 'show' %}showing{% endif %}">{{related.sel_count}}</span>
+                  </a>
+                </span>
+              </span>
+            {% endif %}
+          </h4>
+
+          <!-- Check if there is any contents -->
+          {% if related.rel_list|length == 0 %}
+            <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
+          {% else %}
+            <!-- main part of selecting a research set -->
+            {% if related.selbutton %}
+              <form class="selitem-main" targeturl="{% url 'selitem_apply' profile.id %}">
+                {% csrf_token %}
+                <div class="hidden">
+                  <input type="text" id="id_selitemtype"   name="selitemtype"   value="{{related.selitemtype}}" />
+                  <input type="text" id="id_selitemaction" name="selitemaction" value="-" />
+                </div>
+
+                {% if related.selitemForm.rsetone %}
+                  <div id="selitem-dct" class="row hidden">
+                    <div class="col-md-6 pull-right">
+                      <table style="width: 100%;">
+                        <tbody>
+                          <tr>
+                            <!-- Allow selecting from available research sets -->
+                            <td style="width: 100%">{{related.selitemForm.rsetone}}</td>
+                          </tr>
+                          <tr>
+                            <td align="right">
+                              <!-- Button to cancel -->
+                              <a id="msel_rsetaddcancel" title="Cancel adding to a research set" 
+                                 class="btn btn-sm jumbo-1" 
+                                 onclick="ru.dct.do_selitem(this, 'cancel_dct');">
+                                <span>Cancel</span>
+                              </a>
+
+                              <!-- Button to actually add to the chosen research set -->
+                              <a id="msel_rsetadd" title="Add selected items to a research set" 
+                                 class="btn btn-sm jumbo-3" mode="add_dct"
+                                 onclick="ru.dct.do_selitem('.related-original .selitem-main', 'add_dct');"  >
+                                <span>Add to this research set</span>
+                              </a>
+
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Possibly show a link to the ResearchSet -->
+                  <div id="selitem-rset" class="row hidden">
+                    <div class="col-md-3 pull-right">
+                      <a role="button" class="btn btn-sm jumbo-1" href="" title="Go to the research set to which the item has been added">Open research set</a>
+                    </div>
+                  </div>    
+                {% endif %}
+
+              </form>
+            {% endif %}
+
+            <!-- Room for custumisable stuff -->
+            {% if related.customshow %}
+              {{related.customshow}}
+            {% endif %}
+
+            <!-- List of related items -->
+            <table class="func-view related compact-simple {{related.gridclass}}" 
+                    style="width: 100%;">
+              <thead>
+                <tr>
+                  {% if related.selbutton %}
+                    <th class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}"><!-- This is for selecting --></th>
+                  {% endif %}
+                  {% if related.use_counter %}
+                    <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
+                  {% endif %}
+                  {% for col in related.columns %}
+                    <th class="tdnowrap">
+                      {% if col.sortable %}
+                        <span class="sortable">
+                          <span class="glyphicon glyphicon-sort"></span>
+                        </span>
+                      {% else %}
+                      {% endif %}
+                      {{col|safe}}
+                    </th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for relrow in related.rel_list %}
+                  {% if relrow.isgroup %}
+                    <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                        mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
+                      {% if related.selbutton %}
+                        <!-- Possibly add select field (not used here, but neede to be incorporated) -->
+                        <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">&nbsp;</td>
+                      {% endif %}
+
+                      <!-- Counter-->
+                      {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+
+                      <!-- columns taken together -->
+                      <th colspan="{{related.columns|length}}"
+                          onclick="ru.basic.related_groupclick(this);"
+                          ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}} 
+                        {% if relrow.url %}<a href="{{relrow.url}}">{% endif %}
+                          <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                        {% if relrow.url %}</a>{% endif %}
                       </th>
-                    {% endfor %}
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for relrow in related.rel_list %}
 
-                    <tr class="form-row" rowid="{{relrow.id}}">
+                    </tr>
+                  {% else %}
+
+                    <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}" 
+                        rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
+                      {% if related.selbutton %}
+                        <!-- Possibly add select field-->
+                        <td class="select-column {% if selMode and selMode == 'show' %}{% else %}hidden{% endif %}">
+                          {{relrow.sel_info|safe}}
+                        </td>
+                      {% endif %}
+
                       <!-- Counter-->
                       {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
@@ -111,49 +233,50 @@
                       <!-- Possible delete cell -->
 
                     </tr>
-                  {% endfor %}
 
-                  {% if related.editable and is_app_editor %}
-                    <!-- Provide an empty row that can be added -->
-                    <tr class="form-row empty-form">
-                      <!-- A 1-based counter for the forms in this set-->
-                      {% if related.use_counter %}<td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
-
-                      <!-- A button to edit or save this item -->
-                      <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
-                        <div class="view-mode hidden">
-                          <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
-                            <span class="glyphicon glyphicon-pencil"></span>
-                          </a>
-                        </div>
-                        <div class="edit-mode">
-                          <a title="Save changes to this item"
-                              onclick="ru.basic.formset_update(this);"
-                              targetid="sermongold_eqset"
-                              targeturl="">
-                            <span class="glyphicon glyphicon-ok"></span>
-                          </a>
-                        </div>
-                      </td>
-
-                    </tr>
-
-                    <!-- Add row -->
-                    <tr class="basic-add-row">
-                      <td colspan="5">
-                        <span id="add_one_{{related.prefix}}">
-                          <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
-                        </span>
-                      </td>
-                    </tr>
                   {% endif %}
+                {% endfor %}
 
-                </tbody>
-              </table>
-            {% endif %}
-          </div>
+                {% if related.editable and is_app_editor %}
+                  <!-- Provide an empty row that can be added -->
+                  <tr class="form-row empty-form">
+                    <!-- A 1-based counter for the forms in this set-->
+                    {% if related.use_counter %}<td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
 
+                    <!-- A button to edit or save this item -->
+                    <td valign="top" class="clickable hightlighted"  style="min-width: 20px;">
+                      <div class="view-mode hidden">
+                        <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
+                          <span class="glyphicon glyphicon-pencil"></span>
+                        </a>
+                      </div>
+                      <div class="edit-mode">
+                        <a title="Save changes to this item"
+                            onclick="ru.basic.formset_update(this);"
+                            targetid="sermongold_eqset"
+                            targeturl="">
+                          <span class="glyphicon glyphicon-ok"></span>
+                        </a>
+                      </div>
+                    </td>
+
+                  </tr>
+
+                  <!-- Add row -->
+                  <tr class="basic-add-row">
+                    <td colspan="5">
+                      <span id="add_one_{{related.prefix}}">
+                        <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
+                      </span>
+                    </td>
+                  </tr>
+                {% endif %}
+
+              </tbody>
+            </table>
+          {% endif %}
         </div>
+
 
       </div>
 

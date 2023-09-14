@@ -17,7 +17,7 @@
 {% endblock %}
 
 {% block content %}
-  <div>
+  <div class="scrolltop-allow">
     {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
       <div class="panel panel-none" style="margin-top: 15px;">      
@@ -35,9 +35,23 @@
                  title="{{buttonspec.title}}">{{buttonspec.label|safe}}</a>
             {% endfor %}
           </div>
+
+          <!-- Possible stable URI -->
+          <div class="col-md-3 col-md-offset-4">
+            {% if stable_uri %}
+              <div class="panel panel-default stable-uri">
+                <!-- Copy to clipboard -->
+                <span title="{{stable_uri}}">Stable URI:</span><br />
+                <span class="stable">{{stable_uri}}</span>
+                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this);"
+                     title="Copy stable URI to clipboard">
+              </div>
+            {% endif %}
+          </div>
           
           <!-- Button for User comments-->
-          <div class="col-md-2 col-md-offset-7 text-right dropdown">
+          <div class="col-md-2 text-right dropdown">
+
             {% if comment_button %}
               <!-- Comment button -->            
               <a class="btn btn-s jumbo-1"
@@ -212,6 +226,7 @@
                         action="{% if basic_form.instance.id %}{{detailsview}}{% endif %}">
                     {% csrf_token %}
                     <input type="text" id="id_{{related.prefix}}-hlist" name="{{related.prefix}}-hlist" value="" />
+                    <input type="text" id="id_{{related.prefix}}-glist" name="{{related.prefix}}-glist" value="" />
                     <input type="text" id="id_{{related.prefix}}-savenew" name="{{related.prefix}}-savenew" value="false" />
                   </form>
                 </div>
@@ -250,7 +265,7 @@
                       <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
                     {% else %}
                       <!-- List of related items -->
-                      <table class="func-view compact-simple {{related.gridclass}}" 
+                      <table class="func-view related compact-simple {{related.gridclass}}" 
                              style="width: 100%;">
                         <thead>
                           <tr>
@@ -258,7 +273,7 @@
                               <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                             {% endif %}
                             {% for col in related.columns %}
-                              <th class="tdnowrap">
+                              <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}"  >
                                 {% if col.sortable %}
                                   <span class="sortable">
                                     <span class="glyphicon glyphicon-sort"></span>
@@ -272,37 +287,76 @@
                         </thead>
                         <tbody>
                           {% for relrow in related.rel_list %}
+                            {% if relrow.isgroup %}
+                              <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                                  mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
+                                <!-- Counter-->
+                                {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
-                            <tr class="form-row" rowid="{{relrow.id}}">
-                              <!-- Counter-->
-                              {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+                                <!-- columns taken together -->
+                                <th colspan="{{related.columns|length}}" align="center" 
+                                    onclick="ru.basic.related_groupclick(this);"
+                                    ondragover="ru.basic.related_dragentergroup(event);">{{relrow.name}}
+                                  <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                                </th>
 
-                              <!-- Remaining cells -->
-                              {% for relcol in relrow.cols %}
-                                <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
-                                    class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
-                                           {% if relcol.draggable %}draggable{% endif %}"
-                                    {% if relcol.align %}align="{{relcol.align}}"{% endif %}
-                                    {% if relcol.draggable %}draggable="true"{% endif %}
-                                    {% if relcol.draggable %}
-                                      ondragstart="ru.basic.related_drag(event);" 
-                                      ondragover="ru.basic.related_dragenter(event);" 
-                                    {% endif %}
-                                    style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
-                                    >
-                                  {% if relcol.value %}
-                                    {% if relcol.link %}
-                                      <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
-                                    {% else %}
-                                      {{relcol.value|safe}}
+                              </tr>
+                            {% else %}
+
+                              <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}" 
+                                  rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
+                                <!-- Counter-->
+                                {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+
+                                <!-- Remaining cells -->
+                                {% for relcol in relrow.cols %}
+
+                                  {% if related.editable and relcol.editable %}
+                                    {% if relcol.colspan %}
+                                      <td class="rel-edit-mode hidden" colspan="{{relcol.colspan}}" style="width: 100%;">
+                                        {{relcol.html}}
+                                      </td>
                                     {% endif %}
                                   {% endif %}
-                                </td>
-                              {% endfor %}
+                                  <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
+                                      class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
+                                              {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}"
+                                      {% if relcol.align %}align="{{relcol.align}}"{% endif %}
+                                      {% if relcol.draggable %}draggable="true"{% endif %}
+                                      {% if relcol.draggable %}
+                                        ondragstart="ru.basic.related_drag(event);" 
+                                        ondragover="ru.basic.related_dragenter(event);" 
+                                      {% endif %}
+                                      style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}"
+                                      >
+                                    {% if relcol.value %}
+                                      {% if relcol.link %}
+                                        <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                                      {% else %}
+                                        {{relcol.value|safe}}
+                                      {% endif %}
+                                    {% endif %}
+                                  </td>
 
-                              <!-- Possible delete cell -->
+                                  {% if forloop.first and related.editable and not related.use_counter %}
+                                    <td style="min-width: 20px;" valign="top">
+                                      <span class="rel-edit-open">
+                                        <a href="#" onclick="ru.basic.rel_row_edit(this, 'open');">
+                                        <span class="glyphicon glyphicon-pencil"></span></a>
+                                      </span>
+                                      <span class="rel-edit-close hidden">
+                                        <a href="#" onclick="ru.basic.rel_row_edit(this, 'close');">
+                                        <span class="glyphicon glyphicon-ok"></span></a>
+                                      </span>
+                                    </td>
 
-                            </tr>
+                                  {% endif %}
+                                {% endfor %}
+
+                                <!-- Possible delete cell -->
+
+                              </tr>
+                            {% endif %}
                           {% endfor %}
 
                           {% if related.editable and is_app_editor %}
@@ -390,6 +444,11 @@
         </p>
       </div>
     {% endif %}
+    <div class="scrolltop-container">
+      <a class="" href="#top" title="Scroll back to top">
+        <span class="glyphicon glyphicon-triangle-top"></span>
+      </a>
+    </div>
   </div>
 
 

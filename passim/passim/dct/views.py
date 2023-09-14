@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
 from io import StringIO
+import copy
 import json
 import csv
 
@@ -25,14 +26,16 @@ import csv
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
-from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, user_is_superuser
+from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
+    user_is_superuser, get_selectitem_info
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
-    SavedItem, SavedSearch, SelectItem
-from passim.dct.forms import ResearchSetForm, SetDefForm
+    SavedItem, SavedSearch, SelectItem, SavedVis, SaveGroup
+from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm, SaveGroupForm, SgroupSelForm
 from passim.approve.models import EqualChange, EqualApproval
+from passim.stemma.models import StemmaItem, StemmaSet
 
 def get_application_name():
     """Try to get the name of this application"""
@@ -222,6 +225,7 @@ def dct_manulist(lst_manu, bDebug=False):
 
 
 
+
 # =================== MyPassim as model view attempt ======
 class MyPassimEdit(BasicDetails):
     model = Profile
@@ -229,8 +233,19 @@ class MyPassimEdit(BasicDetails):
     prefix = "pre"  # Personal Research Environment
     prefix_type = "simple"
     title = "MY PASSIM"
+    sel_button = "svdi"
     template_name = "dct/mypassim.html"
+    has_select2 = True
     mainitems = []
+
+    form_list = [
+        {"prefix": "svdi", "formclass": RsetSelForm, "forminstance": None},
+        {"prefix": "sgrp", "formclass": SgroupSelForm, "forminstance": None},
+        ]
+
+    selectbuttons = [
+        {'title': 'Add to DCT',         'mode': 'show_dct',      'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        ]
 
     def custom_init(self, instance):
         if user_is_authenticated(self.request):
@@ -272,6 +287,18 @@ class MyPassimEdit(BasicDetails):
             context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
             context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
             context['sermones_allow'] = bAllowSermonesReset
+
+            # Special treatment: we have select2 and we have at least one form 
+            initial = {}
+            user= self.request.user
+            for oItem in self.form_list:
+                frmcls = oItem['formclass']
+                prefix = oItem['prefix']
+                frm = frmcls(initial, prefix=prefix, user=user)
+                oItem['forminstance'] = frm
+                # Possibly set the basic_form
+                if context.get("basic_form") is None:
+                    context['basic_form'] = frm
 
             # COunting table sizes for the super user
             if user_is_superuser(self.request):
@@ -339,8 +366,10 @@ class MyPassimEdit(BasicDetails):
 
         Currently:
             - Saved items
-        To be extended (see issue #408):
             - Saved searches
+            - Saved visualizations
+        To be extended (see issue #409):
+            - DCTs
         """
 
         def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
@@ -357,7 +386,7 @@ class MyPassimEdit(BasicDetails):
         def check_order(qs):
             with transaction.atomic():
                 for idx, obj in enumerate(qs):
-                    if obj.order < 0:
+                    if obj.order <= 0:
                         obj.order = idx + 1
                         obj.save()
 
@@ -388,11 +417,38 @@ class MyPassimEdit(BasicDetails):
             # [1] =============================================================
             # Get all 'SavedItem' objects that belong to the current user (=profile)
             sitemset = dict(title="Saved items", prefix="svitem")  
-            if resizable: sitemset['gridclass'] = "resizable dragdrop"
+            if resizable: sitemset['gridclass'] = "resizable dragdrop sel-table"
             sitemset['savebuttons'] = bMayEdit
             sitemset['saveasbutton'] = False
+            sitemset['selbutton'] = True
+            sitemset['selitemtype'] = "svdi"
+            sitemset['selitemForm'] = self.form_list[0]['forminstance']
 
-            qs_sitemlist = instance.profile_saveditems.all().order_by('order', 'sitemtype')
+            # Create custombuttons
+            lCustom = []
+            lCustom.append("<span>")
+            lCustom.append('<a class="btn btn-xs jumbo-1" role="button" data-toggle="collapse" data-target="#sgroup-add" ')
+            lCustom.append('title="Add/remove/edit saved-item Group Names">')
+            lCustom.append('<span class="glyphicon glyphicon-th-large"></span></a>')
+            lCustom.append("</span>")
+            custombuttons = "\n".join(lCustom)
+            sitemset['custombutton'] = custombuttons
+
+            # Create what is needed for the custom context
+            sgroupForm = self.form_list[1]['forminstance']
+            context = dict(profile=profile, sgroupForm=sgroupForm)
+            sitemset['customshow'] = render_to_string("dct/sgroup_add.html", context, self.request)
+
+            rel_list =[]
+
+            qs_sgrouplist = [x.id for x in instance.profile_savegroups.all().order_by('name')]
+            qs_sgrouplist.insert(0, None)
+            qs_sitemlist = instance.profile_saveditems.all().order_by('group__name', 'order', 'sitemtype')
+
+            # Look into selections
+            qs_sitemids = [x.id for x in qs_sitemlist]
+            sitemset['sel_count'] = instance.profile_selectitems.filter(saveditem_id__in=qs_sitemids).count()
+
             # Also store the count
             sitemset['count'] = qs_sitemlist.count()
             sitemset['instance'] = instance
@@ -400,39 +456,61 @@ class MyPassimEdit(BasicDetails):
             # These elements have an 'order' attribute, so they  may be corrected
             check_order(qs_sitemlist)
 
-            # Walk these sitemlist
-            for obj in qs_sitemlist:
-                # The [obj] is of type `SavedItem`
+            # at the top-level: walk the group list
+            for group_id in qs_sgrouplist:
+                # Look for all [saved items] in this group
+                if group_id is None:
+                    qs_sitemlist = instance.profile_saveditems.filter(group__isnull=True).order_by('order', 'sitemtype')
+                else:
+                    # Select the items in this group
+                    qs_sitemlist = instance.profile_saveditems.filter(group__id=group_id).order_by('order', 'sitemtype')
+                    # Add an item for the name of the group
+                    rel_item = []
+                    sGroupName = SaveGroup.objects.filter(id=group_id).first().name
+                    iGroupSize = qs_sitemlist.count()
+                    url = reverse('savegroup_details', kwargs={'pk': group_id})
+                    rel_list.append(dict(isgroup=True, id=group_id, name=sGroupName, count=iGroupSize, url=url))
 
-                rel_item = []
+                    #if bMayEdit:
+                    #    # Actions that can be performed on this item
+                    #    add_one_item(rel_item, self.get_field_value("savegroup", obj, "buttons"), False)
 
-                # The [item] depends on the sitemtype
-                item = None
-                itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
-                if obj.sitemtype in itemset:
-                    item = getattr(obj, itemset[obj.sitemtype])
+                # Walk these sitemlist
+                for obj in qs_sitemlist:
+                    # The [obj] is of type `SavedItem`
 
-                # SavedItem: Order within the set of SavedItems
-                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+                    rel_item = []
 
-                # SavedItem: Type
-                add_one_item(rel_item, obj.get_sitemtype_display(), False)
+                    # The [item] depends on the sitemtype
+                    item = None
+                    itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+                    if obj.sitemtype in itemset:
+                        item = getattr(obj, itemset[obj.sitemtype])
 
-                # SavedItem: title of the manu/serm/ssg/coll
-                kwargs = None
-                #if obj.name != None and obj.name != "":
-                #    kwargs = dict(name=obj.name)
-                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
+                    # SavedItem: Order within the set of SavedItems
+                    add_one_item(rel_item, obj.order, False, align="right", draggable=True)
 
-                # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
-                add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
+                    # SavedItem: Type
+                    add_one_item(rel_item, obj.get_sitemtype_display(), False)
 
-                if bMayEdit:
-                    # Actions that can be performed on this item
-                    add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
+                    # SavedItem: title of the manu/serm/ssg/coll
+                    kwargs = None
+                    #if obj.name != None and obj.name != "":
+                    #    kwargs = dict(name=obj.name)
+                    add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "title", kwargs=kwargs), False, main=True)
 
-                # Add this line to the list
-                rel_list.append(dict(id=obj.id, cols=rel_item))
+                    # SavedItem: Size (number of SSG in this manu/serm/ssg/coll)
+                    add_one_item(rel_item, self.get_field_value(obj.sitemtype, item, "size"), False, align="right")
+
+                    if bMayEdit:
+                        # Actions that can be performed on this item
+                        add_one_item(rel_item, self.get_field_value("saveditem", obj, "buttons"), False)
+
+                    sel_info = get_selectitem_info(self.request, obj, self.object, self.sel_button)
+
+                    # Add this line to the list
+                    group_id = "0" if group_id is None else group_id
+                    rel_list.append(dict(isgroup=False, id=obj.id, cols=rel_item, sel_info=sel_info, group_id=group_id))
             
             sitemset['rel_list'] = rel_list
             sitemset['columns'] = [
@@ -443,11 +521,259 @@ class MyPassimEdit(BasicDetails):
                 ]
             if bMayEdit:
                 sitemset['columns'].append("")
-            related_objects.append(sitemset)
+            related_objects.append(copy.copy(sitemset))
 
             # [2] ===============================================================
-            # Deal with Saved Searches!!!!
-            # TODO: implement
+            # Get all 'SavedSearch' objects that belong to the current user (=profile)
+            svsearchset = dict(title="Saved searches", prefix="svsearch")  
+            if resizable: svsearchset['gridclass'] = "resizable dragdrop"
+            svsearchset['savebuttons'] = bMayEdit
+            svsearchset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_svsearchlist = instance.profile_savedsearches.all().order_by('order', 'name')
+            # Also store the count
+            svsearchset['count'] = qs_svsearchlist.count()
+            svsearchset['instance'] = instance
+            svsearchset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_svsearchlist)
+
+            # Walk these svsearchlist
+            for obj in qs_svsearchlist:
+                # The [obj] is of type `SavedSearch`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the saved searches are:
+                # 1 - order
+                # 2 - name for the saved search
+                # 3 - listview name (e.g. Manifestation, Manuscript, Authority File and so on)
+                #     or an icon for this listview, or a 3-letter abbr for this listview
+
+                # SavedSearch: Order within the set of SavedSearches
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SavedSearch: Name
+                add_one_item(rel_item, obj.name, False, main=True)
+
+                # SavedSearch: Listview name + link
+                add_one_item(rel_item, obj.get_view_link(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("savedsearch", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            svsearchset['rel_list'] = rel_list
+            svsearchset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of saved search">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Kind of listview">View</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                svsearchset['columns'].append("")
+            related_objects.append(copy.copy(svsearchset))
+
+            # [3] ===============================================================
+            # Get all 'SavedVis' objects that belong to the current user (=profile)
+            svdvisset = dict(title="Saved visualizations", prefix="svdvis")  
+            if resizable: svdvisset['gridclass'] = "resizable dragdrop"
+            svdvisset['savebuttons'] = bMayEdit
+            svdvisset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_svdvislist = instance.profile_savedvisualizations.all().order_by('order', 'name')
+            # Also store the count
+            svdvisset['count'] = qs_svdvislist.count()
+            svdvisset['instance'] = instance
+            svdvisset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+            # These elements have an 'order' attribute, so they  may be corrected
+            check_order(qs_svdvislist)
+
+            # Walk these svdvislist
+            for obj in qs_svdvislist:
+                # The [obj] is of type `SavedVis`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the Saved visualisations are:
+                # 1 - order
+                # 2 - name for the saved search
+                # 3 - visualization name (e.g. AF Overlap, AF transmission, DCT and so on)
+                #     or: an icon for this visualization
+                #     or: a 3-letter abbr for this visualization
+
+                # SavedVis: Order within the set of Saved visualizations
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SavedVis: Name
+                add_one_item(rel_item, obj.name, False, main=True)
+
+                # SavedVis: visualization type + link to open/execute it
+                add_one_item(rel_item, obj.get_view_link(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("savedvis", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            svdvisset['rel_list'] = rel_list
+            svdvisset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of saved visualization">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Kind of visualization">Type</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                svdvisset['columns'].append("")
+            related_objects.append(copy.copy(svdvisset))
+
+            # [3] ===============================================================
+            # Get all 'SetDef' objects that belong to the current user (=profile)
+            dctdefset = dict(title="Dynamic comparitive tables", prefix="dctdef")  
+            if resizable: dctdefset['gridclass'] = "resizable dragdrop"
+            dctdefset['savebuttons'] = bMayEdit
+            dctdefset['saveasbutton'] = False
+            rel_list =[]
+
+            # qs_dctdeflist = instance.profile_mydctualizations.all().order_by('order', 'name')
+            qs_dctdeflist = SetDef.objects.filter(researchset__profile=instance).order_by('order', 'name')
+            # Also store the count
+            dctdefset['count'] = qs_dctdeflist.count()
+            dctdefset['instance'] = instance
+            dctdefset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+
+            # And store an introduction
+            lIntro = []
+            lIntro.append('View and work with research sets on the <em>development version</em> of ')
+            lIntro.append('the <a role="button" class="btn btn-xs jumbo-1" ')
+            lIntro.append('href="{}">DCT tool</a> page.'.format(reverse('researchset_list')))
+            sIntro = " ".join(lIntro)
+            dctdefset['introduction'] = sIntro
+
+            # These elements have an 'order' attribute, but...
+            #   ... but that order may *NOT be corrected here
+            # check_order(qs_dctdeflist)
+
+            # Walk these dctdeflist
+            for obj in qs_dctdeflist:
+                # The [obj] is of type `SetDef`
+
+                rel_item = []
+
+                # TODO:
+                # Relevant columns for the Your visualisations are:
+                # 1 - order
+                # 2 - name of the ResearchSet
+                # 3 - name of the DCT
+
+                # SetDef: Order within the set of Your visualizations
+                add_one_item(rel_item, obj.order, False, align="right", draggable=True)
+
+                # SetDef: researchSet name
+                add_one_item(rel_item, obj.researchset.name, False, main=True)
+
+                # SetDef: DCT name
+                add_one_item(rel_item, obj.get_view_link(), False)
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("mydct", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            dctdefset['rel_list'] = rel_list
+            dctdefset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Research set">Research set</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Dynamic Comparative Table">DCT</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                dctdefset['columns'].append("")
+            related_objects.append(copy.copy(dctdefset))
+
+            # [3] ===============================================================
+            # Get all 'StemmaSet' objects that belong to the current user (=profile)
+            stemmaset = dict(title="Stemmatizer research sets", prefix="stemma")  
+            if resizable: stemmaset['gridclass'] = "resizable dragdrop"
+            stemmaset['savebuttons'] = bMayEdit
+            stemmaset['saveasbutton'] = False
+            rel_list =[]
+
+            qs_stemmalist = StemmaSet.objects.filter(profile=instance).order_by('name')
+            # Also store the count
+            stemmaset['count'] = qs_stemmalist.count()
+            stemmaset['instance'] = instance
+            stemmaset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+
+            # And store an introduction
+            lIntro = []
+            lIntro.append('View and work with stemmatizer research sets on the <em>development version</em> of ')
+            lIntro.append('the <a role="button" class="btn btn-xs jumbo-1" ')
+            lIntro.append('href="{}">Stemmatizer tool</a> page.'.format(reverse('stemmaset_list')))
+            sIntro = " ".join(lIntro)
+            stemmaset['introduction'] = sIntro
+
+            # These elements have an 'order' attribute, but...
+            #   ... but that order may *NOT be corrected here
+            # check_order(qs_stemmalist)
+
+            # Walk these stemmalist
+            order = 0
+            for obj in qs_stemmalist:
+                # The [obj] is of type `StemmaSet`
+
+                rel_item = []
+                order += 1
+
+                # TODO:
+                # Relevant columns for the Your visualisations are:
+                # 1 - name of the StemmaSet
+                # 2 - scope of the Stemma research set (priv/team/publ)
+                # 3 - size in terms of number of SSGs part of this set
+                # 4 - analyze button
+
+                # SetDef: Order within the set of Your visualizations
+                add_one_item(rel_item, order, False, align="right", draggable=True)
+
+                # Name: the name of this Stemmaset
+                add_one_item(rel_item, obj.get_name_markdown(), False, main=True)
+
+                # Analyze: button to analyze this one
+                add_one_item(rel_item, obj.get_analyze_markdown(), False, main=True)
+
+                # Scope: private, team or global
+                add_one_item(rel_item, obj.get_scope_display(), False)
+
+                # Size: number of StemmaItems part of this StemmaSet
+                size = "{}".format(obj.stemmaset_stemmaitems.count())
+                add_one_item(rel_item, size, False, align="right")
+
+                if bMayEdit:
+                    # Actions that can be performed on this item
+                    add_one_item(rel_item, self.get_field_value("stemma", obj, "buttons"), False)
+
+                # Add this line to the list
+                rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+            stemmaset['rel_list'] = rel_list
+            stemmaset['columns'] = [
+                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                '{}<span title="Name of the stemmatizer research set">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Analyze the stemmatological research set">Analyze</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Scope">Scope</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Number of items in this research set">Size</span>{}'.format(sort_start, sort_end), 
+                ]
+            if bMayEdit:
+                stemmaset['columns'].append("")
+            related_objects.append(copy.copy(stemmaset))
 
         except:
             msg = oErr.get_error_message()
@@ -489,9 +815,6 @@ class MyPassimEdit(BasicDetails):
                 # This is an Authority File (=SSG)
                 if custom == "title":
                     sBack = instance.get_passimcode_markdown()
-                    #url = reverse("equalgold_details", kwargs = {'pk': instance.id})
-                    #sBack = "<span class='clickable'><a href='{}' class='nostyle'><span class='signature'>{}</span>: {}</a><span>".format(
-                    #    url, instance.msitem.codico.manuscript.idno, instance.get_locus())
                 elif custom == "size":
                     count = 1   # There is just 1 authority file
                     sBack = "{}".format(count)
@@ -529,6 +852,31 @@ class MyPassimEdit(BasicDetails):
                     # Create the remove button
                     sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
 
+            elif type == "savedsearch":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "savedvis":
+                # A saved item should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "mydct":
+                # A DCT should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+            elif type == "stemma":
+                # A Stemma research set should get the button 'Delete'
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("MyPassimEdit/get_field_value")
@@ -541,53 +889,132 @@ class MyPassimEdit(BasicDetails):
         oErr = ErrHandle()
         bChanges = False
         bDebug = True
+        hlist_objects = [
+            {"prefix": "svitem",    "cls": SavedItem, "grp": SaveGroup},
+            {"prefix": "svsearch",  "cls": SavedSearch},
+            ]
 
         try:
-            arg_hlist = "svitem-hlist"
-            arg_savenew = "svitem-savenew"
-            if arg_hlist in self.qd and arg_savenew in self.qd:
-                # Interpret the list of information that we receive
-                hlist = json.loads(self.qd[arg_hlist])
-                # Interpret the savenew parameter
-                savenew = self.qd[arg_savenew]
+            # Walk all hlist objects
+            for oHlist in hlist_objects:
+                prefix = oHlist.get("prefix")
+                cls = oHlist.get("cls")
+                grp = oHlist.get("grp")
+                arg_hlist = "{}-hlist".format(prefix)
+                arg_glist = "{}-glist".format(prefix)
+                arg_savenew = "{}-savenew".format(prefix)
 
-                # Make sure we are not saving
-                self.do_not_save = True
-                # But that we do a new redirect
-                self.newRedirect = True
+                # NOTE: it is either [hlist] or [glist], not both of them
+                if arg_glist in self.qd and not grp is None:
+                    glist = json.loads(self.qd[arg_glist])
 
-                # Change the redirect URL
-                if self.redirectpage == "":
-                    self.redirectpage = reverse('mypassim_details')
+                    # Make sure we are not saving
+                    self.do_not_save = True
+                    # But that we do a new redirect
+                    self.newRedirect = True
 
-                # What we have is the ordered list of Manuscript id's that are part of this collection
-                with transaction.atomic():
-                    # Make sure the orders are correct
-                    for idx, item_id in enumerate(hlist):
-                        order = idx + 1
+                    # Change the redirect URL
+                    if self.redirectpage == "":
+                        self.redirectpage = reverse('mypassim_details')
+
+                    # We also need to create a [hlist] to check existing
+                    hlist = []
+                    # What we have is the ordered list of SavedItem id's plus a possible SaveGroup id
+                    with transaction.atomic():
+                        # Make sure the orders are correct
+                        for idx, oItem in enumerate(glist):
+                            order = idx + 1
+                            groupid = oItem.get("groupid")
+                            item_id = oItem.get("rowid")
+
+                            # Keep track of the actually used items, in the mean time
+                            hlist.append(item_id)
+
+                            lstQ = [Q(profile=instance)]
+                            lstQ.append(Q(**{"id": item_id}))
+                            obj = cls.objects.filter(*lstQ).first()
+
+                            if isinstance(groupid, str): groupid = int(groupid)
+                            if groupid == 0:
+                                group = None
+                            else:
+                                lstQ = [Q(profile=instance)]
+                                lstQ.append(Q(**{"id": groupid}))
+                                group = grp.objects.filter(*lstQ).first()
+
+                            if obj != None:
+                                # The order should be correct
+                                if obj.order != order:
+                                    obj.order = order
+                                    obj.save()
+                                    bChanges = True
+                                # The group adherence should also be correct
+                                current_group_id = 0 if obj.group is None else obj.group.id
+                                if current_group_id != groupid:
+                                    # Assign the new group
+                                    obj.group = group
+                                    obj.save()
+                                    bChanges = True
+
+                    # See if any need to be removed
+                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    delete_id = []
+                    for item_id in existing_item_id:
+                        if not item_id in hlist:
+                            delete_id.append(item_id)
+                    if len(delete_id)>0:
                         lstQ = [Q(profile=instance)]
-                        lstQ.append(Q(**{"id": item_id}))
-                        obj = SavedItem.objects.filter(*lstQ).first()
-                        if obj != None:
-                            if obj.order != order:
-                                obj.order = order
-                                obj.save()
-                                bChanges = True
-                # See if any need to be removed
-                existing_item_id = [str(x.id) for x in SavedItem.objects.filter(profile=instance)]
-                delete_id = []
-                for item_id in existing_item_id:
-                    if not item_id in hlist:
-                        delete_id.append(item_id)
-                if len(delete_id)>0:
-                    lstQ = [Q(profile=instance)]
-                    lstQ.append(Q(**{"id__in": delete_id}))
-                    SavedItem.objects.filter(*lstQ).delete()
-                    bChanges = True
+                        lstQ.append(Q(**{"id__in": delete_id}))
+                        cls.objects.filter(*lstQ).delete()
+                        bChanges = True
 
-                if bChanges:
-                    # (6) Re-calculate the order
-                    SavedItem.update_order(instance)
+                    if bChanges:
+                        # (6) Re-calculate the order
+                        cls.update_order(instance)
+
+                elif arg_hlist in self.qd and arg_savenew in self.qd:
+                    # Interpret the list of information that we receive
+                    hlist = json.loads(self.qd[arg_hlist])
+                    # Interpret the savenew parameter
+                    savenew = self.qd[arg_savenew]
+
+                    # Make sure we are not saving
+                    self.do_not_save = True
+                    # But that we do a new redirect
+                    self.newRedirect = True
+
+                    # Change the redirect URL
+                    if self.redirectpage == "":
+                        self.redirectpage = reverse('mypassim_details')
+
+                    # What we have is the ordered list of SavedItem id's that are part of this collection
+                    with transaction.atomic():
+                        # Make sure the orders are correct
+                        for idx, item_id in enumerate(hlist):
+                            order = idx + 1
+                            lstQ = [Q(profile=instance)]
+                            lstQ.append(Q(**{"id": item_id}))
+                            obj = cls.objects.filter(*lstQ).first()
+                            if obj != None:
+                                if obj.order != order:
+                                    obj.order = order
+                                    obj.save()
+                                    bChanges = True
+                    # See if any need to be removed
+                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    delete_id = []
+                    for item_id in existing_item_id:
+                        if not item_id in hlist:
+                            delete_id.append(item_id)
+                    if len(delete_id)>0:
+                        lstQ = [Q(profile=instance)]
+                        lstQ.append(Q(**{"id__in": delete_id}))
+                        cls.objects.filter(*lstQ).delete()
+                        bChanges = True
+
+                    if bChanges:
+                        # (6) Re-calculate the order
+                        cls.update_order(instance)
 
             return True
         except:
@@ -612,6 +1039,127 @@ class MyPassimDetails(MyPassimEdit):
             self.check_hlist(profile)
         return None
 
+
+# ================= Views for SavedSearch ==========================
+
+class SavedSearchApply(BasicPart):
+    """Add a named saved search item"""
+
+    MainModel = User
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+
+            # We already know who we are
+            profile = self.obj.user_profiles.first()
+            # Retrieve necessary parameters
+            usersearch_id = self.qd.get("svd-usersearch_id")
+            searchname = ""
+            for k,v in self.qd.items():
+                if "-searchname" in k:
+                    if isinstance(v,str) and "<script" in v:
+                        searchname = "--script--"
+                    else:
+                        searchname = v
+                    break
+            if searchname == "--script--":
+                # The name contains a script
+                data['action'] = "script"
+            elif searchname == "":
+                # User did not supply a name
+                data['action'] = "empty"
+            else:
+                # Create a saved search
+                obj = SavedSearch.objects.filter(name=searchname, profile=profile).first()
+                if obj is None:
+                    obj = SavedSearch.objects.create(name=searchname, profile=profile, usersearch_id=usersearch_id)
+                else:
+                    # Check and set the usersearch_id
+                    searchid = obj.usersearch.id
+                    if usersearch_id != searchid:
+                        obj.usersearch_id = usersearch_id
+                        obj.save()
+                # Indicate what happened: adding
+                data['action'] = "added"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearchApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
+
+
+class SavedVisualizationApply(BasicPart):
+    """Add a named saved visualization item"""
+
+    MainModel = User
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+       
+        try:
+
+            # We already know who we are
+            profile = self.obj.user_profiles.first()
+            # Retrieve necessary parameters
+            options = self.qd.get("options")
+            # Unwrap the options
+            if not options is None:
+                oOptions = json.loads(options)
+                # URL to be called to get the visualization
+                visurl = oOptions.get("visurl")
+                # Type of visualization
+                vistype = oOptions.get("vistype")
+
+                searchname = ""
+                for k,v in self.qd.items():
+                    if "-visname" in k:
+                        if isinstance(v,str) and "<script" in v:
+                            searchname = "--script--"
+                        else:
+                            searchname = v
+                        break
+                if searchname == "--script--":
+                    # The name contains a script
+                    data['action'] = "script"
+                elif searchname == "":
+                    # User did not supply a name
+                    data['action'] = "empty"
+                else:
+                    # Create a saved search
+                    obj = SavedVis.objects.filter(name=searchname, profile=profile).first()
+                    if obj is None:
+                        obj = SavedVis.objects.create(name=searchname, profile=profile, visurl=visurl, options=options)
+                    else:
+                        bNeedSaving = False
+                        # Check and set the visurl + options
+                        if obj.visurl != visurl: 
+                            obj.visurl = visurl 
+                            bNeedSaving = True
+                        if obj.options != options:
+                            obj.options = options
+                            bNeedSaving = True
+
+                        if bNeedSaving:
+                            obj.save()
+                    # Indicate what happened: adding
+                    data['action'] = "added"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedVisualizationApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
 
 
 # ================= Views for SavedItem, SelectItem ================
@@ -729,7 +1277,8 @@ class SelectItemApply(BasicPart):
                     rsetoneid = v
                     break
 
-            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", hc="collection", pd="collection")
+            itemset = dict(manu="manuscript", serm="sermon", ssg="equal", 
+                           hc="collection", pd="collection", svdi="saveditem")
             itemidfield = itemset[selitemtype]
 
             if selitemaction == "-" and not mode is None:
@@ -838,32 +1387,71 @@ class SelectItemApply(BasicPart):
                     data['action'] = "update_basket"
 
             elif selitemaction == "add_dct":
-                # Double check: this functionality only exists for M, HC, PD
-                if selitemtype in oSelDct and not rsetoneid is None:
-                    # Add all selected items to the DCT
-                    qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
-
-                    # Figure out which selection object to use
-                    selParams = oSelDct[selitemtype]
-                    setlisttype = selParams['setlisttype']
-                    field_s = selParams['field_s']
-
-                    # Add all selected items to the DCT
+                # A research set needs to have been selected
+                if not rsetoneid is None:
+                    # Get to the research set
                     rset = ResearchSet.objects.filter(id=rsetoneid).first()
                     if not rset is None:
-                        # Walk all the selected items
-                        for obj in qs:
-                            # Add this item to the chosen research set
-                            item = getattr(obj,field_s)
-                            rset.add_list(item, setlisttype)
-                        # make sure to add a link to the research set here
-                        data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+                        # Make a list of items that are to be added to the DCT
+                        if selitemtype == "svdi":
+                            # Treat special case: 'svdi' = SavedItems from the PRE
+                            qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
 
-                    # Remove the selection
-                    qs.delete()
+                            # List to capture of all id's of SelItem that are used
+                            lst_selitem = []
 
-                    # Indicate that the JS also needs to do some clearing
-                    data['action'] = "update_dct"
+                            # Retrieve each SavedItem and interpret it
+                            for selitem in qs:
+                                saveditem = selitem.saveditem
+                                if not saveditem is None:
+                                    selitemtype = saveditem.sitemtype
+
+                                    if selitemtype in oSelDct:
+                                        # Figure out which selection object to use
+                                        selParams = oSelDct[selitemtype]
+                                        setlisttype = selParams['setlisttype']
+                                        field_s = selParams['field_s']
+
+                                        # Add what the SavedItem points to the chosen research set
+                                        item = getattr(saveditem,field_s)
+                                        rset.add_list(item, setlisttype)
+
+                                        # Indicate that this can be 'unselected'
+                                        lst_selitem.append(selitem.id)
+
+                            # make sure to add a link to the research set here
+                            data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                            # Remove the selection
+                            if len(lst_selitem) > 0:
+                                SelectItem.objects.filter(id__in=lst_selitem).delete()
+
+                            # Indicate that the JS also needs to do some clearing
+                            data['action'] = "update_dct"
+
+                        # Double check: this functionality only exists for M, HC, PD
+                        elif selitemtype in oSelDct:
+                            # Add all selected items to the DCT
+                            qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)
+
+                            # Figure out which selection object to use
+                            selParams = oSelDct[selitemtype]
+                            setlisttype = selParams['setlisttype']
+                            field_s = selParams['field_s']
+
+                            # Walk all the selected items
+                            for obj in qs:
+                                # Add this item to the chosen research set
+                                item = getattr(obj,field_s)
+                                rset.add_list(item, setlisttype)
+                            # make sure to add a link to the research set here
+                            data['researchset'] = reverse("researchset_details", kwargs={'pk': rsetoneid})
+
+                            # Remove the selection
+                            qs.delete()
+
+                            # Indicate that the JS also needs to do some clearing
+                            data['action'] = "update_dct"
 
             
 
@@ -879,6 +1467,204 @@ class SelectItemApply(BasicPart):
 
         context['data'] = data
         return context
+
+
+
+# ================== Views for the SaveGroup stuff =================
+
+
+class SaveGroupListView(BasicList):
+    """Listview of SaveGroup"""
+
+    model = SaveGroup
+    listform = SaveGroupForm
+    bUseFilter = True
+    prefix = "sgrp"
+    plural_name = "SaveGroups"
+    new_button = True
+    use_team_group = True
+    order_cols = ['name', 'saved', '']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Name',        'order': 'o=1','type': 'str', 'field': 'name',                      'linkdetails': True, 'main': True},
+        {'name': 'Date',        'order': 'o=2','type': 'str', 'custom': 'date', 'align': 'right',   'linkdetails': True},
+        {'name': 'Saved items', 'order': '',   'type': 'int', 'custom': 'count', 'align': 'right'},
+                ]
+    filters = [ 
+        {"name": "Name",       "id": "filter_name",      "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name',  'dbfield': 'name',      'keyS': 'name'},
+            ]},
+        {'section': 'other', 'filterlist': [
+            {'filter': 'scope',     'dbfield': 'scope',  'keyS': 'scope'}
+            ]}
+         ]
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+
+        if custom == "date":
+            sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+        elif custom == "owner":
+            sBack = instance.profile.user.username
+        elif custom == "count":
+            iCount = instance.group_saveditems.count()
+            sBack = "{}".format(iCount)
+
+        return sBack, sTitle
+
+    def get_own_list(self):
+        # Get the user
+        username = self.request.user.username
+        user = User.objects.filter(username=username).first()
+        # Get to the profile of this user
+        qs = Profile.objects.filter(user=user)
+        return qs
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+
+        # Show private datasets as well as those with scope "team", provided the person is in the team
+        ownlist = self.get_own_list()
+        fields['scope'] = Q(profile__in=ownlist)  
+
+        # Return the correct response
+        return fields, lstExclude, qAlternative
+
+
+class SaveGroupEdit(BasicDetails):
+    model = SaveGroup
+    mForm = SaveGroupForm
+    prefix = 'sgrp'
+    prefix_type = "simple"
+    title = "SaveGroup"
+    use_team_group = True
+    listview = None
+    listviewtitle = "MyPassim"
+    mainitems = []
+
+    def custom_init(self, instance):
+        # Set the listview target
+        self.listview = reverse("mypassim_details")
+        # Make sure upon deletion we also return to the same listview target
+
+        return None
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        # Define the main items to show and edit
+        context['mainitems'] = [
+            {'type': 'line',  'label': "Name:",         'value': instance.name,              'field_key': 'name'  },
+            {'type': 'line',  'label': "Size:",         'value': instance.get_size_markdown()   },
+            {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
+            {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
+            ]
+
+        # Signal that we do have select2
+        context['has_select2'] = True
+
+        # Determine what the permission level is of this collection for the current user
+        # (1) Is this user a different one than the one who created the collection?
+        profile_owner = instance.profile
+        profile_user = Profile.get_user_profile(self.request.user.username)
+        # (2) Set default permission
+        permission = "read"
+        if profile_owner.id == profile_user.id:
+            # (3) Any creator of the SaveGroup may write it
+            permission = "write"
+
+        context['permission'] = permission
+
+        context['afterdelurl'] = self.listview
+
+        # Return the context we have made
+        return context
+
+
+class SaveGroupDetails(SaveGroupEdit):
+    """The HTML variant of [SaveGroupEdit]"""
+
+    rtype = "html"
+
+    def before_save(self, form, instance):
+        bStatus = True
+        msg = ""
+        # Do we already have an instance?
+        if instance == None or instance.id == None:
+            # See if we have the profile id
+            profile = Profile.get_user_profile(self.request.user.username)
+            form.instance.profile = profile
+
+        # Do we have cleaned data?
+        if hasattr(form, "cleaned_data"):
+            cleaned = form.cleaned_data
+
+        # Return as usual
+        return bStatus, msg
+
+
+class SaveGroupApply(BasicPart):
+    """Possibly add a new SaveGroup for this user"""
+
+    MainModel = Profile
+
+    def add_to_context(self, context):
+
+        oErr = ErrHandle()
+        data = dict(status="ok")
+        bIsNewGroup = False
+        sHtml = ""
+       
+        try:
+            # Check validity and permissions
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
+
+            # We already know who we are
+            profile = self.obj
+
+            # Retrieve necessary parameters
+            sgroupadd = self.qd.get("sgrp-sgroupadd")
+            sgroupaction = self.qd.get("sgroupaction")
+
+            if sgroupaction == "add":
+                # We are going to add a SaveGroup
+                lstQ = []
+                lstQ.append(Q(profile=profile))
+                lstQ.append(Q(name__iexact=sgroupadd))
+                obj = SaveGroup.objects.filter(*lstQ).first()
+                # OLD and obsolete: obj = SavedItem.objects.filter(profile=profile, sitemtype=sitemtype).first()
+                if obj is None:
+                    obj = SaveGroup.objects.create(
+                        profile=profile, name=sgroupadd)
+                    obj.save()
+                    bIsNewGroup = True
+                data['action'] = "added"
+
+                # Calculate what the savegroup HTML row looks like
+                if bIsNewGroup:
+                    context = dict(groupid=obj.id, groupname=sgroupadd)
+                    sHtml = render_to_string("dct/sgroup_new.html", context, self.request)
+                data['sgroupnew'] = sHtml
+
+            ## Possibly adapt the ordering of the saved items for this user
+            #if 'action' in data:
+            #    # Something has happened
+            #    SavedItem.update_order(profile)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SaveGroupApply")
+            data['status'] = "error"
+
+        context['data'] = data
+        return context
+
 
 
 # =================== Model views for the DCT ========

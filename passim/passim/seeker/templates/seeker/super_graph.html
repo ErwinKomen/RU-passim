@@ -35,10 +35,19 @@
       </div>
 
       <!-- Button to stop -->
-      <div class="col-md-1 align-right">
+      <div class="col-md-1 align-right tdnowrap">
+
+        <a role="button" class="btn btn-xs jumbo-2" data-target="#transmission-saveas" data-toggle="collapse"
+            title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim." >
+          <span class="glyphicon glyphicon-floppy-disk"></span>
+        </a>
         <a role="button" class="btn btn-xs jumbo-2"
+            title="Update/refresh the visualization with the current setting"
             targeturl={{equalgold_trans}}
-            onclick="ru.passim.seeker.network_transmission(this);">Update</a>
+            onclick="ru.passim.seeker.network_transmission(this);">
+          <span class="glyphicon glyphicon-repeat"></span>
+        </a>
+
       </div>
     </div>
 
@@ -57,6 +66,29 @@
         {% include 'seeker/download.html' with downloadid="trans" urlname="equalgold_trans_download" object_id=object.id %}
       </div>
     </div>
+
+    <!-- Room for saving a visualization -->
+    <div class="row">
+      <div class="col-md-6 col-md-offset-6 align-right">
+        <div id="transmission-saveas" class="saveas collapse">
+          <span>
+            <input type="text" name="transmission-visname" style="width: 80%" placeholder="Name for this visualization" />
+          </span>
+          &nbsp;
+          <span class="pull-right">
+            <a role="button" class="btn btn-xs jumbo-2" 
+                saveurl="{{equalgold_trans}}" targeturl="{% url 'savedvis_apply' user.id %}" 
+                onclick="ru.passim.seeker.do_savedvis(this, 'transmission');">Save</a>
+          </span>            
+        </div>
+        <!-- Any responses -->
+        <div id="transmission-saveas-result" class="hidden">
+          <!-- Any result to be shown-->
+        </div>
+
+      </div>
+    </div>
+
   </form>
 
   <div id="super_network_trans_wait" class="hidden">
@@ -188,9 +220,16 @@
             </td>
 
             <td align="right">
+              <a role="button" class="btn btn-xs jumbo-2" data-target="#overlap-saveas" data-toggle="collapse"
+                 title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim." >
+                <span class="glyphicon glyphicon-floppy-disk"></span>
+              </a>
               <a role="button" class="btn btn-xs jumbo-2"
+                 title="Update/refresh the visualization with the current setting"
                  targeturl={{equalgold_overlap}}
-                 onclick="ru.passim.seeker.network_overlap(this);">Update</a>
+                 onclick="ru.passim.seeker.network_overlap(this);">
+                <span class="glyphicon glyphicon-repeat"></span>
+              </a>
             </td>
           </tr>
 
@@ -264,7 +303,23 @@
               </div>
 
             </td>
-            <td colspan="2">&nbsp;</td>
+            <td colspan="4"  align="right">
+              <div id="overlap-saveas" class="saveas collapse">
+                <span>
+                  <input type="text" name="overlap-visname" style="width: 80%" placeholder="Name for this visualization" />
+                </span>
+                &nbsp;
+                <span>
+                  <a role="button" class="btn btn-xs jumbo-2" 
+                     saveurl="{{equalgold_overlap}}" targeturl="{% url 'savedvis_apply' user.id %}" 
+                     onclick="ru.passim.seeker.do_savedvis(this, 'overlap');">Save</a>
+                </span>            
+              </div>
+              <!-- Any responses -->
+              <div id="overlap-saveas-result" class="hidden">
+                <!-- Any result to be shown-->
+              </div>
+            </td>
           </tr>
 
           <tr>

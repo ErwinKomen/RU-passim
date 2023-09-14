@@ -16,7 +16,7 @@ import csv, json
 # import yaml
 # import ast
 import requests
-import demjson
+# import demjson
 
 # My own stuff
 import utils
@@ -136,10 +136,13 @@ def create_libraries(oArgs):
                 break
 
             # Retrieve the city information
+            lCity = []
+            #with open(fCity, "r", encoding="utf-8") as fc:
+            #    # Interpret the data with wingle quotes
+            #    data = fc.read()
+            #    lCity = demjson.decode(data)    
             with open(fCity, "r", encoding="utf-8") as fc:
-                # Interpret the data with wingle quotes
-                data = fc.read()
-                lCity = demjson.decode(data)                
+                lCity = json.load(fc)
 
             # Walk all the cities of this country
             if 'items' in lCity:
@@ -165,8 +168,10 @@ def create_libraries(oArgs):
                             return False
                         if r.status_code == 200:
                             # Return positively
-                            # reply = json.loads(r.text.replace("\t", " "))
-                            reply = demjson.decode(r.text.replace("\t", " "))
+                            # OLDEST: reply = json.loads(r.text.replace("\t", " "))
+                            # OLD: reply = demjson.decode(r.text.replace("\t", " "))
+                            sText = r.text.replace("\t", "")
+                            reply = json.loads(sText)
                             if 'items' in reply:
                                 libraries = reply['items']
                                 for oLibrary in libraries:

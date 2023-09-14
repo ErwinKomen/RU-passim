@@ -373,6 +373,7 @@ a:not(.btn) span.glyphicon-remove {
 
 .visborder {
     border: 1px solid blue;
+    margin-top: 10px;
 }
 
 svg {
@@ -556,6 +557,10 @@ div.arg-selected {
 /* Adjust [row] within forms */
 form .row {
     margin-left: 0px;
+}
+form .row.noform {
+    margin-left: 0px;
+    margin-right: 0px;
 }
 form .panel-heading.row {
     margin-right: 0px;
@@ -1992,10 +1997,18 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     cursor: pointer;
 }
 
+.savegroup {
+
+}
+
 /* Stemmatology */
 .fullquote {
     color: red;
     font-size: smaller;
     vertical-align: super;
+}
+
+svg tspan:hover {
+    fill: red;
 }
 

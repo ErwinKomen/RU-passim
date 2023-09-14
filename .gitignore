@@ -337,3 +337,25 @@ ModelManifest.xml
 /passim/passim_seeker_20221013.svg
 /passimproject/media/22.12.02_CfP_PASSIM_Conference2023.pdf
 /passimproject/media/Visions of Authority - Flyer.pdf
+/passim/passim/stemma/migrations
+/passim/passim/stemma/templates/index.html
+/passim/log
+/passim/arrayms2
+/passim/arrayms1
+/stemmac/fitch2.lib
+/stemmac/fitch2.exp
+/stemmac/fitch2.dll
+/stemmac/fitch.so
+/stemmac/fitch.lib
+/stemmac/fitch.exp
+/stemmac/fitch.dll
+/stemmac/drawtree.exe
+/stemmac/draw2.exe
+/stemmac/intree
+/stemmac/drawtree.lib
+/stemmac/drawtree.exp
+/stemmac/drawtree.dll
+/stemmac/drawtree.so
+/requirements_jul2023.txt
+/installtree.txt
+/requirements_aug2023.txt

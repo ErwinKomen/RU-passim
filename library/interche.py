@@ -159,6 +159,7 @@ def interlinear2phonemic(oArgs):
     flInput = ""
     flOutput = ""
     method = "test1"
+    rBreak =re.compile( r'[\-\:\.]')
     namespaces = {'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math',
                   'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
     
@@ -196,19 +197,28 @@ def interlinear2phonemic(oArgs):
             text_lst = gloss.xpath("./descendant::m:t", namespaces=namespaces)
             gloss_txt = text_lst[0].text
             Status("Gloss = [{}]".format(gloss_txt))
+
             # Split on period
-            gloss_parts = gloss_txt.split(".")
+            # OLD gloss_parts = gloss_txt.split(".")
+
+            # Find a list of all splittable elements:'-','.'
+            gloss_break = rBreak.findall(gloss_txt)
+            gloss_parts = rBreak.split(gloss_txt)
+
             # Remove the current <m:r> child
             for mr in gloss.getchildren():
                 gloss.remove(mr)
+
             # Walk the parts and add children respecively
             for idx, gloss_part in enumerate(gloss_parts):
                 style = "Interlin Word Gloss en"
-                if gloss_part != gloss_part.lower():
+                if gloss_part[-1] != gloss_part[-1].lower():
                     gloss_part = gloss_part.lower()
                     style = "Interlin Morpheme Gloss en"
                 # Add the period for anything but the first element
-                if idx > 0: gloss_part = "." + gloss_part
+                if idx > 0: 
+                    # gloss_part = "." + gloss_part
+                    gloss_part = gloss_break[idx-1] + gloss_part
                 # Create a child
                 child_mr = etree.fromstring('<m:r {}><m:rPr><m:nor /></m:rPr><w:rPr><w:rStyle w:val="{}" /></w:rPr><m:t>{}</m:t></m:r>'.format(
                     namespacestyle, style, gloss_part))

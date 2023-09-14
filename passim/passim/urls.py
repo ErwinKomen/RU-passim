@@ -19,6 +19,7 @@ from passim import views
 from passim.seeker.views import *
 from passim.seeker.visualizations import *
 from passim.dct.views import *
+from passim.stemma.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel, \
@@ -40,6 +41,8 @@ from django.views.generic.base import RedirectView
 
 admin.autodiscover()
 
+handler404 = 'passim.seeker.views.view_404'
+
 
 # Set admin stie information
 admin.site.site_header = "Patristic Sermons in the Middle Ages"
@@ -49,13 +52,14 @@ pfx = APP_PREFIX
 use_testapp = False
 
 # ================ Custom error handling when debugging =============
-def custom_page_not_found(request):
+def custom_page_not_found(request, exception=None):
     return passim.seeker.views.view_404(request)
+
+handler404 = custom_page_not_found
 
 urlpatterns = [
     # Examples:
     url(r'^$', passim.seeker.views.home, name='home'),
-    # url(r'^404/$', passim.seeker.views.view_404, name='view_404'),
     path("404/", custom_page_not_found),
     url(r'^favicon\.ico$',RedirectView.as_view(url='/static/seeker/content/favicon.ico')),
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
@@ -103,6 +107,10 @@ urlpatterns = [
     url(r'^manuscript/huwa/download/$', ManuscriptHuwaToJson.as_view(), name='manuscript_huwajson'),
     url(r'^manuscript/ead/download', ManuEadDownload.as_view(), name='ead_results'),
 
+    url(r'^manulink/list', ManuscriptLinkListView.as_view(), name='manuscriptlink_list'),
+    url(r'^manulink/details(?:/(?P<pk>\d+))?/$', ManuscriptLinkDetails.as_view(), name='manuscriptlink_details'),
+    url(r'^manulink/edit(?:/(?P<pk>\d+))?/$', ManuscriptLinkEdit.as_view(), name='manuscriptlink_edit'),
+    
     url(r'^codico/list', CodicoListView.as_view(), name='codico_list'),
     url(r'^codico/details(?:/(?P<pk>\d+))?/$', CodicoDetails.as_view(), name='codico_details'),
     url(r'^codico/edit(?:/(?P<pk>\d+))?/$', CodicoEdit.as_view(), name='codico_edit'),
@@ -126,6 +134,7 @@ urlpatterns = [
     url(r'^ssg/list', EqualGoldListView.as_view(), name='equalgold_list'),
     url(r'^ssg/details(?:/(?P<pk>\d+))?/$', EqualGoldDetails.as_view(), name='equalgold_details'),
     url(r'^ssg/edit(?:/(?P<pk>\d+))?/$', EqualGoldEdit.as_view(), name='equalgold_edit'),
+    url(r'^ssg/transdel(?:/(?P<pk>\d+))?/$', EqualGoldTransDel.as_view(), name='equalgold_transdel'),
     url(r'^ssg/ukw(?:/(?P<pk>\d+))?/$', EqualGoldUserKeyword.as_view(), name='equalgold_ukw'),
     url(r'^ssg/pca(?:/(?P<pk>\d+))?/$', EqualGoldPca.as_view(), name='equalgold_pca'),
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
@@ -183,9 +192,14 @@ urlpatterns = [
     url(r'^sermon/list', SermonListView.as_view(), name='sermon_list'),
     url(r'^sermon/details(?:/(?P<pk>\d+))?/$', SermonDetails.as_view(), name='sermon_details'),
     url(r'^sermon/edit(?:/(?P<pk>\d+))?/$', SermonEdit.as_view(), name='sermon_edit'),
+    url(r'^sermon/transdel(?:/(?P<pk>\d+))?/$', SermonTransDel.as_view(), name='sermon_transdel'),
     url(r'^sermon/move(?:/(?P<pk>\d+))?/$', SermonMove.as_view(), name='sermon_move'),
     url(r'^sermon/ukw(?:/(?P<pk>\d+))?/$', SermonUserKeyword.as_view(), name='sermon_ukw'),
         
+    url(r'^sermolink/list', SermonDescrLinkListView.as_view(), name='sermondescrlink_list'),
+    url(r'^sermolink/details(?:/(?P<pk>\d+))?/$', SermonDescrLinkDetails.as_view(), name='sermondescrlink_details'),
+    url(r'^sermolink/edit(?:/(?P<pk>\d+))?/$', SermonDescrLinkEdit.as_view(), name='sermondescrlink_edit'),
+    
     url(r'^dataset/private/list', CollectionListView.as_view(prefix="priv"), name='collpriv_list'), 
     url(r'^dataset/public/list', CollectionListView.as_view(prefix="publ"), name='collpubl_list'),  
     url(r'^collection/hist/list', CollectionListView.as_view(prefix="hist"), name='collhist_list'),
@@ -262,6 +276,9 @@ urlpatterns = [
     url(r'^comment/list', CommentListView.as_view(), name='comment_list'),
     url(r'^comment/details(?:/(?P<pk>\d+))?/$', CommentDetails.as_view(), name='comment_details'),
     url(r'^comment/edit(?:/(?P<pk>\d+))?/$', CommentEdit.as_view(), name='comment_edit'),
+    url(r'^comment/response/details(?:/(?P<pk>\d+))?/$', CommentResponseDetails.as_view(), name='commentresponse_details'),
+    url(r'^comment/response/edit(?:/(?P<pk>\d+))?/$', CommentResponseEdit.as_view(), name='commentresponse_edit'),
+    url(r'^comment/response/send(?:/(?P<pk>\d+))?/$', CommentResponseSend.as_view(), name='commentresponse_send'),
 
     url(r'^bibrange/list', BibRangeListView.as_view(), name='bibrange_list'),
     url(r'^bibrange/details(?:/(?P<pk>\d+))?/$', BibRangeDetails.as_view(), name='bibrange_details'),
@@ -304,18 +321,41 @@ urlpatterns = [
     url(r'^gold/import/json/$', SermonGoldUploadJson.as_view(), name='gold_upload_json'),
     url(r'^gold/ukw(?:/(?P<pk>\d+))?/$', SermonGoldUserKeyword.as_view(), name='gold_ukw'),
 
+    # ------------ DCT tool ------------------------------------------------------------------------------
     url(r'^rset/list', ResearchSetListView.as_view(), name='researchset_list'),
     url(r'^rset/details(?:/(?P<pk>\d+))?/$', ResearchSetDetails.as_view(), name='researchset_details'),
     url(r'^rset/edit(?:/(?P<pk>\d+))?/$', ResearchSetEdit.as_view(), name='researchset_edit'),
+
     url(r'^dct/list', SetDefListView.as_view(), name='setdef_list'),
     url(r'^dct/details(?:/(?P<pk>\d+))?/$', SetDefDetails.as_view(), name='setdef_details'),
     url(r'^dct/edit(?:/(?P<pk>\d+))?/$', SetDefEdit.as_view(), name='setdef_edit'),
     url(r'^dct/data(?:/(?P<pk>\d+))?/$', SetDefData.as_view(), name='setdef_data'),
     url(r'^dct/download(?:/(?P<pk>\d+))?/$', SetDefDownload.as_view(), name='setdef_download'),
+
+    url(r'^sgroup/list', SaveGroupListView.as_view(), name='savegroup_list'),
+    url(r'^sgroup/details(?:/(?P<pk>\d+))?/$', SaveGroupDetails.as_view(), name='savegroup_details'),
+    url(r'^sgroup/edit(?:/(?P<pk>\d+))?/$', SaveGroupEdit.as_view(), name='savegroup_edit'),
+
+    # ------------ Stemmatology tool ---------------------------------------------------------------------
+    url(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),
+    url(r'^stemmaset/details(?:/(?P<pk>\d+))?/$', StemmaSetDetails.as_view(), name='stemmaset_details'),
+    url(r'^stemmaset/edit(?:/(?P<pk>\d+))?/$', StemmaSetEdit.as_view(), name='stemmaset_edit'),
+    url(r'^stemmaset/add(?:/(?P<pk>\d+))?/$', StemmaSetAdd.as_view(), name='stemmaset_add'),
+
+    url(r'^stemmaset/dashboard(?:/(?P<pk>\d+))?/$', StemmaDashboard.as_view(), name='stemmaset_dashboard'),
+    url(r'^stemmacalc/start(?:/(?P<pk>\d+))?/$', StemmaStart.as_view(), name='stemma_start'),
+    url(r'^stemmacalc/progress(?:/(?P<pk>\d+))?/$', StemmaProgress.as_view(), name='stemma_progress'),
+    url(r'^stemmacalc/download(?:/(?P<pk>\d+))?/$', StemmaDownload.as_view(), name='stemma_download'),
+
+    # ------------ My Passim PRE -------------------------------------------------------------------------
     url(r'^mypassim/details', MyPassimDetails.as_view(), name='mypassim_details'),
     url(r'^mypassim/edit', MyPassimEdit.as_view(), name='mypassim_edit'),
+
+    url(r'^savedsearch/apply(?:/(?P<pk>\d+))?/$', SavedSearchApply.as_view(), name='savedsearch_apply'),
+    url(r'^savedvis/apply(?:/(?P<pk>\d+))?/$', SavedVisualizationApply.as_view(), name='savedvis_apply'),
     url(r'^saveditem/apply(?:/(?P<pk>\d+))?/$', SavedItemApply.as_view(), name='saveditem_apply'),
     url(r'^selitem/apply(?:/(?P<pk>\d+))?/$', SelectItemApply.as_view(), name='selitem_apply'),
+    url(r'^savegroup/apply(?:/(?P<pk>\d+))?/$', SaveGroupApply.as_view(), name='savegroup_apply'),
 
     url(r'^api/countries/$', passim.seeker.views.get_countries, name='api_countries'),
     url(r'^api/cities/$', passim.seeker.views.get_cities, name='api_cities'),

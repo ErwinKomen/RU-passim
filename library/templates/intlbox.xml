@@ -1,0 +1,37 @@
+            <w:r>
+              <w:drawing>
+                <wp:inline distT="0" distB="0" distL="0" distR="0" wp14:anchorId="4BB7F66B" wp14:editId="7587D90E">
+                  <wp:extent cx="914400" cy="540000" />
+                  <wp:effectExtent l="0" t="0" r="7620" b="0" />
+                  <wp:docPr id="{{item.docpr_id}}" name="Tekstvak {{item.docpr_id}}" />
+                  <wp:cNvGraphicFramePr />
+                  <a:graphic >
+                    <a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                      <wps:wsp>
+                        <wps:cNvSpPr txBox="1" />
+                        <wps:spPr>
+                          <a:xfrm><a:off x="0" y="0" /><a:ext cx="914400" cy="540000" /></a:xfrm>
+                          <a:prstGeom prst="rect"><a:avLst /></a:prstGeom>
+                          <a:solidFill><a:schemeClr val="lt1" /></a:solidFill>
+                          <a:ln w="6350"><a:noFill /></a:ln>
+                        </wps:spPr>
+                        <wps:txbx>
+                          <w:txbxContent>
+                            <w:p><w:r><w:rPr><w:rStyle w:val="Interlin Base ce" /></w:rPr><w:t>{{item.part_orig}}</w:t></w:r></w:p>
+                            <w:p><w:r ><w:rPr><w:rStyle w:val="Interlin Base ce-Latn" /></w:rPr><w:t>{{item.part_trans}}</w:t></w:r></w:p>
+                            <w:p><w:r><w:rPr><w:rStyle w:val="Interlin Word Gloss en" /></w:rPr><w:t>{{item.part_morph}}</w:t></w:r></w:p>
+                          </w:txbxContent>
+                        </wps:txbx>
+                        <wps:bodyPr rot="0" spcFirstLastPara="0" vertOverflow="overflow" horzOverflow="overflow" 
+                          vert="horz" wrap="none" lIns="36000" tIns="36000" rIns="36000" bIns="36000" 
+                          numCol="1" spcCol="0" rtlCol="0" fromWordArt="0" anchor="t" 
+                          anchorCtr="0" forceAA="0" compatLnSpc="1">
+                          <a:prstTxWarp prst="textNoShape"><a:avLst /></a:prstTxWarp>
+                          <a:noAutofit />
+                        </wps:bodyPr>
+                      </wps:wsp>
+                    </a:graphicData>
+                  </a:graphic>
+                </wp:inline>
+              </w:drawing>
+            </w:r>

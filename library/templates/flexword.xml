@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?mso-application  progid="Word.Document"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage" xmlns="http://www.w3.org/1999/XSL/Format" xmlns:v="urn:schemas-microsoft-com:vml">
+  <pkg:part pkg:name="/_rels/.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml" pkg:padding="512">
+    <pkg:xmlData>
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml" />
+      </Relationships>
+    </pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/_rels/document.xml.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml" pkg:padding="256">
+    <pkg:xmlData>
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" />
+      </Relationships>
+    </pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+      xmlns:ve="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+      xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+      xmlns:w10="urn:schemas-microsoft-com:office:word"
+      xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+      xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+      xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+      xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml">
+        <w:body>
+
+      {% for itext in interlinear_texts %}
+          <w:p><w:pPr><w:pStyle w:val="Interlin Title" /></w:pPr><w:r><w:t>{{itext.title}}</w:t></w:r></w:p>
+          <w:p><w:pPr><w:pStyle w:val="Interlin Description" /></w:pPr><w:r><w:t>{{itext.comment}}</w:t></w:r></w:p>
+          
+          {% for ipara in itext.paragraphs %}
+            {% for iphrase in ipara.phrases %}
+              <w:p>
+                {% with item=iphrase.segnum %}
+                  {% include 'intlbox.xml' %}
+                {% endwith %}
+                
+                {% for oitem in iphrase.items %}
+                
+                  {% with item=oitem %}
+                    {% include 'intlbox.xml' %}
+                  {% endwith %}
+
+                {% endfor %}
+              </w:p> 
+            
+              <w:p><w:pPr><w:pStyle w:val="Interlin Freeform en" /></w:pPr><w:r><w:t>{{ipara.freeform}}</w:t></w:r></w:p>
+            {% endfor %}
+          {% endfor %}
+          
+      {% endfor %}
+
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+  <pkg:part pkg:name="/word/styles.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml">
+    <pkg:xmlData>
+      <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <w:style w:type="paragraph" w:styleId="Interlin Base" />
+        <w:style w:type="paragraph" w:styleId="Interlin Title">
+          <w:basedOn w:val="Interlin Base" />
+          <w:name w:val="Interlin Title" />
+          <w:pPr>
+            <w:spacing w:before="40" w:after="120" />
+            <w:keepNext w:val="on" />
+          </w:pPr>
+          <w:rPr>
+            <w:b w:val="on" />
+            <w:sz w:val="32" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Source">
+          <w:basedOn w:val="Interlin Base" />
+          <w:name w:val="Interlin Source" />
+          <w:pPr>
+            <w:spacing w:before="40" w:after="40" />
+            <w:keepNext w:val="on" />
+          </w:pPr>
+          <w:rPr>
+            <w:b w:val="on" />
+            <w:sz w:val="24" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Paragraph Marker">
+          <w:name w:val="Interlin Paragraph Marker" />
+          <w:basedOn w:val="Interlin Base" />
+          <w:pPr>
+            <w:spacing w:before="40" w:after="40" />
+            <w:keepNext w:val="on" />
+          </w:pPr>
+          <w:rPr>
+            <w:b w:val="on" />
+            <w:keepNext w:val="on" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Description">
+          <w:name w:val="Interlin Description" />
+          <w:basedOn w:val="Interlin Base" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Vernacular">
+          <w:name w:val="Interlin Vernacular" />
+          <w:rPr>
+            <w:noProof w:val="on" />
+            <w:rFonts w:ascii="Charis SIL" w:h-ansi="Charis SIL" w:cs="Charis SIL" w:fareast="Charis SIL" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Vern ce" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Vern ce" />
+          <w:rPr>
+            <w:rFonts w:ascii="Charis SIL" w:h-ansi="Charis SIL" w:cs="Charis SIL" w:fareast="Charis SIL" />
+          </w:rPr>
+          <w:basedOn w:val="Interlin Vernacular" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Base ce" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Base ce" />
+          <w:basedOn w:val="Interlin Vern ce" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Cf ce" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Cf ce" />
+          <w:basedOn w:val="Interlin Vern ce" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morph ce" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Morph ce" />
+          <w:basedOn w:val="Interlin Vern ce" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Vern ce-Latn" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Vern ce-Latn" />
+          <w:rPr>
+            <w:rFonts w:ascii="Charis SIL" w:h-ansi="Charis SIL" w:cs="Charis SIL" w:fareast="Charis SIL" />
+          </w:rPr>
+          <w:basedOn w:val="Interlin Vernacular" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Base ce-Latn" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Base ce-Latn" />
+          <w:basedOn w:val="Interlin Vern ce-Latn" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Cf ce-Latn" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Cf ce-Latn" />
+          <w:basedOn w:val="Interlin Vern ce-Latn" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morph ce-Latn" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Morph ce-Latn" />
+          <w:basedOn w:val="Interlin Vern ce-Latn" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Baseline">
+          <w:name w:val="Interlin Baseline" />
+          <w:basedOn w:val="Interlin Vernacular" />
+          <w:rPr>
+            <w:b w:val="on" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Words">
+          <w:name w:val="Interlin Words" />
+          <w:basedOn w:val="Interlin Baseline" />
+          <w:bidi />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Homograph">
+          <w:name w:val="Interlin Homograph" />
+          <w:rPr>
+            <w:vertAlign w:val="subscript" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Variant Types">
+          <w:name w:val="Interlin Variant Types" />
+          <w:rPr>
+            <w:smallCaps w:val="on" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Analysis">
+          <w:name w:val="Interlin Analysis" />
+          <w:rPr>
+            <w:rFonts w:ascii="Times New Roman" w:h-ansi="Times New Roman" w:cs="Times New Roman" w:fareast="Times New Roman" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Phrase Number">
+          <w:name w:val="Interlin Phrase Number" />
+          <w:basedOn w:val="Interlin Analysis" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morpheme POS">
+          <w:name w:val="Interlin Morpheme POS" />
+          <w:basedOn w:val="Interlin Analysis" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Word POS">
+          <w:name w:val="Interlin Word POS" />
+          <w:basedOn w:val="Interlin Analysis" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Analysis en" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Analysis en" />
+          <w:rPr>
+            <w:rFonts w:ascii="Times New Roman" w:h-ansi="Times New Roman" w:cs="Times New Roman" w:fareast="Times New Roman" />
+          </w:rPr>
+          <w:basedOn w:val="Interlin Base" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morpheme Gloss en" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Morpheme Gloss en" />
+          <w:basedOn w:val="Interlin Analysis en" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Word Gloss en" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Word Gloss en" />
+          <w:basedOn w:val="Interlin Analysis en" />
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Freeform en" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Freeform en" />
+          <w:basedOn w:val="Interlin Analysis en" />
+          <w:pPr>
+            <w:spacing w:after="30" />
+          </w:pPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Analysis nl" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Analysis nl" />
+          <w:rPr>
+            <w:rFonts w:ascii="Charis SIL" w:h-ansi="Charis SIL" w:cs="Charis SIL" w:fareast="Charis SIL" />
+          </w:rPr>
+          <w:basedOn w:val="Interlin Base" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morpheme Gloss nl" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Morpheme Gloss nl" />
+          <w:basedOn w:val="Interlin Analysis nl" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Word Gloss nl" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Word Gloss nl" />
+          <w:basedOn w:val="Interlin Analysis nl" />
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Freeform nl" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Freeform nl" />
+          <w:basedOn w:val="Interlin Analysis nl" />
+          <w:pPr>
+            <w:spacing w:after="30" />
+          </w:pPr>
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Analysis ru" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Analysis ru" />
+          <w:rPr>
+            <w:rFonts w:ascii="Times New Roman" w:h-ansi="Times New Roman" w:cs="Times New Roman" w:fareast="Times New Roman" />
+          </w:rPr>
+          <w:basedOn w:val="Interlin Base" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Morpheme Gloss ru" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Morpheme Gloss ru" />
+          <w:basedOn w:val="Interlin Analysis ru" />
+        </w:style>
+        <w:style w:type="character" w:styleId="Interlin Word Gloss ru" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Word Gloss ru" />
+          <w:basedOn w:val="Interlin Analysis ru" />
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Interlin Freeform ru" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+          <w:name w:val="Interlin Freeform ru" />
+          <w:basedOn w:val="Interlin Analysis ru" />
+          <w:pPr>
+            <w:spacing w:after="30" />
+          </w:pPr>
+        </w:style>
+      </w:styles>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>          

@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
     <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>    
+    {% if has_select2 %}{{basic_form.media.css}}{% endif %}
 {% endblock %}
 
 
@@ -14,7 +15,7 @@
   <h2>My PASSIM</h2>
   <div class="row">
     <div class="col-md-12">
-      My PASSIM is the place where user-related items can be reached.
+      My PASSIM is the place to quickly get to what is important for <b>your</b> work.
       <span style="color: darkred;">This is a beta version.</span>
     </div>
   </div>
@@ -31,21 +32,6 @@
         </h3>
         <div id="keyword-area" class="collapse-indicator collapse">
           <p>List of my own keywords</p>
-        </div>
-      </section>
-
-      <section>
-        <h3>
-          <span class="glyphicon glyphicon-minus"></span>
-          <span data-toggle="collapse" data-target="#dct-area">Dynamic comparative table</span>
-        </h3>
-        <div id="dct-area" class="collapse-indicator in">
-          <p>
-            View and work with research sets on the <em>development version</em> of 
-            the <a role="button" class="btn btn-xs jumbo-1" href="{% url 'researchset_list' %}">DCT tool</a> page.
-          </p>
-          <p>Current statistics: {{rset_count}} research set(s) and {{dct_count}} DCT(s).
-          </p>
         </div>
       </section>
 
@@ -124,13 +110,6 @@
         <h3>Datasets</h3>
         <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}">my datasets</a>
         (current size: {{count_datasets}}).
-        </p>
-      </section>
-
-      <section>
-        <h3>Visualizations</h3>
-        <p>This will contain a list of any visualizations that you have 'saved' for future reference.
-
         </p>
       </section>
 
@@ -291,3 +270,6 @@
 </div>
 {% endblock %}
 
+{% block endcontent %} 
+  {% if has_select2 %}{{basic_form.media.js }}{% endif %}
+{% endblock %}

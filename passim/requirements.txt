@@ -1,54 +1,43 @@
-alabaster==0.7.12
-Babel==2.9.1
-bibtexparser==1.1.0
-certifi==2021.5.30
-chardet==3.0.4
-charset-normalizer==2.0.4
-demjson==2.2.4
-Django==2.2
-django-appconf==1.0.4
+# Requirements for PASSIM
+# Date: 28/aug/2023
+# 
+# Python version this works for: 3.10.12
+#
+# For a better overview of dependencies: install pipdeptree
+
+django==2.2.24
 django-extensions==3.1.0
 django-redis==4.11.0
 django-select2==6.3.1
-docutils==0.17.1
-et-xmlfile==1.1.0
-feedparser==5.2.1
-future==0.18.2
-idna==3.2
-imagesize==1.2.0
-jdcal==1.4.1
-Jinja2==3.0.2
-joblib==1.0.1
+docopt==0.6.2
 lxml==4.6.1
 Markdown==3.3.4
-MarkupSafe==2.0.1
-numpy==1.21.1
 openpyxl==2.6.2
-packaging==21.0
-pandas==1.3.1
-pathlib==1.0.1
-Pillow==6.2.2
-Pygments==2.10.0
-pyparsing==2.4.7
-python-dateutil==2.8.2
-pytz==2021.1
-Pyzotero==1.4.24
-redis==3.5.3
-reportlab==3.5.68
-requests==2.26.0
-scikit-learn==0.24.2
-scipy==1.7.1
-six==1.16.0
-sklearn==0.0
-snowballstemmer==2.1.0
-Sphinx==4.2.0
-sphinxcontrib-applehelp==1.0.2
-sphinxcontrib-devhelp==1.0.2
-sphinxcontrib-htmlhelp==2.0.0
-sphinxcontrib-jsmath==1.0.1
-sphinxcontrib-qthelp==1.0.3
-sphinxcontrib-serializinghtml==1.1.5
-sqlparse==0.4.1
-threadpoolctl==2.2.0
-urllib3==1.26.6
+PyGraph==0.2.1
 xmltodict==0.12.0
+# chardet - not needed
+# demjson - overtaken by the built-in JSON (import json)
+
+# Note: the correct numpy version must be use for a couple of packages
+numpy==1.22.1
+  pandas==2.0.3
+  scipy==1.9.3
+  scikit-learn==1.3.0
+# Note: 'import sklearn' is no longer possible as separate package
+#       'from sklearn import XXX' works with just 'import scikit-learn'
+  
+# Note: pillow might install a version of reportlab too new  
+pillow==6.2.2
+  reportlab==3.5.68
+
+# Note: requests are needed anyway, so we pick the version
+#       as well as the pyparsing an pyzotero going along with it
+# Note: pyzotero will also install e.g. bibtexparser, pathlib and others
+requests==2.26.0
+  pyparsing==2.4.7
+    pydotplus==2.0.2
+    Pyzotero==1.5.10  
+
+# Note: this is used by the documentation .rst files
+#       (it does install a lot of packages)
+sphinx==4.2.0

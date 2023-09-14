@@ -6,10 +6,34 @@
     <tbody>
       {% for item in comment_list %}
         <tr>
+          <td valign="top"  style='width: 100px;'>
+            <span class="glyphicon glyphicon-comment" style="color: darkgreen;" title="Original comment"></span>
+          </td>
           <td valign="top" class='tdnowrap' style="font-size: small; color: darkred;">[{{item.profile.user.username}}] </td>
-          <td valign="top" class='tdnowrap' style="font-size: small; color: darkblue;">{{item.get_created}} </td>
-          <td valign="top"  style='margin-left: 20px; width: 80%;'>{{item.content}}</td>
+          <td valign="top" class='tdnowrap' style="font-size: small; color: darkblue; width: 100%;">{{item.get_created}} </td>
         </tr>
+        <tr>
+          <td></td>
+          <td colspan="2" valign="top"  style='margin-left: 20px; width: 100%;'>
+            {{item.content}}
+          </td>
+        </tr>
+        <!-- Check for comment responses -->
+        {% for response in item.get_responses %}
+          <tr>
+            <td valign="top"  style='width: 100px; padding-left: 10px;'>
+              <span class="glyphicon glyphicon-chevron-right" style="color: gray;" title="Response to the comment"></span>
+            </td>
+            <td valign="top" class='tdnowrap' style="font-size: small; color: darkred;">[{{response.person}} Passim editor] </td>
+            <td valign="top" class='tdnowrap' style="font-size: small; color: darkblue; width: 100%;">{{response.created}} </td>
+          </tr>
+          <tr>
+            <td></td>
+            <td colspan="2" valign="top"  style='margin-left: 20px; width: 100%;'>
+              {{response.content}}
+            </td>
+          </tr>
+        {% endfor %}
       {% endfor %}
     </tbody>
   </table>

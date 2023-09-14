@@ -33,8 +33,11 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_filter = [],        // Building a complex filter
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+        loc_sFilterOp = "<select class='form-control input-xs filteropt' onchange='ru.basic.filter_opt(this)'><option value='and'>and</option>" +
+          "<option value='nand'>and not</option><option value='or'>or</option><option value='nor'>or not</option></select>",
         loc_bManuSaved = false,
         loc_keyword = [],           // Keywords that can belong to a sermongold or a sermondescr
         loc_language = [],
@@ -193,11 +196,16 @@ var ru = (function ($, ru) {
        *  errMsg - show error message in <div> loc_divErr
        */
       errMsg: function (sMsg, ex) {
+        var err = "#" + loc_divErr;
+
         var sHtml = "Error in [" + sMsg + "]<br>";
         if (ex !== undefined && ex !== null) {
           sHtml = sHtml + ex.message;
         }
-        $("#" + loc_divErr).html(sHtml);
+        if ($(err).length === 0) {
+          err = $(".err-msg").first();
+        }
+        $(err).html(sHtml);
       },
 
       /** 
@@ -1090,22 +1098,40 @@ var ru = (function ($, ru) {
       copy_to_clipboard: function (el) {
         var elSpan = null,
             copyText = null,
+            textarea = null,
             range = null,
+            selector = null,
+            tmp = "tmp_stable",
             sText = "";
 
         try {
           // Get the span
           elSpan = $(el).closest("div").find("textarea").first();
-          copyText = document.getElementById("search_copy");
-          copyText.select();
-          copyText.setSelectionRange(0, 99999);
-          document.execCommand("copy");
+          if (elSpan.length === 0) {
+            elSpan = $(el).closest("div").find("span.stable").first();
+            textarea = document.getElementById(tmp);
+            if (textarea === undefined || textarea === null) {
+              textarea = document.createElement("textarea");
+              textarea.id = tmp;
+              document.body.appendChild(textarea);
+            }
+            textarea.style.height = 0;
+            textarea.value = $(elSpan).text().trim();
+            selector = document.querySelector("#" + tmp);
+            selector.select();
+            document.execCommand("copy");
+          } else {
+            copyText = document.getElementById("search_copy");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            document.execCommand("copy");
 
-          // Set the range correctly
-          range = document.createRange();
-          range.selectNode(copyText);
-          window.getSelection().addRange(range);
-          document.execCommand("copy");
+            // Set the range correctly
+            range = document.createRange();
+            range.selectNode(copyText);
+            window.getSelection().addRange(range);
+            document.execCommand("copy");
+          }
 
           // sText = $(el).attr("targeturl");
 
@@ -1124,6 +1150,24 @@ var ru = (function ($, ru) {
           $(el).closest("div.delete-confirm").addClass("hidden");
         } catch (ex) {
           private_methods.errMsg("delete_cancel", ex);
+        }
+      },
+
+      /**
+       * delete_confirm
+       *   In order to get delete confirmation (or not), open the .delete-confirm one under .view-mode above me
+       *
+       */
+      delete_confirm_view: function (el) {
+        var elView = null;
+
+        try {
+          elView = $(el).closest(".view-mode");
+          if (elView !== undefined && elView !== null) {
+            $(elView).find(".delete-confirm").removeClass("hidden");
+          }
+        } catch (ex) {
+          private_methods.errMsg("delete_confirm_view", ex);
         }
       },
 
@@ -1154,6 +1198,66 @@ var ru = (function ($, ru) {
         }
       },
 
+      filter_opt: function (el) {
+        var elLabel = null,
+            sNumber = "",
+            operator = null,
+            iNumber = 0;
+
+        try {
+          elLabel = $(el).closest("span").find("label").first();
+          sNumber = $(elLabel).text().trim();
+          if (sNumber !== "") {
+            iNumber = parseInt(sNumber, 10);
+            operator = $(el).val();
+            if (iNumber > 0 && iNumber <= loc_filter.length && operator !== null) {
+              // Find the element in loc_filter
+              loc_filter[iNumber - 1]['operator'] = $(el).val();
+            }
+            // Adapt the #qfilter
+            $("#qfilter").val(JSON.stringify(loc_filter));
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_opt", ex);
+        }
+      },
+
+      /**
+       * filter_init
+       *    Initialize the logcal operations for all filters that are in loc_filter
+       *
+       */
+      filter_init: function () {
+        var i = 0,
+            target = "",
+            operator = "",
+            sName = "",
+            iNumber = -1,
+            sNumber = "";
+
+        try {
+          // Walk all filters
+          for (i = 0; i < loc_filter.length; i++) {
+            sName = loc_filter[i].name;
+            target = loc_filter[i].target;
+            operator = loc_filter[i].operator;
+            if (i === 0 && loc_filter[i].operator !== "start") {
+              $(target).find(".filter-operator").html("");
+            } else if (i > 0) {
+              iNumber = i + 1;
+              // Set label + number
+              sNumber = "<label>" + iNumber.toString() + "</label>" + loc_sFilterOp;
+              $(target).find(".filter-operator").html(sNumber);
+              // Set value of select correctly
+              $(target).find(".filter-operator select").val(operator);
+            }
+
+          }
+        } catch (ex) {
+          private_methods.errMsg("filter_init", ex);
+        }
+      },
+
       /**
        * filter_click
        *    What happens when clicking a badge filter
@@ -1163,22 +1267,86 @@ var ru = (function ($, ru) {
         var target = null,
             targetadd = null,
             target_item = null,
+            target_id = "",
             i = 0,
+            iRemove = -1,
+            iNumber = 0,
+            operator = "",
+            bRecalculate = false,
             sLabel = "",
+            sNumber = "",
+            sName = "",
             lst_target = [],
             specs = null;
 
         try {
           // Find out which target to show
-          target = $(this).attr("targetid");
+          target_id = $(this).attr("targetid");
           // Find out which target to show
           sLabel = $(this).attr("targetaddid");
           if (sLabel !== undefined && sLabel !== null && sLabel !== "") {
             targetadd = $("#" + sLabel);
           }
           // Start showing the target
-          if (target !== undefined && target !== null && target !== "") {
-            target = $("#" + target);
+          if (target_id !== undefined && target_id !== null && target_id !== "") {
+            target = $("#" + target_id);
+
+            // Check whether this target should appear on the loc_filter
+            if (!$(target).hasClass("row")) {
+              sName = $(target).attr("id");
+              // Are we switching on or off?
+              if ($(this).hasClass("on")) {
+                // WE are switching off: find the element within loc_filter
+                for (i = 0; i < loc_filter.length; i++) {
+                  if (loc_filter[i].name === sName) {
+                    // Mark this as 'to be removed'
+                    iRemove = i;
+                    break;
+                  }
+                  
+                }
+                // Actually remove it
+                if (iRemove >= 0) {
+                  // Splice it away in a sweep
+                  loc_filter.splice(iRemove, 1);
+                  // Re-calculate all targets
+                  for (i = 0; i < loc_filter.length; i++) {
+                    // Make sure to set the number of this one okay
+                    iNumber = i + 1;
+                    $(loc_filter[i].target).find("label").html(iNumber.toString());
+                    // Possibly adapt the operator
+                    if (i === 0 && loc_filter[i].operator !== "start") {
+                      loc_filter[i].operator = "start";
+                      $(loc_filter[i].target).find(".filter-operator").html("");
+                    }
+                  }
+                  // Adapt the #qfilter
+                  $("#qfilter").val(JSON.stringify(loc_filter));
+                }
+
+              } else {
+                // We are switching on: determine the operator
+                operator = (loc_filter.length === 0) ? "start" : "and";
+
+                // Should be added
+                loc_filter.push({ operator: operator, name: sName, target: "#" + target_id });
+                // Adapt the #qfilter
+                $("#qfilter").val(JSON.stringify(loc_filter));
+
+                // If this is not start, then add the operator code
+                if (operator === "start") {
+                  //
+                  $(target).find(".filter-operator").html("");
+                } else {
+                  sNumber = "<label>" + loc_filter.length + "</label>" + loc_sFilterOp;
+                  $(target).find(".filter-operator").html(sNumber);
+                }
+              }
+            } else {
+              // At least re-construct the filters on the basis of loc_filter
+              ru.basic.filter_init();
+            }
+
             // Create a list of targets
             lst_target.push(target);
             if (targetadd !== null && $(targetadd).length > 0) {
@@ -1481,6 +1649,7 @@ var ru = (function ($, ru) {
             object_id = "",
             targetid = null,
             elW = null,
+            sQfilter = "",
             sColwrap = "",
             post_loads = [],
             sHtml = "";
@@ -1506,6 +1675,14 @@ var ru = (function ($, ru) {
             } else {
               loc_colwrap = JSON.parse(sColwrap);
             }
+          }
+
+          // Get the qfilter
+          sQfilter = $("#qfilter").val();
+          if (sQfilter !== undefined && sQfilter !== null && sQfilter !== "") {
+            loc_filter = JSON.parse(sQfilter);
+            // Make sure to show the contents of the qfilter in the search interface
+            ru.basic.filter_init();
           }
 
           // Make sure we catch changes
@@ -1644,7 +1821,7 @@ var ru = (function ($, ru) {
                 // Find the 'Search' button
                 button = $(this).closest("form").find("a[role=button]").last();
                 // Check for the inner text
-                if ($(button)[0].innerText === "Search") {
+                if (button.length > 0 && $(button)[0].innerText === "Search") {
                   // Found it
                   $(button).click();
                   evt.preventDefault();
@@ -1745,10 +1922,14 @@ var ru = (function ($, ru) {
       fixed_header: function() {
         $("div .fixed-header-container").each(function (idx, el) {
           var iHeight,
+              elFoot = null,
               elDiv;
 
-          iHeight = $("footer").get(0).offsetTop - 300;
-          $(el).height(iHeight);
+          elFoot = $("footer").get(0);
+          if (elFoot !== undefined) {
+            iHeight = elFoot.offsetTop - 300;
+            $(el).height(iHeight);
+          }
         });
 
       },
@@ -2463,7 +2644,7 @@ var ru = (function ($, ru) {
       },
 
       /**
-        * result_download
+        * post_download
         *   Trigger creating and downloading a result CSV / XLSX / JSON
         *
         */
@@ -2629,6 +2810,19 @@ var ru = (function ($, ru) {
                           // Now submit the form
                           oBack = frm.submit();
 
+                        })
+                        .catch(function (err) {
+                          var x = 1;
+
+                          // Need to stop showing waiting?
+                          if (waitclass !== null) {
+                            // Start waiting
+                            $(frm).find(waitclass).addClass("hidden");
+                          }
+
+                          // Show something has happened
+                          private_methods.errMsg("Sorry, unable to create an image");
+
                         });
 
                     }
@@ -2739,6 +2933,33 @@ var ru = (function ($, ru) {
       },
 
       /**
+        * post_submit
+        *   Submit this page via [targeturl] on the nearest <form> through POST
+        *
+        */
+      post_submit: function (elStart) {
+        var frm = null,
+            targeturl = null,
+            data = null;
+
+        try {
+          // Get targeturl
+          targeturl = $(elStart).attr("targeturl");
+          if (targeturl !== undefined && targeturl !== null) {
+            // Get the form
+            frm = $(elStart).closest("form");
+            // Set the method to POST and the action to targeturl
+            $(frm).attr("method", "POST");
+            $(frm).attr("action", targeturl);
+            $(frm).submit();
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("post_submit", ex);
+        }
+      },
+
+      /**
        * related_cancel
        *    Cancel all sorting, deleting etc done on this related set. 
        *
@@ -2803,6 +3024,80 @@ var ru = (function ($, ru) {
        */
       related_dragenter: function (ev) {
         var row = null,
+            prev = null,
+            table = null,
+            groupid = 0,
+            children = null;
+
+        try {
+          // Prevend the default behaviour
+          ev.preventDefault();
+          // ev.dataTransfer.dropEffect = 'all';
+          // Get the row that is stored
+          row = loc_relatedRow;
+
+          // Check if this is a different row
+          if (row.attributes["rowid"] !== ev.target.parentNode.attributes["rowid"]) {
+            // We must be going over a TD with the right class
+            if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
+              // Get the <tr> children of the table
+              table = $(ev.target).closest("tbody");
+              children = Array.from($(table).find("tr"));
+              // Check whether we are before or after the target
+              if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
+                // Target comes after
+                ev.target.parentNode.after(row);
+              } else {
+                // Target comes before
+                ev.target.parentNode.before(row);
+              }
+              // Show that changes can/need to be saved
+              $(table).closest("div").find(".related-save").removeClass("hidden");
+              // Figure out what my previous row is
+              prev = $(row).prev();
+              // Figure out what the groupid is of my previous row
+              if ($(prev).hasClass("savegroup")) {
+                groupid = $(prev).attr("rowid");
+              } else {
+                groupid = $(prev).attr("groupid");
+              }
+
+              // Group addition: if the previous row is in a group, then take over that one's groupid
+              if (groupid !== undefined) {
+                // Take over that one's groupid into my own
+                $(row).attr("groupid", groupid);
+                // if this group's elements are hidden, so must I be
+                if ($(table).find("tr.savegroup[groupid='" + groupid + "']").attr("mode") === "closed") {
+                  $(row).addClass("hidden");
+                } else {
+                  $(row).removeClass("hidden");
+                }
+              } else {
+                // I must always be visible
+                $(row).removeClass("hidden");
+              }
+            }
+
+            ru.basic.related_update(ev.target);
+          }
+
+
+        } catch (ex) {
+          private_methods.errMsg("related_dragenter", ex);
+        }
+      },
+
+      /**
+       * related_dragentergroup
+       *    Dragging one row over other rows
+       * See: https://www.therogerlab.com/how-can-i/javascript/reorder-html-table-rows-using-drag-and-drop.html
+       *
+       */
+      related_dragentergroup: function (ev) {
+        var row = null,
+            groupid = 0,
+            table = null,
+            gsize = 0,
             children = null;
 
         try {
@@ -2812,23 +3107,75 @@ var ru = (function ($, ru) {
           // Get the row that is stored
           row = loc_relatedRow;
           // We must be going over a TD with the right class
-          if (ev.target.nodeName.toLowerCase() === "td" && $(ev.target).hasClass("draggable")) {
+          if (ev.target.nodeName.toLowerCase() === "th") {
             // Get the <tr> children of the table
-            children = Array.from($(ev.target).closest("tbody").find("tr"));
+            table = $(ev.target).closest("tbody");
+            children = Array.from($(table).find("tr"));
+            // Get the groupid
+            groupid = $(ev.target).closest("tr").attr("rowid");
+
+            console.log("Entering group: " + groupid);
+
             // Check whether we are before or after the target
             if (children.indexOf(ev.target.parentNode) > children.indexOf(row)) {
               // Target comes after
               ev.target.parentNode.after(row);
+              //// Adapt the groupid of this row
+              //$(row).attr("groupid", groupid);
+
             } else {
-              // Target comes before
-              ev.target.parentNode.before(row);
+              // Need to break here and check what is the matter
+              gsize = gsize;
+              // Target ALSO comes after
+              ev.target.parentNode.after(row);
             }
+            // Adapt the groupid of this row
+            $(row).attr("groupid", groupid);
+            // if this group is 'closed', I must be hidden
+            if ($(ev.target).closest("tr").attr("mode") === "closed") {
+              $(row).addClass("hidden");
+            } else {
+              $(row).removeClass("hidden");
+            }
+
             // Show that changes can/need to be saved
             $(ev.target).closest("table").closest("div").find(".related-save").removeClass("hidden");
 
-          } 
+            ru.basic.related_update(ev.target);
+          }
         } catch (ex) {
-          private_methods.errMsg("related_dragenter", ex);
+          private_methods.errMsg("related_dragentergroup", ex);
+        }
+      },
+
+      related_update: function (elStart) {
+        var groups = null,
+            table = null,
+            row = null,
+            children = null;
+
+        try {
+          // We must be going over a TD with the right class
+          if (elStart.nodeName.toLowerCase() === "th" || elStart.nodeName.toLowerCase() === "td") {
+            // Walk the <tr> children of the table associated with a particular group
+            table = $(elStart).closest("tbody");
+            groups = $(table).find("tr.savegroup");
+            $(groups).each(function (idx, el) {
+              var groupid = 0,
+                  gsize = 0;
+
+              // what is the ID of this group?
+              groupid = $(el).attr("rowid");
+              // Adapt the number of items that are currently in this group
+              gsize = $(table).find("tr[groupid='" + groupid + "']").length;
+              $(el).find("span.gcount").html(gsize);
+            });
+
+          }
+
+
+        } catch (ex) {
+          private_methods.errMsg("related_update", ex);
         }
       },
 
@@ -2862,22 +3209,36 @@ var ru = (function ($, ru) {
         var elTable = null,
             elForm = null,
             elHlist = null,
+            elGlist = null,
             elSavenew = null,
+            groupid = 0,
+            lst_grow = [],
             lst_row = [];
 
         try {
-          elTable = $(elStart).closest(".related-original").find("table tbody").first();
+          elTable = $(elStart).closest(".related-original").find("table.related tbody").first();
           if (elTable.length > 0 && prefix !== undefined && mode !== undefined) {
             // Get all the rows in their current order
             $(elTable).find("tr.form-row").each(function (idx, el) {
-              lst_row.push($(el).attr("rowid"));
+              // Exclude .savegroup
+              if (!$(el).hasClass("savegroup")) {
+                // Regular [hlist]
+                lst_row.push($(el).attr("rowid"));
+                // Grouping [glist]
+                groupid = $(el).attr("groupid");
+                if (groupid !== undefined) {
+                  lst_grow.push({ groupid: groupid, rowid: $(el).attr("rowid") });
+                }
+              }
             });
             // Get form, hlist, savenew
             elForm = $("#save_related_" + prefix);
             elHlist = $("#id_" + prefix + "-hlist");
+            elGlist = $("#id_" + prefix + "-glist");
             elSavenew = $("#id_" + prefix + "-savenew");
             // Set the parameters
             $(elHlist).val(JSON.stringify(lst_row));
+            $(elGlist).val(JSON.stringify(lst_grow));
             switch (mode) {
               case "save":
                 $(elSavenew).val("false");
@@ -2895,6 +3256,119 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("related_save", ex);
+        }
+      },
+
+      /**
+       * related_groupclick
+       *    Clicking a group
+       *
+       */
+      related_groupclick: function (elStart) {
+        var groupid = 0,
+            mode = "",
+            grouprows = null,
+            grow = null,
+            row = 0;
+
+        try {
+          // Get the groupid 
+          grow = $(elStart).closest("tr");
+          groupid = $(grow).attr("rowid");
+          // Get the mode
+          mode = $(grow).attr("mode");
+
+          // Get the rows in this group
+          grouprows = $(elStart).closest("tbody").find("tr[groupid='" + groupid + "']");
+          // row = grouprows.first();
+          if ($(grouprows).length > 0) {
+            // Check if these rows need hiding or showing
+            //if ($(row).hasClass("hidden")) {
+            if (mode == "closed") {
+                // Need to show them
+              grouprows.removeClass("hidden");
+              $(grow).attr("mode", "open");
+            } else {
+              // These rows need to be hidden
+              grouprows.addClass("hidden");
+              $(grow).attr("mode", "closed");
+            }
+          }
+        } catch (ex) {
+          private_methods.errMsg("related_groupclick", ex);
+        }
+      },
+
+      /**
+       * rel_row_edit
+       *    Start or finish editing of this row
+       *
+       */
+      rel_row_edit: function (elStart, sAction, editcols) {
+        var elRow = null,
+            frm = null,
+            data = [],
+            targeturl = "",
+            targetid = "",
+            elRelated = "#related-constituents",
+            bNeedOpen = false;
+
+        try {
+          // Get to the row
+          elRow = $(elStart).closest("tr");
+          // Action switching
+          switch (sAction) {
+            case "open":    // Hide summary view and enter edit view
+              $(elRow).find(".rel-view-mode, .rel-edit-open").addClass("hidden");
+              $(elRow).find(".rel-edit-mode, .rel-edit-close").removeClass("hidden");
+              break;
+            case "close":   // Hide edit view and enter summary view
+              // Get the form that needs to be used for this row
+              frm = $(elRow).find("form").first();
+              data = frm.serializeArray();
+              targeturl = $(frm).attr("target");
+              targetid = $(elRow).find(".err-msg").first();
+              // Issue a post
+              $.post(targeturl, data, function (response) {
+                // Action depends on the response
+                if (response === undefined || response === null || !("status" in response)) {
+                  private_methods.errMsg("No status returned");
+                } else {
+                  switch (response.status) {
+                    case "ready":
+                    case "ok":
+                      // Show the HTML target
+                      $(targetid).html(response['html']);
+                      // Possibly do some initialisations again??
+
+                      $(elRow).find(".rel-view-mode, .rel-edit-open").removeClass("hidden");
+                      $(elRow).find(".rel-edit-mode, .rel-edit-close").addClass("hidden");
+
+                      // Make sure events are re-established
+                      // ru.passim.seeker.init_events();
+                      ru.basic.init_typeahead();
+                      break;
+                    case "error":
+                      // Show the error
+                      if ('msg' in response) {
+                        if (typeof (response.msg) === "string") {
+                          $(targetid).html(response.msg);
+                        } else {
+                          $(targetid).html(JSON.stringify(response.msg));
+                        }
+                      } else {
+                        $(targetid).html("An error has occurred (basic search_start)");
+                      }
+                      break;
+                  }
+                }
+              });
+
+              break;
+          }
+
+        } catch (ex) {
+          private_methods.errMsg("rel_row_edit", ex);
         }
       },
 
@@ -2933,54 +3407,60 @@ var ru = (function ($, ru) {
         try {
           // Clear filters
           $(".badge.filter").each(function (idx, elThis) {
-             var target,
-                 targetadd,
-                 targetitem,
-                 i,
-                 lst_target = [];
+              var target,
+                  targetadd,
+                  targetitem,
+                  i,
+                  lst_target = [];
 
             target = $(elThis).attr("targetid");
             targetadd = $(elThis).attr("targetaddid");
-              if (target !== undefined && target !== null && target !== "") {
-                  target = $("#" + target);
-                  lst_target.push(target);
-                  if (targetadd !== undefined && targetadd !== null && targetadd !== "") {
-                      lst_target.push($("#" + targetadd));
-                  }
-
-                  // Action depends on checking or not
-                  if ($(elThis).hasClass("on")) {
-                      // it is on, switch it off
-                      $(elThis).removeClass("on");
-                      $(elThis).removeClass("jumbo-3");
-                      $(elThis).addClass("jumbo-1");
-
-                      // Must hide it and reset all associated targets
-                      for (i = 0; i < lst_target.length; i++) {
-                          targetitem = lst_target[i];
-                          $(targetitem).addClass("hidden");
-
-                          // Process the <input> element
-                          $(target).find("input").each(function (idx, elLocal) {
-                              $(elLocal).val("");
-                          });
-                          // Process the <textarea> element
-                          $(target).find("textarea").each(function (idx, elLocal) {
-                              $(elLocal).val("");
-                          });
-                          // Also reset all select 2 items
-                          $(target).find("select").each(function (idx, elLocal) {
-                              $(elLocal).val("").trigger("change");
-                          });
-                        }  
-                      }  
-                    }  
-                  });
-
-                } catch (ex) {
-                  private_methods.errMsg("search_clear", ex);
+            if (target !== undefined && target !== null && target !== "") {
+                target = $("#" + target);
+                lst_target.push(target);
+                if (targetadd !== undefined && targetadd !== null && targetadd !== "") {
+                    lst_target.push($("#" + targetadd));
                 }
-               },
+
+                // Action depends on checking or not
+                if ($(elThis).hasClass("on")) {
+                    // it is on, switch it off
+                    $(elThis).removeClass("on");
+                    $(elThis).removeClass("jumbo-3");
+                    $(elThis).addClass("jumbo-1");
+
+                    // Must hide it and reset all associated targets
+                    for (i = 0; i < lst_target.length; i++) {
+                        targetitem = lst_target[i];
+                        $(targetitem).addClass("hidden");
+
+                        // Process the <input> element
+                        $(target).find("input").each(function (idx, elLocal) {
+                            $(elLocal).val("");
+                        });
+                        // Process the <textarea> element
+                        $(target).find("textarea").each(function (idx, elLocal) {
+                            $(elLocal).val("");
+                        });
+                        // Also reset all select 2 items
+                        $(target).find("select").each(function (idx, elLocal) {
+                            $(elLocal).val("").trigger("change");
+                        });
+                    }  
+                }  
+              }  
+          });
+
+            // Make sure to clear the filter builder
+          loc_filter = [];
+
+          // Adapt the #qfilter
+          $("#qfilter").val(JSON.stringify(loc_filter));
+
+          } catch (ex) {
+            private_methods.errMsg("search_clear", ex);
+          }
+        },
 
       /**
        * search_start

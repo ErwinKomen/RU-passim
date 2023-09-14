@@ -25,6 +25,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_NAME = os.path.basename(BASE_DIR)
 WRITABLE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../writable/database/"))
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = False
+
 # print("Writable dir = [{}]".format(WRITABLE_DIR))
 
 if "RU-passim\\writable" in WRITABLE_DIR:
@@ -46,6 +49,7 @@ if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or "c:" in WRITABLE_DIR or "C:" 
     # Specific differentiation
     if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR:
         USE_REDIS = True
+        DEBUG = True
 elif "131.174" in hst:
     # Configuration within the Radboud University environment (AppleJack)
     APP_PREFIX = ""             # Was: "passim/"
@@ -85,9 +89,6 @@ BLOCKED_IPS = ['40.77.167.57',      '161.35.188.242',
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.rich.ru.nl', 'testserver', '131.174.114.236' ]
 
@@ -130,6 +131,7 @@ INSTALLED_APPS = [
     'passim.reader',
     'passim.seeker',
     'passim.dct',
+    'passim.stemma',
     'passim.enrich'
 ]
 

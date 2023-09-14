@@ -1,0 +1,13 @@
+﻿<form method="post" target="{% url 'commentresponse_edit' instance.id %}">
+  {% csrf_token %}
+  <div class="hidden">
+    <input name="cresp-id" value="{{form.id}}" />
+    <input type="text" name="cresp-edifields" value="{{edifields}}" />
+  </div>
+  <div>
+    Person <code>{{instance.profile.user.username}}</code> has responded at <code>{{instance.get_created}}</code>:
+    {{form.content}}
+  </div>
+  
+</form>
+<div id="error_{{instance.id}}" class="err-msg"></div>

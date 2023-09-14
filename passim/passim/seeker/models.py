@@ -83,6 +83,7 @@ LINK_UNSPECIFIED = "uns"
 LINK_REL = 'rel'
 LINK_PRT = [LINK_PARTIAL, LINK_NEAR]
 LINK_BIDIR = [LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
+LINK_BIDIR_MANU = [LINK_REL, LINK_PARTIAL, LINK_NEAR, LINK_ECHO, LINK_SIM]
 
 # All spec types with their possible bi-directional partners
 LINK_SPEC_A = ['usd', 'usi', 'udd', 'udi', 'cso', 'cdo', 'pto', 'pth', 'tro', 'tra',
@@ -242,13 +243,15 @@ def adapt_latin(val):
     val = val.replace('...', u'\u2026')
     return val
 
-def adapt_markdown(val, lowercase=True):
+def adapt_markdown(val, lowercase=True, keep_para=False):
     sBack = ""
     if val != None:
         val = val.replace("***", "\*\*\*")
-        sBack = mark_safe(markdown(val, safe_mode='escape'))
-        sBack = sBack.replace("<p>", "")
-        sBack = sBack.replace("</p>", "")
+        sBack = markdown(val, safe_mode='escape')
+        sBack = mark_safe(sBack)
+        if not keep_para:
+            sBack = sBack.replace("<p>", "")
+            sBack = sBack.replace("</p>", "")
         if lowercase:
             sBack = sBack.lower()
         #print(sBack)
@@ -387,14 +390,25 @@ def striphtmlre(data):
 
 def striphtml(data):
     sBack = data
-    if not data is None and data != "":
-        xml = lxml.html.document_fromstring(data)
-        if not xml is None:
-            sBack = xml.text_content()
+    oErr = ErrHandle()
+    try:
+        if not data is None and data != "":
+            try:
+                xml = lxml.html.document_fromstring(data)
+                if not xml is None:
+                    sBack = xml.text_content()
+            except:
+                # If it fails here, we just assume it is not parseable
+                sBack = ""
+                oErr.Status("striphtml: removed [{}]".format(data))
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("seeker/striphtml")
     return sBack
 
 def get_searchable(sText):
-    sRemove = r"/\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]/"
+    # Note: no opening or closing slash!
+    sRemove = r"\<|\>|\_|\,|\.|\:|\;|\?|\!|\(|\)|\[|\]"
 
     oErr = ErrHandle()
     try:
@@ -1225,6 +1239,7 @@ def send_email(subject, profile, contents, add_team=False):
     """Send an email"""
 
     oErr = ErrHandle()
+    bResult = True
     try:
         # Set the sender
         mail_from = Information.get_kvalue("mail_from")
@@ -1254,7 +1269,8 @@ def send_email(subject, profile, contents, add_team=False):
     except:
         msg = oErr.get_error_message()
         oErr.DoError("send_mail")
-    return True
+        bResult = False
+    return bResult
 
 def transcription_path(sType, instance, filename):
     """Upload TEI-P5 XML file to the right place,and remove old file if existing
@@ -3457,10 +3473,237 @@ class Comment(models.Model):
         # Always return positively!!!
         return True
 
+    def get_object(self):
+        """Get the object to which this comment belongs"""
+
+        oErr = ErrHandle()
+        obj = None
+        try:
+            otype = self.otype
+            if otype == "sermo":
+                obj = self.comments_sermon.first()
+            elif otype == "super":
+                obj = self.comments_super.first()
+            elif otype == "manu":
+                obj = self.comments_manuscript.first()
+            elif otype == "gold":
+                obj = self.comments_gold.first()
+            elif otype == "codi":
+                obj = self.comments_codi.first()
+            elif otype == "hc":
+                obj = self.comments_collection.first()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/get_object")
+
+        # Return what has been found
+        return obj
+
+    def get_object_url(self):
+        """Get the object to which this comment belongs"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        url_names = {"manu": "manuscript_details", "sermo": "sermon_details",
+                     "gold": "sermongold_details", "super": "equalgold_details",
+                     "codi": "codico_details", "hc": "collhist_details"}
+        try:
+            otype = self.otype
+            if otype == "sermo":
+                obj = self.comments_sermon.first()
+            elif otype == "super":
+                obj = self.comments_super.first()
+            elif otype == "manu":
+                obj = self.comments_manuscript.first()
+            elif otype == "gold":
+                obj = self.comments_gold.first()
+            elif otype == "codi":
+                obj = self.comments_codi.first()
+            elif otype == "hc":
+                obj = self.comments_collection.first()
+            sBack = reverse(url_names[otype], kwargs={'pk': obj.id})
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Comment/get_object_url")
+
+        # Return what has been found
+        return sBack
+
     def get_otype(self):
         otypes = dict(manu="Manuscript", sermo="Sermon", gold="Gold Sermon", 
                       super="Authority file", codi="Codicological Unit", hc="Historical Collection")
         return otypes[self.otype]
+
+    def get_responses(self, viewable=True):
+        """Get thos commentresponse items, that are viewable"""
+
+        qs = self.comment_cresponses.filter(visible=True)
+        lst_responses = []
+        for obj in qs:
+            oResponse = dict(created=obj.get_created(), content=obj.content, status=obj.status)
+            oResponse['person'] = obj.profile.user.username
+            lst_responses.append(oResponse)
+        return lst_responses
+
+
+class CommentRead(models.Model):
+    """Whenever a different user reads the comment of one user"""
+
+    # [1] The comment that has been read
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="comment_creads")
+    # [1] links to the user who read this comment
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_creads")
+    # [1] Date created = date when the comment has been read
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{} read comment id {}".format(self.profile.user.username, self.comment.id)
+        return sBack
+
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
+
+class CommentResponse(models.Model):
+    """Whenever a different user reads the comment of one user"""
+
+    # [1] The comment that this response pertains to
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="comment_cresponses")
+    # [1] links to the user who makes this response
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_cresponses")
+    # [1] Date created = date when the user makes this response 
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+    # [0-1] The text of the response itself
+    content = models.TextField("Response", null=True, blank=True)
+    # [1] Visibility of this response in the overview
+    visible = models.BooleanField("Visible in overview", default=False)
+    # [1] There must be a status on the comment, so that we know whether it has been sent or not
+    status = models.TextField("Status", default = "empty")
+
+    def __str__(self):
+        sBack = "{} responds to comment id {}".format(self.profile.user.username, self.comment.id)
+        return sBack
+
+    def get_comment(self):
+        """Get a summary of the original comment"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.comment is None:
+                comment = self.comment
+                url = comment.get_object_url()
+                sLink = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, comment.otype)
+                lHtml = []
+                lHtml.append("<table class='func-view'>")
+                lHtml.append("<tr><td>Timestamp:</td><td>{}</td></tr>".format(comment.get_created()))
+                lHtml.append("<tr><td>User name:</td><td>{}</td></tr>".format(comment.profile.user.username))
+                lHtml.append("<tr><td>About:</td><td>{}</td></tr>".format(sLink))
+                lHtml.append("<tr><td>Comment:</td><td>{}</td></tr>".format(comment.content))
+
+                lHtml.append("</table>")
+                sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponse/get_comment")
+        return sBack
+
+    def get_content(self):
+        """Get the content, possibly decyphering markdown"""
+        sBack = ""
+        if not self.content is None:
+            NL = '\n'
+            if "\r\n" in self.content:
+                NL = "\r\n"
+            sContent = self.content.replace(NL, "  {}".format(NL))
+            sBack = adapt_markdown(sContent, lowercase=False, keep_para=True)
+        return sBack
+
+    def get_created(self):
+        sCreated = get_crpp_date(self.created, True)
+        return sCreated
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_status(self):
+        """Provide a short status message"""
+
+        sBack = ""
+        if self.status == "empty":
+            sBack = "Initial"
+        elif self.status in ['sending', 'sent']:
+            sBack = "Response has been e-mailed on: {}".format(self.get_saved())
+        elif self.status == "changed":
+            sBack = "Response has changed, but has not been e-mailed to the user"
+        else:
+            sBack = self.status
+        return sBack
+
+    def get_visible(self):
+        sBack = "-"
+        if not self.visible is None:
+            if self.visible:
+                sBack = "Response *IS* visible in the overview"
+            else:
+                sBack = "Response is *NOT* visible in the overview"
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        # Be sure to change the status
+        if self.status == "sending":
+            self.status = "sent"
+        else:
+            # Compare with previous version
+            previous = CommentResponse.objects.filter(id=self.id).first()
+            if previous is None:
+                self.status = "changed"
+            else:
+                previous_content = previous.content
+                previous_content = "" if previous_content is None else previous_content
+                if previous_content != self.content:
+                    self.status = "changed"
+
+        # print("CommentResponse, status #1 is: {}".format(self.status))
+
+        response = super(CommentResponse, self).save(force_insert, force_update, using, update_fields)
+
+        # print("CommentResponse, status #2 is: {}".format(self.status))
+
+        # Return the response when saving
+        return response
+
+    def send_by_email(self, recipient, contents):
+        """Send this comment by email to two addresses"""
+
+        oErr = ErrHandle()
+        bIncludeTeam = False
+        try:
+            # Sanity checks
+            if not recipient is None and not recipient.user.email is None:
+                html = []
+
+                # Send this mail
+                if send_email("Passim user comment response {}".format(self.id), recipient, contents, bIncludeTeam):
+
+                    # Adapt the status
+                    self.status = "sending"
+                    self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CommentResponse/send_by_email")
+
+        # Always return positively!!!
+        return True
 
 
 class Scribe(models.Model):
@@ -3493,7 +3736,7 @@ class Manuscript(models.Model):
     """A manuscript can contain a number of sermons"""
 
     # [1] Name of the manuscript (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
+    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
     # [0-1] One manuscript can only belong to one particular library
     #     Note: deleting a library sets the Manuscript.library to NULL
     library = models.ForeignKey(Library, null=True, blank=True, on_delete = models.SET_NULL, related_name="library_manuscripts")
@@ -3547,6 +3790,10 @@ class Manuscript(models.Model):
     #       NOTE: better to use ManuscriptExternal table!!!
     external = models.IntegerField("ID in external DB", null=True)
 
+    # ============= CALCULATED FIELDS =============
+    # [1] The number of Manuscripts linked to me (i.e. relations.count)
+    manucount = models.IntegerField("Number of related manuscripts", default=0)
+
     # [1] Every manuscript may be a manifestation (default) or a template (optional)
     #     The third alternative is: a reconstruction
     #     So the options: 'man', 'tem', 'rec'
@@ -3574,6 +3821,8 @@ class Manuscript(models.Model):
     keywords = models.ManyToManyField(Keyword, through="ManuscriptKeyword", related_name="keywords_manu")
     # [m] Many-to-many: one sermon can be a part of a series of collections 
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
+    # [m] Many-to-many: all the manuscripts linked to me
+    relations = models.ManyToManyField("self", through="ManuscriptLink", symmetrical=False, related_name="related_to")
     
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
@@ -3625,7 +3874,7 @@ class Manuscript(models.Model):
         if codi == None:
             # Create and link a new codico
             codi = Codico.objects.create(
-                name="SUPPLY A NAME", order=1, pagefirst=1, pagelast=1, manuscript=self
+                name="", order=1, pagefirst=1, pagelast=1, manuscript=self
                 )
 
         # Possibly adapt the number of manuscripts for the associated library
@@ -3919,7 +4168,7 @@ class Manuscript(models.Model):
                         # Check if this codico has a proper name...
                         codico_name = oManu.get("codico_name")
                         if codico_name is None:
-                            if codico.name is None or codico.name == "SUPPLY A NAME":
+                            if codico.name is None or codico.name == "" or codico.name == "SUPPLY A NAME":
                                 # Evaluate all the sermons under it
                                 sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
                                 etc = "" if sermons.count() <= 1 else " etc."
@@ -4489,6 +4738,69 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/get_litrefs_markdown")
         return sBack
 
+    def get_manulinks_markdown(self, plain=False):
+        """Return all the SSG links = type + dst"""
+
+        def get_one_row(lHtml, manulink, direction):
+            # Initializations
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
+
+            try:
+                # Start the row
+                lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this manuscript to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other manuscripts to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Get the URL for this particular link
+                link_url = reverse('manuscriptlink_details', kwargs={'pk': manulink.id})
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span></td>".format(
+                    link_url, manulink.get_linktype_display()))
+
+                # Define the third column
+                if manulink.note != None and len(manulink.note) > 1:
+                    sTitle = "title='{}'".format(manulink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#manunote_{}'>N</span>".format(
+                        manulink.id)
+                    sNoteDiv = "<div id='manunote_{}' class='collapse explanation'>{}</div>".format(
+                        manulink.id, manulink.note)
+                manu = manulink.dst if direction == "there" else manulink.src
+                url = reverse('manuscript_details', kwargs={'pk': manu.id})
+                lHtml.append("<td valign='top'><a href='{}' {}>{}</a>{}{}</td>".format(
+                    url, sTitle, manu.get_full_name(), sNoteShow, sNoteDiv))
+
+                # Finish the row
+                lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_manulinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for manulink in self.manuscript_src.all().order_by('dst__idno'):
+                get_one_row(lHtml, manulink, "there")
+
+            # Combine into a whole table
+            if len(lHtml) > 0:
+                sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_manulinks_markdown")
+        return sBack
+
     def get_notes_markdown(self):
         sBack = ""
         if self.notes != None:
@@ -4792,6 +5104,14 @@ class Manuscript(models.Model):
 
         # Return the new object
         return obj
+
+    def get_view(self, bShort = False):
+        """Get a HTML valid view of myself"""
+
+        url = reverse('manuscript_details', kwargs={'pk': self.id})
+        sBack = "<span class='signature badge ot'><a href='{}'>{}</a></span>".format(
+            url, self.get_full_name())
+        return sBack
 
     def import_template_adapt(self, template, profile, notes_only=False):
         """Adapt a manuscript after importing from template"""
@@ -5491,6 +5811,15 @@ class Manuscript(models.Model):
         # Return the object that has been created
         return oBack
 
+    def set_manucount(self):
+        # Calculate and set the manucount
+        manucount = self.manucount
+        iSize = self.relations.count()
+        if iSize != manucount:
+            self.manucount = iSize
+            self.save()
+        return True
+
     def set_projects(self, projects):
         """Make sure there are connections between myself and the projects"""
 
@@ -5514,7 +5843,7 @@ class Codico(models.Model):
     """A codicological unit is a physical part (or whole) of a Manuscript"""
 
     # [1] Name of the codicological unit (that is the TITLE)
-    name = models.CharField("Name", max_length=LONG_STRING, default="SUPPLY A NAME")
+    name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
     # [0-1] Notes field, which may be empty - see issue #298
     notes = models.TextField("Notes", null=True, blank=True)
 
@@ -6576,6 +6905,8 @@ class EqualGold(models.Model):
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_eqgold_path)
+    fullinfo = models.TextField("Full text info", null=True, blank=True)
+
     # [0-1] The 'passim-code' for a sermon - see instructions (16-01-2020 4): [PASSIM aaa.nnnn]
     code = models.CharField("Passim code", blank=True, null=True, max_length=PASSIM_CODE_LENGTH, default="ZZZ_DETERMINE")
     # [0-1] The number of this SSG (numbers are 1-based, per author)
@@ -6711,6 +7042,26 @@ class EqualGold(models.Model):
         html.append(info)
 
         return "\n".join(html)
+
+    def check_links(self):
+        """Check the EqualGoldLink items connected to this AF"""
+
+        oErr = ErrHandle()
+        try:
+            with transaction.atomic():
+                for obj in self.equalgold_src.all():
+                    if obj.spectype == "0":
+                        obj.spectype = None
+                        obj.save()
+            with transaction.atomic():
+                for obj in self.equalgold_dst.all():
+                    if obj.spectype == "0":
+                        obj.spectype = None
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/check_links")
+        return None
 
     def create_empty():
         """Create an empty new one"""
@@ -7039,8 +7390,6 @@ class EqualGold(models.Model):
         code = self.code if self.code and self.code != "" else "(nocode_{})".format(self.id)
         url = reverse('equalgold_details', kwargs={'pk': self.id})
         sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to the Authority file'>{}</a></span>".format(url, code)
-        #lHtml.append("<span class='passimcode'>{}</span> ".format(code))
-        #sBack = " ".join(lHtml)
         return sBack
 
     def get_short(self):
@@ -7063,6 +7412,41 @@ class EqualGold(models.Model):
         # Return the results
         return "".join(lHtml)
 
+    def get_size(self):
+        """Get HTML size in terms of SermonGold"""
+
+        lHtml = []
+        sBack = ""
+        oErr= ErrHandle()
+        try:
+            iSize = self.sgcount
+            lHtml.append("{}".format(iSize))
+            sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_size")
+        return sBack
+
+    def get_siglist(self):
+        """Get HTML list of signatures associated with me"""
+
+        lHtml = []
+        sBack = ""
+        oErr= ErrHandle()
+        try:
+            # Get all the associated signatures
+            qs = Signature.objects.filter(gold__equal=self).order_by('-editype', 'code')
+            for sig in qs:
+                editype = sig.editype
+                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                short = sig.short()
+                lHtml.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+            sBack = "\n".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_siglist")
+        return sBack
+
     def get_stype_light(self, add="", usercomment=False): 
         count = 0
         if usercomment:
@@ -7074,38 +7458,81 @@ class EqualGold(models.Model):
     def get_superlinks_markdown(self):
         """Return all the SSG links = type + dst"""
 
-        lHtml = []
-        sBack = ""
-        oErr = ErrHandle()
-        try:
-            for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
-                # Initializations
-                sSpectype = ""
-                sAlternatives = ""
-                sTitle = ""
-                sNoteShow = ""
-                sNoteDiv = ""
+        def get_one_row(lHtml, superlink, direction):
+            # Initializations
+            sSpectype = ""
+            sAlternatives = ""
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
 
-                # Get the URL for this particular link
-                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
+            try:
+                # Start the row
                 lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this AF to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other AFs to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Define the second column
                 if superlink.spectype != None and len(superlink.spectype) > 1:
                     # Show the specification type
                     sSpectype = "<span class='badge signature gr'>{}</span>".format(superlink.get_spectype_display())
                 if superlink.alternatives != None and superlink.alternatives == "true":
                     sAlternatives = "<span class='badge signature cl' title='Alternatives'>A</span>"
+                # Get the URL for this particular link
+                link_url = reverse('equalgoldlink_details', kwargs={'pk': superlink.id})
                 lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span>{}</td>".format(
                     link_url, superlink.get_linktype_display(), sSpectype))
+
+                # Define the third column
                 if superlink.note != None and len(superlink.note) > 1:
                     sTitle = "title='{}'".format(superlink.note)
                     sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#ssgnote_{}'>N</span>".format(
                         superlink.id)
                     sNoteDiv = "<div id='ssgnote_{}' class='collapse explanation'>{}</div>".format(
                         superlink.id, superlink.note)
-                url = reverse('equalgold_details', kwargs={'pk': superlink.dst.id})
+                ssg = superlink.dst if direction == "there" else superlink.src
+                url = reverse('equalgold_details', kwargs={'pk': ssg.id})
                 lHtml.append("<td valign='top'><a href='{}' {}>{}</a>{}{}{}</td>".format(
-                    url, sTitle, superlink.dst.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+                    url, sTitle, ssg.get_view(), sAlternatives, sNoteShow, sNoteDiv))
+
+                # Finish the row
                 lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_superlinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        unidirectional_spectype = ['com', 'cap', 'tki', 'pro', 'pas', 'epi', 'pad']
+        oErr = ErrHandle()
+        try:
+            lst_ssgs = []
+
+            # Get the links from me to others
+            for superlink in self.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+                get_one_row(lHtml, superlink, "there")
+                ssg_id = superlink.dst.id
+                lst_ssgs.append(ssg_id)
+ 
+            # Get links from others to me
+            for superlink in self.equalgold_dst.all().order_by('dst__code', 'dst__author__name', 'dst__number'):
+                ssg_id = superlink.src.id
+                if not ssg_id in lst_ssgs:
+                    #spectype = superlink.spectype
+                    #if not spectype is None and spectype != "" and spectype in unidirectional_spectype:
+                    get_one_row(lHtml, superlink, "back")
+                    lst_ssgs.append(ssg_id)
+
+            # Combine into a whole table
             if len(lHtml) > 0:
                 sBack = "<table><tbody>{}</tbody></table>".format( "".join(lHtml))
         except:
@@ -7229,13 +7656,20 @@ class EqualGold(models.Model):
         return True
 
     def set_sgcount(self):
-        # Calculate and set the sgcount
-        sgcount = self.sgcount
-        iSize = self.equal_goldsermons.all().count()
-        if iSize != sgcount:
-            self.sgcount = iSize
-            self.save()
-        return True
+        iChanges = 0
+        oErr = ErrHandle()
+        try:
+            # Calculate and set the sgcount
+            sgcount = self.sgcount
+            iSize = self.equal_goldsermons.all().count()
+            if iSize != sgcount:
+                self.sgcount = iSize
+                self.save()
+                iChanges += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("set_sgcount")
+        return iChanges
 
     def set_ssgcount(self):
         # Calculate and set the ssgcount
@@ -8329,6 +8763,10 @@ class Collection(models.Model):
             ssg_id = self.super_col.all().values('super__id')
             authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
             self.ssgauthornum = authornum
+
+            # Issue #599: if this is or becomes settype 'hc', then the scopy must be 'public'
+            self.scope = "publ"
+
         # Adapt the save date
         self.saved = get_current_datetime()
 
@@ -8339,6 +8777,35 @@ class Collection(models.Model):
 
         response = super(Collection, self).save(force_insert, force_update, using, update_fields)
         return response
+
+    def add_sitems(self, lst_item, coltype):
+        """Add items to this collection"""
+
+        oErr = ErrHandle()
+        try:
+            if len(lst_item) > 0:
+                with transaction.atomic():
+                    for obj in lst_item:
+                        # Check if it is not there yet
+                        if coltype == "sermo":
+                            added = self.sermondescr_col.filter(sermon=obj).first()
+                            if added is None:
+                                order = self.sermondescr_col.count() + 1
+                                added = CollectionSerm.objects.create(sermon=obj, collection=self, order=order)
+                        elif coltype == "manu":
+                            added = self.manuscript_col.filter(manuscript=obj).first()
+                            if added is None:
+                                order = self.manuscript_col.count() + 1
+                                added = CollectionMan.objects.create(manuscript=obj, collection=self, order=order)
+                        elif coltype == "super":
+                            added = self.super_col.filter(super=obj).first()
+                            if added is None:
+                                order = self.super_col.count() + 1
+                                added = CollectionSuper.objects.create(super=obj, collection=self, order=order)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/add_sitems")
+        return None
 
     def freqsermo(self):
         """Frequency in manifestation sermons"""
@@ -8544,6 +9011,71 @@ class Collection(models.Model):
         # REturn the result
         return qs
 
+    def get_sitems(self, profile):
+        """Get all collection items (M/S/SSG) that are also SavedItems (for me)"""
+
+        sBack = ""
+        oColTypeSitemType = dict(manu="manu", sermo="serm", super="ssg")
+        oErr = ErrHandle()
+        try:
+            coltype = self.type
+            # What is my type of collection?
+            sItemType = oColTypeSitemType.get(coltype)
+            if not sItemType is None:
+                # Get the id's of the M/S/SSG objects in the current collection
+                current_ids = []
+                qs = None
+                sDetails = ""
+                if coltype == "manu":
+                    current_ids = [x['manuscript__id'] for x in self.manuscript_col.all().values('manuscript__id')]
+                    sDetails = "manuscript_details"
+                    # Get all the Saved Items associated with my profile
+                    manu_ids = [x.manuscript.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                        manuscript__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = Manuscript.objects.filter(id__in=manu_ids)
+                elif coltype == "sermo":
+                    current_ids = [x['sermon__id'] for x in self.sermondescr_col.all().values('sermon__id')]
+                    sDetails = "sermon_details"
+                    # Get all the Saved Items associated with my profile
+                    sermo_ids = [x.sermon.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                        sermon__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = SermonDescr.objects.filter(id__in=sermo_ids)
+                elif coltype == "super":
+                    current_ids = [x['super__id'] for x in self.super_col.all().values('super__id')]
+                    sDetails = "equalgold_details"
+                    # Get all the Saved Items associated with my profile
+                    saved_ids = [x['equal__id'] for x in profile.profile_saveditems.filter(sitemtype=sItemType).values('equal__id')]
+                    super_ids = []
+                    for id in saved_ids:
+                        if not id in current_ids: 
+                            super_ids.append(id)
+                    ## Old method: SQL problem
+                    #super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype=sItemType).filter(
+                    #    equal__id__in=current_ids)]
+                    # Get the queryset of the Manuscripts that are left
+                    qs = EqualGold.objects.filter(id__in=super_ids)
+                if not qs is None:
+                    # Convert this into a list
+                    lHtml = []
+                    for obj in qs:
+                        url = reverse(sDetails, kwargs = {'pk': obj.id})
+                        sLabel = "NietGevonden"
+                        if coltype == "manu":
+                            sLabel = "{}, {}, {}".format(obj.get_city(), obj.get_library(), obj.idno)
+                        elif coltype == "sermo":
+                            sLabel = "{}: {}".format(obj.msitem.codico.manuscript.idno, obj.get_locus())
+                        elif coltype == "super":
+                            sLabel = obj.get_passimcode_markdown()
+                        oItem = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, sLabel)
+                        lHtml.append(oItem)
+                    sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/get_sitems")
+        return sBack
+
     def get_size_markdown(self):
         """Count the items that belong to me, depending on my type
         
@@ -8606,7 +9138,8 @@ class Collection(models.Model):
         msitems = []
         with transaction.atomic():
             order = 1
-            for ssg in self.collections_super.all():
+            for obj in CollectionSuper.objects.filter(collection=self).order_by('order'):
+                ssg = obj.super
                 # Create a MsItem
                 msitem = MsItem.objects.create(manu=manu, codico=codico, order=order)
                 order += 1
@@ -8852,12 +9385,15 @@ class SermonDescr(models.Model):
 
     # [0-1] Not every sermon might have a title ...
     title = models.CharField("Title", null=True, blank=True, max_length=LONG_STRING)
+    srchtitle = models.TextField("Title (searchable)", null=True, blank=True)
 
     # [0-1] Some (e.g. e-codices) may have a subtitle (field <rubric>)
     subtitle = models.CharField("Sub title", null=True, blank=True, max_length=LONG_STRING)
+    srchsubtitle = models.TextField("Sub title (searchable)", null=True, blank=True)
 
     # [0-1] Section title 
     sectiontitle = models.CharField("Section title", null=True, blank=True, max_length=LONG_STRING)
+    srchsectiontitle = models.TextField("Section title (searchable)", null=True, blank=True)
 
     # ======= OPTIONAL FIELDS describing the sermon ============
     # [0-1] We would very much like to know the *REAL* author
@@ -8880,6 +9416,7 @@ class SermonDescr(models.Model):
     fulltext = models.TextField("Full text", null=True, blank=True)
     srchfulltext = models.TextField("Full text (searchable)", null=True, blank=True)
     transcription = models.FileField("TEI-P5 xml file", null=True, blank=True, upload_to=transcription_sermo_path)
+    fullinfo = models.TextField("Full text info", null=True, blank=True)
 
     # [0-1] Postscriptim
     postscriptum = models.TextField("Postscriptum", null=True, blank=True)
@@ -8913,11 +9450,16 @@ class SermonDescr(models.Model):
     ## ================ Calculated fields ===============================
     ## [1] Number of sermons 'equal' to me
     #scount = models.IntegerField("Equal sermon count", default=0)
+    # [1] The number of SermonDesrc objects linked to me (i.e. relations.count)
+    sermocount = models.IntegerField("Number of related sermon manifestations", default=0)
 
     ## ================ MANYTOMANY relations ============================
 
     # [0-n] Many-to-many: keywords per SermonDescr
     keywords = models.ManyToManyField(Keyword, through="SermonDescrKeyword", related_name="keywords_sermon")
+
+    # [m] Many-to-many: all the sermon manifestations linked to me
+    relations = models.ManyToManyField("self", through="SermonDescrLink", symmetrical=False, related_name="related_to")
 
     # [0-n] Link to one or more golden standard sermons
     #       NOTE: this link is legacy. We now have the EqualGold link through 'SermonDescrEqual'
@@ -9695,6 +10237,12 @@ class SermonDescr(models.Model):
             if bAutoCorrect and self.bibleref != sBack:
                 self.bibleref = sBack
                 self.save()
+        else:
+            # There should be no references
+            if not self.bibleref is None and self.bibleref != "":
+                self.bibleref = ""
+                self.save()
+                sBack = self.bibleref
 
         # Return what we have
         return sBack
@@ -9702,25 +10250,32 @@ class SermonDescr(models.Model):
     def get_collection_link(self, settype):
         lHtml = []
         lstQ = []
-        # Get all the SSG to which I link
-        lstQ.append(Q(super_col__super__in=self.equalgolds.all()))
-        lstQ.append(Q(settype=settype))
-        # Make sure we restrict ourselves to the *public* datasets
-        lstQ.append(Q(scope="publ"))
-        # Get the collections in which these SSGs are
-        collections = Collection.objects.filter(*lstQ).order_by('name')
-        # Visit all datasets/collections linked to me via the SSGs
-        for col in collections:
-            # Determine where clicking should lead to
-            # url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
-            if settype == "hc":
-                url = reverse("collhist_details", kwargs={'pk': col.id})
-            else:
-                url = reverse("collpubl_details", kwargs={'pk': col.id})
-            # Create a display for this topic
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get all the SSG to which I link
+            lstQ.append(Q(super_col__super__in=self.equalgolds.all()))
+            lstQ.append(Q(settype=settype))
+            # Make sure we restrict ourselves to the *public* datasets
+            # issue #547: do *NOT* have such a restriction
+            #   lstQ.append(Q(scope="publ"))
+            # Get the collections in which these SSGs are
+            collections = Collection.objects.filter(*lstQ).order_by('name')
+            # Visit all datasets/collections linked to me via the SSGs
+            for col in collections:
+                # Determine where clicking should lead to
+                # url = "{}?sermo-collist_s={}".format(reverse('sermon_list'), col.id)
+                if settype == "hc":
+                    url = reverse("collhist_details", kwargs={'pk': col.id})
+                else:
+                    url = reverse("collpubl_details", kwargs={'pk': col.id})
+                # Create a display for this topic
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url,col.name))
 
-        sBack = ", ".join(lHtml)
+            sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_collection_link")
         return sBack
     
     def get_collections_markdown(self, username, team_group, settype = None, plain=False):
@@ -9802,6 +10357,27 @@ class SermonDescr(models.Model):
             oErr.DoError("get_eqset")
         return sBack
 
+    def get_eqsetsignatures(self):
+
+        # Initializations
+        signatures = Signature.objects.none()
+        oErr = ErrHandle()
+        try:
+            # Get all linked SSG items
+            ssg_list = self.equalgolds.all().values('id')
+            if len(ssg_list) > 0:
+                # Get a list of all the SG that are in these equality sets
+                gold_list = SermonGold.objects.filter(equal__in=ssg_list).order_by('id').distinct().values("id")
+                if len(gold_list) > 0:
+                    # Get the list of Signature objects this results in
+                    signatures = Signature.objects.filter(gold__in=gold_list)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/get_eqsetsignatures")
+
+        # Return what we received
+        return signatures
+
     def get_eqsetsignatures_markdown(self, type="all", plain=False):
         """Get the signatures of all the sermon Gold instances in the same eqset"""
 
@@ -9876,13 +10452,29 @@ class SermonDescr(models.Model):
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, self.feast.name)
         return sBack
 
+    def get_full_name(self):
+        """Get a representation of this sermon """
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            manu = self.get_manuscript()
+            lHtml = []
+            if not manu is None:
+                sManu = manu.get_full_name()
+                lHtml.append(sManu)
+            sLocus = self.locus
+            if not sLocus is None and sLocus != "":
+                lHtml.append(sLocus)
+            # Combine
+            sBack = " ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/get_full_name")
+        return sBack
+
     def get_fulltext(self):
         """Return the *searchable* fulltext, without any additional formatting"""
         return self.fulltext
-
-    #def get_fulltext_markdown(self):
-    #    """Get the contents of the fulltext field using markdown"""
-    #    return adapt_markdown(self.fulltext)
 
     def get_fulltext_markdown(self, incexp_type = "actual", lowercase=True):
         """Get the contents of the fulltext field using markdown"""
@@ -10147,6 +10739,69 @@ class SermonDescr(models.Model):
             sBack = self.sectiontitle
         return sBack
 
+    def get_sermolinks_markdown(self, plain=False):
+        """Return all the Sermon Manifestation links = type + dst"""
+
+        def get_one_row(lHtml, sermolink, direction):
+            # Initializations
+            sTitle = ""
+            sNoteShow = ""
+            sNoteDiv = ""
+            sBack = ""
+            oErr = ErrHandle()
+
+            try:
+                # Start the row
+                lHtml.append("<tr class='view-row'>")
+
+                # Define the first column
+                if direction == "there":
+                    sDirection = "<span class='glyphicon glyphicon-arrow-right' title='From this manifestation to others'></span>"
+                else:
+                    sDirection = "<span class='glyphicon glyphicon-arrow-left' title='From other manifestations to this one'></span>"
+                lHtml.append("<td valign='top' class='tdnowrap'>{}</td>".format(sDirection))
+
+                # Get the URL for this particular link
+                link_url = reverse('sermondescrlink_details', kwargs={'pk': sermolink.id})
+                lHtml.append("<td valign='top' class='tdnowrap'><span class='badge signature ot'><a href='{}'>{}</a></span></td>".format(
+                    link_url, sermolink.get_linktype_display()))
+
+                # Define the third column
+                if sermolink.note != None and len(sermolink.note) > 1:
+                    sTitle = "title='{}'".format(sermolink.note)
+                    sNoteShow = "<span class='badge signature btn-warning' title='Notes' data-toggle='collapse' data-target='#sermonote_{}'>N</span>".format(
+                        sermolink.id)
+                    sNoteDiv = "<div id='sermonote_{}' class='collapse explanation'>{}</div>".format(
+                        sermolink.id, sermolink.note)
+                sermo = sermolink.dst if direction == "there" else sermolink.src
+                url = reverse('sermon_details', kwargs={'pk': sermo.id})
+                lHtml.append("<td valign='top' style='width: 100%;'><a href='{}' {}>{}</a>{}{}</td>".format(
+                    url, sTitle, sermo.get_full_name(), sNoteShow, sNoteDiv))
+
+                # Finish the row
+                lHtml.append("</tr>")
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("get_sermolinks_markdown/get_one_row")
+
+            return sBack
+
+        lHtml = []
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the links from me to others
+            for sermolink in self.sermondescr_src.all().order_by('dst__msitem__codico__manuscript__idno', 'dst__locus'):
+                get_one_row(lHtml, sermolink, "there")
+
+            # Combine into a whole table
+            if len(lHtml) > 0:
+                sBack = "<table style='width: 100%;'><tbody>{}</tbody></table>".format( "".join(lHtml))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermolinks_markdown")
+        return sBack
+
     def get_sermonsig(self, gsig):
         """Get the sermon signature equivalent of the gold signature gsig"""
 
@@ -10236,6 +10891,14 @@ class SermonDescr(models.Model):
             sBack = self.transcription
         return sBack
 
+    def get_view(self, bShort = False):
+        """Get a HTML valid view of myself"""
+
+        url = reverse('sermon_details', kwargs={'pk': self.id})
+        sBack = "<span class='signature badge gr'><a href='{}'>{}</a></span>".format(
+            url, self.get_full_name())
+        return sBack
+
     def goldauthors(self):
         # Pass on all the linked-gold editions + get all authors from the linked-gold stuff
         lst_author = []
@@ -10309,22 +10972,32 @@ class SermonDescr(models.Model):
         istop = 1
         response = None
         oErr = ErrHandle()
+        brush_up_fields = ['incipit', 'explicit', 'fulltext', 'title', 'subtitle', 'sectiontitle']
         try:
-            # Brush up incipit
-            if self.incipit: 
-                srchincipit = get_searchable(self.incipit)
-                if self.srchincipit != srchincipit:
-                    self.srchincipit = srchincipit
-            # Brush up explicit
-            if self.explicit: 
-                srchexplicit = get_searchable(self.explicit)
-                if self.srchexplicit != srchexplicit:
-                    self.srchexplicit = srchexplicit
-            # Brush up fulltext
-            if self.fulltext: 
-                srchfulltext = get_searchable(self.fulltext)
-                if self.srchfulltext != srchfulltext:
-                    self.srchfulltext = srchfulltext
+            # Brush up fields that need to
+            for field in brush_up_fields:
+                srchfield = "srch{}".format(field)
+                # Get current and intended value
+                value_current = getattr(self, srchfield)
+                if value_current is None: value_current = ""
+                value_intended = get_searchable(getattr(self, field))
+                if value_current != value_intended:
+                    setattr(self, srchfield, value_intended)
+            ## Brush up incipit
+            #if self.incipit: 
+            #    srchincipit = get_searchable(self.incipit)
+            #    if self.srchincipit != srchincipit:
+            #        self.srchincipit = srchincipit
+            ## Brush up explicit
+            #if self.explicit: 
+            #    srchexplicit = get_searchable(self.explicit)
+            #    if self.srchexplicit != srchexplicit:
+            #        self.srchexplicit = srchexplicit
+            ## Brush up fulltext
+            #if self.fulltext: 
+            #    srchfulltext = get_searchable(self.fulltext)
+            #    if self.srchfulltext != srchfulltext:
+            #        self.srchfulltext = srchfulltext
 
             # Preliminary saving, before accessing m2m fields
             response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
@@ -10368,6 +11041,15 @@ class SermonDescr(models.Model):
             oErr.DoError("SermonDescr/set_projects")
             bBack = False
         return bBack
+
+    def set_sermocount(self):
+        # Calculate and set the sermocount
+        sermocount = self.sermocount
+        iSize = self.relations.count()
+        if iSize != sermocount:
+            self.sermocount = iSize
+            self.save()
+        return True
 
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
@@ -10898,6 +11580,63 @@ class SermonDescrExternal(models.Model):
         return sBack
 
 
+class SermonDescrLink(models.Model):
+    """Link between related sermon descriptions"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a SermonDescr is deleted, then the SermonDescrLink instance that refers to it is removed too
+    src = models.ForeignKey(SermonDescr, related_name="sermondescr_src", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(SermonDescr, related_name="sermondescr_dst", on_delete=models.CASCADE)
+    # [1] Each sermo-to-sermo link must have a linktype, with default "related"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_REL)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
+
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is related to {}".format(src_name, dst_name)
+        return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Check for identical links
+            if self.src == self.dst:
+                # do *NOT* actually save a link between the same manuscripts
+                response = None
+            else:
+                # Perform the actual save() method on [self]
+                response = super(SermonDescrLink, self).save(force_insert, force_update, using, update_fields)
+                # Adapt the ssgcount
+                self.src.set_sermocount()
+                self.dst.set_sermocount()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrLink/save")
+        # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        sermo_list = [self.src, self.dst]
+        response = super(SermonDescrLink, self).delete(using, keep_parents)
+        for obj in sermo_list:
+            obj.set_sermocount()
+        return response
+
+    def get_label(self):
+        sBack = "related to: {}".format(self.dst.get_full_name())
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
+        return sBack
+
+
 class ManuscriptKeyword(models.Model):
     """Relation between a Manuscript and a Keyword"""
 
@@ -10945,6 +11684,57 @@ class ManuscriptExternal(models.Model):
 
     def __str__(self):
         sBack = "S_{} to id_{} ({})".format(self.manu.id, self.externalid, self.externaltype)
+        return sBack
+
+
+class ManuscriptLink(models.Model):
+    """Link between related manuscripts"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a Manuscript is deleted, then the ManuscriptLink instance that refers to it is removed too
+    src = models.ForeignKey(Manuscript, related_name="manuscript_src", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(Manuscript, related_name="manuscript_dst", on_delete=models.CASCADE)
+    # [1] Each manu-to-manu link must have a linktype, with default "related"
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default=LINK_REL)
+    # [0-1] Notes
+    note = models.TextField("Notes on this link", blank=True, null=True)
+
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is related to {}".format(src_name, dst_name)
+        return combi
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check for identical links
+        if self.src == self.dst:
+            # do *NOT* actually save a link between the same manuscripts
+            response = None
+        else:
+            # Perform the actual save() method on [self]
+            response = super(ManuscriptLink, self).save(force_insert, force_update, using, update_fields)
+            # Adapt the ssgcount
+            self.src.set_manucount()
+            self.dst.set_manucount()
+        # Return the actual save() method response
+        return response
+
+    def delete(self, using = None, keep_parents = False):
+        manu_list = [self.src, self.dst]
+        response = super(ManuscriptLink, self).delete(using, keep_parents)
+        for obj in manu_list:
+            obj.set_manucount()
+        return response
+
+    def get_label(self):
+        sBack = "related to: {}".format(self.dst.get_full_name())
+        return sBack
+
+    def get_note(self):
+        sBack = "-"
+        if not self.note is None and self.note != "":
+            sBack = self.note
         return sBack
 
 

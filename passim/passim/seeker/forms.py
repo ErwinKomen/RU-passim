@@ -40,10 +40,12 @@ def user_is_in_team(username, team_group, userplus=None):
             bResult = (owner.user.groups.filter(name=userplus).first() != None)
     return bResult
 
-CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Super Sermon Gold'), ('non', 'Loner: not part of a SSG')]
+CODE_TYPE = [('-', 'Irrelevant'), ('spe', 'Part of a Authority File'), ('non', 'Loner: not part of a Authority File')]
 AUTHOR_TYPE = [('', 'All'), ('spe', 'Author defined'), ('non', 'No author defined')]
 SCOUNT_OPERATOR = [('', '(make a choice)'), ('lt', 'Less than'), ('lte', 'Less then or equal'),('exact', 'Equals'), 
                    ('gte', 'Greater than or equal'), ('gt', 'Greater than')]
+TRANSCR_OPERATOR = [('', '(make a choice)'), ('obl', 'Contains a transcription'), ('txt', 'Find AFs, filtering the full text transcription')]
+YESNO_ONLY = [('-', '-'), ('yes', 'Yes'), ('no', 'No')]
 
 
 # =================== HELPER FUNCTIONS ==========================
@@ -410,6 +412,23 @@ class EdirefSgWidget(ModelSelect2MultipleWidget):
 
     def get_queryset(self):
         return EdirefSG.objects.all().order_by('reference__full', 'pages').distinct()
+
+
+class EqualGoldSitemWidget(ModelSelect2MultipleWidget):
+    model = EqualGold
+    search_fields = ['code__icontains', 'id__icontains', 'author__name__icontains', 'equal_goldsermons__siglist__icontains']
+
+    def label_from_instance(self, obj):
+        # sLabel = obj.get_label(do_incexpl = False)
+        sLabel = obj.get_code()
+        return sLabel
+
+    def get_queryset(self):
+        if self.queryset is None:
+            qs = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code').distinct()
+        else:
+            qs = self.queryset
+        return qs
 
 
 class EqualGoldMultiWidget(ModelSelect2MultipleWidget):
@@ -797,17 +816,48 @@ class ManuidWidget(ModelSelect2MultipleWidget):
         return Manuscript.objects.exclude(mtype='tem').order_by('idno').distinct()
 
 
-class ManuidOneWidget(ModelSelect2Widget):
+class ManuscriptWidget(ModelSelect2MultipleWidget):
     model = Manuscript
-    search_fields = [ 'idno__icontains']
+    search_fields = [ 'idno__icontains', 'lcity__name__icontains', 'library__name__icontains']
 
     def label_from_instance(self, obj):
-        return obj.idno
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset.order_by('lcity__name', 'library__name', 'idno')
+        #if qs == None:
+        #    qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
+        return qs
+
+
+class ManuidOneWidget(ModelSelect2Widget):
+    model = Manuscript
+    search_fields = [ 'idno__icontains', 'lcity__name__icontains', 'library__name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
 
     def get_queryset(self):
         qs = self.queryset
         if qs == None:
-            qs = Manuscript.objects.filter(mtype='man').order_by('idno').distinct()
+            qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
+        return qs
+
+
+class ManuscriptLinkAddOnlyWidget(ModelSelect2MultipleWidget):
+    model = ManuscriptLink
+    search_fields = ['dst__idno__icontains', 'dst__name__icontains', 'dst__id__icontains', 'dst__lcity__name__icontains', 'dst__lcountry__name__icontains']
+    addonly = True
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label()
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = ManuscriptLink.objects.none()
+        else:
+            qs = ManuscriptLink.objects.all().order_by('dst__idno').distinct()
         return qs
 
 
@@ -1106,13 +1156,63 @@ class ResearchSetOneWidget(ModelSelect2Widget):
     model = ResearchSet
     search_fields = [ 'name__icontains' ]
     type = None
+    qs = None
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
-        profile = self.attrs.pop('profile', '')
-        qs = ResearchSet.objects.filter(profile=profile)
+        if self.qs is None:
+            profile = self.attrs.pop('profile', '')
+            qs = ResearchSet.objects.filter(profile=profile)
+            self.qs = qs
+        else:
+            qs = self.qs
+        return qs
+
+
+class SermonWidget(ModelSelect2MultipleWidget):
+    model = SermonDescr
+    search_fields = [ 'msitem__codico__manuscript__idno__icontains', 'locus__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = SermonDescr.objects.filter(mtype='man').order_by('msitem__codico__manuscript__idno', 'locus').distinct()
+        return qs
+
+
+class SermonOneWidget(ModelSelect2Widget):
+    model = SermonDescr
+    search_fields = [ 'msitem__codico__manuscript__idno__icontains', 'locus__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+    def get_queryset(self):
+        qs = self.queryset
+        if qs == None:
+            qs = SermonDescr.objects.filter(mtype='man').order_by('msitem__codico__manuscript__idno', 'locus').distinct()
+        return qs
+
+
+class SermonDescrLinkAddOnlyWidget(ModelSelect2MultipleWidget):
+    model = SermonDescrLink
+    search_fields = ['dst__msitem__codico__manuscript__idno__icontains', 'dst__id__icontains', 'dst__locus__icontains']
+    addonly = True
+
+    def label_from_instance(self, obj):
+        sLabel = obj.get_label()
+        return sLabel
+
+    def get_queryset(self):
+        if self.addonly:
+            qs = SermonDescrLink.objects.none()
+        else:
+            qs = SermonDescrLink.objects.all().order_by('dst__msitem__codico__manuscript__idno', 'dst__locus').distinct()
         return qs
 
 
@@ -1193,7 +1293,10 @@ class SermonGoldWidget(ModelSelect2MultipleWidget):
         return full
 
     def get_queryset(self):
-        return SermonGold.objects.all().order_by('siglist').distinct()
+        qs = self.queryset
+        if qs is None:
+            qs = SermonGold.objects.all().order_by('siglist').distinct()
+        return qs
 
 
 class ManualSignatureWidget(ModelSelect2MultipleWidget):
@@ -1598,6 +1701,8 @@ class SearchManuForm(PassimModelForm):
     city        = forms.CharField(required=False)
     city_ta     = forms.CharField(label=_("City"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+    cityloc_ta  = forms.CharField(label=_("City/Location"), required=False, 
+                           widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'City/location...',  'style': 'width: 100%;'}))
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
@@ -1670,6 +1775,8 @@ class SearchManuForm(PassimModelForm):
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'})) # , 'value':'100'
+    searchname = forms.CharField(label=_("Name of this search"), required=False,
+                widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     
     # SERMON-specific  
     sermo_authorname = forms.CharField(label=_("Author"), required=False, 
@@ -1797,6 +1904,7 @@ class SearchManuForm(PassimModelForm):
                             country = obj.name
                     # Put them in the fields
                     self.fields['city_ta'].initial = city
+                    self.fields['cityloc_ta'].initial = city
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
@@ -1864,6 +1972,8 @@ class SermonForm(PassimModelForm):
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
+    searchname = forms.CharField(label=_("Name of this search"), required=False,
+                widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
 
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
@@ -1896,6 +2006,7 @@ class SermonForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+    slinklist   = ModelMultipleChoiceField(queryset=None, required=False)
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -1991,6 +2102,7 @@ class SermonForm(PassimModelForm):
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['slinklist'].queryset = SermonDescrLink.objects.none()
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
                 self.fields['ukwlist'].widget.is_team = True
@@ -2013,6 +2125,9 @@ class SermonForm(PassimModelForm):
             self.fields['free_exclude'].queryset = Free.objects.filter(main="SermonDescr").order_by('name')
             self.fields['free_include'].widget.main = "SermonDescr"
             self.fields['free_exclude'].widget.main = "SermonDescr"
+
+            self.fields['slinklist'].widget = SermonDescrLinkAddOnlyWidget(attrs={
+                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Some lists need to be initialized to NONE:
             self.fields['bibreflist'].queryset = Daterange.objects.none()
@@ -2330,12 +2445,18 @@ class UserForm(BasicModelForm):
 class ProfileForm(BasicModelForm):
     """Profile list and details"""
 
+    email_ta = forms.CharField(label=_("Email address"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Email address...', 'style': 'width: 100%;'}))
+    username_ta = forms.CharField(label=_("User name"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'User name(s)...', 'style': 'width: 100%;'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     editlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    userlist   = ModelMultipleChoiceField(queryset=None, required=False,
+                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # Issue #435: facilitate changing [email, (user)name]
     newusername = forms.CharField(label=_("User name"), required=False,
@@ -2346,6 +2467,10 @@ class ProfileForm(BasicModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'First name...', 'style': 'width: 100%;'}))
     newlast_name = forms.CharField(label=_("Last name"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Last name...', 'style': 'width: 100%;'}))
+
+    # Facilitate turning someone into a passim editor
+    editrights = forms.ChoiceField(label=_("Edit rights"), required=False, 
+               widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Edit rights...',  'style': 'width: 100%;'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -2373,6 +2498,9 @@ class ProfileForm(BasicModelForm):
             self.fields['editlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['deflist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['userlist'].queryset = User.objects.all().order_by('username')
+
+            self.fields['editrights'].choices = YESNO_ONLY
 
             # Initialize choices for linktype
             init_choices(self, 'ptype', PROFILE_TYPE, bUseAbbr=True, use_helptext=False)
@@ -2396,6 +2524,10 @@ class ProfileForm(BasicModelForm):
                 self.fields['newemail'].initial = instance.user.email
                 self.fields['newfirst_name'].initial = instance.user.first_name
                 self.fields['newlast_name'].initial = instance.user.last_name
+
+                glist = [x.name for x in instance.user.groups.all()]
+                sEditRights = "yes" if "passim_editor" in glist else "no"
+                self.fields['editrights'].initial = sEditRights
 
         except:
             msg = oErr.get_error_message()
@@ -2465,6 +2597,14 @@ class CollectionForm(PassimModelForm):
     colscope    = ModelChoiceField(queryset=None, required=False, 
                 widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
 
+    sitemlist_gold = ModelMultipleChoiceField(queryset=None, required=False,
+                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+    sitemlist_sermo = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SermonWidget(attrs={'data-placeholder': 'Select multiple sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+    sitemlist_manu = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=ManuscriptWidget(attrs={'data-placeholder': 'Select multiple manuscripts...', 'style': 'width: 100%;'}))
+    sitemlist_super = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=EqualGoldSitemWidget(attrs={'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2567,128 +2707,175 @@ class CollectionForm(PassimModelForm):
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(CollectionForm, self).__init__(*args, **kwargs)
-        username = self.username
-        team_group = self.team_group
-        profile = Profile.get_user_profile(username)
 
-        # Get the prefix
-        prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
-        # Some fields are not required
-        self.fields['name'].required = False
-        self.fields['owner'].required = False
-        self.fields['descrip'].required = False
-        self.fields['readonly'].required = False
-        self.fields['type'].required = False
-        self.fields['settype'].required = False
-        self.fields['scope'].required = False
-        self.fields['url'].required = False
-        self.fields['collone'].required = False
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            team_group = self.team_group
+            profile = Profile.get_user_profile(username)
+
+            # Get the prefix
+            prefix = "any" if 'prefix' not in kwargs else kwargs['prefix']
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['owner'].required = False
+            self.fields['descrip'].required = False
+            self.fields['readonly'].required = False
+            self.fields['type'].required = False
+            self.fields['settype'].required = False
+            self.fields['scope'].required = False
+            self.fields['url'].required = False
+            self.fields['collone'].required = False
         
-        self.fields['colscope'].queryset = FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
+            self.fields['colscope'].queryset = FieldChoice.objects.filter(field=COLLECTION_SCOPE).order_by("english_name")
 
-        self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
+            self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
 
-        # Set the widgets correctly
-        self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
-                    'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
-                    'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['sitemlist_manu'].queryset = Manuscript.objects.none()
+            self.fields['sitemlist_sermo'].queryset = SermonDescr.objects.none()
+            self.fields['sitemlist_gold'].queryset = SermonGold.objects.none()
+            self.fields['sitemlist_super'].queryset = EqualGold.objects.none()
 
-        # The rsetone information is needed for "selection-to-DCT" processing
-        self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
+            # Set the widgets correctly
+            self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
+                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
+                        'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
-        # Project2:
-        # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-        if profile is None:
-            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
-        else:
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
-            self.fields['projlist'].queryset = profile.get_myprojects()
-        self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            # The rsetone information is needed for "selection-to-DCT" processing
+            self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
 
-        # SSG section
-        self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-        self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
-        self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
-        self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            # Project2:
+            # self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            if profile is None:
+                self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct()
+            else:
+                # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+                self.fields['projlist'].queryset = profile.get_myprojects()
+            self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
-        # S section
-        self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-        self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
-        self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
-        self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
-        self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
+            # SSG section
+            self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
+            self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
+            self.fields['ssgkwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
 
-        # M section
-        self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
-        self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-        self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            # S section
+            self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
+            self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
+            self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
 
-        if prefix == "priv" or prefix == "publ":
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
-                        'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
-        elif prefix == "hist":
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
-                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
-        else:
-            self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            # M section
+            self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
-        self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
+            if prefix == "priv" or prefix == "publ":
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
+                            'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+            elif prefix == "hist":
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
+                            'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+            else:
+                self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
+                            'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
-        if prefix == "any":
-            all_collections = Collection.objects.all().order_by('name')
-            self.fields['collist'].queryset = all_collections
-            self.fields['collone'].queryset = all_collections
+            self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
 
-        elif prefix == "hist":
-            # Historical collections
-            type = "super"
-            settype = "hc"
-            self.fields['collist'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
-            self.fields['collone'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
-            # Set the initial type
-            self.fields['type'].initial = type
-            self.initial['type'] = type
-            # Obligatory values for the querysets of m/s/sg/ssg
-            self.fields['collist_m'].queryset = Collection.objects.none()
-            self.fields['collist_s'].queryset = Collection.objects.none()
-            self.fields['collist_sg'].queryset = Collection.objects.none()
-            self.fields['collist_ssg'].queryset = Collection.objects.none()
-        else:
-            type = prefix.split("-")[0]
-            # self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')
-            self.fields['collist'].queryset = Collection.get_scoped_queryset('', username, team_group)
-            self.fields['collone'].queryset = Collection.objects.filter(type=type).order_by('name')
+            if prefix == "any":
+                all_collections = Collection.objects.all().order_by('name')
+                self.fields['collist'].queryset = all_collections
+                self.fields['collone'].queryset = all_collections
 
-            # Note: the collection filters must use the SCOPE of the collection
-            self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
-            self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
-            self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
-            self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
-            
-
-            # Set the initial type - provided it fits
-            if self.initial.get("type", "") == "":
+            elif prefix == "hist":
+                # Historical collections
+                type = "super"
+                settype = "hc"
+                self.fields['collist'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+                self.fields['collone'].queryset = Collection.objects.filter(type=type, settype=settype).order_by('name')
+                # Set the initial type
                 self.fields['type'].initial = type
                 self.initial['type'] = type
+                # Obligatory values for the querysets of m/s/sg/ssg
+                self.fields['collist_m'].queryset = Collection.objects.none()
+                self.fields['collist_s'].queryset = Collection.objects.none()
+                self.fields['collist_sg'].queryset = Collection.objects.none()
+                self.fields['collist_ssg'].queryset = Collection.objects.none()
             else:
-                # Make sure to retain its value
-                self.fields['type'].initial = self.initial.get("type", "")
+                type = prefix.split("-")[0]
+                # self.fields['collist'].queryset = Collection.objects.filter(type=type).order_by('name')
+                self.fields['collist'].queryset = Collection.get_scoped_queryset('', username, team_group)
+                self.fields['collone'].queryset = Collection.objects.filter(type=type).order_by('name')
 
-        self.fields['ownlist'].queryset = Profile.objects.all()
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']
-            self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
-            self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+                # Note: the collection filters must use the SCOPE of the collection
+                self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
+                self.fields['collist_s'].queryset = Collection.get_scoped_queryset('sermo', username, team_group)
+                self.fields['collist_sg'].queryset = Collection.get_scoped_queryset('gold', username, team_group)
+                self.fields['collist_ssg'].queryset = Collection.get_scoped_queryset('super', username, team_group)
+            
+
+                # Set the initial type - provided it fits
+                if self.initial.get("type", "") == "":
+                    self.fields['type'].initial = type
+                    self.initial['type'] = type
+                else:
+                    # Make sure to retain its value
+                    self.fields['type'].initial = self.initial.get("type", "")
+
+            self.fields['ownlist'].queryset = Profile.objects.all()
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+
+                # The sitemset querysets need to take the profile as a starting point
+                current_ids = []
+                coltype = instance.type
+                if coltype == "manu":
+                    current_ids = [x['manuscript__id'] for x in instance.manuscript_col.all().values('manuscript__id')]
+                    manu_ids = [x.manuscript.id for x in profile.profile_saveditems.filter(sitemtype="manu").exclude(manuscript__id__in=current_ids)]
+                    qs = Manuscript.objects.filter(id__in=manu_ids)
+                    self.fields['sitemlist_manu'].queryset = qs
+                    self.fields['sitemlist_manu'].widget.queryset = qs
+                elif coltype == "sermo":
+                    current_ids = [x['sermon__id'] for x in instance.sermondescr_col.all().values('sermon__id')]
+                    sermo_ids = [x.sermon.id for x in profile.profile_saveditems.filter(sitemtype="serm").exclude(sermon__id__in=current_ids)]
+                    qs = SermonDescr.objects.filter(id__in=sermo_ids)
+                    self.fields['sitemlist_sermo'].queryset = qs
+                    self.fields['sitemlist_sermo'].widget.queryset = qs
+                elif coltype == "super":
+                    current_ids = [x['super__id'] for x in instance.super_col.all().values('super__id')]
+                    saved_ids = [x['equal__id'] for x in profile.profile_saveditems.filter(sitemtype="ssg").values('equal__id')]
+                    super_ids = []
+                    for id in saved_ids:
+                        if not id in current_ids: 
+                            super_ids.append(id)
+                    # super_ids = [x.equal.id for x in profile.profile_saveditems.filter(sitemtype="ssg").exclude(equal__id__in=current_ids)]
+                    qs = EqualGold.objects.filter(id__in=super_ids)
+                    self.fields['sitemlist_super'].queryset = qs
+                    self.fields['sitemlist_super'].widget.queryset = qs
+                elif coltype == "gold":
+                    qs = SermonGold.objects.none()
+                    self.fields['sitemlist_gold'].queryset = qs
+                    self.fields['sitemlist_gold'].widget.queryset = qs
+
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionForm/init")
+
+        # Nothing is returned from this __init__()
+        return None
 
 
 class SermonDescrSignatureForm(BasicModelForm):
@@ -2808,9 +2995,13 @@ class SermonDescrSuperForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, # help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
     # For the method "nodistance"
-    newsuper    = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
+    newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
                 widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
-                                                  'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+                        'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
+    #            widget=EqualGoldWidget(attrs={'data-placeholder': 'Select links...', 
+    #                    'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
+
     # For the method "superdist"
     #newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
     #            widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
@@ -3150,8 +3341,10 @@ class SuperSermonGoldForm(PassimModelForm):
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
     newfulltext = forms.CharField(label=_("Explicit"), required=False,
-                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 
-                                             'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
+    srchfulltext = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 
+                                             'placeholder': 'Full text transcription ...'}))
     signature = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
@@ -3160,16 +3353,14 @@ class SuperSermonGoldForm(PassimModelForm):
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 
                                                 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
-    #superlist   = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=EqualGoldLinkAddOnlyWidget(attrs={'data-placeholder': 'Use the + sign to add links...', 
-    #                                                     'data-ajax--cache': 'false',
-    #                                                     'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    lstprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     addprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
@@ -3183,6 +3374,7 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Relation set size'}))
     soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
     ssgoperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
+    foperator   = forms.ChoiceField(required=False, choices=TRANSCR_OPERATOR,widget=forms.Select())
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -3237,6 +3429,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['transcription'].required = False
             self.fields['soperator'].initial = 2
             self.fields['ssgoperator'].initial = 2
+            self.fields['foperator'].initial = 0
             self.fields['scount'].initial = -1
             self.fields['ssgcount'].initial = -1
 
@@ -3250,11 +3443,13 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['superlist'].queryset = EqualGold.objects.all().order_by('code', 'author__name', 'number')
 
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
+            # issue #576: this one is for the details view
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            # issue #576: this one is for the listview
+            self.fields['lstprojlist'].queryset = Project2.objects.all().order_by('name')
+            self.fields['lstprojlist'].widget.queryset = self.fields['lstprojlist'].queryset
 
             current_proj_ids = [x.id for x in self.fields['projlist'].queryset]
             self.fields['addprojlist'].queryset = Project2.objects.exclude(id__in=current_proj_ids).order_by('name').distinct()
@@ -3336,6 +3531,184 @@ class SuperSermonGoldForm(PassimModelForm):
         return None
 
 
+class ManuscriptLinkForm(BasicModelForm):
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newmanu = ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget=ManuidOneWidget(attrs={'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
+                    'tdstyle': 'width: 300px;', 'rows': 1, 
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = ManuscriptLink
+        fields = ['src', 'linktype', 'dst', 'note' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Read the manu_id
+            manu_id = kwargs.pop("manu_id", "")
+            # Start by executing the standard handling
+            super(ManuscriptLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newmanu'].required = False
+
+            # Initialize choices for linktype
+            init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+            init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+
+            # For searching/listing
+            self.fields['newlinktype'].initial = "rel"
+
+            if manu_id != None and manu_id != "":
+                self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").exclude(id=manu_id).order_by('idno')
+                # Adapt the widget QS
+                self.fields['newmanu'].widget.exclude = manu_id
+            else:
+                self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").order_by('idno')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = Manuscript.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = Manuscript.objects.filter(id=instance.dst.id)
+
+                    # And set a possible new destination
+                    self.fields['newmanu'].queryset = Manuscript.objects.filter(mtype="man").exclude(id=instance.id).order_by('idno')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ManuscriptLinkForm")
+
+        # REturn nothing
+        return None
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(ManuscriptLinkForm, self).clean()
+
+        # Get the source
+        src = cleaned_data.get("src")
+        if src != None:
+            # Any new destination is added in target_list
+            dst = cleaned_data.get("newmanu")
+            if dst != None:
+                # WE have a DST, now check how many links there are with this one
+                existing = src.relations.filter(id=dst.id)
+                if existing.count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "This Manuscript is already linked"
+                        )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
+
+
+class SermonDescrLinkForm(BasicModelForm):
+    newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
+                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
+    newsermo = ModelChoiceField(queryset=None, required=False, help_text="editable",
+                widget=SermonOneWidget(attrs={'data-placeholder': 'Select one sermon manifestation...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+    note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
+                widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
+                    'tdstyle': 'width: 300px;', 'rows': 1, 
+                    'title': 'everything that is not already specified in the link type itself, but that you do want to include'}))
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = SermonDescrLink
+        fields = ['src', 'linktype', 'dst', 'note' ]
+        widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        oErr = ErrHandle()
+        try:
+            # Read the manu_id
+            sermon_id = kwargs.pop("sermon_id", "")
+            # Start by executing the standard handling
+            super(SermonDescrLinkForm, self).__init__(*args, **kwargs)
+
+            # Make sure to set required and optional fields
+            self.fields['src'].required = False
+            self.fields['dst'].required = False
+            self.fields['linktype'].required = False
+            self.fields['note'].required = False
+
+            self.fields['newlinktype'].required = False
+            self.fields['newsermo'].required = False
+
+            # Initialize choices for linktype
+            init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
+            init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+
+            # For searching/listing
+            self.fields['newlinktype'].initial = "rel"
+
+            if sermon_id != None and sermon_id != "":
+                self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").exclude(id=sermon_id).order_by('msitem__codico__manuscript__idno', 'locus')
+                # Adapt the widget QS
+                self.fields['newsermo'].widget.exclude = sermon_id
+            else:
+                self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").order_by('msitem__codico__manuscript__idno', 'locus')
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                if instance != None:
+
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = SermonDescr.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = SermonDescr.objects.filter(id=instance.dst.id)
+
+                    # And set a possible new destination
+                    self.fields['newsermo'].queryset = SermonDescr.objects.filter(mtype="man").exclude(id=instance.id).order_by('idno')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescrLinkForm")
+
+        # REturn nothing
+        return None
+
+    def clean(self):
+        # Run any super class cleaning
+        cleaned_data = super(SermonDescrLinkForm, self).clean()
+
+        # Get the source
+        src = cleaned_data.get("src")
+        if src != None:
+            # Any new destination is added in target_list
+            dst = cleaned_data.get("newsermo")
+            if dst != None:
+                # WE have a DST, now check how many links there are with this one
+                existing = src.relations.filter(id=dst.id)
+                if existing.count() > 0:
+                    # This combination already exists
+                    raise forms.ValidationError(
+                            "This Sermon manifestation is already linked"
+                        )
+        # Make sure to return the correct cleaned data again
+        return cleaned_data
+
+
 class EqualGoldLinkForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
@@ -3405,6 +3778,13 @@ class EqualGoldLinkForm(BasicModelForm):
                     #       self.fields['linktype'].initial = instance.linktype
                     #       self.fields['dst'].initial = instance.dst
 
+                    # Prevent the [src] and [dst] to be loaded with all kinds of unnecessary stuff
+                    if not instance.src is None:
+                        self.fields['src'].queryset = EqualGold.objects.filter(id=instance.src.id)
+                    if not instance.dst is None:
+                        self.fields['dst'].queryset = EqualGold.objects.filter(id=instance.dst.id)
+
+                    # Define the newsuper option
                     self.fields['newsuper'].queryset = EqualGold.objects.filter(moved__isnull=True).exclude(id=instance.id).order_by('code')
         except:
             msg = oErr.get_error_message()
@@ -4375,7 +4755,6 @@ class UserKwForm(BasicSimpleForm):
         return None
 
 
-
 class ManuscriptForm(PassimModelForm):
     country_ta  = forms.CharField(label=_("Country"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
@@ -4399,14 +4778,12 @@ class ManuscriptForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #provlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProvenanceWidget(attrs={'data-placeholder': 'Select multiple provenances...', 'style': 'width: 100%;', 'class': 'searching'}))
     mprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
-    #datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+    mlinklist   = ModelMultipleChoiceField(queryset=None, required=False)
+
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
@@ -4446,20 +4823,21 @@ class ManuscriptForm(PassimModelForm):
             username = self.username
             team_group = self.team_group
             profile = Profile.get_user_profile(username)
+
             # Some fields are not required
             self.fields['stype'].required = False
             self.fields['editornotes'].required = False
-            #self.fields['yearstart'].required = False
-            #self.fields['yearfinish'].required = False
             self.fields['name'].required = False
             self.fields['lcity'].required = False
             self.fields['lcountry'].required = False
+
+            # Define querysets
             self.fields['litlist'].queryset = LitrefMan.objects.all().order_by('reference__full', 'pages').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            self.fields['mlinklist'].queryset = ManuscriptLink.objects.none()
 
             # Set the dependent fields for [lcity]
             if self.prefix != "":
@@ -4481,16 +4859,15 @@ class ManuscriptForm(PassimModelForm):
 
             self.fields['origone'].queryset = Origin.objects.all().order_by('name')
 
+            self.fields['mlinklist'].widget = ManuscriptLinkAddOnlyWidget(attrs={
+                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
+
             # Some lists need to be initialized to NONE:
-            #self.fields['provlist'].queryset = Provenance.objects.none()
             self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
             self.fields['extlist'].queryset = ManuscriptExt.objects.none()
-            # self.fields['datelist'].queryset = Daterange.objects.none()
 
-            # self.fields['provlist'].widget.addonly = True
             self.fields['mprovlist'].widget.addonly = True
             self.fields['extlist'].widget.addonly = True
-            # self.fields['datelist'].widget.addonly = True
         
             # Get the instance
             if 'instance' in kwargs:
@@ -4515,8 +4892,6 @@ class ManuscriptForm(PassimModelForm):
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
 
-                    # New method
-                    # self.fields['library'].initial = 
                 # Look after origin
                 origin = instance.origin
                 self.fields['origname_ta'].initial = "" if origin == None else origin.name
@@ -4527,23 +4902,17 @@ class ManuscriptForm(PassimModelForm):
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.manu_userkeywords.filter(profile=profile).order_by('keyword__name')]
 
-                #self.fields['provlist'].initial = [x.pk for x in instance.provenances.all()]
-                # issue #289 - below was innovation, but that is now turned back. Above is current
-                # self.fields['provlist'].initial = [x.pk for x in instance.manuprovenances.all()]
-      
                 self.fields['mprovlist'].initial = [x.pk for x in instance.manuscripts_provenances.all()]
                 self.fields['extlist'].initial = [x.pk for x in instance.manuscriptexternals.all()]
-                # self.fields['datelist'].initial = [x.pk for x in instance.manuscript_dateranges.all()]
                 
+                self.fields['mlinklist'].initial = [x.pk for x in instance.manuscript_src.all().order_by('dst__idno')]
+                self.fields['mlinklist'].queryset = ManuscriptLink.objects.filter(id__in=self.fields['mlinklist'].initial)
 
                 # The manuscriptext and the provenance should *just* contain what they have (no extension here)
-                #self.fields['provlist'].queryset = Provenance.objects.filter(id__in=self.fields['provlist'].initial)
                 self.fields['mprovlist'].queryset = ProvenanceMan.objects.filter(id__in=self.fields['mprovlist'].initial)
                 self.fields['extlist'].queryset = ManuscriptExt.objects.filter(id__in=self.fields['extlist'].initial)
-                # self.fields['datelist'].queryset = Daterange.objects.filter(id__in=self.fields['datelist'].initial)
 
 
-                #self.fields['provlist'].widget.manu = instance
                 self.fields['mprovlist'].widget.manu = instance
 
         except:
@@ -4802,7 +5171,8 @@ class BibRangeForm(BasicModelForm):
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 69%;', 
+                                              'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
 
     # =========== MANUSCRIPT-specific ===========================
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
@@ -4833,9 +5203,9 @@ class BibRangeForm(BasicModelForm):
         model = BibRange
         fields = ['book', 'chvslist', 'intro', 'added']
         widgets={'book':        BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'added':       forms.TextInput(attrs={'style': 'width: 100%;'})
+                 'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'intro':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'added':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -5031,6 +5401,30 @@ class CommentForm(BasicModelForm):
 
         # Initialize querysets
         self.fields['profilelist'].queryset = Profile.objects.all().order_by('user__username')
+
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
+
+
+class CommentResponseForm(BasicModelForm):
+    """A form to facilitate providing a response to a comment"""
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = CommentResponse
+        fields = ['content', 'profile', 'comment', 'visible']
+        widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(CommentResponseForm, self).__init__(*args, **kwargs)
+        # Some fields are not required
+        self.fields['profile'].required = False
+        self.fields['content'].required = False
 
         # Get the instance
         if 'instance' in kwargs:

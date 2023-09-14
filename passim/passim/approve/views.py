@@ -252,31 +252,6 @@ def equalchange_json_to_html(instance, type, profile=None):
     sBack = "\n".join(html)
     return sBack
 
-#def equaladd_json_to_accept(instance):
-#    """Accept the add: implement it and set my status"""
-
-#    def link_add(super, oItem):
-#        """Add the superlink, connecting it to [super]"""
-
-#        obj = None
-#        try:
-
-
-
-
-
-        
-            
-#        # Make sure that our state changes to accepted
-#        instance.atype = "acc"
-#        instance.comment = "This change has been successfully processed on: {}".format(get_crpp_date(get_current_datetime(), True))
-#        instance.save()
-#    except:
-#        msg = oErr.get_error_message()
-#        oErr.DoError("equaladd_json_to_accept")
-#        bBack = False
-#    return bBack
-
 def equalchange_json_to_accept(instance):
     """Accept the change: implement it and set my status"""
 

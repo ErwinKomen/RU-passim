@@ -1,0 +1,33 @@
+<div>
+  <h4>Original user comment</h4>
+  <table style="width: 100%">
+    <tbody>
+      <tr><td style="white-space:nowrap;">User name:</td><td><code>{{user.username}}</code></td></tr>
+      <tr><td style="white-space:nowrap;">User email:</td><td>{{user.email}}</td></tr>
+      <tr><td style="white-space:nowrap;">Timestamp:</td><td>{{comdate}}</td></tr>
+      <tr><td style="white-space:nowrap;">Comment on:</td><td>{{objname}} <a href="{{objurl|safe}}">link</a></td></tr>
+      <tr>
+        <td style="white-space:nowrap;" valign="top">Comment:</td>
+        <td style="width: 100%; background-color: lightgoldenrodyellow" valign="top">{{objcontent}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div>&nbsp;</div>
+
+  <h4>Passim editor response to this comment</h4>
+  <table style="width: 100%">
+    <tbody>
+      <tr><td style="white-space:nowrap;">Response from:</td><td><code>{{user.username}}</code> PASSIM editor</td></tr>
+      <tr><td style="white-space:nowrap;">Timestamp:</td><td>{{respdate}}</td></tr>
+      <tr>
+        <td style="white-space:nowrap;" valign="top">Response:</td>
+        <td style="width: 100%; background-color: lightcyan" valign="top">{{respcontent|safe}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="font-size: small; color: darkgray;">
+  This e-mail has been auto-generated. Responding to it is not possible.
+</div>

@@ -1,15 +1,6 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-108165780-4"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'UA-108165780-4');
-    </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
@@ -33,6 +24,7 @@
     <script src="{% static 'seeker/scripts/passim.js' %}"></script>
     <script src="{% static 'seeker/scripts/passim.seeker.js' %}"></script>
     <script src="{% static 'dct/scripts/ru.dct.js' %}"></script>
+    <script src="{% static 'stemma/scripts/ru.stemma.js' %}"></script>
 {% block scripts %}{% endblock %}
 </head>
 
@@ -55,11 +47,11 @@
     </div>
   <div>
         <footer>
-            <span>PASSIM v1.3.0 &copy; jan/2019-mar/2023 </span>
+            <span>PASSIM v1.3.3 &copy; jan/2019-jul/2023 </span>
             &nbsp;&nbsp;&nbsp;&nbsp;
             <span>Sponsored by: <a href="https://cordis.europa.eu/project/rcn/218691/factsheet/en">Cordis</a></span>
             &nbsp;&nbsp;&nbsp;&nbsp;
-            <span>Developed at: <a href="http://www.ru.nl">Radboud University Nijmegen</a></span>
+            <span>Developed at: <a href="https://www.ru.nl/en/about-us/organisation/faculties/arts/research/research-facilities">Radboud University Nijmegen</a></span>
         </footer>
 
   </div>

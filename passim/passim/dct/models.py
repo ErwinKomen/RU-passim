@@ -18,6 +18,7 @@ import json, copy
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE
 from passim.basic.models import UserSearch
+from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
     SermonDescr, EqualGold
@@ -27,6 +28,7 @@ ABBR_LENGTH = 5
 
 SETLIST_TYPE = "dct.setlisttype"
 SAVEDITEM_TYPE = "dct.saveditemtype"
+SELITEM_TYPE = "dct.selitemtype"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -849,8 +851,89 @@ class SetDef(models.Model):
             oErr.DoError("SetDef/get_setlist")
         return oBack
 
+    def get_view_link(self):
+        """Get the HTML code to go to and view a DCT"""
+
+        lHtml = []
+        oErr = ErrHandle()
+        try:
+            if not self.contents == "":
+                # Create the search
+                # rl = "{}?usersearch={}".format(self.usersearch.view, self.usersearch.id)
+                url = reverse('setdef_details', kwargs={'pk': self.id})
+                name = self.name
+                sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Go to this DCT'>{}</a></span>".format(url, name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDef/get_view_link")
+        return sBack
+
 
 # ====================== Personal Research Environment models ========================================
+
+class SaveGroup(models.Model):
+    """A group that holds a number of SavedItems together"""
+
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savegroups")
+    # [1] obligatory name for this group
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            sBack = "{}: {}".format(self.profile.user.username, self.name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SaveGroup")
+        return sBack
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_size_markdown(self):
+        """Get a markdown representation of the size of this group"""
+
+        size = 0
+        lHtml = []
+        size = self.group_saveditems.count()
+        if size > 0:
+            # Create a display for this topic
+            lHtml.append("<span class='badge signature gr'>{}</span>".format(size))
+        else:
+            lHtml.append("0")
+        sBack = ", ".join(lHtml)
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Adapt the save date
+        self.saved = get_current_datetime()
+        if self.name is None or self.name == "":
+            iLast = 1
+            obj = SaveGroup.objects.all().order_by("-id").first()
+            if not obj is None:
+                iLast = obj.id + 1
+            self.name = "Group #{}".format(iLast)
+        response = super(SaveGroup, self).save(force_insert, force_update, using, update_fields)
+
+        # Return the response when saving
+        return response
+
 
 class SavedItem(models.Model):
     """A saved item can be a M/S/SSG or HC or PD"""
@@ -862,6 +945,9 @@ class SavedItem(models.Model):
     # [1] Each saved item must be of a particular type
     #     Possibilities: manu, serm, ssg, hist, pd
     sitemtype = models.CharField("Saved item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+
+    # [0-1] A SavedItem can optionally belong to a [SaveGroup]
+    group = models.ForeignKey(SaveGroup, blank=True, null=True, on_delete=models.SET_NULL, related_name="group_saveditems")
 
     # Depending on the type of SavedItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
@@ -963,6 +1049,8 @@ class SavedItem(models.Model):
 class SavedSearch(models.Model):
     """A saved search links to the basic UserSearch"""
 
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [1] a saved item belongs to a particular user's profile
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savedsearches")
     # [1] The saved items may be ordered (and they can be re-ordered by the user)
@@ -975,6 +1063,160 @@ class SavedSearch(models.Model):
         sBack = "{}: {}".format(self.profile.user.username, self.usersearch.id)
         return sBack
 
+    def get_view_name(self):
+        """Get the name of the view, without slashes"""
+
+        sBack = "-"
+        if not self.usersearch is None:
+            sBack = self.usersearch.view
+            sBack = sBack.replace("/list", "").replace("/search", "")
+            sBack = sBack.replace("/", "")
+        return sBack
+
+    def get_view_link(self):
+        """Get the HTML code to actually click and perform a saved search"""
+
+        lHtml = []
+        oErr = ErrHandle()
+        try:
+            if not self.usersearch is None:
+                # Create the search
+                url = "{}?usersearch={}".format(self.usersearch.view, self.usersearch.id)
+                name = self.get_view_name()
+                sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved search'>{}</a></span>".format(url, name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearch/get_view_link")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = SavedSearch.objects.filter(profile=self.profile).count() + 1
+        response = super(SavedSearch, self).save(force_insert, force_update, using, update_fields)
+        # Return the regular save response
+        return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SavedSearch.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedSearch/update_order")
+            bOkay = Falses
+        return bOkay
+
+
+class SavedVis(models.Model):
+    """A saved visualization links to a particular URL plus a set of parameters"""
+
+    # [1] obligatory name
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] a saved item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_savedvisualizations")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+
+    # [1] The URL that this saved visualization points to 
+    visurl = models.CharField("Visualisation URL", max_length=STANDARD_LENGTH)
+    # [0-1] The parameters (JSON) belonging to this search
+    options = models.TextField("Parameters", blank=True, null=True)
+
+    # [1] And a date: the date when this visualization was created
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{}: {}".format(self.profile.user.username, self.name)
+        return sBack
+
+    def get_view_name(self):
+        """Get the name of the view, without slashes"""
+
+        sBack = "-"
+        if not self.usersearch is None:
+            sBack = self.usersearch.view
+            sBack = sBack.replace("/list", "").replace("/search", "")
+            sBack = sBack.replace("/", "")
+        return sBack
+
+    def get_view_link(self):
+        """Get the HTML code to actually click and perform a saved visualization
+        
+        Note: the 'name' shown here should be the *type* of visualization
+              (e.g: AF overlap, AF transmission, DCT)
+        """
+
+        lHtml = []
+        pass_over = ['visurl', 'vistype']
+        oErr = ErrHandle()
+        try:
+            # The visualization type is filed away in 'options'
+            if not self.options is None:
+                options = json.loads(self.options)
+                # Get the [vistype] parameter
+                name = options.get("vistype", "unknown")
+                # Get the URL to the visualization
+                visurl = options.get("visurl")
+                # Add the id of the savedvis
+                url = "{}?savedvis={}".format(visurl, self.id)
+
+                ## Find all parameters
+                #param_list = []
+                #for k,v in options.items():
+                #    if not k in pass_over:
+                #        param_list.append("{}={}".format(k,v))
+                ## Encode the parameters
+                #params = base64_encode( "&".join(param_list))
+                ## Combine into url
+                #url = "{}?params={}".format( visurl, params)
+
+                # Last chance...
+                if not url is None and url != "":
+                    sBack = "<span  class='badge jumbo-1'><a href='{}'  title='Execute this saved visualization'>{}</a></span>".format(url, name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedVis/get_view_link")
+        return sBack
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = SavedVis.objects.filter(profile=self.profile).count() + 1
+        response = super(SavedVis, self).save(force_insert, force_update, using, update_fields)
+        # Return the regular save response
+        return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SavedVis.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SavedVis/update_order")
+            bOkay = Falses
+        return bOkay
+
 
 class SelectItem(models.Model):
     """A selected item can be a M/S/SSG or HC or PD"""
@@ -985,7 +1227,7 @@ class SelectItem(models.Model):
     order = models.IntegerField("Order", default=0)
     # [1] Each saved item must be of a particular type
     #     Possibilities: manu, serm, ssg, hist, pd
-    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SAVEDITEM_TYPE), max_length=5)
+    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SELITEM_TYPE), max_length=5)
 
     # Depending on the type of SelectItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
@@ -996,6 +1238,8 @@ class SelectItem(models.Model):
     equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_selectitems")
     # [0-1] Collection pointer (that can be HC, public or personal collection
     collection = models.ForeignKey(Collection, blank=True, null=True, on_delete=models.SET_NULL, related_name="collection_selectitems")
+    # [0-1] Pointer to SavedItem
+    saveditem = models.ForeignKey(SavedItem, blank=True, null=True, on_delete=models.SET_NULL, related_name="saveditem_selectitems")
 
     def __str__(self):
         sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
@@ -1017,6 +1261,8 @@ class SelectItem(models.Model):
                     obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, equal=item).first()
                 elif selitemtype == "hc" or selitemtype == "pd":
                     obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, collection=item).first()
+                elif selitemtype == "svdi":
+                    obj = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype, saveditem=item).first()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SelectItem/get_selectitem")
