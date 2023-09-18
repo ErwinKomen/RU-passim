@@ -3115,18 +3115,24 @@ def get_cnrs_manuscripts(city, library):
                 # Return positively
                 # reply = demjson.decode(r.text.replace("\t", " "))
                 sText = r.text.replace("\t", "")
-                reply = json.loads(sText)
-                if reply != None and "items" in reply:
-                    results = []
-                    for item in reply['items']:
-                        if item['name'] != "":
-                            results.append(item['name'])
-                    #data = json.dumps(results)
-                    # Interpret the results
-                    lst_manu = []
-                    for item in results:
-                        lst_manu.append("<span class='manuscript'>{}</span>".format(item))
-                    sBack = "\n".join(lst_manu)
+                # Take extra care that the interpretation doesn't go wrong:
+                try:
+                    reply = json.loads(sText)
+                    if reply != None and "items" in reply:
+                        results = []
+                        for item in reply['items']:
+                            if item['name'] != "":
+                                results.append(item['name'])
+                        #data = json.dumps(results)
+                        # Interpret the results
+                        lst_manu = []
+                        for item in results:
+                            lst_manu.append("<span class='manuscript'>{}</span>".format(item))
+                        sBack = "\n".join(lst_manu)
+                except:
+                    # THis is not proper JSON, so cannot be decoded
+                    oErr.Status("Improper JSON code from cnrs_manuscripts: {}".format(sText))
+                    sBack = ""
     except:
         msg = oErr.get_error_message()
         sBack = "Error: {}".format(msg)
