@@ -1095,12 +1095,13 @@ var ru = (function ($, ru) {
        *   Copy text to clipboard
        *
        */
-      copy_to_clipboard: function (el) {
+      copy_to_clipboard: function (el, bg_color) {
         var elSpan = null,
             copyText = null,
             textarea = null,
             range = null,
             selector = null,
+            bgcol = null,
             tmp = "tmp_stable",
             sText = "";
 
@@ -1120,6 +1121,16 @@ var ru = (function ($, ru) {
             selector = document.querySelector("#" + tmp);
             selector.select();
             document.execCommand("copy");
+            if (bg_color !== undefined) {
+              // Get current bg color
+              bgcol = $(el).css('background-color');
+              // Temporarily show the background color
+              $(el).css('background-color', bg_color);
+              window.setTimeout(function () {
+                $(el).css('background-color', bgcol);
+              },
+              1000);
+            }
           } else {
             copyText = document.getElementById("search_copy");
             copyText.select();

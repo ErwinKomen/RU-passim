@@ -17,7 +17,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="scrolltop-allow">
+  <div class="">
     {% if authenticated and permission %}
       <!-- Upper part of the generic details view interface -->
       <div class="panel panel-none" style="margin-top: 15px;">      
@@ -43,7 +43,7 @@
                 <!-- Copy to clipboard -->
                 <span title="{{stable_uri}}">Stable URI:</span><br />
                 <span class="stable">{{stable_uri}}</span>
-                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this);"
+                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this, 'chocolate');"
                      title="Copy stable URI to clipboard">
               </div>
             {% endif %}
@@ -86,7 +86,7 @@
         </div>
       </div>
       <!-- Upper part of the generic details view interface -->
-      <div class="panel panel-default gold-head subform">        
+      <div class="panel panel-default gold-head subform scrolltop-allow">        
         <div class="row">&nbsp;</div>
         <div class="row">        
           
@@ -426,6 +426,11 @@
         </div>
         <div class="row">&nbsp;</div>
 
+        <div class="scrolltop-container">
+          <a class="" href="#top" title="Scroll back to top">
+            <span class="glyphicon glyphicon-triangle-top"></span>
+          </a>
+        </div>
       </div>
     
     {% elif authenticated and not permission %}
@@ -444,11 +449,6 @@
         </p>
       </div>
     {% endif %}
-    <div class="scrolltop-container">
-      <a class="" href="#top" title="Scroll back to top">
-        <span class="glyphicon glyphicon-triangle-top"></span>
-      </a>
-    </div>
   </div>
 
 

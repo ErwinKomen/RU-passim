@@ -3846,8 +3846,8 @@ class Manuscript(models.Model):
         {'name': 'City',                'type': 'fk',    'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
         {'name': 'City id',             'type': 'fk_id', 'path': 'lcity',     'fkfield': 'name', 'model': 'Location'},
         # THIS GOES WRONG: the Library must *NOT* be treated separately, but only in conjunction with lcountry and lcity!!!
-        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library'},
-        {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library'},
+        {'name': 'Library',             'type': 'fk',    'path': 'library',   'fkfield': 'name', 'model': 'Library',      'readonly': True},
+        {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library',      'readonly': True},
         # TODO: change FK project into m2m
         {'name': 'Projects',            'type': 'func',  'path': 'projects'},   #,  'fkfield': 'name', 'model': 'Project2'},
 
@@ -4161,6 +4161,9 @@ class Manuscript(models.Model):
                             notes = [] if obj.notes is None else [ obj.notes ]
                             notes.append(lib_note)
                             obj.notes = "\n".join(notes)
+                    elif library is None and not obj.library is None:
+                        # A wrong library has been chosen: *REMOVE* the chosen library!
+                        obj.library = None
 
                     # Process the title for this manuscript
                     if obj.name == "SUPPLY A NAME": obj.name="-"
