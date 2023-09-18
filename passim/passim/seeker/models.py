@@ -11053,7 +11053,7 @@ class SermonDescr(models.Model):
             self.sermocount = iSize
             self.save()
         return True
-
+         
     def signature_string(self, include_auto = False, do_plain=True):
         """Combine all signatures into one string: manual ones"""
 
@@ -11074,14 +11074,14 @@ class SermonDescr(models.Model):
                     lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
                         editype, short, url, short[:20]))
 
-            # Add the manual signatures
+            # Add the manual signatures 
             for item in self.sermonsignatures.filter(editype=editype).order_by("code"):
                 if do_plain:
-                    list.append(item)
+                    list.append(item)                    
                     lSign.append(item.short())
                 else:
-                    list.append(item)
-                    short = item.short()
+                    list.append(item)               
+                    short = item.short()   
                     editype = item.editype
                     url = "{}?sermo-siglist_m={}".format(reverse("sermon_list"), item.id)
                     lSign.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(
