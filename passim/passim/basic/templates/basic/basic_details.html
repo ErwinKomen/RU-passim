@@ -43,7 +43,7 @@
                 <!-- Copy to clipboard -->
                 <span title="{{stable_uri}}">Stable URI:</span><br />
                 <span class="stable">{{stable_uri}}</span>
-                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this);"
+                <img src="{% static 'basic/content/clippy.png' %}" onclick="ru.basic.copy_to_clipboard(this, 'chocolate');"
                      title="Copy stable URI to clipboard">
               </div>
             {% endif %}
