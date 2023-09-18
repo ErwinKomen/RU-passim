@@ -5574,7 +5574,7 @@ class SermonListView(BasicList):
                 sTitle = instance.nickname.name
             else:
                 html.append("<span><i>(unknown)</i></span>")
-        elif custom == "signature":
+        elif custom == "signature":           
             html.append(instance.signature_string(include_auto=True, do_plain=False))
         elif custom == "incexpl":
             html.append("<span>{}</span>".format(instance.get_incipit_markdown()))
@@ -13027,12 +13027,20 @@ class SermonGoldListView(BasicList):
                 sTitle = instance.author.name
             else:
                 html.append("<span><i>(unknown)</i></span>")
-        elif custom == "signature":
-            for sig in instance.goldsignatures.all().order_by('-editype'):
-                editype = sig.editype
-                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
-                short = sig.short()
-                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "signature":            
+            # The prefered sequence of codes (Gryson, Clavis, Other)
+            editype_pref_seq = ['gr', 'cl', 'ot'] 
+            # Use the prefered sequence of codes 
+            for editype in editype_pref_seq: 
+            # Get all the associated signatures
+            # Visit all signatures for each Gold Sermon               
+                sublist = instance.goldsignatures.filter(editype=editype).order_by('code')
+                # Iterate over all signatures (for each editype)
+                for sig in sublist:          
+                    editype = sig.editype
+                    url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                    short = sig.short()
+                    html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
         elif custom == "code":
             equal = instance.equal
             if equal:
@@ -14928,14 +14936,19 @@ class EqualGoldListView(BasicList):
             dots = "..." if instance.incipit else ""
             html.append("<span style='color: blue;'>{}</span>".format(dots))
             html.append("<span>{}</span>".format(instance.get_explicit_markdown()))
-        elif custom == "sig":
-            # Get all the associated signatures
-            qs = Signature.objects.filter(gold__equal=instance).order_by('-editype', 'code')
-            for sig in qs:
-                editype = sig.editype
-                url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
-                short = sig.short()
-                html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))
+        elif custom == "sig":           
+            # The prefered sequence of codes (Gryson, Clavis, Other)
+            editype_pref_seq = ['gr', 'cl', 'ot'] 
+            # Use the prefered sequence of codes 
+            for editype in editype_pref_seq: 
+            # Visit all signatures for each Authority File               
+                qs = Signature.objects.filter(gold__equal=instance, editype=editype).order_by('code')
+                # Iterate over all signatures (for each editype)
+                for sig in qs:
+                    editype = sig.editype
+                    url = "{}?gold-siglist={}".format(reverse("gold_list"), sig.id)
+                    short = sig.short()
+                    html.append("<span class='badge signature {}' title='{}'><a class='nostyle' href='{}'>{}</a></span>".format(editype, short, url, short[:20]))           
         elif custom == "saved":
             # Prepare saveditem handling
             saveditem_button = get_saveditem_html(self.request, instance, self.profile, sitemtype="ssg")
