@@ -780,7 +780,7 @@ var ru = (function ($, ru) {
        *  waitInit - initialize waiting
        */
       waitInit: function (el) {
-        var elWaith = null;
+        var elWait = null;
 
         try {
           // Right now no initialization is defined

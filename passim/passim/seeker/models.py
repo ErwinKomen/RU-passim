@@ -4044,16 +4044,35 @@ class Manuscript(models.Model):
                 # ===================================
 
                 # Retrieve or create a new manuscript with default values
-                sCity = oManu.get("lcity")
+                sCity = oManu.get("city", "")
+                sCountry = oManu.get("country", "")
+                sLibrary = oManu.get("library", "")
                 lCity = None
-                if not sCity is None:
-                    sCountry = oManu.get("lcountry", "")
+                lCountry = None
+                lLibrary = None
+
+                # First attempt: try get lib/city/country match
+                if sLibrary != "":
+                    lLibrary = Library.get_best_match(sCountry, sCity, sLibrary)
+
+                # Second attempt: try to at least get lCity and lCountry
+                lCity = None
+                if sCity != "":
                     # DOuble check city co-occurrence
                     lCity = Location.get_location(sCity, sCountry)
+                    lCountry = lCity.lcountry
+                if lCountry is None and sCountry != "":
+                    # Try get the country
+                    lCountry = Location.get_location("", sCountry)
+
                 if lCity is None:
                     qs = Manuscript.objects.filter(idno=idno, mtype="man")
-                else:
+                elif lCountry is None:
                     qs = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man")
+                elif lLibrary is None:
+                    qs = Manuscript.objects.filter(idno=idno, lcity=lCity, lcountry=lCountry, mtype="man")
+                else:
+                    qs = Manuscript.objects.filter(idno=idno, lcity=lCity, lcountry=lCountry, library=lLibrary, mtype="man")
                 # Okay, take the first object, no matter the source
                 obj = qs.first()
                 # Exclude anything that has the same source
@@ -6034,11 +6053,13 @@ class Codico(models.Model):
             if manu == None:
                 oErr.DoError("Codico/add_one: no [manuscript] provided")
             else:
+                # We also need the 'order' value of the codico
+                order = oCodico.get('order', 1)
                 # Retrieve or create a new codico with default values
-                obj = Codico.objects.filter(manuscript=manu).first()
+                obj = Codico.objects.filter(manuscript=manu, order=order).first()
                 if obj == None:
                     # Doesn't exist: create it
-                    obj = Codico.objects.create(manuscript=manu, stype="imp")
+                    obj = Codico.objects.create(manuscript=manu, order=order, stype="imp")
                 else:
                     bOverwriting = True
                         

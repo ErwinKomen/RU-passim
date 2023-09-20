@@ -100,11 +100,15 @@ class ManuscriptUploadExcel(ReaderImport):
                             sheetnames = wb.sheetnames
                             ws_manu = None
                             ws_sermo = None
+                            ws_codico = None
                             lst_ws = []
                             for sname in sheetnames:
                                 if "manu" in sname.lower():
                                     ws_manu = wb[sname]
                                     lst_ws.append(ws_manu)
+                                elif "codico" in sname.lower():
+                                    ws_codico = wb[sname]
+                                    lst_ws.append(ws_codico)
                                 elif "sermo" in sname.lower():
                                     ws_sermo = wb[sname]
                                     lst_ws.append(ws_sermo)
@@ -169,11 +173,54 @@ class ManuscriptUploadExcel(ReaderImport):
                                     # We have an object with key/value pairs: process it
                                     manu = Manuscript.custom_add(oManu, params, **kwargs)
 
-                                    # Now get the codicological unit that has been automatically created and adapt it
-                                    codico = manu.manuscriptcodicounits.first()
-                                    if codico != None:
-                                        oManu['manuscript'] = manu
-                                        codico = Codico.custom_add(oManu, **kwargs)
+                                    # Process codicological unit - if it has been provided in the Excel
+                                    dict_codico = {}
+                                    if ws_codico is None:
+                                        # No codicological info has been provided...
+
+                                        # Now get the codicological unit that has been automatically created and adapt it
+                                        codico = manu.manuscriptcodicounits.first()
+                                        if codico != None:
+                                            oManu['manuscript'] = manu
+                                            codico = Codico.custom_add(oManu, **kwargs)
+                                            # Make sure there is a link between the codico order and the codico object
+                                            dict_codico['1'] = codico
+
+                                    else:
+                                        # We have codicological information!!!
+                                        # Get the column names
+                                        row_num = 1
+                                        column = 1
+                                        header = []
+                                        v = ws_codico.cell(row=row_num, column=column).value
+                                        while v != None and v != "" and v != "-":                                        
+                                            header.append(v.lower())
+                                            column += 1
+                                            v = ws_codico.cell(row=row_num, column=column).value
+                                        # Process the codico units in this sheet
+                                        codico_list = []
+                                        column = 1
+
+                                        # Iterate over the rows
+                                        for row in ws_codico.iter_rows():
+                                            row_values = [x.value for x in row]
+                                            v = row_values[0]
+                                            if row_num > 1 and not v is None and v!= "":
+                                                # Create a new codico object
+                                                oCodico = {}
+                                                # Process this row
+                                                for idx, col_name in enumerate(header):
+                                                    column = idx + 1
+                                                    oCodico[col_name] = row_values[idx]
+                                                # Process this sermon
+                                                order = oCodico['order']
+                                                oCodico['manuscript'] = manu
+                                                codico = Codico.custom_add(oCodico, **kwargs)
+
+                                                # Make sure there is a link between the codico order and the codico object
+                                                dict_codico[str(order)] = codico
+                                            # GO to the next row for the next sermon
+                                            row_num += 1
 
                                     oResult['count'] += 1
                                     oResult['obj'] = manu
@@ -209,6 +256,10 @@ class ManuscriptUploadExcel(ReaderImport):
                                                 for idx, col_name in enumerate(header):
                                                     column = idx + 1
                                                     oSermon[col_name] = row_values[idx]
+
+                                                # Get the codico that should be used
+                                                codi_order = str(oSermon.get("codico", 1))
+                                                codico = dict_codico[codi_order]
                                                 # Process this sermon
                                                 order = oSermon['order']
                                                 sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
