@@ -74,7 +74,8 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
     UserForm, SermonDescrLinkForm, CommentResponseForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
-    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
+    add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, get_spec_col_num, \
+    FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
     ManuscriptKeyword, Action, EqualGold, EqualGoldLink, Location, LocationName, LocationIdentifier, LocationRelation, LocationType, \
@@ -744,6 +745,7 @@ def home(request, errortype=None):
             context['is_404'] = True
 
     # Check the newsitems for validity
+    print("- Calling check_until")
     NewsItem.check_until()
 
     # Create the list of news-items
@@ -766,7 +768,9 @@ def home(request, errortype=None):
     return render(request, template_name, context)
 
 def view_404(request, *args, **kwargs):
-    return home(request, "404")
+    # return home(request, "404")
+    sBack = "Error 404 when loading: {}".format(request.path)
+    return sBack
 
 def contact(request):
     """Renders the contact page."""
@@ -12357,7 +12361,41 @@ class ManuscriptDownload(BasicPart):
                     ws.cell(row=row_num, column = 2).value = value
                     row_num += 1
 
-                # Second worksheet: ALL SERMONS in the manuscript
+                # Second worksheet: ALL CODICOLOGICAL units in this manuscript
+                ws = wb.create_sheet("Codicos")
+
+                # Read the header cells and make a header row in the CODICO worksheet
+                headers = [x['name'] for x in Codico.specification ]
+                for col_num in range(len(headers)):
+                    c = ws.cell(row=1, column=col_num+1)
+                    c.value = headers[col_num]
+                    c.font = openpyxl.styles.Font(bold=True)
+                    # Set width to a fixed size
+                    ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+                row_num = 1
+                # Walk all codico's of this manuscript
+                for codico in self.obj.manuscriptcodicounits.all().order_by('order'):
+                    row_num += 1
+                    col_num = 1
+                    # Show the order number of this Codico
+                    # ws.cell(row=row_num, column=col_num).value = msitem.order
+
+                    #for item in Codico.specification:
+                    #    key, value = codico.custom_getkv(item, kwargs=kwargs)
+                    #    # Add the K/V row
+                    #    ws.cell(row=row_num, column = 1).value = key
+                    #    ws.cell(row=row_num, column = 2).value = value
+                    #    row_num += 1
+                    # Walk the items
+                    for item in Codico.specification:
+                        if item['type'] != "":
+                            key, value = codico.custom_getkv(item, kwargs=kwargs)
+                            ws.cell(row=row_num, column=col_num).value = value
+                            col_num += 1
+
+
+                # Third worksheet: ALL SERMONS in the manuscript
                 ws = wb.create_sheet("Sermons")
 
                 # Read the header cells and make a header row in the SERMON worksheet
@@ -12374,11 +12412,13 @@ class ManuscriptDownload(BasicPart):
                 for msitem in self.obj.manuitems.all().order_by('order'):
                     row_num += 1
                     col_num = 1
+                    # Show the order number of this MsItem
                     ws.cell(row=row_num, column=col_num).value = msitem.order
                     # Get other stuff
                     parent = "" if msitem.parent == None else msitem.parent.order
                     firstchild = "" if msitem.firstchild == None else msitem.firstchild.order
                     next = "" if msitem.next == None else msitem.next.order
+                    codico = "" if msitem.codico is None else msitem.codico.order
 
                     # Process the structural elements
                     col_num += 1
@@ -12387,6 +12427,8 @@ class ManuscriptDownload(BasicPart):
                     ws.cell(row=row_num, column=col_num).value = firstchild
                     col_num += 1
                     ws.cell(row=row_num, column=col_num).value = next
+                    col_num += 1
+                    ws.cell(row=row_num, column=col_num).value = codico
 
                     # What kind of item is this?
                     col_num += 1
@@ -12394,9 +12436,10 @@ class ManuscriptDownload(BasicPart):
                         sermonhead = msitem.itemheads.first()
                         # This is a SermonHead
                         ws.cell(row=row_num, column=col_num).value = "Structural"
-                        col_num += 2
+                        # issue #609: needs adjustment
+                        col_num = get_spec_col_num(SermonDescr, 'locus')
                         ws.cell(row=row_num, column=col_num).value = sermonhead.locus
-                        col_num += 4
+                        col_num = get_spec_col_num(SermonDescr, 'title')
                         ws.cell(row=row_num, column=col_num).value = sermonhead.title.strip()
                     else:
                         # This is a SermonDescr

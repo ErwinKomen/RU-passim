@@ -1235,6 +1235,26 @@ def moveup(instance, tblGeneral, tblUser, ItemType):
         bOkay = False
     return bOkay
 
+def get_spec_col_num(cls, path):
+    """Given a class, look for 'specification' and then get the column number (idx+1) of the 'path'"""
+
+    iCol = -1
+    oErr = ErrHandle()
+    try:
+        specification = getattr(cls, "specification")
+        if not specification is None:
+            # Walk through the specification looking for the right path
+            for idx, row in enumerate(specification):
+                if row.get("path") == path:
+                    # Got it!
+                    iCol = idx + 1
+                    break
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_spec_col_num")
+
+    return iCol
+
 def send_email(subject, profile, contents, add_team=False):
     """Send an email"""
 
@@ -5902,19 +5922,24 @@ class Codico(models.Model):
 
     # Scheme for downloading and uploading
     specification = [
+        {'name': 'Order',               'type': 'field', 'path': 'order'},
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
         {'name': 'Support',             'type': 'field', 'path': 'support'},
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Origin',              'type': 'func',  'path': 'origin'},
         {'name': 'Codico_Notes',        'type': 'func',  'path': 'notes'},
         {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
-        {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
         {'name': 'Scribeinfo',          'type': 'func',  'path': 'scribeinfo'},
         {'name': 'Scriptinfo',          'type': 'func',  'path': 'scriptinfo'},
+
+        # === Extinct (doubles) or not to be used because of automatic calculation:
+        # {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
+        # {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
+        # {'name': 'Year start',          'type': 'field', 'path': 'yearstart'},
+        # {'name': 'Year finish',         'type': 'field', 'path': 'yearfinish'},
         ]
 
     class Meta:
@@ -9521,12 +9546,12 @@ class SermonDescr(models.Model):
         {'name': 'Parent',              'type': '',      'path': 'parent'},
         {'name': 'FirstChild',          'type': '',      'path': 'firstchild'},
         {'name': 'Next',                'type': '',      'path': 'next'},
+        {'name': 'Codico',              'type': '',      'path': 'codico'},
         {'name': 'Type',                'type': '',      'path': 'type'},
         {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
-        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
-        {'name': 'Attributed author',   'type': 'func',  'path': 'author_id'},
+        {'name': 'Attributed author id','type': 'func',  'path': 'author_id'},
         {'name': 'Attributed author',   'type': 'func',  'path': 'author'},
         {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
         {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
@@ -9545,6 +9570,9 @@ class SermonDescr(models.Model):
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
         {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
+
+        # ===== Extinct lines =============
+        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
         ]
 
     def __str__(self):
@@ -9715,7 +9743,7 @@ class SermonDescr(models.Model):
                     value = oSermo.get(field)
                     readonly = oField.get('readonly', False)
                 
-                    if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
+                    if value != None and value != "" and value != "-" and (sourcetype == "huwa" or not readonly ):
                         type = oField.get("type")
                         path = oField.get("path")
                         if type == "field":

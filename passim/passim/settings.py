@@ -50,6 +50,9 @@ if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR or "c:" in WRITABLE_DIR or "C:" 
     if "d:" in WRITABLE_DIR or "D:" in WRITABLE_DIR:
         USE_REDIS = True
         DEBUG = True
+    elif "c:" in WRITABLE_DIR or "C:" in WRITABLE_DIR:
+        USE_REDIS = False
+        DEBUG = True
 elif "131.174" in hst:
     # Configuration within the Radboud University environment (AppleJack)
     APP_PREFIX = ""             # Was: "passim/"
