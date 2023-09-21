@@ -12022,7 +12022,7 @@ class ManuscriptListView(BasicList):
         sTitle = ""
         html = []
         if custom == "city":
-            if instance.library:
+            if not instance.library is None:
                 city = None
                 if instance.library.lcity:
                     city = instance.library.lcity.name
@@ -12034,8 +12034,13 @@ class ManuscriptListView(BasicList):
                 else:
                     html.append("<span>{}</span>".format(city[:12]))        
                     sTitle = city
+            elif not instance.lcity is None:
+                city = instance.lcity.name
+                html.append("<span>{}</span>".format(city[:12]))        
+                sTitle = city
+
         elif custom == "library":
-            if instance.library:
+            if not instance.library is None:
                 lib = instance.library.name
                 html.append("<span>{}</span>".format(lib[:12]))  
                 sTitle = lib      
