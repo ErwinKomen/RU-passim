@@ -8,6 +8,7 @@ import json
 import os
 import csv
 import pandas as pd
+from unidecode import unidecode
 from passim.settings import MEDIA_DIR
 
 # ======= imports from my own application ======
@@ -47,7 +48,8 @@ adaptation_list = {
     'profile_list': ['projecteditors'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc']    
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc'],
+    'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
     }
 
 
@@ -1495,6 +1497,54 @@ def adapt_projecteditors():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+
+# ========== Part of onlinesources_list ======================
+
+def adapt_unicode_name_online():
+    """Make sure that sortname is filled with the unicode version of name in OnlineSources"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try: 
+        # Iterate over all objects in the OnlineSources table
+        for obj in OnlineSources.objects.all():           
+            name = obj.name
+            # Decode the unicode
+            name_dec = unidecode(name)
+            # Store the new version
+            obj.sortname = name_dec
+            obj.save()
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
+def adapt_unicode_name_litref():
+    """Make sure that sortname is filled with the unicode version of short in Litref"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try: 
+        # Iterate over all objects in the OnlineSources table
+        for obj in Litref.objects.all():           
+            short = obj.short
+            # Decode the unicode
+            short_dec = unidecode(short)
+            print(short, "  ",  short_dec)            
+            # Store the new version
+            obj.sortref = short_dec
+            obj.save()
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 

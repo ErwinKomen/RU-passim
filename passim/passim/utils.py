@@ -3,6 +3,8 @@ from django.conf import settings
 from django import http
 from passim.basic.models import Address
 
+
+
 class ErrHandle:
     """Error handling"""
 

@@ -28,6 +28,7 @@ from email.mime.text import MIMEText
 from difflib import SequenceMatcher
 from io import StringIO
 from pyzotero import zotero
+from unidecode import unidecode
 
 # import xml.etree.ElementTree as ET
 # from lxml import etree as ET
@@ -2737,7 +2738,7 @@ class Litref(models.Model):
 
             # Read them in groups of 25
             total_groups = math.ceil(total_count / group_size)
-            for grp_num in range( total_groups):
+            for grp_num in range(total_groups):
                 # Show where we are
                 oErr.Status("Sync zotero {}/{}".format(grp_num, total_groups))
                 # Calculate the umber to start from
@@ -2966,8 +2967,12 @@ class Litref(models.Model):
                     if result != "" and self.short != result:
                         oErr.Status("Update short [{}] to [{}]".format(self.short, result))
                         # update the short field
+                        
                         self.short = result
                         bNeedShortSave = True
+                        # version without unicode (for proper sorting)
+                        short_dec = unidecode(result)                        
+                        self.sortref = short_dec
 
                     if year != "" and year != "?":
                         try:
@@ -3159,7 +3164,7 @@ class Litref(models.Model):
                         pass
                     if result != "" and self.full != result:
                         # update the full field
-                        oErr.Status("Update full [{}] to [{}]".format(self.full, result))
+                        oErr.Status("Update full [{}] to [{}]".format(self.full, result))                        
                         self.full = result
                         bNeedFullSave = True
 
@@ -3212,7 +3217,7 @@ class Litref(models.Model):
                         lastname = get_lastname(item)
                         # Add this author
                         if bFirst:
-                            # Extremely short: only the last name of the first author TH: afvangen igv geen auteurs
+                            # Extremely short: only the last name of the first author 
                             authors.append(lastname)
                         else:
                             if number == 1 and type == "author":
@@ -3297,6 +3302,7 @@ class Litref(models.Model):
             sBack = self.short
         else:
             return adapt_markdown(self.short, lowercase=False)
+
 
 
 class Project2(models.Model):
@@ -6501,7 +6507,6 @@ class Daterange(models.Model):
     yearstart = models.IntegerField("Year from", null=False, default=100)
     # [1] Date estimate: finishing with this year
     yearfinish = models.IntegerField("Year until", null=False, default=100)
-
     # [0-1] An optional reference for this daterange
     reference = models.ForeignKey(Litref, null=True, related_name="reference_dateranges", on_delete=models.SET_NULL)
     # [0-1] The first and last page of the reference
@@ -6513,7 +6518,7 @@ class Daterange(models.Model):
     #manuscript = models.ForeignKey(Manuscript, null=False, related_name="manuscript_dateranges", on_delete=models.CASCADE)
     # [0-1] Each daterange belongs (or should belong) to exactly one Codico
     codico = models.ForeignKey(Codico, null=True, related_name="codico_dateranges", on_delete=models.SET_NULL)
-
+    
     def __str__(self):
         sBack = "{}-{}".format(self.yearstart, self.yearfinish)
         return sBack
@@ -8897,6 +8902,22 @@ class Collection(models.Model):
             oErr.DoError("Collection/get_copy")
         return new_copy
 
+    def get_date_markdown(self):
+        """Get the date range as a HTML string"""
+        lhtml = []
+        # Get all the date ranges in the correct order
+        qs = self.histcoll_dateranges.all().order_by('yearstart')        
+        # Walk the date range objects        
+        for obj in qs:         
+           if obj.yearstart == obj.yearfinish:
+               years = "{}".format(obj.yearstart)
+           else:
+               years = "{}-{}".format(obj.yearstart, obj.yearfinish)                     
+           item = "<div><span class='badge signature ot'>{}</span></div>".format(years)
+           lhtml.append(item)
+
+        return "\n".join(lhtml)
+
     def get_elevate(self):
         html = []
         url = reverse("collhist_elevate", kwargs={'pk': self.id})
@@ -9177,6 +9198,21 @@ class Collection(models.Model):
 
         # Return the manuscript or the template that has been created
         return obj
+
+
+class DaterangeHistColl(models.Model):
+    """Each historical collection can have a number of date ranges attached to it"""
+
+    # [1] Date estimate: starting from this year
+    yearstart = models.IntegerField("Year from", null=False, default=100)
+    # [1] Date estimate: finishing with this year
+    yearfinish = models.IntegerField("Year until", null=False, default=100)   
+    # [0-1] Each daterange belongs (or should belong) to exactly one Historical Collection     
+    histcoll = models.ForeignKey(Collection, null=True, related_name="histcoll_dateranges", on_delete=models.SET_NULL)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.yearstart, self.yearfinish)
+        return sBack
 
 
 class MsItem(models.Model):
@@ -12472,9 +12508,9 @@ class NewsItem(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
       # Adapt the save date
-      self.saved = get_current_datetime()
-      response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
-      return response
+       self.saved = get_current_datetime()
+       response = super(NewsItem, self).save(force_insert, force_update, using, update_fields)
+       return response
 
     def check_until():
         """Check all news items for the until date and emend status where needed"""

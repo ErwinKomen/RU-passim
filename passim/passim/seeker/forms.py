@@ -402,6 +402,29 @@ class DaterangeWidget(ModelSelect2MultipleWidget):
         return qs
 
 
+class DaterangeHistCollWidget(ModelSelect2MultipleWidget):
+    model = DaterangeHistColl
+    search_fields = [ 'yearstart__icontains', 'yearfinish__icontains' ]
+    addonly = False
+    collection = None
+
+    def label_from_instance(self, obj):
+        if obj.yearstart == obj.yearfinish:
+            years = "{}".format(obj.yearstart)
+        else:
+            years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+        return years
+
+    def get_queryset(self):
+        if self.addonly:
+            if self.collection is None:
+                qs = DaterangeHistColl.objects.none()
+            else:
+                qs = self.collection.histcoll_dateranges.all()
+        else:
+            qs = DaterangeHistColl.objects.all().order_by('yearstart').distinct()
+        return qs
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -2596,7 +2619,6 @@ class CollectionForm(PassimModelForm):
                 widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     colscope    = ModelChoiceField(queryset=None, required=False, 
                 widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
-
     sitemlist_gold = ModelMultipleChoiceField(queryset=None, required=False,
                 widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
     sitemlist_sermo = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -2605,6 +2627,15 @@ class CollectionForm(PassimModelForm):
                 widget=ManuscriptWidget(attrs={'data-placeholder': 'Select multiple manuscripts...', 'style': 'width: 100%;'}))
     sitemlist_super = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=EqualGoldSitemWidget(attrs={'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    # HC specific
+    date_from   = forms.IntegerField(label=_("Date start"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Starting from...',  'style': 'width: 30%;', 'class': 'searching'}))
+    date_until  = forms.IntegerField(label=_("Date until"), required = False,
+                widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
+    datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=DaterangeHistCollWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+    
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
@@ -2736,6 +2767,10 @@ class CollectionForm(PassimModelForm):
             self.fields['sitemlist_gold'].queryset = SermonGold.objects.none()
             self.fields['sitemlist_super'].queryset = EqualGold.objects.none()
 
+            # HC
+            self.fields['datelist'].queryset = DaterangeHistColl.objects.none()
+            self.fields['datelist'].widget.addonly = True
+
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
                         'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
@@ -2837,6 +2872,10 @@ class CollectionForm(PassimModelForm):
                 instance = kwargs['instance']
                 self.fields['litlist'].initial = [x.pk for x in instance.collection_litrefcols.all().order_by('reference__full', 'pages')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] # zie verderop
+                #elif prefix == "hist":   # hier niet goed volgebs mij                
+                self.fields['datelist'].initial = [x.pk for x in instance.histcoll_dateranges.all()]
+                self.fields['datelist'].queryset = DaterangeHistColl.objects.filter(id__in=self.fields['datelist'].initial)
+                self.fields['datelist'].widget.collection = instance
 
                 # The sitemset querysets need to take the profile as a starting point
                 current_ids = []
@@ -2867,9 +2906,8 @@ class CollectionForm(PassimModelForm):
                 elif coltype == "gold":
                     qs = SermonGold.objects.none()
                     self.fields['sitemlist_gold'].queryset = qs
-                    self.fields['sitemlist_gold'].widget.queryset = qs
-
-
+                    self.fields['sitemlist_gold'].widget.queryset = qs                
+                
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollectionForm/init")
@@ -5053,6 +5091,36 @@ class LocationRelForm(BasicModelForm):
             # Check if the initial name should be added
             if instance.container != None:
                 self.fields['partof_ta'].initial = instance.container.get_loc_name()
+
+
+class DaterangeHistCollForm(BasicModelForm):
+    newstart    = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Start...',  'style': 'width: 100%;'}))
+    newfinish   = forms.CharField(required=False, help_text='editable', 
+                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Finish (optional)...',  'style': 'width: 100%;'}))
+    
+    action_log = ['yearstart', 'yearfinish']
+    exclude = []    
+
+    class Meta:
+        ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+        model = DaterangeHistColl
+        fields = ['yearstart', 'yearfinish']
+        widgets={'yearstart':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+                 'yearfinish':  forms.TextInput(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Start by executing the standard handling
+        super(DaterangeHistCollForm, self).__init__(*args, **kwargs)
+
+        # Set other parameters
+        self.fields['yearstart'].required = False
+        self.fields['yearfinish'].required = False        
+        # Get the instance
+        if 'instance' in kwargs:
+            instance = kwargs['instance']
 
 
 class DaterangeForm(BasicModelForm):

@@ -60,7 +60,7 @@ handler404 = custom_page_not_found
 urlpatterns = [
     # Examples:
     url(r'^$', passim.seeker.views.home, name='home'),
-    path("404/", custom_page_not_found),
+    #path("404/", custom_page_not_found),
     url(r'^favicon\.ico$',RedirectView.as_view(url='/static/seeker/content/favicon.ico')),
     url(r'^contact$', passim.seeker.views.contact, name='contact'),
     url(r'^about', passim.seeker.views.about, name='about'),

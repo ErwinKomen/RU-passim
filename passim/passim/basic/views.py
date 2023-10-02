@@ -1620,7 +1620,7 @@ class BasicList(ListView):
             get = get.copy()
             # If this is a 'usersearch' then replace the parameters
             usersearch_id = get.get("usersearch")
-            if usersearch_id != None:
+            if usersearch_id != None and usersearch_id != "":
                 get = UserSearch.load_parameters(usersearch_id, get)
             self.qd = get
             self.param_list = []

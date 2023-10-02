@@ -44,6 +44,8 @@ from openpyxl.utils.cell import get_column_letter
 import sqlite3
 from io import StringIO
 from itertools import chain
+from unidecode import unidecode
+
 
 
 # ======== imports for PDF creation ==========
@@ -72,7 +74,7 @@ from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, Sear
     SuperSermonGoldCollectionForm, ProfileForm, UserKeywordForm, ProvenanceForm, ProvenanceManForm, \
     TemplateForm, TemplateImportForm, ManuReconForm,  ManuscriptProjectForm, \
     CodicoForm, CodicoProvForm, ProvenanceCodForm, OriginCodForm, CodicoOriginForm, OnlineSourceForm, \
-    UserForm, SermonDescrLinkForm, CommentResponseForm
+    UserForm, SermonDescrLinkForm, CommentResponseForm, DaterangeHistCollForm
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, FieldChoice, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -85,7 +87,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, SermonDescrLink, \
-    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, \
+    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, DaterangeHistColl, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
@@ -744,7 +746,8 @@ def home(request, errortype=None):
             context['is_404'] = True
 
     # Check the newsitems for validity
-    NewsItem.check_until()
+    # ==== TESTING ======
+    # NewsItem.check_until()
 
     # Create the list of news-items
     lstQ = []
@@ -5873,6 +5876,23 @@ class OnlineSourceEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
+    def after_save(self, form, instance):
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            name = instance.name            
+            name_dec = unidecode(name)
+            # Store the new version
+            instance.sortname = name_dec
+            instance.save()
+        
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
 
 class OnlineSourceDetails(OnlineSourceEdit):
     """Like OnlineSource Edit, but then html output"""
@@ -5905,6 +5925,12 @@ class OnlineSourceListView(BasicList):
             ]}
         ] 
 
+    def initializations(self):
+        # Make sure possible adaptations are executed
+        listview_adaptations("onlinesources_list")
+        # We are not returning anything        
+        return None
+     
     def get_field_value(self, instance, custom):
         sBack = ""
         sTitle = ""
@@ -5917,18 +5943,22 @@ class OnlineSourceListView(BasicList):
                 html.append("<span class='collection'><a href='{}'>{}</a></span>".format(instance.url, instance.url))
         
             elif custom == "name":
-                sName = instance.name
+                sName = instance.sortname
                 # Make sure that the records without name are given a name so that one can select the record.
                 if sName == "": sName = "<i>(unnamed)</i>"
                 html.append(sName)
         
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("ProjectListView/get_field_value")
+            oErr.DoError("OnlineSourcesListView/get_field_value")
         
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle              
+    
+   
+
+
 
 
 class KeywordEdit(BasicDetails):
@@ -7744,22 +7774,32 @@ class CollAnyEdit(BasicDetails):
                                          fk_name = "collection",
                                          extra=0, can_delete=True, can_order=False)
 
-    formset_objects = []
+    ColdrhcFormSet = inlineformset_factory(Collection, DaterangeHistColl,
+                                         form=DaterangeHistCollForm, min_num=0,
+                                         fk_name = "histcoll",
+                                         extra=0, can_delete=True, can_order=False)
 
     stype_edi_fields = ['name', 'owner', 'readonly', 'type', 'settype', 'descrip', 'url', 'path', 'scope', 
-                        'LitrefMan', 'litlist', 'projlist']
-
+                        'LitrefMan', 'litlist', 
+                        'projlist', 
+                        'Daterange', 'datelist']
+    
     def custom_init(self, instance):
         if instance != None and instance.settype == "hc":
-            # First check if the 'clit' is already in the formset_objects or not
-            bFound = False
-            for oItem in self.formset_objects:
-                if oItem['prefix'] == "clit":
-                    bFound = True
+            # Check if the 'clit' and the 'coldrhc' are already in the formset_objects or not
+            bFound1 = False
+            bFound2 = False
+            for oItem in self.formset_objects: 
+                if oItem['prefix'] == "clit" or oItem['prefix'] == "coldrhc":
+                    bFound1 = True
+                    bFound2 = True         
                     break
-            if not bFound:
+            if not bFound1:
                 self.formset_objects.append(
                     {'formsetClass': self.ClitFormSet,  'prefix': 'clit',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})
+            if not bFound2:
+                self.formset_objects.append(
+                    {'formsetClass': self.ColdrhcFormSet,  'prefix': 'coldrhc',  'readonly': False, 'noinit': True, 'linkfield': 'collection'})       
         if instance != None:
             self.datasettype = instance.type
         return None
@@ -7921,23 +7961,34 @@ class CollAnyEdit(BasicDetails):
                 # If 'manu' is set, then this procedure is called from 'collhist_compare'
                 if self.manu == None:
                     context['mainitems'].append({'type': 'safe', 'label': 'Manuscript', 'value': instance.get_manuscript_link()})
-            # Historical collections may have literature references
+            
+            # Historical collections may have literature references and dates   
             if instance.settype == "hc" and len(self.formset_objects) > 0 and len(self.formset_objects[0]) > 0:
-                oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown() }
+                oLitref = {'type': 'plain', 'label': "Literature:",   'value': instance.get_litrefs_markdown()}
+                oDate = {'type': 'plain', 'label': "Date:",   'value': instance.get_date_markdown()}
+
                 if context['is_app_editor']:
+                    # Literature references
                     oLitref['multiple'] = True
                     oLitref['field_list'] = 'litlist'
                     oLitref['fso'] = self.formset_objects[0]
                     oLitref['template_selection'] = 'ru.passim.litref_template'
-                context['mainitems'].append(oLitref)        
-        
+                    
+                    # Dates
+                    oDate['multiple'] = True
+                    oDate['field_list'] = 'datelist'
+                    oDate['fso'] = self.formset_objects[1]
+
+                context['mainitems'].append(oLitref)
+                context['mainitems'].append(oDate)  
+
             # Historical collections have a project assigned to them
             if instance.settype == "hc":
                 oProject =  {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()}
                 if may_edit_project(self.request, profile, instance):
                     oProject['field_list'] = 'projlist'
                 context['mainitems'].append(oProject)        
-
+                        
             # Add comment modal stuff
             if instance.settype == "hc":
                 initial = dict(otype="hc", objid=instance.id, profile=profile)
@@ -8088,15 +8139,14 @@ class CollAnyEdit(BasicDetails):
 
         return sBack
     
-    def process_formset(self, prefix, request, formset):
+    def process_formset(self, prefix, request, formset): 
         errors = []
         bResult = True
         instance = formset.instance
-        for form in formset:
+        for form in formset: # Hier komt het niet verder 
             if form.is_valid():
                 cleaned = form.cleaned_data
                 # Action depends on prefix
-
                 if prefix == "clit":
                     # Literature reference processing
                     newpages = cleaned.get("newpages")
@@ -8111,11 +8161,25 @@ class CollAnyEdit(BasicDetails):
                             if newpages:
                                 form.instance.pages = newpages
                     # Note: it will get saved with form.save()
+                elif prefix == 'coldrhc':
+                    # Processing one daterange
+                    newstart = cleaned.get('newstart', None)
+                    newfinish = cleaned.get('newfinish', None)
+                    if newstart:
+                        # Possibly set newfinish equal to newstart
+                        if newfinish == None or newfinish == "":
+                            newfinish = newstart
+                        # Double check if this one already exists for the current instance
+                        obj = instance.histcoll_dateranges.filter(yearstart=newstart, yearfinish=newfinish).first()
+                        if obj == None:
+                            form.instance.yearstart = int(newstart)
+                            form.instance.yearfinish = int(newfinish)                 
 
             else:
                 errors.append(form.errors)
                 bResult = False
         return None
+
 
     def before_save(self, form, instance):
         oErr = ErrHandle()
@@ -8178,6 +8242,15 @@ class CollAnyEdit(BasicDetails):
             instance.add_sitems(sitemlist_manu, "manu")
             sitemlist_super = form.cleaned_data['sitemlist_super']
             instance.add_sitems(sitemlist_super, "super")
+                        
+            # (4) Process many-to-ONE changes
+            # (1) links from Daterange to Codico
+            datelist = form.cleaned_data['datelist']
+            adapt_m2o(DaterangeHistColl, instance, "histcoll", datelist)
+
+            # Make sure to process changes
+            instance.refresh_from_db()     
+
 
         except:
             msg = oErr.get_error_message()
@@ -8246,6 +8319,16 @@ class CollHistEdit(CollAnyEdit):
     settype = "hc"
     basic_name = "collhist"
     title = "Historical Collection"
+
+    #ColdrhcFormSet = inlineformset_factory(Collection, DaterangeHistColl,
+    #                                     form=DaterangeHistCollForm, min_num=0,
+    #                                     fk_name = "histcoll",
+    #                                     extra=0, can_delete=True, can_order=False)
+
+    #formset_objects = [{'formsetClass': ColdrhcFormSet,   'prefix': 'coldrhc',   'readonly': False, 'noinit': True, 'linkfield': 'histcoll'}] # dit goed?
+
+    #stype_edi_fields = ['Daterange', 'datelist']                       
+
 
     def before_save(self, form, instance):
         # Make sure the [CollAnyEdit] is executed
@@ -16349,7 +16432,7 @@ class LitRefListView(ListView):
     template_name = 'seeker/literature_list.html'
     entrycount = 0    
     # EK: nee dus, dit zijn geen projecten. plural_name = "Projects"
-
+    
     def get_context_data(self, **kwargs):
         # Call the base implementation first to get a context
         context = super(LitRefListView, self).get_context_data(**kwargs)
@@ -16419,15 +16502,14 @@ class LitRefListView(ListView):
 
         # Combine the two qs into one and filter
         litref_ids = chain(litref_ids_man, litref_ids_sg)
-        qs = Litref.objects.filter(id__in=litref_ids).order_by('full')
+        qs = Litref.objects.filter(id__in=litref_ids).order_by('sortref')
 
         # Determine the length
         self.entrycount = len(qs)
 
         # Return the resulting filtered and sorted queryset
         return qs
-
-    # list  online resources??
+    
     def create_onlineset(self):
         #Get the parameters passed on with the GET or the POST request
         get = self.request.GET if self.request.method == "GET" else self.request.POST
@@ -16443,7 +16525,7 @@ class LitRefListView(ListView):
        
         # Sort and filter all editions MODIFY
         #qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
-        qs = OnlineSources.objects.order_by('name').order_by('name')
+        qs = OnlineSources.objects.order_by('name').order_by('sortname')
 
         # Determine the length
         self.entrycount_online = len(qs)
@@ -16462,14 +16544,14 @@ class LitRefListView(ListView):
         ediref_ids = [x['reference'] for x in EdirefSG.objects.all().values('reference')]
        
         # Sort and filter all editions
-        qs = Litref.objects.filter(id__in=ediref_ids).order_by('full')
+        qs = Litref.objects.filter(id__in=ediref_ids).order_by('short')
 
         # Determine the length
         self.entrycount_edition = len(qs)
 
         # Return the resulting filtered and sorted queryset
-        return qs
-
+        return qs   
+    
 
 class BasketView(SermonListView):
     """Like SermonListView, but then with the basket set true"""
