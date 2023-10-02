@@ -1236,6 +1236,26 @@ def moveup(instance, tblGeneral, tblUser, ItemType):
         bOkay = False
     return bOkay
 
+def get_spec_col_num(cls, path):
+    """Given a class, look for 'specification' and then get the column number (idx+1) of the 'path'"""
+
+    iCol = -1
+    oErr = ErrHandle()
+    try:
+        specification = getattr(cls, "specification")
+        if not specification is None:
+            # Walk through the specification looking for the right path
+            for idx, row in enumerate(specification):
+                if row.get("path") == path:
+                    # Got it!
+                    iCol = idx + 1
+                    break
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_spec_col_num")
+
+    return iCol
+
 def send_email(subject, profile, contents, add_team=False):
     """Send an email"""
 
@@ -4030,173 +4050,219 @@ class Manuscript(models.Model):
                 # ===================================
 
                 # Retrieve or create a new manuscript with default values
-                sCity = oManu.get("lcity")
+                sCity = oManu.get("city", "")
+                sCountry = oManu.get("country", "")
+                sLibrary = oManu.get("library", "")
                 lCity = None
-                if not sCity is None:
-                    sCountry = oManu.get("lcountry", "")
+                lCountry = None
+                lLibrary = None
+                msg = None
+                obj = None
+
+                # First attempt: try get lib/city/country match
+                if sLibrary != "":
+                    libCountry, libCity, lLibrary, note = Library.get_best_match(sCountry, sCity, sLibrary)
+
+                # Second attempt: try to at least get lCity and lCountry
+                if sCity != "":
                     # DOuble check city co-occurrence
                     lCity = Location.get_location(sCity, sCountry)
-                if lCity is None:
-                    qs = Manuscript.objects.filter(idno=idno, mtype="man")
-                else:
-                    qs = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man")
-                # Okay, take the first object, no matter the source
-                obj = qs.first()
-                # Exclude anything that has the same source
-                obj_same = None
-                if not source is None:
-                    obj_same = qs.filter(source=source).first()
+                    lCountry = lCity.lcountry
 
-                # Check if it exists *anywhere*
-                if obj == None:
-                    # Doesn't exist: create it
-                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
-                    if not source is None:
-                        obj.source = source
-                elif sourcetype == "huwa" and not externalid is None:
-                    # We are going to read it anyway, but adapt the [idno] to reflect this
-                    obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
-                    if not source is None:
-                        obj.source = source
-                    obj.idno = "{}\thuwa={}".format(idno,externalid)
-                    # We are adding one that is already there
-                    msg = "Adding double shelfmark:\t{}\tmanu={}".format(obj.idno, obj.id)
+                    # Check for discrepancies
+                    if not libCity is None and lCity.id != libCity.id:
+                        # Mismatch between library-country and stated country
+                        msg = "For manuscript [{}] there is a mismatch between library-city [{}] and manuscript-city [{}]".format(
+                            idno, libCity.name, lCity.name)
+
+                if lCountry is None and sCountry != "":
+                    # Try get the country
+                    lCountry = Location.get_location("", sCountry)
+
+                # Check for discrepancies between library's country/city
+                if not lCountry is None and not libCountry is None and lCountry.id != libCountry.id:
+                    # Mismatch between library-country and stated country
+                    msg = "For manuscript [{}] there is a mismatch between library-country [{}] and manuscript-country [{}]".format(
+                        idno, libCountry.name, lCountry.name)
+
+                # Don't overwrite, if there has been a discrepancy
+                if not msg is None:
+                    # We are not allowed to upload it - discrepancies
                     oErr.Status(msg)
-                    oParams['msg'] = msg
                 else:
-                    # Default overwriting message
-                    msg = "Attempt to overwrite manuscript shelfmark [{}]".format(idno)
-                    # Check if the object actually is from the same source
-                    if obj_same is None:
-                        if sourcetype == "huwa":
-                            # Check if the manuscript that exists was already read by HUWA
-                            dataset = obj.collections.first()
-                            if not dataset is None and "huwa" in dataset.name.lower():
-                                msg = "Attempt to overwrite HUWA manuscript shelfmark [{}]".format(idno)
+                    # Okay, we may continue to locate it and upload it
+                    if lCity is None:
+                        qs = Manuscript.objects.filter(idno=idno, mtype="man")
+                    elif lCountry is None:
+                        qs = Manuscript.objects.filter(idno=idno, lcity=lCity, mtype="man")
+                    elif lLibrary is None:
+                        qs = Manuscript.objects.filter(idno=idno, lcity=lCity, lcountry=lCountry, mtype="man")
                     else:
-                        # This means the [obj] *is* from the same source
-                        if sourcetype == "huwa":
-                            # Get the handschrift
-                            handschrift_id = oManu.get("handschrift_id")
-                            msg = "Attempt to overwrite HUWA manuscript shelfmark [{}] (handschrift={})".format(idno, handschrift_id)
+                        qs = Manuscript.objects.filter(idno=idno, lcity=lCity, lcountry=lCountry, library=lLibrary, mtype="man")
+                    
+                    # Okay, take the first object, no matter the source
+                    obj = qs.first()
+                    # Exclude anything that has the same source
+                    obj_same = None
+                    if not source is None:
+                        obj_same = qs.filter(source=source).first()
+
+                    # Check if it exists *anywhere*
+                    if obj is None:
+                        # Doesn't exist: create it
+                        obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                        if not source is None:
+                            obj.source = source
+                        ## Must add library/city
+                        #if obj.library is None and not lLibrary is None:
+                        #    obj.library = lLibrary
+                        #if obj.lcity is None and not lCity is None:
+                        #    obj.lcity = lCity
+
+                    elif sourcetype == "huwa" and not externalid is None:
+                        # We are going to read it anyway, but adapt the [idno] to reflect this
+                        obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
+                        if not source is None:
+                            obj.source = source
+                        obj.idno = "{}\thuwa={}".format(idno,externalid)
+                        # We are adding one that is already there
+                        msg = "Adding double shelfmark:\t{}\tmanu={}".format(obj.idno, obj.id)
+                        oErr.Status(msg)
+                        oParams['msg'] = msg
+                    else:
+                        # Default overwriting message
+                        msg = "Attempt to overwrite manuscript shelfmark [{}]".format(idno)
+                        # Check if the object actually is from the same source
+                        if obj_same is None:
+                            if sourcetype == "huwa":
+                                # Check if the manuscript that exists was already read by HUWA
+                                dataset = obj.collections.first()
+                                if not dataset is None and "huwa" in dataset.name.lower():
+                                    msg = "Attempt to overwrite HUWA manuscript shelfmark [{}]".format(idno)
                         else:
-                            msg = "Attempt to overwrite same-source manuscript shelfmark [{}]".format(idno)
+                            # This means the [obj] *is* from the same source
+                            if sourcetype == "huwa":
+                                # Get the handschrift
+                                handschrift_id = oManu.get("handschrift_id")
+                                msg = "Attempt to overwrite HUWA manuscript shelfmark [{}] (handschrift={})".format(idno, handschrift_id)
+                            else:
+                                msg = "Attempt to overwrite same-source manuscript shelfmark [{}]".format(idno)
 
-                    # We are overwriting
-                    oErr.Status(msg)
-                    bOverwriting = True
-                    if 'overwriting' in oParams:
-                        oParams['overwriting'] = True
-                        bSkip = True
+                        # We are overwriting
+                        oErr.Status(msg)
+                        bOverwriting = True
+                        if 'overwriting' in oParams:
+                            oParams['overwriting'] = True
+                            bSkip = True
 
-                if not bSkip:
-                    # Issue #479: get the default project(s) - may be more than one
-                    projects = profile.get_defaults()
-                    # Link the manuscript to the projects, if not already done
-                    obj.set_projects(projects)
+                    if not bSkip:
+                        # Issue #479: get the default project(s) - may be more than one
+                        projects = profile.get_defaults()
+                        # Link the manuscript to the projects, if not already done
+                        obj.set_projects(projects)
 
-                    country = ""
-                    city = ""
-                    library = ""
-                    # Process all fields in the Specification
-                    for oField in Manuscript.specification:
-                        field = oField.get(keyfield).lower()
-                        if keyfield == "path" and oField.get("type") == "fk_id":
-                            field = "{}_id".format(field)
-                        value = oManu.get(field)
-                        readonly = oField.get('readonly', False)
-                        if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
-                            path = oField.get("path")
-                            if "target" in oField:
-                                path = oField.get("target")
-                            type = oField.get("type")
-                            if type == "field":
-                                # Note overwriting
-                                old_value = getattr(obj, path)
-                                if value != old_value:
-                                    if bOverwriting:
-                                        # Show that this overwriting took place
-                                        obj.action_add_change(username, "import", path, old_value, value)
-                                    # Set the correct field's value
-                                    setattr(obj, path, value)
-                            elif type == "fk" or type == "fk_id":
-                                fkfield = oField.get("fkfield")
-                                model = oField.get("model")
-                                if fkfield != None and model != None:
-                                    # Find an item with the name for the particular model
-                                    cls = apps.app_configs['seeker'].get_model(model)
+                        country = ""
+                        city = ""
+                        library = oManu.get("library", "")
+                        # Process all fields in the Specification
+                        for oField in Manuscript.specification:
+                            field = oField.get(keyfield).lower()
+                            if keyfield == "path" and oField.get("type") == "fk_id":
+                                field = "{}_id".format(field)
+                            value = oManu.get(field)
+                            readonly = oField.get('readonly', False)
+                            if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
+                                path = oField.get("path")
+                                if "target" in oField:
+                                    path = oField.get("target")
+                                type = oField.get("type")
+                                if type == "field":
+                                    # Note overwriting
+                                    old_value = getattr(obj, path)
+                                    if value != old_value:
+                                        if bOverwriting:
+                                            # Show that this overwriting took place
+                                            obj.action_add_change(username, "import", path, old_value, value)
+                                        # Set the correct field's value
+                                        setattr(obj, path, value)
+                                elif type == "fk" or type == "fk_id":
+                                    fkfield = oField.get("fkfield")
+                                    model = oField.get("model")
+                                    if fkfield != None and model != None:
+                                        # Find an item with the name for the particular model
+                                        cls = apps.app_configs['seeker'].get_model(model)
+                                        if type == "fk":
+                                            instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                        else:
+                                            instance = cls.objects.filter(**{"id".format(fkfield): value}).first()
+                                        if instance != None:
+                                            old_value = getattr(obj,path)
+                                            if instance != old_value:
+                                                if bOverwriting:
+                                                    # Show that this overwriting took place
+                                                    old_id = "" if old_value == None else old_value.id
+                                                    obj.action_add_change(username, "import", path, old_id, instance.id)
+                                                setattr(obj, path, instance)
+                                    # Keep track of country/city/library for further fine-tuning
                                     if type == "fk":
-                                        instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
+                                        if path == "lcountry":
+                                            country = value
+                                        elif path == "lcity":
+                                            city = value
+                                        elif path == "library":
+                                            library = value
+                                elif type == "func":
+                                    # Set the KV in a special way
+                                    obj.custom_set(path, value, **kwargs)
+
+                        # Check what we now have for Country/City/Library
+                        lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
+                        # The country can safely added
+                        if lcountry != None and lcountry != obj.lcountry:
+                            obj.lcountry = lcountry
+                        # The city too can safely be added
+                        if lcity != None and lcity != obj.lcity:
+                            obj.lcity = lcity
+                        # But the library can only be added under the strictest conditions
+                        if library != None and library != obj.library:
+                            if lib_note == "":
+                                # No notes, so add the library
+                                obj.library = library
+                            else:
+                                # There is a note, so the library may not be added
+                                notes = [] if obj.notes is None else [ obj.notes ]
+                                notes.append(lib_note)
+                                obj.notes = "\n".join(notes)
+                        elif library is None and not obj.library is None:
+                            # A wrong library has been chosen: *REMOVE* the chosen library!
+                            obj.library = None
+
+                        # Process the title for this manuscript
+                        if obj.name == "SUPPLY A NAME": obj.name="-"
+                        for codico in obj.manuscriptcodicounits.all():
+                            # Check if this codico has a proper name...
+                            codico_name = oManu.get("codico_name")
+                            if codico_name is None:
+                                if codico.name is None or codico.name == "" or codico.name == "SUPPLY A NAME":
+                                    # Evaluate all the sermons under it
+                                    sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
+                                    etc = "" if sermons.count() <= 1 else " etc."
+                                    titles = [x['title'] for x in sermons if not x['title'] is None]
+                                    if len(titles) > 0:
+                                        title = "{}{}".format(titles[0], etc)
                                     else:
-                                        instance = cls.objects.filter(**{"id".format(fkfield): value}).first()
-                                    if instance != None:
-                                        old_value = getattr(obj,path)
-                                        if instance != old_value:
-                                            if bOverwriting:
-                                                # Show that this overwriting took place
-                                                old_id = "" if old_value == None else old_value.id
-                                                obj.action_add_change(username, "import", path, old_id, instance.id)
-                                            setattr(obj, path, instance)
-                                # Keep track of country/city/library for further fine-tuning
-                                if type == "fk":
-                                    if path == "lcountry":
-                                        country = value
-                                    elif path == "lcity":
-                                        city = value
-                                    elif path == "library":
-                                        library = value
-                            elif type == "func":
-                                # Set the KV in a special way
-                                obj.custom_set(path, value, **kwargs)
+                                        title = "(unknown)"
+                                    codico.name = title
+                            else:
+                                codico.name = codico_name
+                            # Make sure to write the CODICO now
+                            codico.save()
 
-                    # Check what we now have for Country/City/Library
-                    lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
-                    # The country can safely added
-                    if lcountry != None and lcountry != obj.lcountry:
-                        obj.lcountry = lcountry
-                    # The city too can safely be added
-                    if lcity != None and lcity != obj.lcity:
-                        obj.lcity = lcity
-                    # But the library can only be added under the strictest conditions
-                    if library != None and library != obj.library:
-                        if lib_note == "":
-                            # No notes, so add the library
-                            obj.library = library
-                        else:
-                            # There is a note, so the library may not be added
-                            notes = [] if obj.notes is None else [ obj.notes ]
-                            notes.append(lib_note)
-                            obj.notes = "\n".join(notes)
-                    elif library is None and not obj.library is None:
-                        # A wrong library has been chosen: *REMOVE* the chosen library!
-                        obj.library = None
+                        # Make sure we have a copy of the RAW json data for this manuscript
+                        obj.raw = json.dumps(oManu, indent=2)
 
-                    # Process the title for this manuscript
-                    if obj.name == "SUPPLY A NAME": obj.name="-"
-                    for codico in obj.manuscriptcodicounits.all():
-                        # Check if this codico has a proper name...
-                        codico_name = oManu.get("codico_name")
-                        if codico_name is None:
-                            if codico.name is None or codico.name == "" or codico.name == "SUPPLY A NAME":
-                                # Evaluate all the sermons under it
-                                sermons = SermonDescr.objects.filter(msitem__codico=codico).values('title')
-                                etc = "" if sermons.count() <= 1 else " etc."
-                                titles = [x['title'] for x in sermons if not x['title'] is None]
-                                if len(titles) > 0:
-                                    title = "{}{}".format(titles[0], etc)
-                                else:
-                                    title = "(unknown)"
-                                codico.name = title
-                        else:
-                            codico.name = codico_name
-                        # Make sure to write the CODICO now
-                        codico.save()
-
-                    # Make sure we have a copy of the RAW json data for this manuscript
-                    obj.raw = json.dumps(oManu, indent=2)
-
-                    # Make sure the update the object
-                    obj.save()
+                        # Make sure the update the object
+                        obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/custom_add")
@@ -5908,19 +5974,24 @@ class Codico(models.Model):
 
     # Scheme for downloading and uploading
     specification = [
+        {'name': 'Order',               'type': 'field', 'path': 'order'},
         {'name': 'Status',              'type': 'field', 'path': 'stype',     'readonly': True},
         {'name': 'Title',               'type': 'field', 'path': 'name'},
         {'name': 'Date ranges',         'type': 'func',  'path': 'dateranges'},
-        {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
         {'name': 'Support',             'type': 'field', 'path': 'support'},
         {'name': 'Extent',              'type': 'field', 'path': 'extent'},
         {'name': 'Format',              'type': 'field', 'path': 'format'},
         {'name': 'Origin',              'type': 'func',  'path': 'origin'},
         {'name': 'Codico_Notes',        'type': 'func',  'path': 'notes'},
         {'name': 'Provenances',         'type': 'func',  'path': 'provenances'},
-        {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
         {'name': 'Scribeinfo',          'type': 'func',  'path': 'scribeinfo'},
         {'name': 'Scriptinfo',          'type': 'func',  'path': 'scriptinfo'},
+
+        # === Extinct (doubles) or not to be used because of automatic calculation:
+        # {'name': 'Date ranges',         'type': 'func',  'path': 'date'},
+        # {'name': 'Provenance',          'type': 'func',  'path': 'provenances'},
+        # {'name': 'Year start',          'type': 'field', 'path': 'yearstart'},
+        # {'name': 'Year finish',         'type': 'field', 'path': 'yearfinish'},
         ]
 
     class Meta:
@@ -6015,11 +6086,13 @@ class Codico(models.Model):
             if manu == None:
                 oErr.DoError("Codico/add_one: no [manuscript] provided")
             else:
+                # We also need the 'order' value of the codico
+                order = oCodico.get('order', 1)
                 # Retrieve or create a new codico with default values
-                obj = Codico.objects.filter(manuscript=manu).first()
+                obj = Codico.objects.filter(manuscript=manu, order=order).first()
                 if obj == None:
                     # Doesn't exist: create it
-                    obj = Codico.objects.create(manuscript=manu, stype="imp")
+                    obj = Codico.objects.create(manuscript=manu, order=order, stype="imp")
                 else:
                     bOverwriting = True
                         
@@ -6142,10 +6215,21 @@ class Codico(models.Model):
             username = kwargs.get("username")
             team_group = kwargs.get("team_group")
             value_lst = []
-            if isinstance(value, str) and value[0] != '[':
-                value_lst = value.split(",")
-                for idx, item in enumerate(value_lst):
-                    value_lst[idx] = value_lst[idx].strip()
+            if isinstance(value, str):
+                if value[0] == '[':
+                    # One more sanity check
+                    if value != "[]":
+                        if not '"' in value:
+                            # Put everything inside in quotation marks
+                            value = '["{}"]'.format(value[1:-1])
+                    # Make list from JSON
+                    value_lst = json.loads(value)
+                else:
+                    value_lst = value.split(",")
+                    for idx, item in enumerate(value_lst):
+                        value_lst[idx] = value_lst[idx].strip()
+            elif isinstance(value, list):
+                value_lst = value
             elif isinstance(value, dict):
                 value_lst = [ value ] 
             if path == "dateranges" or path == "date":
@@ -6156,7 +6240,21 @@ class Codico(models.Model):
                     self.add_one_daterange(date_item)
                 # Ready
             elif path == "origin":
-                if value != "" and value != "-":
+                if len(value_lst) > 0:
+                    # It comes to us in a list of dictionaries:  taekt eh first one
+                    value = value_lst[0]
+                if isinstance(value, dict):
+                    # We are getting it on a silver plate: [{"location": "Bayern", "origin": "Bayern"}]
+                    location = value.get("location", "")
+                    name = value.get("origin", "")
+                    if location == "":
+                        origin = Origin.objects.filter(name__iexact=name).first()
+                    else:
+                        origin = Origin.objects.filter(name__iexact=name, location__name__iexact=location).first()
+                    if not origin is None:
+                        self.origin = origin
+                        self.save()
+                elif value != "" and value != "-":
                     # THere is an origin specified
                     origin = Origin.objects.filter(name__iexact=value).first()
                     if origin == None:
@@ -6176,23 +6274,44 @@ class Codico(models.Model):
             elif path == "provenances":
                 provenance_names = value_lst #  json.loads(value)
                 for pname in provenance_names:
-                    pname = pname.strip()
-                    # Try find this provenance
-                    prov_found = Provenance.objects.filter(name__iexact=pname).first()
-                    if prov_found == None:
-                        prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
-                    if prov_found == None:
-                        # Indicate that we didn't find it in the notes
-                        intro = ""
-                        if self.notes != "" and self.notes != None: intro = "{}. ".format(self.notes)
-                        self.notes = "{}\nPlease set manually provenance [{}]".format(intro, pname)
-                        self.save()
+                    # Initialize
+                    prov_found = None
+
+                    # See what we have
+                    if isinstance(pname, dict):
+                        # We probably have a 'location'/ 'prov' dictionary
+                        location = pname.get('location', '')
+                        prov = pname.get('prov', '')
+                        if location != "" and prov != "":
+                            prov_found = Provenance.objects.filter(name__iexact=prov, location__name__iexact=location).first()
+                            if not prov_found is None:
+                                # Make link between provenance and codico
+                                obj = ProvenanceCod.objects.create(codico=self, provenance=prov_found, note="Automatically added Codico/custom_getkv")
+                        if prov_found is None or obj is None:
+                            # Indicate that we didn't find it in the notes
+                            intro = ""
+                            if self.notes != "" and self.notes != None: intro = "{}. ".format(self.notes)
+                            self.notes = "{}\nPlease set manually provenance [loc={}, prov={}]".format(intro, location, prov)
+                            self.save()
+
                     else:
-                        # Make a copy of prov_found
-                        provenance = Provenance.objects.create(
-                            name=prov_found.name, location=prov_found.location)
-                        # Make link between provenance and codico
-                        ProvenanceCod.objects.create(codico=self, provenance=provenance, note="Automatically added Codico/custom_getkv")
+                        pname = pname.strip()
+                        # Try find this provenance
+                        prov_found = Provenance.objects.filter(name__iexact=pname).first()
+                        if prov_found == None:
+                            prov_found = Provenance.objects.filter(location__name__iexact=pname).first()
+                        if prov_found == None:
+                            # Indicate that we didn't find it in the notes
+                            intro = ""
+                            if self.notes != "" and self.notes != None: intro = "{}. ".format(self.notes)
+                            self.notes = "{}\nPlease set manually provenance [{}]".format(intro, pname)
+                            self.save()
+                        else:
+                            # Make a copy of prov_found
+                            provenance = Provenance.objects.create(
+                                name=prov_found.name, location=prov_found.location)
+                            # Make link between provenance and codico
+                            ProvenanceCod.objects.create(codico=self, provenance=provenance, note="Automatically added Codico/custom_getkv")
                 # Ready
             elif path == "scribeinfo":
                 scribe_infos = value_lst
@@ -9557,13 +9676,14 @@ class SermonDescr(models.Model):
         {'name': 'Parent',              'type': '',      'path': 'parent'},
         {'name': 'FirstChild',          'type': '',      'path': 'firstchild'},
         {'name': 'Next',                'type': '',      'path': 'next'},
+        {'name': 'Codico',              'type': '',      'path': 'codico'},
         {'name': 'Type',                'type': '',      'path': 'type'},
         {'name': 'External ids',        'type': 'func',  'path': 'externals'},
         {'name': 'Status',              'type': 'field', 'path': 'stype'},
         {'name': 'Locus',               'type': 'field', 'path': 'locus'},
-        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
-        {'name': 'Attributed author',   'type': 'func',  'path': 'author_id'},
+        {'name': 'Attributed author id','type': 'func',  'path': 'author_id'},
         {'name': 'Attributed author',   'type': 'func',  'path': 'author'},
+        {'name': 'Author certainty',    'type': 'field', 'path': 'autype'},
         {'name': 'Section title',       'type': 'field', 'path': 'sectiontitle'},
         {'name': 'Lectio',              'type': 'field', 'path': 'quote'},
         {'name': 'Title',               'type': 'field', 'path': 'title'},
@@ -9581,6 +9701,9 @@ class SermonDescr(models.Model):
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
         {'name': 'SSG links',           'type': 'func',  'path': 'ssglinks'},
+
+        # ===== Extinct lines =============
+        # {'name': 'Attributed author',   'type': 'fk',    'path': 'author', 'fkfield': 'name', 'model': 'Author'},
         ]
 
     def __str__(self):
@@ -9751,7 +9874,7 @@ class SermonDescr(models.Model):
                     value = oSermo.get(field)
                     readonly = oField.get('readonly', False)
                 
-                    if value != None and value != "" and (sourcetype == "huwa" or not readonly ):
+                    if value != None and value != "" and value != "-" and (sourcetype == "huwa" or not readonly ):
                         type = oField.get("type")
                         path = oField.get("path")
                         if type == "field":
@@ -9800,7 +9923,7 @@ class SermonDescr(models.Model):
                 sBack = json.dumps(dates)
             elif path == "author":
                 # Get the author name
-                sBack = self.get_author()
+                sBack = self.get_author(plain=True)
             elif path == "keywords":
                 sBack = self.get_keywords_markdown(plain=True)
             elif path == "keywordsU":
@@ -9903,6 +10026,8 @@ class SermonDescr(models.Model):
                         value_lst[idx] = value_lst[idx].strip()
             elif isinstance(value, list):
                 value_lst = value
+            elif isinstance(value, dict):
+                value_lst = [ value ] 
             # Note: we skip a number of fields that are determined automatically
             #       [ stype ]
             if path == "brefs":
@@ -10206,7 +10331,7 @@ class SermonDescr(models.Model):
                 node = node.parent
         return depth
 
-    def get_author(self):
+    def get_author(self, plain=False):
         """Get the name of the author"""
 
         if self.author:
@@ -10215,7 +10340,10 @@ class SermonDescr(models.Model):
             sAuType = self.get_autype()
 
             # Combine all of this
-            sBack = "<span>{}</span>&nbsp;{}".format(sName, sAuType)
+            if plain:
+                sBack = sName
+            else:
+                sBack = "<span>{}</span>&nbsp;{}".format(sName, sAuType)
         else:
             sBack = "-"
         return sBack
