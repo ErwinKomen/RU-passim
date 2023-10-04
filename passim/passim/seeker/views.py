@@ -727,6 +727,10 @@ def home(request, errortype=None):
     assert isinstance(request, HttpRequest)
     # Specify the template
     template_name = 'index.html'
+
+    bOverrideSync = False
+    oErr = ErrHandle()
+
     # Define the initial context
     context =  {'title':'RU-passim',
                 'year':get_current_datetime().year,
@@ -734,10 +738,7 @@ def home(request, errortype=None):
                 'site_url': admin.site.site_url}
 
     context = get_application_context(request, context)
-    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    # NOTE: the context now contains items like 'is_app_editor'
 
     # Process this visit
     context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
@@ -765,8 +766,11 @@ def home(request, errortype=None):
     context['pie_data'] = get_pie_data()
 
     # Possibly start getting new Stemmatology results
-    thread = Thread(target=scan_transcriptions)
-    thread.start()
+    if bOverrideSync and user_is_superuser(request):
+        scan_transcriptions()
+    else:
+        thread = Thread(target=scan_transcriptions)
+        thread.start()
 
     # Render and return the page
     return render(request, template_name, context)

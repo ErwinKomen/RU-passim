@@ -2145,6 +2145,11 @@ def scan_transcriptions(oStatus=None, oMsg=None):
                     oStatus.set("verifying", oCount=oCount)
 
                 # print("Looking at: [{}]".format(sFile))
+
+                # ===== Debugging ===
+                if "cae_s_177" in sFile.lower():
+                    iStop = 1
+
                 # Treat this file
                 oTrans = read_transcription(sFile)
                 status = oTrans.get("status")
@@ -2327,6 +2332,17 @@ def read_transcription(data_file):
                         html.append("{} {}".format(level, sermon_item.text))
                     elif tag == "div" and attrib.get("type", "") == "paragraph":
                         # Paragraph: add a newline
+                        html.append("")
+                        # This is a paragraph, that contains <head> and <p>
+                        for subitem in sermon_item.xpath("./child::*"):
+                            if subitem.tag == "head":
+                                # This is another level head
+                                html.append("#### {}".format(subitem.text))
+                            elif subitem.tag == "p":
+                                # This is a paragraph containing words and quotes
+                                process_para(subitem, html, info)
+                    elif tag == "div" and attrib.get("type", "") == "chapter":
+                        # This is a new chapter, which can contain <head> and <p>
                         html.append("")
                         # This is a paragraph, that contains <head> and <p>
                         for subitem in sermon_item.xpath("./child::*"):
