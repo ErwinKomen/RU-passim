@@ -40,6 +40,7 @@ import json
 import csv, re
 import requests
 import openpyxl
+from threading import Thread
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
 from io import StringIO
@@ -91,7 +92,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, DaterangeHistColl, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
+from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions, sync_transcriptions
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -764,7 +765,8 @@ def home(request, errortype=None):
     context['pie_data'] = get_pie_data()
 
     # Possibly start getting new Stemmatology results
-    scan_transcriptions()
+    thread = Thread(target=scan_transcriptions)
+    thread.start()
 
     # Render and return the page
     return render(request, template_name, context)
@@ -1059,6 +1061,19 @@ def sync_start(request):
 
                 # Perform the adaptation
                 bResult, msg = adapt_codicocopy(oStatus=oStatus)
+                
+                if bResult:
+                    data['count'] = 1
+                else:
+                    data['status'] = "error {}".format(msg) 
+
+
+            elif synctype == "stemma":
+                # Use the synchronisation object that contains all relevant information
+                oStatus.set("loading")
+
+                # Start up synchronisation
+                bResult, msg = sync_transcriptions(oStatus=oStatus)
                 
                 if bResult:
                     data['count'] = 1

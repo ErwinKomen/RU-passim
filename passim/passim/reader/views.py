@@ -2091,7 +2091,32 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
     # Return the object that has been created
     return oBack
 
-def scan_transcriptions():
+def sync_transcriptions(oStatus):
+    """Status-showing synchronisation of XML transcriptions"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        if oStatus is None:
+            bResult = False
+            msg = "Sync transcription is missing a status object"
+        else:
+            # Call the actual scanning with the status object
+            oMsg = {}
+            bResult = scan_transcriptions(oStatus, oMsg)
+            if not bResult:
+                msg = oMsg.get("msg", "")
+                if msg == "":
+                    msg = "Sync transcriptions encountered a problem"
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("sync_transcriptions")
+        bResult = False
+    return bResult, msg
+
+
+def scan_transcriptions(oStatus=None, oMsg=None):
     """Scan the agreed-upon server location for (new) transcription files"""
 
     oErr = ErrHandle()
@@ -2102,13 +2127,23 @@ def scan_transcriptions():
         # Check if this needs doing
         next_time = Information.get_kvalue("next_stemma")
         now_time = str(get_current_datetime())
-        # next_time = str(get_current_datetime() + timedelta(hours=24))
-        if next_time is None or now_time > next_time:
+
+        rightnow = (not oStatus is None)
+
+        if rightnow or next_time is None or now_time > next_time:
             print("It is time to scan for new transcriptions...")
             # (1) Now execute the scanning
             scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, SCAN_SUBDIR))
             lst_xml = glob.glob(scan_dir)
+            iTotal = len(lst_xml)
+            iCount = 0
             for sFile in lst_xml:
+                iCount += 1
+                # If necessary, provide Status information
+                if not oStatus is None:
+                    oCount = dict(total=iTotal, current=iCount)
+                    oStatus.set("verifying", oCount=oCount)
+
                 # print("Looking at: [{}]".format(sFile))
                 # Treat this file
                 oTrans = read_transcription(sFile)
@@ -2138,22 +2173,37 @@ def scan_transcriptions():
                         if bNeedSaving:
                             # Show we are updating
                             sXmlName = os.path.basename(sFile)
-                            oErr.Status("Scan transcriptions: {} - {}".format(sXmlName, code))
+                            oErr.Status("Saving transcriptions: {} - {}".format(sXmlName, code))
                             # Actually perform the update
                             obj.save()
 
             # (2) Next task: scan the sgcount
             iCount = 0
+            iTotal = EqualGold.objects.count()
             idx = 0
             print("Checking SG count for AF...")
             with transaction.atomic():
                 for ssg in EqualGold.objects.all():
                     idx += 1
+                    # If necessary, provide Status information
+                    if not oStatus is None:
+                        oCount = dict(total=iTotal, current=idx)
+                        oStatus.set("SG-count", oCount=oCount)
+
                     iChanges = ssg.set_sgcount()
                     if iChanges > 0:
                         iCount += iChanges
                         print("# {} - sgcount: {}".format(idx, iCount))
 
+            # If necessary, provide Status information
+            if not oStatus is None:
+                oCount = dict(total=iTotal)
+                oStatus.set("Wrapup", oCount=oCount)
+
+            # Show we are ready
+            if not oStatus is None:
+                oStatus.set("ok", msg="Everything has been synchronized")
+            print("scan_transcriptions: ready")
 
             # Set new next time
             next_time = str(get_current_datetime() + timedelta(hours=24))
@@ -2163,6 +2213,8 @@ def scan_transcriptions():
         msg = oErr.get_error_message()
         oErr.DoError("scan_transcriptions")
         bResult = False
+        if not oMsg is None:
+            oMsg['msg'] = msg
     return bResult
 
 
