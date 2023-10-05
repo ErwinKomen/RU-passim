@@ -2153,7 +2153,7 @@ class SermonForm(PassimModelForm):
                         'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Some lists need to be initialized to NONE:
-            self.fields['bibreflist'].queryset = Daterange.objects.none()
+            self.fields['bibreflist'].queryset = BibRange.objects.none()
 
             self.fields['bibreflist'].widget.addonly = True
 
@@ -3394,6 +3394,8 @@ class SuperSermonGoldForm(PassimModelForm):
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
+    bibreflist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -3527,6 +3529,11 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
             self.fields['superlist'].queryset = EqualGoldLink.objects.none()
 
+            # Some lists need to be initialized to NONE:
+            self.fields['bibreflist'].queryset = BibRange.objects.none()
+
+            self.fields['bibreflist'].widget.addonly = True
+
             # The CollOne information is needed for the basket (add basket to collection)
             prefix = "super"
             self.fields['collone'].queryset = Collection.get_scoped_queryset(prefix, username, team_group)
@@ -3558,6 +3565,9 @@ class SuperSermonGoldForm(PassimModelForm):
                 #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
                 #self.fields['superlist'].widget.queryset = self.fields['superlist'].queryset
                 # ==================================
+
+                self.fields['bibreflist'].initial = [x.pk for x in instance.equalbibranges.all()]
+                self.fields['bibreflist'].queryset = BibRange.objects.filter(id__in=self.fields['bibreflist'].initial)
 
                 self.fields['delprojlist'].queryset = Project2.objects.filter(id__in=self.fields['projlist'].initial).order_by('name').distinct()
                 self.fields['delprojlist'].widget.queryset = self.fields['delprojlist'].queryset

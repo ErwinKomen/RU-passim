@@ -757,6 +757,7 @@ def home(request, errortype=None):
     lstQ.append(Q(status='val'))
     newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
     context['newsitem_list'] = newsitem_list
+    print("counting for statistics")
 
     # Gather the statistics
     context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
@@ -5874,6 +5875,9 @@ class SermonListView(BasicList):
         return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
 
 
+# ============= ONLINESOURCE ==============================
+
+
 class OnlineSourceEdit(BasicDetails):
     """The details of one online source"""
 
@@ -5983,10 +5987,9 @@ class OnlineSourceListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle              
-    
-   
 
 
+# ============= KEYWORD ====================================
 
 
 class KeywordEdit(BasicDetails):
@@ -6754,16 +6757,29 @@ class BibRangeEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # Find out what type of bibref this is: to an SSG or to an S?
+        is_sermon_bibref = (instance.equal is None)
+
         # Define the main items to show and edit
-        context['mainitems'] = [
+        main_items = [
             {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),   'field_key': 'book', 'key_hide': True },
             {'type': 'plain', 'label': "Abbreviations:",'value': instance.get_abbr()                        },
             {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,     'field_key': 'chvslist', 'key_hide': True },
             {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
             {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},
-            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
-            {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
             ]
+
+        if is_sermon_bibref:
+            add_links = [
+                {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
+                {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
+                ]
+        else:
+            add_links = [
+                {'type': 'plain', 'label': "Authority File:",'value': self.get_equal(instance)                  },
+                ]
+
+        context['mainitems'] = main_items + add_links
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -6793,6 +6809,13 @@ class BibRangeEdit(BasicDetails):
         sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, title)
         return sBack
 
+    def get_equal(self, instance):
+        # Get the EqualGold instance
+        equal = instance.equal
+        url = reverse("equalgold_details", kwargs = {'pk': equal.id})
+        sBack = equal.get_passimcode_markdown()
+        return sBack
+
 
 class BibRangeDetails(BibRangeEdit):
     """Like BibRange Edit, but then html output"""
@@ -6809,14 +6832,16 @@ class BibRangeListView(BasicList):
     sg_name = "Bible reference"
     plural_name = "Bible references"
     new_button = False  # BibRanges are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 'sermon__msitem__codico__manuscript__idno;sermon__locus']
+    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 
+                  'sermon__msitem__codico__manuscript__idno;sermon__locus', 'equal__code']
     order_default = order_cols
     order_heads = [
         {'name': 'Book',            'order': 'o=1', 'type': 'str', 'custom': 'book', 'linkdetails': True},
         {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
         {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
-        {'name': 'Sermon',          'order': 'o=5', 'type': 'str', 'custom': 'sermon'}
+        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon'},
+        {'name': 'Authority File',  'order': 'o=6', 'type': 'str', 'custom': 'equal'},
         ]
     filters = [ 
         {"name": "Bible reference", "id": "filter_bibref",      "enabled": False},
@@ -6858,11 +6883,15 @@ class BibRangeListView(BasicList):
         sBack = ""
         sTitle = ""
         if custom == "sermon":
-            sermon = instance.sermon
-            # find the shelfmark
-            manu = sermon.msitem.manu
-            url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-            sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
+            if not instance.sermon is None:
+                sermon = instance.sermon
+                # find the shelfmark
+                manu = sermon.msitem.manu
+                url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
+        elif custom == "equal":
+            if not instance.equal is None:
+                sBack = instance.equal.get_passimcode_markdown()
         elif custom == "book":
             sBack = instance.book.name
         elif custom == "intro":
@@ -13726,15 +13755,21 @@ class EqualGoldEdit(BasicDetails):
                                          form=EqualGoldForm, min_num=0,
                                          fk_name = "equal",
                                          extra=0, can_delete=True, can_order=False)
+
+    EqgBrefFormSet = inlineformset_factory(EqualGold, BibRange,
+                                         form=BibRangeForm, min_num=0,
+                                         fk_name = "equal",
+                                         extra=0, can_delete=True, can_order=False)
     
     formset_objects = [
         {'formsetClass': EqgcolFormSet,  'prefix': 'eqgcol',  'readonly': False, 'noinit': True, 'linkfield': 'super'},
         {'formsetClass': SsgLinkFormSet, 'prefix': 'ssglink', 'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_PARTIAL }], 'clean': True},     
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
+        {'formsetClass': EqgBrefFormSet, 'prefix': 'eqgbref', 'readonly': False, 'noinit': True, 'linkfield': 'equal'},
         ]
 
     # Note: do not include [code] in here
-    stype_edi_fields = ['author', 'number', 'incipit', 'explicit', 'fulltext',
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit','bibleref', 'fulltext',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
@@ -13797,6 +13832,8 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
                 {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
                 {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
                 {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
@@ -14058,6 +14095,23 @@ class EqualGoldEdit(BasicDetails):
                                             # Make sure this one does not get saved!
                                             setattr(form, 'do_not_save', True)
                         # Note: it will get saved with form.save()
+                    elif prefix == "eqgbref":
+                        # Processing one BibRange
+                        newintro = cleaned.get('newintro', None)
+                        onebook = cleaned.get('onebook', None)
+                        newchvs = cleaned.get('newchvs', None)
+                        newadded = cleaned.get('newadded', None)
+
+                        # Minimal need is BOOK
+                        if onebook != None:
+                            # Note: normally it will get saved with formset.save()
+                            #       However, 'noinit=False' formsets must arrange their own saving
+                            form.instance.book = onebook
+                            if newchvs != None:
+                                form.instance.chvslist = newchvs
+                            form.instance.intro = newintro
+                            form.instance.added = newadded
+
                 except:
                     msg = oErr.get_error_message()
                     oErr.DoError("EqualGoldEdit/process_formset")
@@ -14342,7 +14396,7 @@ class EqualGoldEdit(BasicDetails):
             # Need to know who I am for some operations
             profile = Profile.get_user_profile(self.request.user.username)
 
-            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # ====== Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
             collist_ssg_id = [x['id'] for x in form.cleaned_data['collist_ssg'].values('id') ]
             collist_hist_id = [x['id'] for x in form.cleaned_data['collist_hist'].values('id')]
@@ -14448,7 +14502,7 @@ class EqualGoldEdit(BasicDetails):
                         instance.atype = "acc"
                         instance.save()
 
-            # Process many-to-ONE changes
+            # ====== Process many-to-ONE changes
             # (1) links from SG to SSG
             goldlist = form.cleaned_data['goldlist']
             ssglist = [x.equal for x in goldlist]
@@ -14459,6 +14513,10 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
+
+            # (2) links from BibRange to SSG
+            bibreflist = form.cleaned_data['bibreflist']
+            adapt_m2o(BibRange, instance, "equal", bibreflist)
             
             # Possibly read transcription if this is 'new'
             if 'transcription' in form.changed_data:

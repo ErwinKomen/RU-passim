@@ -2115,7 +2115,6 @@ def sync_transcriptions(oStatus):
         bResult = False
     return bResult, msg
 
-
 def scan_transcriptions(oStatus=None, oMsg=None):
     """Scan the agreed-upon server location for (new) transcription files"""
 
@@ -2221,7 +2220,6 @@ def scan_transcriptions(oStatus=None, oMsg=None):
         if not oMsg is None:
             oMsg['msg'] = msg
     return bResult
-
 
 def read_transcription(data_file):
     """Read a sermon transcription part of an XML in TEI-P5 format

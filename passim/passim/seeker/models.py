@@ -7051,6 +7051,11 @@ class EqualGold(models.Model):
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
 
+    # ============= Bible referencing =============
+    # [0-1] Any number of bible references (as stringified JSON list)
+    bibleref = models.TextField("Bible reference(s)", null=True, blank=True)
+    verses = models.TextField("List of verses", null=True, blank=True)
+
     # ============= CALCULATED FIELDS =============
     # [1] We need to have the size of the equality set for sorting
     sgcount = models.IntegerField("Equality set size", default=0)
@@ -7079,6 +7084,10 @@ class EqualGold(models.Model):
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_super")
     
+    # Retain a copy of the field to detect changes in saving
+    __original_bibleref = None
+    save_lock = False
+
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
         return name
@@ -7149,11 +7158,61 @@ class EqualGold(models.Model):
 
             # Do the saving initially
             response = super(EqualGold, self).save(force_insert, force_update, using, update_fields)
+
+            # Are we in save_lock?
+            if not self.save_lock:
+                self.save_lock = True
+                # Do we need to adapt biblref?
+                if self.__original_bibleref is None and not self.bibleref is None:
+                    if self.bibleref != self.__original_bibleref:
+                        # The reference has changed: recalculate
+                        self.do_ranges(bSave=False)
+                        # And make sure it is adapted
+                        self.__original_bibleref = self.bibleref
+                self.save_lock = False
+
             return response
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Equalgold.save")
             return None
+
+    def adapt_verses(self, bSave = True):
+        """Re-calculated what should be in [verses], and adapt if needed"""
+
+        oErr = ErrHandle()
+        bStatus = True
+        msg = ""
+        try:
+            lst_verse = []
+            for obj in self.equalbibranges.all():
+                lst_verse.append("{}".format(obj.get_fullref()))
+            refstring = "; ".join(lst_verse)
+
+            # Possibly update the field [bibleref] of the sermon
+            if self.bibleref != refstring:
+                self.bibleref = refstring
+                if bSave:
+                    self.save()
+
+            oRef = Reference(refstring)
+            # Calculate the scripture verses
+            bResult, msg, lst_verses = oRef.parse()
+            if bResult:
+                verses = "[]" if lst_verses == None else json.dumps(lst_verses)
+                if self.verses != verses:
+                    self.verses = verses
+                    if bSave:
+                        self.save()
+                    # All is well, so also adapt the ranges (if needed)
+                    self.do_ranges(lst_verses)
+            else:
+                # Unable to parse this scripture reference
+                bStatus = False
+        except:
+            msg = oErr.get_error_message()
+            bStatus = False
+        return bStatus, msg
 
     def author_help(self, info):
         """Provide help for this particular author"""
@@ -7239,6 +7298,66 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def do_ranges(self, lst_verses = None, force = False, bSave = True):
+        bResult = True
+        if self.bibleref == None or self.bibleref == "":
+            # Remove any existing bibrange objects
+            # ... provided they are not used for SermonDescr
+            self.equalbibranges.filter(sermon__isnull=True).delete()
+        else:
+            # done = Information.get_kvalue("biblerefs")
+            if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
+                # Open a Reference object
+                oRef = Reference(self.bibleref)
+
+                # Do we have verses already?
+                if lst_verses == None:
+
+                    # Calculate the scripture verses
+                    bResult, msg, lst_verses = oRef.parse()
+                else:
+                    bResult = True
+                if bResult:
+                    # Add this range to the equalgold (if it's not there already)
+                    verses = json.dumps(lst_verses)
+                    if self.verses != verses:
+                        self.verses = verses
+                        if bSave:
+                            self.save()
+                    # Check and add (if needed) the corresponding BibRange object
+                    for oScrref in lst_verses:
+                        intro = oScrref.get("intro", None)
+                        added = oScrref.get("added", None)
+                        # THis is one book and a chvslist
+                        book, chvslist = oRef.get_chvslist(oScrref)
+
+                        # Possibly create an appropriate Bibrange object (or emend it)
+                        # Note: this will also add BibVerse objects
+                        obj = BibRange.get_range_equal(self, book, chvslist, intro, added)
+                        
+                        if obj == None:
+                            # Show that something went wrong
+                            print("do_ranges0 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                        else:
+                            # Add BibVerse objects if needed
+                            verses_new = oScrref.get("scr_refs", [])
+                            verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                            # Remove outdated verses
+                            deletable = []
+                            for item in verses_old:
+                                if item not in verses_new: deletable.append(item)
+                            if len(deletable) > 0:
+                                obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                            # Add new verses
+                            with transaction.atomic():
+                                for item in verses_new:
+                                    if not item in verses_old:
+                                        verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+                    print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
+                else:
+                    print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
+        return None
+    
     def get_author(self):
         """Get a text representation of the author"""
 
@@ -7247,6 +7366,47 @@ class EqualGold(models.Model):
             sBack = "(undefined)"
         else:
             sBack = self.author.name
+        return sBack
+
+    def get_bibleref(self, plain=False):
+        """Interpret the BibRange objects into a proper view"""
+
+        bAutoCorrect = False
+
+        # First attempt: just show .bibleref
+        sBack = self.bibleref
+        # Or do we have BibRange objects?
+        if self.equalbibranges.count() > 0:
+            html = []
+            for obj in self.equalbibranges.all().order_by('book__idno', 'chvslist'):
+                # Find out the URL of this range
+                url = reverse("bibrange_details", kwargs={'pk': obj.id})
+                # Add this range
+                intro = "" 
+                if obj.intro != None and obj.intro != "":
+                    intro = "{} ".format(obj.intro)
+                added = ""
+                if obj.added != None and obj.added != "":
+                    added = " ({})".format(obj.added)
+                if plain:
+                    bref_display = "{}{} {}{}".format(intro, obj.book.latabbr, obj.chvslist, added)
+                else:
+                    bref_display = "<span class='badge signature ot' title='{}'><a href='{}'>{}{} {}{}</a></span>".format(
+                        obj, url, intro, obj.book.latabbr, obj.chvslist, added)
+                html.append(bref_display)
+            sBack = "; ".join(html)
+            # Possibly adapt the bibleref
+            if bAutoCorrect and self.bibleref != sBack:
+                self.bibleref = sBack
+                self.save()
+        else:
+            # There should be no references
+            if not self.bibleref is None and self.bibleref != "":
+                self.bibleref = ""
+                self.save()
+                sBack = self.bibleref
+
+        # Return what we have
         return sBack
 
     def get_code(self):
@@ -9670,6 +9830,10 @@ class SermonDescr(models.Model):
     # [0-1] Method
     method = models.CharField("Method", max_length=LONG_STRING, default="(OLD)")
 
+    # Retain a copy of the field to detect changes in saving
+    __original_bibleref = None
+    save_lock = False
+
     # SPecification for download/upload
     specification = [
         {'name': 'Order',               'type': '',      'path': 'order'},
@@ -9779,7 +9943,7 @@ class SermonDescr(models.Model):
             oErr.DoError("adapt_projects")
         return bBack
 
-    def adapt_verses(self):
+    def adapt_verses(self, bSave = True):
         """Re-calculated what should be in [verses], and adapt if needed"""
 
         oErr = ErrHandle()
@@ -9794,7 +9958,8 @@ class SermonDescr(models.Model):
             # Possibly update the field [bibleref] of the sermon
             if self.bibleref != refstring:
                 self.bibleref = refstring
-                self.save()
+                if bSave:
+                    self.save()
 
             oRef = Reference(refstring)
             # Calculate the scripture verses
@@ -9803,7 +9968,8 @@ class SermonDescr(models.Model):
                 verses = "[]" if lst_verses == None else json.dumps(lst_verses)
                 if self.verses != verses:
                     self.verses = verses
-                    self.save()
+                    if bSave:
+                        self.save()
                     # All is well, so also adapt the ranges (if needed)
                     self.do_ranges(lst_verses)
             else:
@@ -10249,11 +10415,13 @@ class SermonDescr(models.Model):
         # No need to return anything
         return None
 
-    def do_ranges(self, lst_verses = None, force = False):
+    def do_ranges(self, lst_verses = None, force = False, bSave = True):
         bResult = True
         if self.bibleref == None or self.bibleref == "":
             # Remove any existing bibrange objects
-            self.sermonbibranges.all().delete()
+            # self.sermonbibranges.all().delete()
+            # ... provided they are not used for EqualGold
+            self.sermonbibranges.filter(equal__isnull=True).delete()
         else:
             # done = Information.get_kvalue("biblerefs")
             if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
@@ -10272,7 +10440,8 @@ class SermonDescr(models.Model):
                     verses = json.dumps(lst_verses)
                     if self.verses != verses:
                         self.verses = verses
-                        self.save()
+                        if bSave:
+                            self.save()
                     # Check and add (if needed) the corresponding BibRange object
                     for oScrref in lst_verses:
                         intro = oScrref.get("intro", None)
@@ -10282,7 +10451,7 @@ class SermonDescr(models.Model):
 
                         # Possibly create an appropriate Bibrange object (or emend it)
                         # Note: this will also add BibVerse objects
-                        obj = BibRange.get_range(self, book, chvslist, intro, added)
+                        obj = BibRange.get_range_sermon(self, book, chvslist, intro, added)
                         
                         if obj == None:
                             # Show that something went wrong
@@ -11179,6 +11348,18 @@ class SermonDescr(models.Model):
             # self.do_ranges(force = True)
             # ======================================
 
+            # Are we in save_lock?
+            if not self.save_lock:
+                self.save_lock = True
+                # Do we need to adapt biblref?
+                if self.__original_bibleref is None and not self.bibleref is None:
+                    if self.bibleref != self.__original_bibleref:
+                        # The reference has changed: recalculate
+                        self.do_ranges(bSave=False)
+                        # And make sure it is adapted
+                        self.__original_bibleref = self.bibleref
+                self.save_lock = False
+
             # Make sure to save the siglist too
             if bCheckSave: 
                 siglist_new = json.dumps(lSign)
@@ -11572,8 +11753,12 @@ class BibRange(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="bookbibranges")
     # [0-1] Optional ChVs list
     chvslist = models.TextField("Chapters and verses", blank=True, null=True)
-    # [1] Each range is linked to a Sermon
-    sermon = models.ForeignKey(SermonDescr, on_delete=models.CASCADE, related_name="sermonbibranges")
+
+    # ==== Must have FK from one of the following two
+    # [0-1] Each range could be linked to a Sermon
+    sermon = models.ForeignKey(SermonDescr, null=True, blank=True, on_delete=models.SET_NULL, related_name="sermonbibranges")
+    # [0-1] Each range or it could be linked to a EqualGold
+    equal = models.ForeignKey(EqualGold, null=True, blank=True, on_delete=models.SET_NULL, related_name="equalbibranges")
 
     # [0-1] Optional introducer
     intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
@@ -11596,24 +11781,12 @@ class BibRange(models.Model):
         # First do my own saving
         response = super(BibRange, self).save(force_insert, force_update, using, update_fields)
 
-        # Make sure the fields in [sermon] are adapted, if needed
-        bResult, msg = self.sermon.adapt_verses()
-
-
-        ## Add BibVerse objects if needed
-        #verses_new = oScrref.get("scr_refs", [])
-        #verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
-        ## Remove outdated verses
-        #deletable = []
-        #for item in verses_old:
-        #    if item not in verses_new: deletable.append(item)
-        #if len(deletable) > 0:
-        #    obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
-        ## Add new verses
-        #with transaction.atomic():
-        #    for item in verses_new:
-        #        if not item in verses_old:
-        #            verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+        if not self.sermon is None:
+            # Make sure the fields in [sermon] are adapted, if needed
+            bResult, msg = self.sermon.adapt_verses()
+        elif not self.equal is None:
+            # Make sure the fields in [equal] are adapted, if needed
+            bResult, msg = self.equal.adapt_verses()
 
         return response
 
@@ -11653,7 +11826,7 @@ class BibRange(models.Model):
             sBack = " ".join(html)
         return sBack
 
-    def get_range(sermon, book, chvslist, intro=None, added=None):
+    def get_range_sermon(sermon, book, chvslist, intro=None, added=None):
         """Get the bk/ch range for this particular sermon"""
 
         bNeedSaving = False
@@ -11680,7 +11853,38 @@ class BibRange(models.Model):
                 obj.save()
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("BibRange/get_range")
+            oErr.DoError("BibRange/get_range_sermon")
+            obj = None
+        return obj
+
+    def get_range_equal(equal, book, chvslist, intro=None, added=None):
+        """Get the bk/ch range for this particular equal"""
+
+        bNeedSaving = False
+        oErr = ErrHandle()
+        try:
+            # Sanity check
+            if book is None or book == "":
+                return None
+            # Now we can try to search for an entry...
+            obj = equal.equalbibranges.filter(book=book, chvslist=chvslist).first()
+            if obj == None:
+                obj = BibRange(equal=equal, book=book, chvslist=chvslist)
+                bNeedSaving = True
+                bNeedVerses = True
+            # Double check for intro and added
+            if obj.intro != intro:
+                obj.intro = intro
+                bNeedSaving = True
+            if obj.added != added:
+                obj.added = added
+                bNeedSaving = True
+            # Possibly save the BibRange
+            if bNeedSaving:
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BibRange/get_range_equal")
             obj = None
         return obj
 
@@ -12648,11 +12852,10 @@ class NewsItem(models.Model):
         oErr = ErrHandle()
         try:
             lst_id = []
-            for obj in NewsItem.objects.all():
-                if not obj.until is None:
-                    until_time = obj.until
-                    if until_time < now:
-                        lst_id.append(obj.id)
+            for oItem in NewsItem.objects.filter(until__isnull=False).values('id', 'until'):
+                until_time = oItem.get("until")
+                if until_time < now:
+                    lst_id.append(oItem.get("id"))
             # Need any changes??
             if len(lst_id) > 0:
                 with transaction.atomic():
