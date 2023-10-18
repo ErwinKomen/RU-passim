@@ -1072,7 +1072,6 @@ def sync_start(request):
                 else:
                     data['status'] = "error {}".format(msg) 
 
-
             elif synctype == "stemma":
                 # Use the synchronisation object that contains all relevant information
                 oStatus.set("loading")

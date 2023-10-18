@@ -2118,7 +2118,9 @@ def sync_transcriptions(oStatus):
             # Call the actual scanning with the status object
             oMsg = {}
             bResult = scan_transcriptions(oStatus, oMsg)
-            if not bResult:
+            if bResult:
+                if oStatus != None: oStatus.set("finished")
+            else:
                 msg = oMsg.get("msg", "")
                 if msg == "":
                     msg = "Sync transcriptions encountered a problem"
@@ -2207,6 +2209,8 @@ def scan_transcriptions(oStatus=None, oMsg=None):
                             # Actually perform the update
                             obj.save()
 
+            if not oStatus is None:
+                oStatus.set("ended_xml_sync")
             # (2) Next task: scan the sgcount
             iCount = 0
             iTotal = EqualGold.objects.count()
