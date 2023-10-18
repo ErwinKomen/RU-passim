@@ -2310,6 +2310,8 @@ def read_transcription(data_file):
         sCl = ""
         sPassim = ""
         biblerefs = ""
+        method = "bible_order"  # Following the Bible bk/ch/vs order
+        method = "given_order"  # Following the order made by the XML manuscript
 
         # Get the PASSIM code
         ítem_passim = docroot.xpath("//title[@type='passim']")
@@ -2331,8 +2333,11 @@ def read_transcription(data_file):
                 sText = bibitem.text
                 if not sText is None and sText != "":
                     lst_ref.append(sText.replace("_", " "))
-            # Return them in a sorted unique list that can readily be processed
-            biblerefs = "; ".join(sorted(set(lst_ref)))
+            if method == "bible_order":
+                # Return them in a sorted unique list that can readily be processed
+                biblerefs = "; ".join(sorted(set(lst_ref)))
+            else:
+                biblerefs = "; ".join(lst_ref)
 
         return sPassim, sGr, sCl, biblerefs
 

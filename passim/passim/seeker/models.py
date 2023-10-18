@@ -7379,13 +7379,18 @@ class EqualGold(models.Model):
         """Interpret the BibRange objects into a proper view"""
 
         bAutoCorrect = False
+        bUseOrder = True
 
         # First attempt: just show .bibleref
         sBack = self.bibleref
         # Or do we have BibRange objects?
         if self.equalbibranges.count() > 0:
             html = []
-            for obj in self.equalbibranges.all().order_by('book__idno', 'chvslist'):
+            if bUseOrder:
+                qs = self.equalbibranges.all().order_by('order', 'book__idno', 'chvslist')
+            else:
+                qs = self.equalbibranges.all().order_by('book__idno', 'chvslist')
+            for obj in qs:
                 # Find out the URL of this range
                 url = reverse("bibrange_details", kwargs={'pk': obj.id})
                 # Add this range
@@ -11767,6 +11772,9 @@ class BibRange(models.Model):
     # [0-1] Each range or it could be linked to a EqualGold
     equal = models.ForeignKey(EqualGold, null=True, blank=True, on_delete=models.SET_NULL, related_name="equalbibranges")
 
+    # [1] Order of this field within all the bibranges part of this sermon or equal
+    order = models.IntegerField("Order", default = 0)
+
     # [0-1] Optional introducer
     intro = models.CharField("Introducer",  null=True, blank=True, max_length=LONG_STRING)
     # [0-1] Optional addition
@@ -11785,6 +11793,17 @@ class BibRange(models.Model):
         return sBack
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Determine what the order should be
+        if not self.sermon is None:
+            # Adapt the count within the ones for the sermon
+            if self.order == 0:
+                count = self.sermon.sermonbibranges.filter(order__gt=0).count()
+                self.order = count + 1
+        elif not self.equal is None:
+            # Adapt the count within the ones for the sermon
+            if self.order == 0:
+                count = self.equal.equalbibranges.filter(order__gt=0).count()
+                self.order = count + 1
         # First do my own saving
         response = super(BibRange, self).save(force_insert, force_update, using, update_fields)
 
