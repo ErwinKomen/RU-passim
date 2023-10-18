@@ -7184,6 +7184,10 @@ class EqualGold(models.Model):
         bStatus = True
         msg = ""
         try:
+            # This function may *NOT* be called inside a save_lock
+            if self.save_lock:
+                return bStatus, msg
+
             lst_verse = []
             for obj in self.equalbibranges.all():
                 lst_verse.append("{}".format(obj.get_fullref()))
@@ -7300,6 +7304,7 @@ class EqualGold(models.Model):
 
     def do_ranges(self, lst_verses = None, force = False, bSave = True):
         bResult = True
+        bDebug = False
         if self.bibleref == None or self.bibleref == "":
             # Remove any existing bibrange objects
             # ... provided they are not used for SermonDescr
@@ -7337,7 +7342,7 @@ class EqualGold(models.Model):
                         
                         if obj == None:
                             # Show that something went wrong
-                            print("do_ranges0 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                            print("do_ranges0 eqg={} unparsable: {}".format(self.id, self.bibleref), file=sys.stderr)
                         else:
                             # Add BibVerse objects if needed
                             verses_new = oScrref.get("scr_refs", [])
@@ -7353,9 +7358,11 @@ class EqualGold(models.Model):
                                 for item in verses_new:
                                     if not item in verses_old:
                                         verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
-                    print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
+                    if bDebug:
+                        print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
                 else:
-                    print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                    if bDebug:
+                        print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
         return None
     
     def get_author(self):
