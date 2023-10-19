@@ -7690,16 +7690,29 @@ class ProjectEdit(BasicDetails):
                 if id in dict_singles:
                     count += 1
             return count
-            
 
-        # Only moderators and superusers are to be allowed to create and delete project labels
-        if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
+        oErr = ErrHandle()
+        try:
+            
+            # Is the user allowed to edit/delete or not?
+            bMayDelete = (user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer))
+
+            # Standard behaviour: no_delete to True
+            if not bMayDelete:
+                self.no_delete = True
+                context['no_delete'] = self.no_delete
+                self.permission = "readonly"
+                context['permission'] = self.permission
+
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
+                {'type': 'plain', 'label': "Name:",     'value': instance.name},        #, 'field_key': "name"},
                 {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
-                 'title': 'All the current users that have approval rights for this project'}
-                ]       
+                    'title': 'All the current users that have approval rights for this project'}
+                ]   
+        
+            if bMayDelete:
+                context['mainitems'][0]['field_key'] = "name"    
 
             # Also add a delete Warning Statistics message (see issue #485)
             lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
@@ -7722,6 +7735,11 @@ class ProjectEdit(BasicDetails):
                 single_m=single_m, single_hc=single_hc, single_s=single_s, single_ssg=single_ssg,
                 )
             context['delete_message'] = render_to_string('seeker/project_statistics.html', local_context, self.request)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectEdit/add_to_context")
+
         # Return the context we have made
         return context
     

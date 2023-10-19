@@ -1410,7 +1410,7 @@ var ru = (function ($, ru) {
        *  See: https://observablehq.com/@d3/pie-chart
        *
        */
-      draw_pie_chart: function (divid, data) {
+      draw_pie_chart: function (divid, data, bAddLegend) {
         var margin = null,
             width_g = 400,
             height_g = 200,
@@ -1584,39 +1584,41 @@ var ru = (function ($, ru) {
             .append("div").attr("class", "tooltip").style("opacity", 0);
 
           // Add a legend to the main SVG
-          translate_legend = translate_h + height_g / 2;
-          legendG = svg.selectAll(".legend")
-            .data(pie(data))
-            .enter().append("g")
-            .attr("transform", function (d, i) {
-              // place each legend on the right and bump each one down 15 pixels
-              return "translate(" + (translate_legend) + "," + (i * 15 + 20) + ")";
-            })
-            .attr("class", "legend");
+          if (bAddLegend !== undefined && bAddLegend) {
+            translate_legend = translate_h + height_g / 2;
+            legendG = svg.selectAll(".legend")
+              .data(pie(data))
+              .enter().append("g")
+              .attr("transform", function (d, i) {
+                // place each legend on the right and bump each one down 15 pixels
+                return "translate(" + (translate_legend) + "," + (i * 15 + 20) + ")";
+              })
+              .attr("class", "legend");
 
-          // Make a matching color rect as an index
-          legendG.append("rect")
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("fill", function (d, i) {
-              return color(i);
-            })
+            // Make a matching color rect as an index
+            legendG.append("rect")
+              .attr("width", 10)
+              .attr("height", 10)
+              .attr("fill", function (d, i) {
+                return color(i);
+              })
 
-          // Add the text next to the items
-          legendG.append("text") // add the text
-            .text(function (d) {
-              return d.value + "  " + d.data.name;
-            })
-            .style("font-size", 12)
-            .attr("y", 10)
-            .attr("x", 11);
+            // Add the text next to the items
+            legendG.append("text") // add the text
+              .text(function (d) {
+                return d.value + "  " + d.data.name;
+              })
+              .style("font-size", 12)
+              .attr("y", 10)
+              .attr("x", 11);
 
-          // Add a tooltip <title> element
-          legendG.append("title")
-            .text(function (d) {
-              var sPlural = (d.value === 1) ? "" : "s";
-              return d.data.name + " (" + d.value + " manifestation" + sPlural + ")";
-            })
+            // Add a tooltip <title> element
+            legendG.append("title")
+              .text(function (d) {
+                var sPlural = (d.value === 1) ? "" : "s";
+                return d.data.name + " (" + d.value + " manifestation" + sPlural + ")";
+              })
+          }
 
           // THis should have drawn the pie-chart correctly
         } catch (ex) {
@@ -7036,7 +7038,7 @@ var ru = (function ($, ru) {
                   chart_data = response['attr_author'];
 
                   // Use D3 to draw a pie chart
-                  private_methods.draw_pie_chart(divTarget, chart_data)
+                  private_methods.draw_pie_chart(divTarget, chart_data, true)
 
                   break;
                 case "error":
