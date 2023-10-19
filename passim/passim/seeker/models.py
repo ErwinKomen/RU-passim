@@ -12195,7 +12195,10 @@ class ManuscriptCorpus(models.Model):
 
 
 class ManuscriptCorpusLock(models.Model):
-    """A user-SSG-specific manuscript corpus"""
+    """A user-SSG-specific manuscript corpus
+    
+    Used in seeker/visualizations
+    """
 
     # [1] Each lock is created with a particular SSG as starting point
     super = models.ForeignKey(EqualGold, related_name="supercorpuslocks", on_delete=models.CASCADE)
@@ -12209,7 +12212,10 @@ class ManuscriptCorpusLock(models.Model):
 
     
 class EqualGoldCorpus(models.Model):
-    """A corpus of SSG's"""
+    """A corpus of SSG's
+
+    Used in seeker/visualizations
+    """
 
     # [1] Each lock is created with a particular SSG as starting point
     ssg = models.ForeignKey(EqualGold, related_name="ssgequalcorpora", on_delete=models.CASCADE)
@@ -12225,7 +12231,10 @@ class EqualGoldCorpus(models.Model):
 
 
 class EqualGoldCorpusItem(models.Model):
-    """One item from the EqualGoldCOrpus"""
+    """One item from the EqualGoldCOrpus
+    
+    Used in seeker/visualizations
+    """
 
     # [1] Link-item 1: source
     equal = models.ForeignKey(EqualGold, related_name="ssgcorpusequals", on_delete=models.CASCADE)

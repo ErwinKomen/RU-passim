@@ -14579,17 +14579,14 @@ class EqualGoldEdit(BasicDetails):
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
 
-    #def custom_init(self, instance):
-    #    # Make sure the spectypes are checked
-    #    if not instance is None:
-    #        instance.check_links()
-    #    return None
-
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
+
+        # Use the 'graph' function or not?
+        use_network_graph = True
 
         oErr = ErrHandle()
         try:
@@ -14638,20 +14635,14 @@ class EqualGoldDetails(EqualGoldEdit):
                 team_group = app_editor
                 profile = Profile.get_user_profile(username=username)
 
-                # Make sure to delete any previous corpora of mine
-                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
-
-                # Old, extinct
-                ManuscriptCorpus.objects.filter(super=instance).delete()
-                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+                # Be sure to have the 'object' containing a link to the EqualGold instance
+                if context['object'] == None:
+                    context['object'] = instance
 
                 # List of manuscripts related to the SSG via sermon descriptions
                 manuscripts = dict(title="Manifestations", prefix="manu", gridclass="resizable")
 
-                # WAS: Get all SermonDescr instances linking to the correct eqg instance
-                # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
-
-                # New: Get all the SermonDescr instances linked with equality to SSG:
+                # Get all the SermonDescr instances linked with equality to SSG:
                 # But make sure the EXCLUDE those with `mtype` = `tem`
                 qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
                 rel_list =[]
@@ -14731,6 +14722,9 @@ class EqualGoldDetails(EqualGoldEdit):
                     rel_list.append(dict(id=item.id, cols=rel_item))
                 manuscripts['rel_list'] = rel_list
 
+                # Make the number of Sermons available (confusingly called 'manuscripts')
+                context['manuscripts'] = qs_s.count()
+
                 if method == "FourColumns":
                     manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
                 elif method == "Issue216":
@@ -14747,35 +14741,44 @@ class EqualGoldDetails(EqualGoldEdit):
                         '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
                         ]
 
-                # Use the 'graph' function or not?
-                use_network_graph = True
-
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
 
                 context['related_objects'] = related_objects
 
+                # ======== VISUALIZATION PREPARATION ===============================
+                # (see seeker/visualizations)
+
+                # Make sure to delete any previous corpora of mine
+                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+
+                # Old, extinct
+                ManuscriptCorpus.objects.filter(super=instance).delete()
+                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+
                 # THe graph also needs room in after details
                 if use_network_graph:
+                    # Prepare the CONTEXT for network-related graphs
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
                     context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
                     context['equalgold_overlap'] = reverse("equalgold_overlap", kwargs={'pk': instance.id})
+
+                # Graph that is always there: PCA
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
-                context['manuscripts'] = qs_s.count()
+
+                # Prepare context for attributed author pie chart
+                context['equalgold_attr'] = reverse("equalgold_attr", kwargs={'pk': instance.id})
+
                 lHtml = []
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])
-                if context['object'] == None:
-                    context['object'] = instance
-
-                # NOTE (EK): moved to EqualGoldEdit, so that re-loading is not needed
-                #context['approval_pending'] = approval_pending(instance)
-                #context['approval_pending_list'] = approval_pending_list(instance)
 
                 # Note (EK): this must be here, see issue #508
                 lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
 
                 context['after_details'] = "\n".join(lHtml)
+
+                # ===================================================================
 
         except:
             msg = oErr.get_error_message()
