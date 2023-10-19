@@ -729,52 +729,69 @@ def home(request, errortype=None):
     template_name = 'index.html'
 
     bOverrideSync = False
+    bDebug = False
     oErr = ErrHandle()
 
-    # Define the initial context
-    context =  {'title':'RU-passim',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
+    try:
+        # Define the initial context
+        context =  {'title':'RU-passim',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
 
-    context = get_application_context(request, context)
-    # NOTE: the context now contains items like 'is_app_editor'
+        context = get_application_context(request, context)
+        # NOTE: the context now contains items like 'is_app_editor'
 
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
+        # Process this visit
+        context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
 
-    # See if this is the result of a particular error
-    if errortype != None:
-        if errortype == "404":
-            context['is_404'] = True
+        # See if this is the result of a particular error
+        if errortype != None:
+            if errortype == "404":
+                context['is_404'] = True
 
-    # Check the newsitems for validity
-    print("- Calling check_until")
-    NewsItem.check_until()
+        # Check the newsitems for validity
+        if bDebug: 
+            # ========== DEBUG ============
+            print("- Calling check_until")
+        NewsItem.check_until()
 
-    # Create the list of news-items
-    lstQ = []
-    lstQ.append(Q(status='val'))
-    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
-    context['newsitem_list'] = newsitem_list
-    print("counting for statistics")
+        # Create the list of news-items
+        lstQ = []
+        lstQ.append(Q(status='val'))
+        newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
+        context['newsitem_list'] = newsitem_list
 
-    # Gather the statistics
-    context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
-    context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
 
-    # Gather pie-chart data
-    context['pie_data'] = get_pie_data()
+        # Gather the statistics
+        if bDebug: 
+            # ========== DEBUG ============
+            print("counting for statistics")
+        context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
+        context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
 
-    # Possibly start getting new Stemmatology results
-    if bOverrideSync and user_is_superuser(request):
-        scan_transcriptions()
-    else:
-        thread = Thread(target=scan_transcriptions)
-        thread.start()
+        # Gather pie-chart data
+        if bDebug: 
+            # ========== DEBUG ============
+            print("Fetching pie chart data")
+        context['pie_data'] = get_pie_data()
+
+        # Possibly start getting new Stemmatology results
+        if bOverrideSync and user_is_superuser(request):
+            scan_transcriptions()
+        else:
+            thread = Thread(target=scan_transcriptions)
+            thread.start()
+
+        # Calculate the response
+        response = render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("home")
+        response = "Home error: {}".format(msg)
 
     # Render and return the page
-    return render(request, template_name, context)
+    return response
 
 def view_404(request, *args, **kwargs):
     # return home(request, "404")
