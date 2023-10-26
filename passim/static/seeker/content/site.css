@@ -373,6 +373,7 @@ a:not(.btn) span.glyphicon-remove {
 
 .visborder {
     border: 1px solid blue;
+    margin-top: 10px;
 }
 
 svg {
@@ -556,6 +557,10 @@ div.arg-selected {
 /* Adjust [row] within forms */
 form .row {
     margin-left: 0px;
+}
+form .row.noform {
+    margin-left: 0px;
+    margin-right: 0px;
 }
 form .panel-heading.row {
     margin-right: 0px;
@@ -1170,7 +1175,53 @@ table.compact-table td:hover {
     padding: 0px 4px;
 }
 
+/* Widths for manifestations AF*/
 
+/* Width of one specific column, nodig zo?*/
+
+.shelfm {
+    width: 20%;
+}
+
+.orprov {
+    width: 15%;
+}
+
+.date {
+    width: 3%;
+}
+
+.coll {
+    max-width: 0.1px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    
+}
+
+.item {
+    width: 3%;
+}
+
+.ff {
+    width: 3%;
+}
+
+.attraut {
+    width: 5%;
+}
+
+.inc {
+    width: 20%;
+}
+
+.expl {
+    width: 20%;
+}
+
+.keyw {
+    width: 10%;
+}
 
 
 .codico-title {
@@ -2003,5 +2054,7 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     vertical-align: super;
 }
 
-
+svg tspan:hover {
+    fill: red;
+}
 

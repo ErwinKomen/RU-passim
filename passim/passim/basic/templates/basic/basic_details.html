@@ -273,7 +273,7 @@
                               <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                             {% endif %}
                             {% for col in related.columns %}
-                              <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}"  >
+                              <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}">
                                 {% if col.sortable %}
                                   <span class="sortable">
                                     <span class="glyphicon glyphicon-sort"></span>
@@ -320,7 +320,8 @@
                                   {% endif %}
                                   <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
                                       class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
-                                              {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}"
+                                              {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}
+                                              {% if relcol.myclasses %}{{relcol.myclasses}}{% endif %}"
                                       {% if relcol.align %}align="{{relcol.align}}"{% endif %}
                                       {% if relcol.draggable %}draggable="true"{% endif %}
                                       {% if relcol.draggable %}

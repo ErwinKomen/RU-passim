@@ -14497,9 +14497,13 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
-
+            
         oErr = ErrHandle()
         try:
+
+            # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
+            info = render_to_string('seeker/author_info.html')
+
             # Are we copying information?? (only allowed if we are the app_editor)
             if 'goldcopy' in self.qd and context['is_app_editor']:
                 # Get the ID of the gold sermon from which information is to be copied to the SSG
@@ -14535,11 +14539,26 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # And in all cases: make sure we redirect to the 'clean' GET page
                 self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
+            
             elif instance != None and instance.id != None and instance.moved is None:
-                context['sections'] = []
+                # Add sections Details / User contributions / Connections / Networks / Graphs / Manifestations
+
+                context['sections'] = [
+                    {'name': 'Details', 'id': 'coll_details', 'fields': [
+                        {'type': 'safeline', 'label': "Author:", 'value': instance.author_id},
+                        {'type': 'safeline', 'label': "Author:", 'value': instance.author_id},
+                        ]},               
+                        ]
+            
 
                 # Lists of related objects
                 related_objects = []
+
+                resizable = True
+                index = 1 
+                sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_end = '</span>'
 
                 username = self.request.user.username
                 team_group = app_editor
@@ -14552,15 +14571,22 @@ class EqualGoldDetails(EqualGoldEdit):
                 ManuscriptCorpus.objects.filter(super=instance).delete()
                 ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
 
-                # List of manuscripts related to the SSG via sermon descriptions
-                manuscripts = dict(title="Manifestations", prefix="manu", gridclass="resizable")
-
-                # WAS: Get all SermonDescr instances linking to the correct eqg instance
-                # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
-
                 # New: Get all the SermonDescr instances linked with equality to SSG:
                 # But make sure the EXCLUDE those with `mtype` = `tem`
                 qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
+                
+                # Count the number of records in the qs, make a string out of it
+                count = str(qs_s.count())              
+
+                # Create title with count            
+                title_count = "Manifestations" + " " + "(" + count + ")"
+                
+                # List of manuscripts related to the SSG via sermon descriptions
+                manuscripts = dict(title= title_count, prefix="manu", gridclass="resizable") 
+
+                # WAS: Get all SermonDescr instances linking to the correct eqg instance
+                # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
+                                              
                 rel_list =[]
                 method = "FourColumns"
                 method = "Issue216"
@@ -14596,43 +14622,44 @@ class EqualGoldDetails(EqualGoldEdit):
                         manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
                         # Name as CITY - LIBRARY - IDNO + Name
                         manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
-                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': True, 'initial': 'small',
-                                         'link': reverse('manuscript_details', kwargs={'pk': item.id})})
+                        rel_item.append({'value': manu_name, 'title': item.idno, 'main': False, 'myclasses': 'shelfm',
+                                         'link': reverse('manuscript_details', kwargs={'pk': item.id})}) # 'initial': 'small',
 
                         # Origin
                         or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown(table=False))
-                        rel_item.append({'value': or_prov, 
+                        
+                        
+                        rel_item.append({'value': or_prov, 'myclasses': 'orprov',
                                          'title': "Origin (if known), followed by provenances (between brackets)"}) #, 'initial': 'small'})
 
                         # date range
                         daterange = "{}-{}".format(item.yearstart, item.yearfinish)
-                        rel_item.append({'value': daterange, 'align': "right"}) #, 'initial': 'small'})
+                        rel_item.append({'value': daterange, 'align': "right", 'myclasses': 'date'}) #, 'initial': 'small'})
 
                         # Collection(s)
                         coll_info = item.get_collections_markdown(username, team_group)
-                        rel_item.append({'value': coll_info, 'initial': 'small'})
+                        rel_item.append({'value': coll_info, 'myclasses': 'coll'}) # , 'initial': 'small'  / 
 
                         # Location number and link to the correct point in the manuscript details view...
                         itemloc = "{}/{}".format(sermon.msitem.order, item.get_sermon_count())
                         link_on_manu_page = "{}#sermon_{}".format(reverse('manuscript_details', kwargs={'pk': item.id}), sermon.id)
                         link_to_sermon = reverse('sermon_details', kwargs={'pk': sermon.id})
-                        rel_item.append({'value': itemloc, 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'initial': 'small',
-                                         'link': link_to_sermon })
+                        rel_item.append({'value': itemloc, 'myclasses': 'item', 'align': "right", 'title': 'Jump to the sermon in the manuscript', 'link': link_to_sermon }) #'initial': 'small'
 
                         # Folio number of the item
-                        rel_item.append({'value': sermon.locus, 'initial': 'small'})
+                        rel_item.append({'value': sermon.locus, 'myclasses': 'ff'}) # , 'initial': 'small'
 
                         # Attributed author
-                        rel_item.append({'value': sermon.get_author(), 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_author(), 'myclasses': 'attraut'}) # , 'initial': 'small'
 
                         # Incipit
-                        rel_item.append({'value': sermon.get_incipit_markdown()}) #, 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_incipit_markdown(), 'myclasses': 'inc' }) #, 'initial': 'small'})
 
                         # Explicit
-                        rel_item.append({'value': sermon.get_explicit_markdown()}) #, 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_explicit_markdown(), 'myclasses': 'expl'}) #, 'initial': 'small'})
 
                         # Keywords
-                        rel_item.append({'value': sermon.get_keywords_markdown(), 'initial': 'small'})
+                        rel_item.append({'value': sermon.get_keywords_markdown(), 'myclasses': 'keyw'}) # , 'initial': 'small'
 
                     # Add this Manu/Sermon line to the list
                     rel_list.append(dict(id=item.id, cols=rel_item))
@@ -14641,17 +14668,17 @@ class EqualGoldDetails(EqualGoldEdit):
                 if method == "FourColumns":
                     manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
                 elif method == "Issue216":
-                    manuscripts['columns'] = [
-                        'Shelfmark', 
-                        '<span title="Origin/Provenance">or./prov.</span>', 
-                        '<span title="Date range">date</span>', 
-                        '<span title="Collection name">coll.</span>', 
-                        '<span title="Item">item</span>', 
-                        '<span title="Folio number">ff.</span>', 
-                        '<span title="Attributed author">attr. auth.</span>', 
-                        '<span title="Incipit">inc.</span>', 
-                        '<span title="Explicit">expl.</span>', 
-                        '<span title="Keywords of the Sermon manifestation">keyw.</span>', 
+                    manuscripts['columns'] = [                                              
+                        '{}<span title="Shelfmark">Shelfmark.</span>{}'.format(sort_start, sort_end),
+                        '{}<span class=orprov title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end),                         
+                        '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end),                        
+                        '{}<span title="Collection name">coll.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Item">item</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Folio number">ff</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Attributed author">attr. auth.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Incipit">inc.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Explicit">expl.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Keywords of the Sermon manifestation">keyw.</span>{}'.format(sort_start, sort_end),
                         ]
 
                 # Use the 'graph' function or not?
@@ -14662,7 +14689,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 context['related_objects'] = related_objects
 
-                # THe graph also needs room in after details
+                # The graph also needs room in after details
                 if use_network_graph:
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
                     context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})

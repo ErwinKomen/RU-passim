@@ -1175,7 +1175,50 @@ table.compact-table td:hover {
     padding: 0px 4px;
 }
 
+/* AF Manifestations, widths for each one specific column*/
 
+.shelfm {
+    width: 20%;
+}
+
+.orprov {
+    width: 15%;
+}
+
+.date {
+    width: 3%;
+}
+
+.coll {
+    max-width: 0.1px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;    
+}
+
+.item {
+    width: 3%;
+}
+
+.ff {
+    width: 3%;
+}
+
+.attraut {
+    width: 5%;
+}
+
+.inc {
+    width: 20%;
+}
+
+.expl {
+    width: 20%;
+}
+
+.keyw {
+    width: 10%;
+}
 
 
 .codico-title {
