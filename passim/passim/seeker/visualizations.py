@@ -1116,7 +1116,6 @@ class EqualGoldAttr(BasicPart):
     def add_to_context(self, context):
      
         oErr = ErrHandle()
-        # colors = ['#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77', '#CC6677', '#882255', '#AA4499']
         try:
             # Check validity
             if not self.userpermissions("r"):
@@ -1128,7 +1127,8 @@ class EqualGoldAttr(BasicPart):
             instance = self.obj
 
             # Get a list of SermonDescr linking to this EqualGold
-            qs = SermonDescrEqual.objects.filter(super=instance)
+            # NEW: exclude templates
+            qs = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem")
             count_sermon = qs.count()
             # Only continue if there are some results
             if count_sermon > 0:
@@ -1151,15 +1151,67 @@ class EqualGoldAttr(BasicPart):
                 if other_count > 0:
                     lst_data.append(dict(name="not applicable", value=other_count, total=count_sermon, url=None))
 
-                ## Set the values
-                #for idx, oItem in enumerate(lst_data):
-                #    oItem['value'] = colors[idx]
-
-
                 context['data'] = dict(attr_author=lst_data)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("EqualGoldAttr/add_to_context")
 
         return context
+
+
+class EqualGoldOrigin(BasicPart):
+    """Division of origin locations in manuscripts' codicological units related to this SSG"""
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+     
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            # Get a list of SermonDescr linking to this EqualGold
+            qs_codico = [x.sermon.msitem.codico for x in SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by(
+                'sermon__msitem__codico__id')]
+            if len(qs_codico) > 0:
+                # Get to the origins and distill countries
+                lst_country = []
+                for obj in qs_codico:
+                    lcountry = "no origin defined"
+                    for origin in obj.origins.all():
+                        location = origin.location
+                        if not location is None:
+                            if location.loctype.name == "country":
+                                lcountry = location.name
+                            elif not location.lcountry is None:
+                                lcountry = location.lcountry.name
+                    lst_country.append(lcountry)
+                # Get the unique countries
+                lst_unique = sorted(list(set(lst_country)))
+
+                # Create a list of numbers
+                lst_data = []
+                count_total = len(lst_country)
+                for country_name in lst_unique:
+                    country_count = lst_country.count(country_name)
+                    url = ""
+                    oData = dict(name=country_name, value=country_count, total=count_total, url=url)
+                    lst_data.append(oData)
+
+
+                context['data'] = dict(origin_country=lst_data)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldOrigin/add_to_context")
+
+        return context
+
+
 

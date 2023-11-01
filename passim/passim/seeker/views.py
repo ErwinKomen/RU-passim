@@ -14787,6 +14787,9 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Prepare context for attributed author pie chart
                 context['equalgold_attr'] = reverse("equalgold_attr", kwargs={'pk': instance.id})
 
+                # Prepare context for origin pie chart
+                context['equalgold_origin'] = reverse("equalgold_origin", kwargs={'pk': instance.id})
+
                 lHtml = []
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])
