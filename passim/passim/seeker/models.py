@@ -6446,13 +6446,22 @@ class Codico(models.Model):
         return sBack
 
     def get_origin(self):
+        """New method: user [origins]"""
+
         sBack = "-"
-        if self.origin:
-            # Just take the bare name of the origin
-            sBack = self.origin.name
-            if self.origin.location:
-                # Add the actual location if it is known
-                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+        obj = self.origins.last()
+        if not obj is None:
+            # Take the last origin as the best one
+            if obj.location is None:
+                sBack = obj.name
+            else:
+                sBack = "{}: {}".format(obj.name, obj.location.get_loc_name())
+        #if self.origin:
+        #    # Just take the bare name of the origin
+        #    sBack = self.origin.name
+        #    if self.origin.location:
+        #        # Add the actual location if it is known
+        #        sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
         return sBack
 
     def get_origin_markdown(self, plain=False, table=True):

@@ -1192,6 +1192,10 @@ class EqualGoldOrigin(BasicPart):
                                 lcountry = location.name
                             elif not location.lcountry is None:
                                 lcountry = location.lcountry.name
+                            else:
+                                lcountry = "Country of location: {}".format( location.name)
+                        else:
+                            lcountry = "Country of origin: {}".format( origin.name)
                     lst_country.append(lcountry)
                 # Get the unique countries
                 lst_unique = sorted(list(set(lst_country)))
