@@ -7059,6 +7059,85 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * piechart_origin
+       *   Create and show an attributed author pie-chart
+       *
+       */
+      piechart_origin: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            chart_data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 300,
+            max_value = 0,
+            sOptions = "",
+            value = null,
+            divTarget = "super_graph_origin",
+            divWait = "#super_graph_origin_wait",
+            divPiechart = "#ssg_graph_origin";
+
+        try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
+          // Show what we can about the piechart
+          $(divPiechart).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+
+          // Get the target url
+          frm = $(divPiechart).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || typeof (response) === "string" || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Calculate the width we have right now
+                  iWidth = $("#" + divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  // Get the data
+                  chart_data = response['origin_country'];
+
+                  // Use D3 to draw a pie chart
+                  private_methods.draw_pie_chart(divTarget, chart_data, true)
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker piechart_origin)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("piechart_origin", ex);
+        }
+      },
+
+      /**
        * network_overlap
        *   Create and show a SSG-overlap network
        *

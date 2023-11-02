@@ -3324,7 +3324,6 @@ class Litref(models.Model):
             return adapt_markdown(self.short, lowercase=False)
 
 
-
 class Project2(models.Model):
     """Manuscripts may belong to the one or more projects (Passim or others)"""
     
@@ -3380,20 +3379,6 @@ class Project2(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-#class AltPageNumber(models.Model):
-#    """Alternative page numbers can de linked to a SermonDescr"""
-
-#    # [0-1] Optional alternative page numbering of this sermon on the manuscript
-#    pages = models.CharField("Pages", null=True, blank=True, max_length=LONG_STRING)
-#    # [0-1] Any notes for this alternative page number
-#    note = models.TextField("Note", null=True, blank=True)
-#    # [1] links to a user via profile
-#    #profile = models.ForeignKey(Profile, related_name="profilealtpage", on_delete=models.CASCADE)
-#    # [1] Date created (automatically done)
-#    created = models.DateTimeField(default=get_current_datetime)
-
-#    def __str__(self):
-#        return self.pages
 
 class Keyword(models.Model):
     """A keyword that can be referred to from either a SermonGold or a SermonDescr"""
@@ -6461,13 +6446,22 @@ class Codico(models.Model):
         return sBack
 
     def get_origin(self):
+        """New method: user [origins]"""
+
         sBack = "-"
-        if self.origin:
-            # Just take the bare name of the origin
-            sBack = self.origin.name
-            if self.origin.location:
-                # Add the actual location if it is known
-                sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
+        obj = self.origins.last()
+        if not obj is None:
+            # Take the last origin as the best one
+            if obj.location is None:
+                sBack = obj.name
+            else:
+                sBack = "{}: {}".format(obj.name, obj.location.get_loc_name())
+        #if self.origin:
+        #    # Just take the bare name of the origin
+        #    sBack = self.origin.name
+        #    if self.origin.location:
+        #        # Add the actual location if it is known
+        #        sBack = "{}: {}".format(sBack, self.origin.location.get_loc_name())
         return sBack
 
     def get_origin_markdown(self, plain=False, table=True):

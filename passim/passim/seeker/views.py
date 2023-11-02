@@ -14700,6 +14700,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     # Get the 'item': the manuscript
                     # OLD: item = sermon.manu
                     item = sermon.msitem.manu
+                    codico = sermon.msitem.codico
                     rel_item = []
                 
                     if method == "FourColumns":
@@ -14730,11 +14731,10 @@ class EqualGoldDetails(EqualGoldEdit):
                         rel_item.append({'value': manu_name, 'title': item.idno, 'main': False, 'myclasses': 'shelfm',
                                          'link': reverse('manuscript_details', kwargs={'pk': item.id})}) # 'initial': 'small',
 
-                        # Origin
-                        or_prov = "{} ({})".format(item.get_origin(), item.get_provenance_markdown(table=False))
-                        
-                        
-                        rel_item.append({'value': or_prov, 'myclasses': 'orprov',
+                        # Origin: this should actually be the origin of the CODICO in which the sermon is
+                        #         and the provenance should also be based on the CODICO
+                        or_prov = "{} ({})".format(codico.get_origin(), codico.get_provenance_markdown(table=False))
+                        rel_item.append({'value': or_prov, 
                                          'title': "Origin (if known), followed by provenances (between brackets)"}) #, 'initial': 'small'})
 
                         # date range
@@ -14816,6 +14816,9 @@ class EqualGoldDetails(EqualGoldEdit):
 
                 # Prepare context for attributed author pie chart
                 context['equalgold_attr'] = reverse("equalgold_attr", kwargs={'pk': instance.id})
+
+                # Prepare context for origin pie chart
+                context['equalgold_origin'] = reverse("equalgold_origin", kwargs={'pk': instance.id})
 
                 lHtml = []
                 if 'after_details' in context:
