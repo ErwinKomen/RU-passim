@@ -1282,6 +1282,7 @@ def adapt_searchable():
     return bResult, msg
 
 
+
 # =========== Part of provenance_list ==================
 def adapt_manuprov_m2m():
     oErr = ErrHandle()

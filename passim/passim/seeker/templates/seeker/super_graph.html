@@ -1,6 +1,9 @@
 <div class="row">
   <div class="md-col-12">
     <span class="pull-right" style="margin-bottom: 10px;">
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Attributed author division" 
+         data-target="#ssg_graph_attr"
+         onclick="ru.passim.seeker.piechart_attr(this);">Authors</a>
       <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network" 
          data-target="#ssg_network_overlap"
          onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>
@@ -350,6 +353,26 @@
     </div>
   </div>
 
+</div>
+
+<div id="ssg_graph_attr" class="hidden container-small">
+  <form action="{{equalgold_attr}}" method="post" >
+    {% csrf_token %}
+  </form>
+
+  <div id="super_graph_attr_wait" class="hidden">
+    <span>Calculating attributed author pie-chart...</span>
+    <span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>
+  </div>
+
+  <div id="super_attr" style="width: 800px; height: 220px;">
+    <!-- The overlap network -->
+    <div class="col-md-12">
+      <div id="super_graph_attr" style="width: 100%; " class="visborder" >
+        <!-- Keep this empty -->
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="ssg_pca" class="hidden">

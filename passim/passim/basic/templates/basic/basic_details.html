@@ -240,6 +240,12 @@
                           {{related.custombutton|safe}}
                         </span>
                       {% endif %}
+                      <!-- Always: show/hide the row to show/hide columns -->
+                      <span class="pull-right">
+                        <a class="btn btn-s jumbo-1" data-toggle="collapse" data-target="#tab_{{related.prefix}}_colwrap" role="button" title="Show/hide column(s)...">
+                          <span class="glyphicon glyphicon-tasks"></span>
+                        </a>
+                      </span>
                       {% if related.savebuttons %}
                         <span class="hidden related-save pull-right">
                           <span style="font-size: x-small;">
@@ -264,6 +270,17 @@
                     {% if related.rel_list|length == 0 %}
                       <div><i>(the list of {{related.title}} for this {{titlesg}} is empty)</i></div>
                     {% else %}
+                      <!-- Column Wrapping tab -->
+                      <div id="tab_{{related.prefix}}_colwrap" class="collapse" >
+                        <span>Show or hide columns: </span>
+                        {% for col in related.columns %}
+                          <a role="button" class="btn btn-xs jumbo-1"
+                              offset="{{forloop.counter}}"
+                              onclick="ru.basic.colwrap(this, true);">{{col|safe}}</a>
+                        {% endfor %}
+
+                      </div>
+
                       <!-- List of related items -->
                       <table class="func-view related compact-simple {{related.gridclass}}" 
                              style="width: 100%;">
@@ -273,6 +290,8 @@
                               <th colspan="{% if related.editable %}2{% else %}1{% endif %}" class="tdnowrap">#</th>
                             {% endif %}
                             {% for col in related.columns %}
+                              <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}"
+                                  scope="{% if forloop.first and related.editable and not related.use_counter %}{% else %}col{% endif %}"  >
                               <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}">
                                 {% if col.sortable %}
                                   <span class="sortable">
@@ -319,6 +338,7 @@
                                     {% endif %}
                                   {% endif %}
                                   <td {% if relcol.title %}title="{{relcol.title}}"{% endif %}
+                                      scope="col"
                                       class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %} 
                                               {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}
                                               {% if relcol.myclasses %}{{relcol.myclasses}}{% endif %}"

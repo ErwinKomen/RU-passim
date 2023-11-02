@@ -2071,14 +2071,27 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
         if not oTranscription is None:
             title_passim = oTranscription.get("code")
             text_sermon = oTranscription.get("text")
+            bibleref = oTranscription.get("bibleref")
             # Can we continue?
             if not title_passim is None and not text_sermon is None:
                 eqg = EqualGold.objects.filter(code__iexact=title_passim).first()
                 if not eqg is None:
+                    bNeedSaving = False
                     # We now have the right object: Set the text
                     if eqg.fulltext != text_sermon:
                         eqg.fulltext = text_sermon
+                        bNeedSaving = True
+                    # Possibly adapt the bibleref
+                    if eqg.bibleref != bibleref:
+                        eqg.bibleref = bibleref
+                        bNeedSaving = True
+
+                    # Need saving?
+                    if bNeedSaving:
                         eqg.save()
+                        oErr.Status("read_trans_eqg [{}]: {}".format(title_passim, bibleref))
+
+
             # make sure that we return the transcription together with the other stuff
             for k,v in oTranscription.items():
                 oBack[k] = v
@@ -2091,7 +2104,33 @@ def read_trans_eqg(username, data_file, filename, arErr, xmldoc=None, sName = No
     # Return the object that has been created
     return oBack
 
-def scan_transcriptions():
+def sync_transcriptions(oStatus):
+    """Status-showing synchronisation of XML transcriptions"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        if oStatus is None:
+            bResult = False
+            msg = "Sync transcription is missing a status object"
+        else:
+            # Call the actual scanning with the status object
+            oMsg = {}
+            bResult = scan_transcriptions(oStatus, oMsg)
+            if bResult:
+                if oStatus != None: oStatus.set("finished")
+            else:
+                msg = oMsg.get("msg", "")
+                if msg == "":
+                    msg = "Sync transcriptions encountered a problem"
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("sync_transcriptions")
+        bResult = False
+    return bResult, msg
+
+def scan_transcriptions(oStatus=None, oMsg=None):
     """Scan the agreed-upon server location for (new) transcription files"""
 
     oErr = ErrHandle()
@@ -2102,28 +2141,53 @@ def scan_transcriptions():
         # Check if this needs doing
         next_time = Information.get_kvalue("next_stemma")
         now_time = str(get_current_datetime())
-        # next_time = str(get_current_datetime() + timedelta(hours=24))
-        if next_time is None or now_time > next_time:
+
+        rightnow = (not oStatus is None)
+
+        if rightnow or next_time is None or now_time > next_time:
             print("It is time to scan for new transcriptions...")
             # (1) Now execute the scanning
             scan_dir = os.path.abspath(os.path.join(MEDIA_DIR, SCAN_SUBDIR))
             lst_xml = glob.glob(scan_dir)
+            iTotal = len(lst_xml)
+            iCount = 0
             for sFile in lst_xml:
+                iCount += 1
+                # If necessary, provide Status information
+                if not oStatus is None:
+                    oCount = dict(total=iTotal, current=iCount)
+                    oStatus.set("verifying", oCount=oCount)
+
                 # print("Looking at: [{}]".format(sFile))
+
+                # ===== Debugging ===
+                if "cae_s_177" in sFile.lower():
+                    iStop = 1
+
                 # Treat this file
                 oTrans = read_transcription(sFile)
                 status = oTrans.get("status")
-                if status == "ok":
+                code = oTrans.get("code")
+                equal_id = oTrans.get('equal_id') 
+                obj = None
+                if status == "ok" and not code is None:
                     # It has been read and needs to be added
-                    code = oTrans.get("code")
                     text_sermon = oTrans.get("text")
+                    bibleref = oTrans.get("biblerefs")
                     full_info = {}
                     for k,v in oTrans.items():
                         if k != "text":
                             full_info[k] = v
                     # Turn the fullinfo into a string
                     sFullInfo = json.dumps(full_info)
-                    obj = EqualGold.objects.filter(code__iexact=code).first()
+                    if not equal_id is None:
+                        obj = EqualGold.objects.filter(id=equal_id).first()
+                    elif not code is None and code != "" and not "no passim" in code.lower():
+                        obj = EqualGold.objects.filter(code__iexact=code).first()
+                    else:
+                        # Okay, cannot process this one
+                        iStop = 1
+
                     if not obj is None:
                         bNeedSaving = False
                         if obj.transcription is None or obj.transcription == "" or obj.transcription.name is None:
@@ -2135,25 +2199,45 @@ def scan_transcriptions():
                         if obj.fullinfo != sFullInfo:
                             obj.fullinfo = sFullInfo
                             bNeedSaving= True
+                        if obj.bibleref != bibleref:
+                            obj.bibleref = bibleref
+                            bNeedSaving = True
                         if bNeedSaving:
                             # Show we are updating
                             sXmlName = os.path.basename(sFile)
-                            oErr.Status("Scan transcriptions: {} - {}".format(sXmlName, code))
+                            oErr.Status("Saving transcriptions: {} - {} [{}]".format(sXmlName, code, bibleref))
                             # Actually perform the update
                             obj.save()
 
+            if not oStatus is None:
+                oStatus.set("ended_xml_sync")
             # (2) Next task: scan the sgcount
             iCount = 0
+            iTotal = EqualGold.objects.count()
             idx = 0
             print("Checking SG count for AF...")
             with transaction.atomic():
                 for ssg in EqualGold.objects.all():
                     idx += 1
+                    # If necessary, provide Status information
+                    if not oStatus is None:
+                        oCount = dict(total=iTotal, current=idx)
+                        oStatus.set("SG-count", oCount=oCount)
+
                     iChanges = ssg.set_sgcount()
                     if iChanges > 0:
                         iCount += iChanges
                         print("# {} - sgcount: {}".format(idx, iCount))
 
+            # If necessary, provide Status information
+            if not oStatus is None:
+                oCount = dict(total=iTotal)
+                oStatus.set("Wrapup", oCount=oCount)
+
+            # Show we are ready
+            if not oStatus is None:
+                oStatus.set("ok", msg="Everything has been synchronized")
+            print("scan_transcriptions: ready")
 
             # Set new next time
             next_time = str(get_current_datetime() + timedelta(hours=24))
@@ -2163,8 +2247,9 @@ def scan_transcriptions():
         msg = oErr.get_error_message()
         oErr.DoError("scan_transcriptions")
         bResult = False
+        if not oMsg is None:
+            oMsg['msg'] = msg
     return bResult
-
 
 def read_transcription(data_file):
     """Read a sermon transcription part of an XML in TEI-P5 format
@@ -2220,6 +2305,42 @@ def read_transcription(data_file):
             bResult = False
         return bResult
 
+    def get_titles(docroot):
+        sGr = ""
+        sCl = ""
+        sPassim = ""
+        biblerefs = ""
+        method = "bible_order"  # Following the Bible bk/ch/vs order
+        method = "given_order"  # Following the order made by the XML manuscript
+
+        # Get the PASSIM code
+        ítem_passim = docroot.xpath("//title[@type='passim']")
+        if len(ítem_passim) > 0:
+            sPassim = ítem_passim[0].text
+        # Get a possible GRYSON code
+        ítem_gr = docroot.xpath("//title[@type='gr']")
+        if len(ítem_gr) > 0:
+            sGr = ítem_gr[0].text
+        # Get a possible CLAVIS code
+        ítem_cl = docroot.xpath("//title[@type='cl']")
+        if len(ítem_cl) > 0:
+            sCl = ítem_cl[0].text
+        # Get list of bible references
+        bibitems = docroot.xpath("//keywords[@scheme='bible']/descendant::item")
+        if len(bibitems) > 0:
+            lst_ref = []
+            for bibitem in bibitems:
+                sText = bibitem.text
+                if not sText is None and sText != "":
+                    lst_ref.append(sText.replace("_", " "))
+            if method == "bible_order":
+                # Return them in a sorted unique list that can readily be processed
+                biblerefs = "; ".join(sorted(set(lst_ref)))
+            else:
+                biblerefs = "; ".join(lst_ref)
+
+        return sPassim, sGr, sCl, biblerefs
+
     oErr = ErrHandle()
     oBack = {'status': 'ok', 'count': 0, 'msg': "", 'lst_obj': []}
     try:
@@ -2236,28 +2357,42 @@ def read_transcription(data_file):
                 elem.tag = ET.QName(elem).localname
         ET.cleanup_namespaces(root)
 
-        # Get the titles
-        title_passim = None
-        titles = root.xpath("//title[@type='passim']")
-        if len(titles)>0:
-            title_passim = titles[0].text
+        # Get the titles: Passim, GR, CL
+        title_passim, title_gr, title_cl, biblerefs = get_titles(root)
+        if title_passim != "" or title_gr != "" or title_cl != "":
 
             # Initially: assume this needs to be read again
             bReadFile = True
 
-            # Get the passim item
-            if not title_passim is None and title_passim != "":
+            # Get the passim item, based on the title
+            if title_passim != "" and not "no passim" in title_passim.lower():
                 obj = EqualGold.objects.filter(code__iexact=title_passim).first()
-                if not obj is None:
-                    # Get the information stored with this file
-                    sFullInfo = obj.fullinfo
-                    if sFullInfo is None or sFullInfo == "":
-                        sFullInfo = "{}"
-                    oFullInfo = json.loads(sFullInfo)
-                    last_time = oFullInfo.get("change_time")
-                    if not last_time is None and change_time <= last_time:
-                        # The file has not changed
-                        bReadFile = False
+            elif title_gr != "":
+                sig = Signature.objects.filter(code__iexact=title_gr, editype="gr").first()
+                if not sig is None:
+                    obj = sig.gold.equal
+                    title_passim = obj.get_code()
+            elif title_cl != "":
+                sig = Signature.objects.filter(code__iexact=title_cl, editype="cl").first()
+                if not sig is None:
+                    obj = sig.gold.equal
+                    title_passim = obj.get_code()
+            # If there is a EqualGold that has been located...
+            if not obj is None:
+                # Get the information stored with this file
+                sFullInfo = obj.fullinfo
+                if sFullInfo is None or sFullInfo == "":
+                    sFullInfo = "{}"
+                oFullInfo = json.loads(sFullInfo)
+                last_time = oFullInfo.get("change_time")
+
+                bHasChanged = (not last_time is None and change_time <= last_time)
+                bBibChanged = (biblerefs != "" and biblerefs != obj.bibleref)
+
+                if not bHasChanged and not bBibChanged:
+                    # The file has not changed
+                    bReadFile = False
+
             # Need to read it?
             if bReadFile:
 
@@ -2284,6 +2419,17 @@ def read_transcription(data_file):
                             elif subitem.tag == "p":
                                 # This is a paragraph containing words and quotes
                                 process_para(subitem, html, info)
+                    elif tag == "div" and attrib.get("type", "") == "chapter":
+                        # This is a new chapter, which can contain <head> and <p>
+                        html.append("")
+                        # This is a paragraph, that contains <head> and <p>
+                        for subitem in sermon_item.xpath("./child::*"):
+                            if subitem.tag == "head":
+                                # This is another level head
+                                html.append("#### {}".format(subitem.text))
+                            elif subitem.tag == "p":
+                                # This is a paragraph containing words and quotes
+                                process_para(subitem, html, info)
 
                 # Okay, we found all the elements, now store them.
                 text_sermon = "\n".join(html)
@@ -2292,14 +2438,18 @@ def read_transcription(data_file):
                 oBack['count'] = oBack['count'] + 1
                 oBack['tsize'] = len(text_sermon)
                 oBack['code'] = title_passim
+                oBack['gr'] = title_gr
+                oBack['cl'] = title_cl
                 oBack['wordcount'] = info.get("wordcount", 0)
                 oBack['change_time'] = change_time
+                oBack['biblerefs'] = biblerefs
+                oBack['equal_id'] = None if obj is None else obj.id
             else:
                 oBack['status'] = "skip"
-
+       
     except:
         sError = oErr.get_error_message()
-        oBack['filename'] = filename
+        oBack['filename'] = data_file
         oBack['status'] = 'error'
         oBack['msg'] = sError
 

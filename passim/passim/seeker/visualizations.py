@@ -1106,3 +1106,60 @@ class EqualGoldPca(BasicPart):
             oErr.DoError("do_hier_method1")
 
         return node_list, link_list, max_value
+
+
+class EqualGoldAttr(BasicPart):
+    """Division of attributed authors in manuscripts related to this SSG"""
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+     
+        oErr = ErrHandle()
+        # colors = ['#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77', '#CC6677', '#882255', '#AA4499']
+        try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            # Get a list of SermonDescr linking to this EqualGold
+            qs = SermonDescrEqual.objects.filter(super=instance)
+            count_sermon = qs.count()
+            # Only continue if there are some results
+            if count_sermon > 0:
+                # Get all the attributed authors
+                lst_attr_author = [x['sermon__author__name'] for x in qs.filter(sermon__author__isnull=False).values('sermon__author__name')]
+                # Create a list of the individual ones
+                lst_unique = sorted(list(set(lst_attr_author)))
+                # Create a list of numbers
+                lst_data = []
+                attr_total = 0
+                for attr_name in lst_unique:
+                    attr_count = qs.filter(sermon__author__name=attr_name).count()
+                    author = qs.filter(sermon__author__name=attr_name).first().sermon.author
+                    url = reverse("author_details", kwargs={'pk': author.id})
+                    oData = dict(name=attr_name, value=attr_count, total=count_sermon, url=url)
+                    lst_data.append(oData)
+                    attr_total += attr_count
+                # Add the number of unidentified authors
+                other_count = count_sermon - attr_total
+                if other_count > 0:
+                    lst_data.append(dict(name="not applicable", value=other_count, total=count_sermon, url=None))
+
+                ## Set the values
+                #for idx, oItem in enumerate(lst_data):
+                #    oItem['value'] = colors[idx]
+
+
+                context['data'] = dict(attr_author=lst_data)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldAttr/add_to_context")
+
+        return context
+

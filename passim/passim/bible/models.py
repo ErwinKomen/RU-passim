@@ -12,6 +12,7 @@ ABBR_LENGTH = 5
 BKCHVS_LENGTH = 9       # BBBCCCVVV
 
 BOOK_NAMES = [
+    {"name": "ZECH", "abbr": "ZEC"},{"name": "ZAC", "abbr": "ZEC"},
     {"name":"Romans","abbr":"ROM"},{"name":"Rom:","abbr":"ROM"},{"name":"Revelations","abbr":"REV"},
     {"name":"Prv.","abbr":"PRO"},{"name":"Prov.","abbr":"PRO"},
     {"name":"Philippians","abbr":"PHP"},
@@ -27,9 +28,11 @@ BOOK_NAMES = [
     {"name":"Lam.","abbr":"LAM"},{"name":"John","abbr":"JHN"},{"name":"Joh.","abbr":"JHN"},
     {"name":"Jo.","abbr":"JHN"},{"name":"James","abbr":"JAS"},{"name":"Isaias","abbr":"ISA"},
     {"name":"Isaiah","abbr":"ISA"}, {"name":"I Thes.","abbr":"1TH"},
+    {"name": "IAC", "abbr": "JAS"},
     {"name":"I Mcc","abbr":"1MA"}, {"name":"Heb.","abbr":"HEB"}, {"name":"Ephesians","abbr":"EPH"},
     {"name":"Eph:","abbr":"EPH"}, {"name":"Cor.","abbr":"1CO"},{"name":"Canticum Canticorum","abbr":"SNG"},
-    {"name":"Apocalypsis","abbr":"REV"},{"name":"Acts","abbr":"ACT"}
+    {"name":"Apocalypsis","abbr":"REV"},{"name":"Acts","abbr":"ACT"},
+    {"name": "SAP", "abbr": "WIS"},
     ]
 BOOK_SPECIAL = [{"name":"Act. Apost.","abbr":"ACT"}]
 
@@ -191,6 +194,7 @@ class Reference():
             self.ref_string = self.ref_string.strip()
             self.ref_len = len(self.ref_string)
             self.pos = 0
+            self.sr = []
         return super(Reference, self).__init__()
 
     def get_range(self):
@@ -311,6 +315,9 @@ class Reference():
                     chvslist = "{}, {}".format(chvslist, start.get_until(current, idno))
   
             #chvslist = ", ".join(lst_chvs)
+        else:
+            # There are no scripture references
+            iStop = 1
         # Return what we found
         return book, chvslist
 

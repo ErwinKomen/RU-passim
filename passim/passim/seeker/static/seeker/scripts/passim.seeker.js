@@ -1410,15 +1410,18 @@ var ru = (function ($, ru) {
        *  See: https://observablehq.com/@d3/pie-chart
        *
        */
-      draw_pie_chart: function (divid, data) {
+      draw_pie_chart: function (divid, data, bAddLegend) {
         var margin = null,
-            width_g = 200,
+            width_g = 400,
             height_g = 200,
             translate_h = 0,
+            translate_legend = 0,
             width = 0,
             height = 0,
             viewbox = "",
+            mySvg = null,
             svg = null,
+            legendG = null,
             pie = null,
             path = null,
             label = null,
@@ -1430,7 +1433,9 @@ var ru = (function ($, ru) {
             title = {
               'pie_sermo': 'Sermon manifestations',
               'pie_manu': 'Manuscripts',
-              'pie_super': 'Authority files'},
+              'pie_super': 'Authority files',
+              'super_graph_attr': 'Attributed authors'
+            },
             g = null,
             color = null,
             colidx = -1,    // COlor index into array [color]
@@ -1448,6 +1453,9 @@ var ru = (function ($, ru) {
           // Do *NOT* use a viewbox, otherwise downloading as PNG doesn't work
           // viewbox = "0 0 970 510";
 
+          // Clear up what was there
+          $("#" + divid).html("");
+
           // Create an SVG top node
           svg = d3.select("#" + divid).append("svg")
             //.attr("width", "100%").attr("height", "100%")
@@ -1458,13 +1466,13 @@ var ru = (function ($, ru) {
             .attr("xmlns:xlink", "http://www.w3.org/1999/xlink");
 
           // Create an over-arching <g> element
-          translate_h = width_g / 2 - 20;
+          translate_h = height_g / 2 - 20;
           g = svg
             .append("g")
             .attr("transform", "translate(" + translate_h + "," + height_g / 2 + ")");
 
           // Define the colors that we want to use
-          color = d3.scaleOrdinal(['red', 'orange', 'green']);
+          color = d3.scaleOrdinal(['red', 'orange', 'green', 'blue', 'purple', 'mint', 'olive', 'lime', 'cyan', 'magenta', 'navy']);
 
           // Calculate the radius
           radius = Math.min(width, height) / 2;
@@ -1513,7 +1521,8 @@ var ru = (function ($, ru) {
           openListview = function (event, d) {
             var elDiv = null;
             elDiv = d.data.url;
-            window.location.href = elDiv;
+            // window.location.href = elDiv;
+            window.open(elDiv, "_blank");
           }
 
           path = d3.arc().outerRadius(radius - 10).innerRadius(0);
@@ -1527,7 +1536,6 @@ var ru = (function ($, ru) {
                  .enter()
                  .append("g")
                  .attr("class", "arc passim-pie-arc")
-                 // .on("click", showGuide)
                  .on("click", openListview)
                  .on("mouseover", showTooltip)
                  .on("mousemove", moveTooltip)
@@ -1565,7 +1573,7 @@ var ru = (function ($, ru) {
                ); */
 
           svg.append("g")
-              .attr("transform", "translate(" + translate_h + "," + 10 + ")")
+              .attr("transform", "translate(" + translate_h + "," + 20 + ")")
               .attr("text-anchor", "middle")
               .append("text")
               .text(title[divid])
@@ -1575,6 +1583,42 @@ var ru = (function ($, ru) {
           tooltip = d3.select("#" + divid)
             .append("div").attr("class", "tooltip").style("opacity", 0);
 
+          // Add a legend to the main SVG
+          if (bAddLegend !== undefined && bAddLegend) {
+            translate_legend = translate_h + height_g / 2;
+            legendG = svg.selectAll(".legend")
+              .data(pie(data))
+              .enter().append("g")
+              .attr("transform", function (d, i) {
+                // place each legend on the right and bump each one down 15 pixels
+                return "translate(" + (translate_legend) + "," + (i * 15 + 20) + ")";
+              })
+              .attr("class", "legend");
+
+            // Make a matching color rect as an index
+            legendG.append("rect")
+              .attr("width", 10)
+              .attr("height", 10)
+              .attr("fill", function (d, i) {
+                return color(i);
+              })
+
+            // Add the text next to the items
+            legendG.append("text") // add the text
+              .text(function (d) {
+                return d.value + "  " + d.data.name;
+              })
+              .style("font-size", 12)
+              .attr("y", 10)
+              .attr("x", 11);
+
+            // Add a tooltip <title> element
+            legendG.append("title")
+              .text(function (d) {
+                var sPlural = (d.value === 1) ? "" : "s";
+                return d.data.name + " (" + d.value + " manifestation" + sPlural + ")";
+              })
+          }
 
           // THis should have drawn the pie-chart correctly
         } catch (ex) {
@@ -6915,6 +6959,102 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("network_overlap_hist", ex);
+        }
+      },
+
+      /**
+       * piechart_attr
+       *   Create and show an attributed author pie-chart
+       *
+       */
+      piechart_attr: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            chart_data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 300,
+            max_value = 0,
+            sOptions = "",
+            value = null,
+            divTarget = "super_graph_attr",
+            divWait = "#super_graph_attr_wait",
+            divPiechart = "#ssg_graph_attr";
+
+        try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
+          // Show what we can about the piechart
+          $(divPiechart).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+
+          // Get the target url
+          frm = $(divPiechart).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || typeof(response) === "string" || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  //// Then retrieve the data here: two lists
+                  //options['nodes'] = response.node_list;
+                  //options['links'] = response.link_list;
+                  //options['watermark'] = response.watermark;
+                  //options['hcset'] = response.hist_set;
+                  //options['degree'] = 1;
+
+                  // Calculate the width we have right now
+                  iWidth = $("#" + divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  //// Other data
+                  //max_value = response.max_value;
+                  //options['target'] = divTarget;
+                  //options['width'] = iWidth;
+                  //options['height'] = iHeight;
+                  //options['factor'] = Math.min(iWidth, iHeight) / (2 * max_value);
+                  //options['legend'] = response.legend;
+                  //options['max_value'] = max_value;
+                  //options['max_group'] = response.max_group;
+
+                  // Get the data
+                  chart_data = response['attr_author'];
+
+                  // Use D3 to draw a pie chart
+                  private_methods.draw_pie_chart(divTarget, chart_data, true)
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker piechart_attr)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("piechart_attr", ex);
         }
       },
 

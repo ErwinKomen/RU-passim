@@ -1049,7 +1049,7 @@ var ru = (function ($, ru) {
        *   Show or hide a column
        *
        */
-      colwrap: function (el) {
+      colwrap: function (el, is_related) {
         var offset = 0,
             colnum = 0,
             onclass = "jumbo-1",
@@ -1061,7 +1061,14 @@ var ru = (function ($, ru) {
           // Get the column number
           offset = parseInt($(el).attr("offset"), 10);
           colnum = offset - 1;
-          elTable = $("#tab_list").find("table.table").first();
+          if (is_related === undefined) {
+            is_related = false;
+          }
+          if (is_related) {
+            elTable = $(el).closest(".related-original").find("table").first();
+          } else {
+            elTable = $("#tab_list").find("table.table").first();
+          }
           // Determine what to do
           if ($(el).hasClass(onclass)) {
             // Need to switch off this column
@@ -1071,8 +1078,11 @@ var ru = (function ($, ru) {
             $(elTable).find("tbody tr").each(function (idx, elThis) {
               $(elThis).find("td[scope=col]").eq(colnum).addClass("hidden");
             });
-            // TODO: make this known to the server
-            private_methods.colwrap_switch(colnum, true);
+
+            if (!is_related) {
+              // TODO: make this known to the server
+              private_methods.colwrap_switch(colnum, true);
+            }
           } else {
             // Need to switch on this column
             $(el).addClass(onclass);
@@ -1082,8 +1092,11 @@ var ru = (function ($, ru) {
             $(elTable).find("tbody tr").each(function (idx, elThis) {
               $(elThis).find("td[scope=col]").eq(colnum).removeClass("hidden");
             });
-            // TODO: make this known to the server
-            private_methods.colwrap_switch(colnum, false);
+
+            if (!is_related) {
+              // TODO: make this known to the server
+              private_methods.colwrap_switch(colnum, false);
+            }
           }
         } catch (ex) {
           private_methods.errMsg("colwrap", ex);

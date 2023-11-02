@@ -40,6 +40,7 @@ import json
 import csv, re
 import requests
 import openpyxl
+from threading import Thread
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
 from io import StringIO
@@ -91,7 +92,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, DaterangeHistColl, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
-from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions
+from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions, sync_transcriptions
 from passim.bible.models import Reference
 from passim.dct.models import ResearchSet, SetList, SavedItem, SavedSearch, SelectItem
 from passim.approve.views import approval_parse_changes, approval_parse_formset, approval_pending, approval_pending_list, \
@@ -726,48 +727,71 @@ def home(request, errortype=None):
     assert isinstance(request, HttpRequest)
     # Specify the template
     template_name = 'index.html'
-    # Define the initial context
-    context =  {'title':'RU-passim',
-                'year':get_current_datetime().year,
-                'pfx': APP_PREFIX,
-                'site_url': admin.site.site_url}
 
-    context = get_application_context(request, context)
-    #context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
-    #context['is_app_editor'] = user_is_ingroup(request, app_editor)
-    #context['is_enrich_editor'] = user_is_ingroup(request, enrich_editor)
-    #context['is_app_moderator'] = user_is_superuser(request) or user_is_ingroup(request, app_moderator)
+    bOverrideSync = False
+    bDebug = False
+    oErr = ErrHandle()
 
-    # Process this visit
-    context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
+    try:
+        # Define the initial context
+        context =  {'title':'RU-passim',
+                    'year':get_current_datetime().year,
+                    'pfx': APP_PREFIX,
+                    'site_url': admin.site.site_url}
 
-    # See if this is the result of a particular error
-    if errortype != None:
-        if errortype == "404":
-            context['is_404'] = True
+        context = get_application_context(request, context)
+        # NOTE: the context now contains items like 'is_app_editor'
 
-    # Check the newsitems for validity
-    print("- Calling check_until")
-    NewsItem.check_until()
+        # Process this visit
+        context['breadcrumbs'] = get_breadcrumbs(request, "Home", True)
 
-    # Create the list of news-items
-    lstQ = []
-    lstQ.append(Q(status='val'))
-    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
-    context['newsitem_list'] = newsitem_list
+        # See if this is the result of a particular error
+        if errortype != None:
+            if errortype == "404":
+                context['is_404'] = True
 
-    # Gather the statistics
-    context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
-    context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
+        # Check the newsitems for validity
+        if bDebug: 
+            # ========== DEBUG ============
+            print("- Calling check_until")
+        NewsItem.check_until()
 
-    # Gather pie-chart data
-    context['pie_data'] = get_pie_data()
+        # Create the list of news-items
+        lstQ = []
+        lstQ.append(Q(status='val'))
+        newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
+        context['newsitem_list'] = newsitem_list
 
-    # Possibly start getting new Stemmatology results
-    scan_transcriptions()
+
+        # Gather the statistics
+        if bDebug: 
+            # ========== DEBUG ============
+            print("counting for statistics")
+        context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
+        context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
+
+        # Gather pie-chart data
+        if bDebug: 
+            # ========== DEBUG ============
+            print("Fetching pie chart data")
+        context['pie_data'] = get_pie_data()
+
+        # Possibly start getting new Stemmatology results
+        if bOverrideSync and user_is_superuser(request):
+            scan_transcriptions()
+        else:
+            thread = Thread(target=scan_transcriptions)
+            thread.start()
+
+        # Calculate the response
+        response = render(request, template_name, context)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("home")
+        response = "Home error: {}".format(msg)
 
     # Render and return the page
-    return render(request, template_name, context)
+    return response
 
 def view_404(request, *args, **kwargs):
     # return home(request, "404")
@@ -1059,6 +1083,18 @@ def sync_start(request):
 
                 # Perform the adaptation
                 bResult, msg = adapt_codicocopy(oStatus=oStatus)
+                
+                if bResult:
+                    data['count'] = 1
+                else:
+                    data['status'] = "error {}".format(msg) 
+
+            elif synctype == "stemma":
+                # Use the synchronisation object that contains all relevant information
+                oStatus.set("loading")
+
+                # Start up synchronisation
+                bResult, msg = sync_transcriptions(oStatus=oStatus)
                 
                 if bResult:
                     data['count'] = 1
@@ -5855,6 +5891,9 @@ class SermonListView(BasicList):
         return get_selectitem_info(self.request, instance, self.profile, self.sel_button, context)
 
 
+# ============= ONLINESOURCE ==============================
+
+
 class OnlineSourceEdit(BasicDetails):
     """The details of one online source"""
 
@@ -5964,10 +6003,9 @@ class OnlineSourceListView(BasicList):
         # Combine the HTML code
         sBack = "\n".join(html)
         return sBack, sTitle              
-    
-   
 
 
+# ============= KEYWORD ====================================
 
 
 class KeywordEdit(BasicDetails):
@@ -6735,16 +6773,29 @@ class BibRangeEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # Find out what type of bibref this is: to an SSG or to an S?
+        is_sermon_bibref = (instance.equal is None)
+
         # Define the main items to show and edit
-        context['mainitems'] = [
+        main_items = [
             {'type': 'plain', 'label': "Book:",         'value': instance.get_book(),   'field_key': 'book', 'key_hide': True },
             {'type': 'plain', 'label': "Abbreviations:",'value': instance.get_abbr()                        },
             {'type': 'plain', 'label': "Chapter/verse:",'value': instance.chvslist,     'field_key': 'chvslist', 'key_hide': True },
             {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
             {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},
-            {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
-            {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
             ]
+
+        if is_sermon_bibref:
+            add_links = [
+                {'type': 'plain', 'label': "Sermon:",       'value': self.get_sermon(instance)                  },
+                {'type': 'plain', 'label': "Manuscript:",   'value': self.get_manuscript(instance)              }
+                ]
+        else:
+            add_links = [
+                {'type': 'plain', 'label': "Authority File:",'value': self.get_equal(instance)                  },
+                ]
+
+        context['mainitems'] = main_items + add_links
 
         # Signal that we have select2
         context['has_select2'] = True
@@ -6774,6 +6825,13 @@ class BibRangeEdit(BasicDetails):
         sBack = "<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url, title)
         return sBack
 
+    def get_equal(self, instance):
+        # Get the EqualGold instance
+        equal = instance.equal
+        url = reverse("equalgold_details", kwargs = {'pk': equal.id})
+        sBack = equal.get_passimcode_markdown()
+        return sBack
+
 
 class BibRangeDetails(BibRangeEdit):
     """Like BibRange Edit, but then html output"""
@@ -6790,14 +6848,16 @@ class BibRangeListView(BasicList):
     sg_name = "Bible reference"
     plural_name = "Bible references"
     new_button = False  # BibRanges are added in the Manuscript view; each provenance belongs to one manuscript
-    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 'sermon__msitem__codico__manuscript__idno;sermon__locus']
+    order_cols = ['book__idno', 'chvslist', 'intro', 'added', 
+                  'sermon__msitem__codico__manuscript__idno;sermon__locus', 'equal__code']
     order_default = order_cols
     order_heads = [
         {'name': 'Book',            'order': 'o=1', 'type': 'str', 'custom': 'book', 'linkdetails': True},
         {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
         {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
-        {'name': 'Sermon',          'order': 'o=5', 'type': 'str', 'custom': 'sermon'}
+        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon'},
+        {'name': 'Authority File',  'order': 'o=6', 'type': 'str', 'custom': 'equal'},
         ]
     filters = [ 
         {"name": "Bible reference", "id": "filter_bibref",      "enabled": False},
@@ -6839,11 +6899,15 @@ class BibRangeListView(BasicList):
         sBack = ""
         sTitle = ""
         if custom == "sermon":
-            sermon = instance.sermon
-            # find the shelfmark
-            manu = sermon.msitem.manu
-            url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-            sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
+            if not instance.sermon is None:
+                sermon = instance.sermon
+                # find the shelfmark
+                manu = sermon.msitem.manu
+                url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
+        elif custom == "equal":
+            if not instance.equal is None:
+                sBack = instance.equal.get_passimcode_markdown()
         elif custom == "book":
             sBack = instance.book.name
         elif custom == "intro":
@@ -7626,16 +7690,29 @@ class ProjectEdit(BasicDetails):
                 if id in dict_singles:
                     count += 1
             return count
-            
 
-        # Only moderators and superusers are to be allowed to create and delete project labels
-        if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
+        oErr = ErrHandle()
+        try:
+            
+            # Is the user allowed to edit/delete or not?
+            bMayDelete = (user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer))
+
+            # Standard behaviour: no_delete to True
+            if not bMayDelete:
+                self.no_delete = True
+                context['no_delete'] = self.no_delete
+                self.permission = "readonly"
+                context['permission'] = self.permission
+
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Name:",     'value': instance.name, 'field_key': "name"},
+                {'type': 'plain', 'label': "Name:",     'value': instance.name},        #, 'field_key': "name"},
                 {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
-                 'title': 'All the current users that have approval rights for this project'}
-                ]       
+                    'title': 'All the current users that have approval rights for this project'}
+                ]   
+        
+            if bMayDelete:
+                context['mainitems'][0]['field_key'] = "name"    
 
             # Also add a delete Warning Statistics message (see issue #485)
             lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
@@ -7658,6 +7735,11 @@ class ProjectEdit(BasicDetails):
                 single_m=single_m, single_hc=single_hc, single_s=single_s, single_ssg=single_ssg,
                 )
             context['delete_message'] = render_to_string('seeker/project_statistics.html', local_context, self.request)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectEdit/add_to_context")
+
         # Return the context we have made
         return context
     
@@ -13707,15 +13789,21 @@ class EqualGoldEdit(BasicDetails):
                                          form=EqualGoldForm, min_num=0,
                                          fk_name = "equal",
                                          extra=0, can_delete=True, can_order=False)
+
+    EqgBrefFormSet = inlineformset_factory(EqualGold, BibRange,
+                                         form=BibRangeForm, min_num=0,
+                                         fk_name = "equal",
+                                         extra=0, can_delete=True, can_order=False)
     
     formset_objects = [
         {'formsetClass': EqgcolFormSet,  'prefix': 'eqgcol',  'readonly': False, 'noinit': True, 'linkfield': 'super'},
         {'formsetClass': SsgLinkFormSet, 'prefix': 'ssglink', 'readonly': False, 'noinit': True, 'initial': [{'linktype': LINK_PARTIAL }], 'clean': True},     
         # {'formsetClass': GeqFormSet,    'prefix': 'geq',    'readonly': False, 'noinit': True, 'linkfield': 'equal'}
+        {'formsetClass': EqgBrefFormSet, 'prefix': 'eqgbref', 'readonly': False, 'noinit': True, 'linkfield': 'equal'},
         ]
 
     # Note: do not include [code] in here
-    stype_edi_fields = ['author', 'number', 'incipit', 'explicit', 'fulltext',
+    stype_edi_fields = ['author', 'number', 'incipit', 'explicit','bibleref', 'fulltext',
                         #'kwlist', 
                         #'CollectionSuper', 'collist_ssg',
                         'EqualGoldLink', 'superlist',
@@ -13778,6 +13866,8 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
                 {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
                  'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
                 {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
                 {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
                 {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
@@ -14039,6 +14129,23 @@ class EqualGoldEdit(BasicDetails):
                                             # Make sure this one does not get saved!
                                             setattr(form, 'do_not_save', True)
                         # Note: it will get saved with form.save()
+                    elif prefix == "eqgbref":
+                        # Processing one BibRange
+                        newintro = cleaned.get('newintro', None)
+                        onebook = cleaned.get('onebook', None)
+                        newchvs = cleaned.get('newchvs', None)
+                        newadded = cleaned.get('newadded', None)
+
+                        # Minimal need is BOOK
+                        if onebook != None:
+                            # Note: normally it will get saved with formset.save()
+                            #       However, 'noinit=False' formsets must arrange their own saving
+                            form.instance.book = onebook
+                            if newchvs != None:
+                                form.instance.chvslist = newchvs
+                            form.instance.intro = newintro
+                            form.instance.added = newadded
+
                 except:
                     msg = oErr.get_error_message()
                     oErr.DoError("EqualGoldEdit/process_formset")
@@ -14323,7 +14430,7 @@ class EqualGoldEdit(BasicDetails):
             # Need to know who I am for some operations
             profile = Profile.get_user_profile(self.request.user.username)
 
-            # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
+            # ====== Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
             collist_ssg_id = [x['id'] for x in form.cleaned_data['collist_ssg'].values('id') ]
             collist_hist_id = [x['id'] for x in form.cleaned_data['collist_hist'].values('id')]
@@ -14429,7 +14536,7 @@ class EqualGoldEdit(BasicDetails):
                         instance.atype = "acc"
                         instance.save()
 
-            # Process many-to-ONE changes
+            # ====== Process many-to-ONE changes
             # (1) links from SG to SSG
             goldlist = form.cleaned_data['goldlist']
             ssglist = [x.equal for x in goldlist]
@@ -14440,6 +14547,10 @@ class EqualGoldEdit(BasicDetails):
                 ssg.set_sgcount()
                 # Adapt the 'firstsig' value
                 ssg.set_firstsig()
+
+            # (2) links from BibRange to SSG
+            bibreflist = form.cleaned_data['bibreflist']
+            adapt_m2o(BibRange, instance, "equal", bibreflist)
             
             # Possibly read transcription if this is 'new'
             if 'transcription' in form.changed_data:
@@ -14486,18 +14597,15 @@ class EqualGoldEdit(BasicDetails):
 class EqualGoldDetails(EqualGoldEdit):
     rtype = "html"
 
-    #def custom_init(self, instance):
-    #    # Make sure the spectypes are checked
-    #    if not instance is None:
-    #        instance.check_links()
-    #    return None
-
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
-            
+
+        # Use the 'graph' function or not?
+        use_network_graph = True
+
         oErr = ErrHandle()
         try:
 
@@ -14564,12 +14672,9 @@ class EqualGoldDetails(EqualGoldEdit):
                 team_group = app_editor
                 profile = Profile.get_user_profile(username=username)
 
-                # Make sure to delete any previous corpora of mine
-                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
-
-                # Old, extinct
-                ManuscriptCorpus.objects.filter(super=instance).delete()
-                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+                # Be sure to have the 'object' containing a link to the EqualGold instance
+                if context['object'] == None:
+                    context['object'] = instance
 
                 # New: Get all the SermonDescr instances linked with equality to SSG:
                 # But make sure the EXCLUDE those with `mtype` = `tem`
@@ -14584,9 +14689,9 @@ class EqualGoldDetails(EqualGoldEdit):
                 # List of manuscripts related to the SSG via sermon descriptions
                 manuscripts = dict(title= title_count, prefix="manu", gridclass="resizable") 
 
-                # WAS: Get all SermonDescr instances linking to the correct eqg instance
-                # qs_s = SermonDescr.objects.filter(goldsermons__equal=instance).order_by('manu__idno', 'locus')
-                                              
+                # Get all the SermonDescr instances linked with equality to SSG:
+                # But make sure the EXCLUDE those with `mtype` = `tem`
+                qs_s = SermonDescrEqual.objects.filter(super=instance).exclude(sermon__mtype="tem").order_by('sermon__msitem__manu__idno', 'sermon__locus')
                 rel_list =[]
                 method = "FourColumns"
                 method = "Issue216"
@@ -14665,6 +14770,9 @@ class EqualGoldDetails(EqualGoldEdit):
                     rel_list.append(dict(id=item.id, cols=rel_item))
                 manuscripts['rel_list'] = rel_list
 
+                # Make the number of Sermons available (confusingly called 'manuscripts')
+                context['manuscripts'] = qs_s.count()
+
                 if method == "FourColumns":
                     manuscripts['columns'] = ['Manuscript', 'Items', 'Date range', 'Sermon manifestation']
                 elif method == "Issue216":
@@ -14681,35 +14789,44 @@ class EqualGoldDetails(EqualGoldEdit):
                         '{}<span title="Keywords of the Sermon manifestation">keyw.</span>{}'.format(sort_start, sort_end),
                         ]
 
-                # Use the 'graph' function or not?
-                use_network_graph = True
-
                 # Add the manuscript to the related objects
                 related_objects.append(manuscripts)
 
                 context['related_objects'] = related_objects
 
-                # The graph also needs room in after details
+                # ======== VISUALIZATION PREPARATION ===============================
+                # (see seeker/visualizations)
+
+                # Make sure to delete any previous corpora of mine
+                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+
+                # Old, extinct
+                ManuscriptCorpus.objects.filter(super=instance).delete()
+                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+
+                # THe graph also needs room in after details
                 if use_network_graph:
+                    # Prepare the CONTEXT for network-related graphs
                     context['equalgold_graph'] = reverse("equalgold_graph", kwargs={'pk': instance.id})
                     context['equalgold_trans'] = reverse("equalgold_trans", kwargs={'pk': instance.id})
                     context['equalgold_overlap'] = reverse("equalgold_overlap", kwargs={'pk': instance.id})
+
+                # Graph that is always there: PCA
                 context['equalgold_pca'] = reverse("equalgold_pca", kwargs={'pk': instance.id})
-                context['manuscripts'] = qs_s.count()
+
+                # Prepare context for attributed author pie chart
+                context['equalgold_attr'] = reverse("equalgold_attr", kwargs={'pk': instance.id})
+
                 lHtml = []
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])
-                if context['object'] == None:
-                    context['object'] = instance
-
-                # NOTE (EK): moved to EqualGoldEdit, so that re-loading is not needed
-                #context['approval_pending'] = approval_pending(instance)
-                #context['approval_pending_list'] = approval_pending_list(instance)
 
                 # Note (EK): this must be here, see issue #508
                 lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
 
                 context['after_details'] = "\n".join(lHtml)
+
+                # ===================================================================
 
         except:
             msg = oErr.get_error_message()

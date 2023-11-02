@@ -140,6 +140,7 @@ urlpatterns = [
     url(r'^ssg/graph(?:/(?P<pk>\d+))?/$', EqualGoldGraph.as_view(), name='equalgold_graph'),
     url(r'^ssg/trans(?:/(?P<pk>\d+))?/$', EqualGoldTrans.as_view(), name='equalgold_trans'),
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
+    url(r'^ssg/attr(?:/(?P<pk>\d+))?/$', EqualGoldAttr.as_view(), name='equalgold_attr'),
     url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
     url(r'^ssg/huwa/literature/$', EqualGoldHuwaLitToJson.as_view(), name='equalgold_huwalitjson'),
     url(r'^ssg/huwa/opera/$', EqualGoldHuwaOpera.as_view(), name='equalgold_huwaopera'),
