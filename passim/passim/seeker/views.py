@@ -14820,6 +14820,9 @@ class EqualGoldDetails(EqualGoldEdit):
                 # Prepare context for origin pie chart
                 context['equalgold_origin'] = reverse("equalgold_origin", kwargs={'pk': instance.id})
 
+                # Prepare context for chronological codico date line chart
+                context['equalgold_chrono'] = reverse("equalgold_chrono", kwargs={'pk': instance.id})
+
                 lHtml = []
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])

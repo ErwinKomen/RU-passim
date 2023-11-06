@@ -1218,4 +1218,82 @@ class EqualGoldOrigin(BasicPart):
         return context
 
 
+class EqualGoldChrono(BasicPart):
+    """Division date ranges in sermons' codicological units related to this SSG"""
+
+    MainModel = EqualGold
+
+    def add_to_context(self, context):
+     
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("r"):
+                # Don't do anything
+                return context
+
+            # Need to figure out who I am
+            profile = Profile.get_user_profile(self.request.user.username)
+            instance = self.obj
+
+            # Other initializations
+
+            # Get a list of SermonDescr linking to this EqualGold
+            qs_codico = [x['sermon__msitem__codico__id'] for x in SermonDescrEqual.objects.filter(super=instance).exclude(
+                sermon__mtype="tem").order_by('sermon__msitem__codico__id').values('sermon__msitem__codico__id')]
+            if len(qs_codico) > 0:
+                # Get to the date ranges
+                weight_year = {}
+                # Get the overall minimum and maximum year
+                qExcl = ( Q(codico__yearstart=0) & Q(codico__yearfinish__gte=2000) ) | ( Q(codico__yearstart=100) & Q(codico__yearfinish=100) )
+                qs = Daterange.objects.exclude(qExcl).filter(codico__id__in=qs_codico)
+                if qs.count() > 0:
+                    # Note min_year and max_year
+                    min_year = qs.order_by('yearstart').first().yearstart
+                    max_year = qs.order_by('-yearfinish').first().yearfinish
+
+                    # Initialize dictionary of cumulative weight
+                    for year in range(min_year, max_year + 1): 
+                        weight_year[year] = 0
+
+                
+                for obj in qs_codico:
+                    # Filter out two "no date" scenario's:
+                    # 1 - min_year '0', max_year >= 2000
+                    # 2 - min_year/max_year '100'
+                    # Note the number of date-ranges for this codico
+                    qExcl = ( Q(yearstart=0) & Q(yearfinish__gte=2000) ) | ( Q(yearstart=100) & Q(yearfinish=100) )
+                    # qs = obj.codico_dateranges.exclude(qExcl)
+                    qs = Daterange.objects.filter(codico_id=obj).exclude(qExcl)
+                    num_dr = qs.count()
+
+                    # We can only continue if there are *any* datings
+                    if num_dr > 0:
+                        # Go through each date-range
+                        for oDr in qs.values('yearstart', 'yearfinish'):
+                            yearstart = oDr.get('yearstart', -1)
+                            yearfinish = oDr.get('yearfinish', -1)
+                            if yearstart < 0 or yearfinish < 0:
+                                # We have a problem
+                                iStop = 1
+                                pass
+                            else:
+                                #yearstart = min(min_year, yearstart)
+                                #yearfinish = max(max_year, yearfinish)
+                                # Calculate the weight
+                                weight = 1 / (num_dr * (yearfinish - yearstart + 1) )
+                                # Add the weight to all relevant years
+                                for year in range(yearstart, yearfinish + 1):
+                                    weight_year[year] += weight
+                
+                # Turn this into an ordered list
+                lst_data = [dict(date=x[0], value=x[1]) for x in sorted(weight_year.items())]
+
+                # The data expected is: date (year), value (our cumulative weight)
+                context['data'] = dict(codico_chrono=lst_data)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldChrono/add_to_context")
+
+        return context
 

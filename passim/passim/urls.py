@@ -142,6 +142,7 @@ urlpatterns = [
     url(r'^ssg/overlap(?:/(?P<pk>\d+))?/$', EqualGoldOverlap.as_view(), name='equalgold_overlap'),
     url(r'^ssg/attr(?:/(?P<pk>\d+))?/$', EqualGoldAttr.as_view(), name='equalgold_attr'),
     url(r'^ssg/origin(?:/(?P<pk>\d+))?/$', EqualGoldOrigin.as_view(), name='equalgold_origin'),
+    url(r'^ssg/chrono(?:/(?P<pk>\d+))?/$', EqualGoldChrono.as_view(), name='equalgold_chrono'),
     url(r'^ssg/huwa/download/$', EqualGoldHuwaToJson.as_view(), name='equalgold_huwajson'),
     url(r'^ssg/huwa/literature/$', EqualGoldHuwaLitToJson.as_view(), name='equalgold_huwalitjson'),
     url(r'^ssg/huwa/opera/$', EqualGoldHuwaOpera.as_view(), name='equalgold_huwaopera'),
