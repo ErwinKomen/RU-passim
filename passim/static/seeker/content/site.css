@@ -1175,16 +1175,17 @@ table.compact-table td:hover {
     padding: 0px 4px;
 }
 
-/* Widths for manifestations AF*/
-
-/* Width of one specific column, nodig zo?*/
+/* AF Manifestations, widths for each one specific column*/
 
 .shelfm {
     width: 20%;
 }
 
 .orprov {
-    width: 15%;
+    max-width: 75px;
+    
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .date {
@@ -1195,8 +1196,7 @@ table.compact-table td:hover {
     max-width: 0.1px;
     white-space: nowrap;
     text-overflow: ellipsis;
-    overflow: hidden;
-    
+    overflow: hidden;    
 }
 
 .item {
@@ -1208,20 +1208,47 @@ table.compact-table td:hover {
 }
 
 .attraut {
-    width: 5%;
+    width: 2%;
+}
+
+.title {
+    width: 2%;
 }
 
 .inc {
-    width: 20%;
+    width: 15%;
 }
 
 .expl {
-    width: 20%;
+    width: 15%;
+}
+
+.post_scriptum {
+    width: 5%;
+}
+
+.bible_ref {
+    width: 5%;
+}
+
+.feast_manif {
+    width: 5%;
 }
 
 .keyw {
     width: 10%;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 .codico-title {

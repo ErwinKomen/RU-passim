@@ -291,8 +291,7 @@
                             {% endif %}
                             {% for col in related.columns %}
                               <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}"
-                                  scope="{% if forloop.first and related.editable and not related.use_counter %}{% else %}col{% endif %}"  >
-                              <th class="tdnowrap" colspan="{% if forloop.first and related.editable and not related.use_counter %}2{% else %}1{% endif %}">
+                                  scope="{% if forloop.first and related.editable and not related.use_counter %}{% else %}col{% endif %}">
                                 {% if col.sortable %}
                                   <span class="sortable">
                                     <span class="glyphicon glyphicon-sort"></span>

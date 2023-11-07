@@ -14600,8 +14600,29 @@ class EqualGoldDetails(EqualGoldEdit):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        # One general item is the 'help-popup' to be shown when the user clicks on 'Author'
+        info = render_to_string('seeker/author_info.html')
+        # Need to know who this user (profile) is
+        profile = Profile.get_user_profile(self.request.user.username)
+
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
+
+        # Sections: Details / User contributions / Connections / Networks / Graphs / Manifestations
+
+        #context['sections'] = [
+        #    {'name': 'Details', 'id': 'equalgold_details', 'fields': [
+        #        {'type': 'safeline',    'label': "Author: ", 'value': instance.author_help(info), }, # plain?                     'field_key': 'newauthor'       
+        #        ]},
+        #    # {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
+        #    {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
+        #        {'type': 'safeline',    'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
+        #        # {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
+        #        # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                               
+        #        ]}]
+
+        
 
         # Use the 'graph' function or not?
         use_network_graph = True
@@ -14735,15 +14756,15 @@ class EqualGoldDetails(EqualGoldEdit):
                         #         and the provenance should also be based on the CODICO
                         or_prov = "{} ({})".format(codico.get_origin(), codico.get_provenance_markdown(table=False))
                         rel_item.append({'value': or_prov, 
-                                         'title': "Origin (if known), followed by provenances (between brackets)"}) #, 'initial': 'small'})
+                                         'title': "Origin (if known), followed by provenances (between brackets)",  'myclasses': 'orprov'}) #, 'initial': 'small'})
 
-                        # date range
+                        # Date range
                         daterange = "{}-{}".format(item.yearstart, item.yearfinish)
                         rel_item.append({'value': daterange, 'align': "right", 'myclasses': 'date'}) #, 'initial': 'small'})
 
                         # Collection(s)
-                        coll_info = item.get_collections_markdown(username, team_group)
-                        rel_item.append({'value': coll_info, 'myclasses': 'coll'}) # , 'initial': 'small'  / 
+                        #coll_info = item.get_collections_markdown(username, team_group)
+                        #rel_item.append({'value': coll_info, 'myclasses': 'coll'}) # , 'initial': 'small'  / 
 
                         # Location number and link to the correct point in the manuscript details view...
                         itemloc = "{}/{}".format(sermon.msitem.order, item.get_sermon_count())
@@ -14757,15 +14778,27 @@ class EqualGoldDetails(EqualGoldEdit):
                         # Attributed author
                         rel_item.append({'value': sermon.get_author(), 'myclasses': 'attraut'}) # , 'initial': 'small'
 
+                        # Title 
+                        rel_item.append({'value': sermon.title, 'myclasses': 'title'}) # Goed plaatsen!
+
                         # Incipit
                         rel_item.append({'value': sermon.get_incipit_markdown(), 'myclasses': 'inc' }) #, 'initial': 'small'})
 
                         # Explicit
                         rel_item.append({'value': sermon.get_explicit_markdown(), 'myclasses': 'expl'}) #, 'initial': 'small'})
 
+                        # Postscriptum
+                        rel_item.append({'value': sermon.get_postscriptum_markdown(), 'myclasses': 'post_scriptum'}) # Goed plaatsen!
+
+                        # Bible reference 
+                        rel_item.append({'value': sermon.get_bibleref(), 'myclasses': 'bible_ref '}) # Goed plaatsen!
+
+                        # Feast 
+                        rel_item.append({'value': sermon.get_feast(), 'myclasses': 'feast_manif'}) # Goed plaatsen!
+
                         # Keywords
                         rel_item.append({'value': sermon.get_keywords_markdown(), 'myclasses': 'keyw'}) # , 'initial': 'small'
-
+                        
                     # Add this Manu/Sermon line to the list
                     rel_list.append(dict(id=item.id, cols=rel_item))
                 manuscripts['rel_list'] = rel_list
@@ -14778,14 +14811,18 @@ class EqualGoldDetails(EqualGoldEdit):
                 elif method == "Issue216":
                     manuscripts['columns'] = [                                              
                         '{}<span title="Shelfmark">Shelfmark.</span>{}'.format(sort_start, sort_end),
-                        '{}<span class=orprov title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end),                         
+                        '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end),                         
                         '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end),                        
-                        '{}<span title="Collection name">coll.</span>{}'.format(sort_start, sort_end),
+                       #'{}<span title="Collection name">coll.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Item">item</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Folio number">ff</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Attributed author">attr. auth.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Title">title</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Incipit">inc.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Explicit">expl.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Postscriptum">postscr.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Bible reference">bib. ref.</span>{}'.format(sort_start, sort_end),
+                        '{}<span title="Feast">feast</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Keywords of the Sermon manifestation">keyw.</span>{}'.format(sort_start, sort_end),
                         ]
 

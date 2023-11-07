@@ -1182,7 +1182,10 @@ table.compact-table td:hover {
 }
 
 .orprov {
-    width: 15%;
+    max-width: 100px;
+    
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .date {
@@ -1205,20 +1208,47 @@ table.compact-table td:hover {
 }
 
 .attraut {
-    width: 5%;
+    width: 2%;
+}
+
+.title {
+    width: 2%;
 }
 
 .inc {
-    width: 20%;
+    width: 15%;
 }
 
 .expl {
-    width: 20%;
+    width: 15%;
+}
+
+.post_scriptum {
+    width: 5%;
+}
+
+.bible_ref {
+    width: 5%;
+}
+
+.feast_manif {
+    width: 5%;
 }
 
 .keyw {
     width: 10%;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 .codico-title {
