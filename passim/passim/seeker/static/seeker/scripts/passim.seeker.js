@@ -1402,7 +1402,7 @@ var ru = (function ($, ru) {
         }
       },
 
-        /**
+      /**
        * draw_pie_chart
        *    Show a pie-chart using D3
        *
@@ -1623,6 +1623,238 @@ var ru = (function ($, ru) {
           // THis should have drawn the pie-chart correctly
         } catch (ex) {
           private_methods.errMsg("draw_pie_chart", ex);
+        }
+      },
+
+      /**
+       * draw_line_chart
+       *    Show a line-chart using D3
+       *
+       *  The data is expected to be: 'date', 'value'
+       *  See: https://observablehq.com/@d3/line-chart
+       *
+       */
+      draw_line_chart: function (divid, data, bAddLegend) {
+        var margin = null,
+            width_g = 800,
+            height_g = 200,
+            xScale = null,
+            yScale = null,
+            xAxis = null,
+            yAxis = null,
+            bisect = null,
+            translate_h = 0,
+            translate_legend = 0,
+            width = 0,
+            height = 0,
+            viewbox = "",
+            mySvg = null,
+            svg = null,
+            legendG = null,
+            line = null,
+            path = null,
+            label = null,
+            arcLabel = null,
+            arc = null,
+            arcs = null,
+            radius = null,
+            arcRadius = null,
+            title = {
+              'super_graph_chrono': 'Dating of codicological units'
+            },
+            g = null,
+            color = null,
+            colidx = -1,    // COlor index into array [color]
+            i = 0,
+            showGuide = null,
+            openListview = null,
+            tooltip = null, showTooltip = null, moveTooltip = null, hideTooltip = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 20, left: 50 }
+          width = width_g - margin.left - margin.right;
+          height = height_g - margin.top - margin.bottom;
+
+          // Do *NOT* use a viewbox, otherwise downloading as PNG doesn't work
+          // viewbox = "0 0 970 510";
+
+          // Set up the x and y scales 
+          xScale = d3.scaleLinear(d3.extent(data, d => d.date), [margin.left, width]);
+          yScale = d3.scaleLinear([0, d3.max(data, d => d.value)], [height, margin.bottom]);
+          // yScale = d3.scaleLinear([0, 1.0], [height, margin.bottom]);
+
+          // Set up the axes (d3 v6)
+          xAxis = d3.axisBottom(xScale);
+          yAxis = d3.axisLeft(yScale).ticks(Math.floor(d3.max(data, d => d.value) * 100));
+
+          //X = d3.map(data, x);
+          //Y = d3.map(data, y);
+
+          // Clear up what was there
+          $("#" + divid).html("");
+
+          // Create an SVG top node
+          svg = d3.select("#" + divid).append("svg")
+            //.attr("width", "100%").attr("height", "100%")
+            //.attr("viewBox", viewbox)
+            .attr("width", width_g)
+            .attr("height", height_g)
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink")
+            .on("pointerenter pointermove", pointermoved)
+            .on("pointerleave", pointerleft);
+
+          // Draw the axes
+          svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height + ")")
+            .call(xAxis)
+            .append("text").attr("y", 30).attr("x", width - 20).text("Year");
+
+          svg.append("g").attr("class", "y axis")
+            .attr("transform", "translate(50,0)")
+            .call(yAxis)
+            //.call(g => g.select(".domain").remove())
+            .call(g => g.selectAll(".tick line").clone()
+                .attr("x2", width) // - margin.left - margin.right)
+                .attr("stroke-opacity", 0.1))
+            .append("text")     // This 'text' is just the title of this axis
+              .attr("transform", "rotate(-90)")
+              .attr("y", -45)       // Because of the rotation this is HORIZONTAL w.r.t. the 'zero' point
+              .attr("dy", ".71em")
+              .attr("x", -20)        // Because of the rotation this is VERTICAL w.r.t. start of "Weight" and top
+              .style("text-anchor", "end")
+              .text("Weight");
+
+          // Generate the line
+          line = d3.line()
+            .x(function (d) {return xScale(d.date);})
+            .y(function (d) {return yScale(d.value);});
+
+          // Add the line to the SGV
+          svg.append("path")
+            .datum(data)
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 1.5)
+            .attr("d", line);
+
+          //// Tooltip data respond function
+          //showTooltip = function (event, d) {
+          //  tooltip.transition().duration(100).style("opacity", 1.0);
+          //  // tooltip.html(d.length + " SSGs have a set of " + d.x0 + " sermon(s)")
+          //  tooltip.html(d.data.date +
+          //    ":</br> <b>" + d.data.value.toLocaleString() + "</b>")
+          //    .style("left", (event.x + 10) + "px")
+          //    .style("top", (event.y - 35) + "px");
+          //  // All arcs become transparent
+          //  $(event.target).closest("svg").find(".arc > path").attr("opacity", "0.2");
+          //  // I myself become my *FULL* color
+          //  $(event.target).attr("opacity", "1.0");
+          //};
+          //// Make sure the tooltip shows about where the user hovers
+          //moveTooltip = function (event, d) {
+          //  tooltip.style("left", (event.x + 10) + "px")
+          //         .style("top", (event.y - 35) + "px");
+          //};
+          //// Change the opacity again
+          //hideTooltip = function (event, d) {
+          //  tooltip.transition().duration(300).style("opacity", 0);
+          //  // Restore all colors to their original
+          //  $(event.target).closest("svg").find(".arc > path").each(function () {
+          //    $(this).attr("opacity", "0.8");
+          //  });
+          //};
+          //// Act on the CLICK function
+          //showGuide = function (event, d) {
+          //  var elDiv = null;
+          //  elDiv = $(event.target).closest("div[targeturl]");
+          //  window.location.href = $(elDiv).attr("targeturl");
+          //};
+
+          // New way to handle click function
+          openListview = function (event, d) {
+            var elDiv = null;
+            elDiv = d.data.url;
+            // window.location.href = elDiv;
+            window.open(elDiv, "_blank");
+          }
+
+          //path = d3.arc().outerRadius(radius - 10).innerRadius(0);
+          //label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
+          //arcLabel = d3.arc().innerRadius(arcRadius).outerRadius(arcRadius);
+          //arcs = line(data);
+
+          // Add the title of this graph
+          svg.append("g")
+              .attr("transform", "translate(" + (width / 2 - margin.left) + "," + 20 + ")")
+              .attr("text-anchor", "middle")
+              .append("text")
+              .text(title[divid])
+              .attr("class", "title");
+
+          // Add a tooltip <div>
+          //tooltip = d3.select("#" + divid)
+          //  .append("div").attr("class", "tooltip").style("opacity", 0);
+          tooltip = svg.append("g")
+            .attr("id", "line_toolpoint");
+
+          // Define bisect function
+          bisect = d3.bisector(function (d) {
+            return d.date;
+          }).center;
+          // Define pointerevents
+          function pointermoved(event) {
+            var i = null,
+                oRect = {},
+                path = null,
+                text = null;
+            // Start...
+            // i = d3.bisectCenter(X, xScale.invert(d3.pointer(event)[0]));
+            i = bisect(data, xScale.invert(d3.pointer(event)[0])); // - data[0].date;
+            tooltip.style("display", null);
+            tooltip.attr("transform", `translate(${xScale(data[i].date)},${yScale(data[i].value)})`);
+
+            // Define path
+            path = tooltip.selectAll("path")
+              .data([, ])
+              .join("path")
+              .attr("fill", "white")
+              .attr("stroke", "black");
+
+            text = tooltip.selectAll("text")
+              .data([, ])
+              .join("text")
+              .call(text => text
+                .selectAll("tspan")
+                .data([data[i].date, data[i].value.toFixed(3)])
+                .join("tspan")
+                  .attr("x", 0)
+                  .attr("y", (_, i) => `${i * 1.1}em`)
+                  .attr("font-weight", (_, i) => i ? null : "bold")
+                  .text(d => d));
+
+            size(text, path);
+          }
+
+          function pointerleft() {
+            tooltip.style("display", "none");
+          }
+
+          // Wraps the text with a callout path of the correct size, as measured in the page.
+          function size(text, path) {
+            var oRect, w, h, x, y;
+            oRect = text.node().getBoundingClientRect();
+            w = oRect['width'];
+            h = oRect['height'];
+            y = oRect['y'];
+            text.attr("transform", `translate(${-w / 2},${15 - y})`);
+            path.attr("d", `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+          }
+          
+
+          // THis should have drawn the line-chart correctly
+        } catch (ex) {
+          private_methods.errMsg("draw_line_chart", ex);
         }
       },
 
@@ -7134,6 +7366,85 @@ var ru = (function ($, ru) {
 
         } catch (ex) {
           private_methods.errMsg("piechart_origin", ex);
+        }
+      },
+
+      /**
+       * linechart_chrono
+       *   Create and show an attributed author pie-chart
+       *
+       */
+      linechart_chrono: function (elStart) {
+        var targeturl = "",
+            frm = null,
+            data = null,
+            chart_data = null,
+            options = {},
+            link_list = null,
+            node_list = null,
+            lock_status = "",
+            fFactor = 1.6,
+            iWidth = 1600,
+            iHeight = 300,
+            max_value = 0,
+            sOptions = "",
+            value = null,
+            divTarget = "super_graph_chrono",
+            divWait = "#super_graph_chrono_wait",
+            divLineChart = "#ssg_graph_chrono";
+
+        try {
+          // Figure out what course of action to take
+          if (private_methods.sticky_switch(elStart) === "leave") {
+            return;
+          }
+
+          // Show what we can about the piechart
+          $(divLineChart).removeClass("hidden");
+          $(divWait).removeClass("hidden");
+          $("#" + divTarget).find("svg").empty();
+
+          // Get the target url
+          frm = $(divLineChart).find("form").first();
+          targeturl = $(frm).attr("action");
+          // Get the data for the form
+          data = frm.serializeArray();
+          // Go and call...
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || typeof (response) === "string" || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              $(divWait).addClass("hidden");
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Calculate the width we have right now
+                  iWidth = $("#" + divTarget).width();
+                  // iHeight = iWidth / fFactor - 100;
+                  iHeight = $("#" + divTarget).height();
+
+                  // Get the data
+                  chart_data = response['codico_chrono'];
+
+                  // Use D3 to draw a line chart
+                  private_methods.draw_line_chart(divTarget, chart_data, true)
+
+                  break;
+                case "error":
+                  // Show the error
+                  if ('msg' in response) {
+                    $(targetid).html(response.msg);
+                  } else {
+                    $(targetid).html("An error has occurred (passim.seeker linechart_chrono)");
+                  }
+                  break;
+              }
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("linechart_chrono", ex);
         }
       },
 
