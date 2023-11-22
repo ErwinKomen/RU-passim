@@ -2145,24 +2145,31 @@ class BasicDetails(DetailView):
             # fill in the form values
             if frm and 'mainitems' in context:
                 for mobj in context['mainitems']:
-                    # Check for possible form field information
-                    if 'field_key' in mobj: 
-                        mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
-                        mobj['field_key'] = frm[mobj['field_key']]
-                    if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
-                    if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
-                    if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
+                    ## Check for possible form field information
+                    #if 'field_key' in mobj: 
+                    #    mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
+                    #    mobj['field_key'] = frm[mobj['field_key']]
+                    #if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
+                    #if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+                    #if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
 
-                    # Calculate view-mode versus any-mode
-                    #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
-                    if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
-                        mobj['allowing'] = "edit"
-                    else:
-                        mobj['allowing'] = "view"
-                    if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
-                        mobj['allowing_key_list'] = "edit"
-                    else:
-                        mobj['allowing_key_list'] = "view"
+                    ## Calculate view-mode versus any-mode
+                    ##  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
+                    #if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                    #    mobj['allowing'] = "edit"
+                    #else:
+                    #    mobj['allowing'] = "view"
+                    #if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                    #    mobj['allowing_key_list'] = "edit"
+                    #else:
+                    #    mobj['allowing_key_list'] = "view"
+                    bResult = self.process_mainitem(frm, mobj)
+
+            # Check for mainsections
+            if frm and 'mainsections' in context:
+                for section in context['mainsections']:
+                    for mobj in section['fields']:
+                        bResult = self.process_mainitem(frm, mobj)
 
             # Define where to go to after deletion
             if 'afterdelurl' not in context or context['afterdelurl'] == "":
@@ -2178,6 +2185,36 @@ class BasicDetails(DetailView):
 
         # Return the calculated context
         return context
+
+    def process_mainitem(self, frm, mobj):
+        """Process one 'mainitem' or one 'field' from 'mainsections'"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            # Check for possible form field information
+            if 'field_key' in mobj: 
+                mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
+                mobj['field_key'] = frm[mobj['field_key']]
+            if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
+            if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+            if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
+
+            # Calculate view-mode versus any-mode
+            #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
+            if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                mobj['allowing'] = "edit"
+            else:
+                mobj['allowing'] = "view"
+            if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                mobj['allowing_key_list'] = "edit"
+            else:
+                mobj['allowing_key_list'] = "view"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_mainitem")
+            bResult = False
+        return bResult
 
     def get_abs_uri(self, sName, obj):
         sBack =  "{}{}".format(self.request.get_host(), reverse(sName, kwargs={'pk': obj.id}))

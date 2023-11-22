@@ -1,0 +1,115 @@
+{% load i18n %}
+
+        <!-- Check if this may be shown or not -->
+        {% if 'empty' in mainitem and mainitem.empty == "idonly" %}
+            <tr class="hidden">
+              <td colspan="2">
+                <input id="id_{{mainitem.field_abbr}}_id" name="{{mainitem.field_abbr}}_id" type="text" value="{{mainitem.value}}" />
+              </td>
+            </tr>
+        {% elif 'empty' in mainitem and mainitem.empty == "hide" %}
+            <tr class="hidden">
+              <td colspan="2">{{mainitem.field_key}}</td>
+            </tr>
+        {% elif 'empty' not in mainitem or mainitem.empty == "hidenone" and mainitem.value != "" %}
+          <tr class="view-row {% if 'editonly' in mainitem %}edit-mode hidden{% endif %}">
+            <!-- Cell with the name of the field-->
+            <td class="tdnowrap" valign="top" {% if mainitem.title %}title="{{mainitem.title}}"{% endif %}>
+              <span {% if 'editonly' in mainitem %}style="color: gray;"{% if not mainitem.title %}title="This field is edit-only"{% endif %}{% endif %}>{{mainitem.label}}</span>
+              {% if mainitem.multiple %}
+                {% if is_app_editor or permission == "write"  %}
+                  <!-- Multiple value field, i.e. select2 -->
+                  <span>
+                    <a class="edit-mode hidden btn" 
+                       onclick="ru.basic.add_new_select2(this, '{{mainitem.fso.prefix}}' {% if 'template_selection' in mainitem %}, {{mainitem.template_selection}}{% endif %});">
+                      <span class="glyphicon glyphicon-plus"></span>
+                    </a>
+                  </span>
+                {% endif %}
+              {% endif %}
+            </td>
+
+            <!-- Cell with the value of the field (or editing) -->
+            <td class="hoverable {% if mainitem.hidden %}hidden {% endif %}"  
+                {% if mainitem.align %}align="{{mainitem.align}}"{% endif %}
+                {% if mainitem.title %}title="{{mainitem.title}}"{% endif %} style="width: 100%;">
+
+              {% if mainitem.multiple and not 'field_list' in mainitem and not mainitem.nolist %}
+                <!-- Multiple instances choosing using Select2 -->
+                <div class="{% if 'field_list' in mainitem and mainitem.allowing == "edit"  %}view-mode{% else %}any-mode{% endif %} ">
+                  {% if mainitem.value|length > 0 %}
+                    {% for subitem in mainitem.value %}
+                      <span class="keyword"><a href="{{mainitem.link}}?{{mainitem.qlist}}={{subitem.id}}">{{subitem.get_label}}</a></span>
+                    {% endfor %}
+                  {% else %}-{% endif %}
+                </div>
+                {% if 'field_list' in mainitem and  mainitem.allowing == "edit" %}
+                  <div class="edit-mode hidden">{{mainitem.field_list}}</div>
+                  {% if is_app_editor or permission == "write"  %}
+                    <div class="new-mode hidden" id="{{mainitem.fso.prefix}}_formset">
+                      {% if mainitem.unique %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
+                      {% else %}
+                        {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                {% endif %}
+
+              {% else %}
+                <!-- Basic view mode -->
+                <div class="{% if mainitem.allowing_key_list == "edit" %}view-mode{% else %}any-mode{% endif %} ">
+                  {% spaceless %}
+                  {% if mainitem.type == "bold" %}
+                    {% if mainitem.link == "" %}<b>{% if mainitem.value %}{{mainitem.value}}
+                    {% else %}-{% endif %}</b>{% else %}<a href="{{mainitem.link}}"><b>{% if mainitem.value %}{{mainitem.value}}{% else %}-{% endif %}</b></a>
+                    {% endif %}
+                  {% elif mainitem.type == "line" %}<div style="white-space: pre-line;">{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}</div>
+                  {% elif mainitem.type == "safe" %}{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}
+                  {% elif mainitem.type == "safeline" %}<div style="white-space: pre-line;">{% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}</div>
+                  {% else %}
+                    {% if mainitem.value %}{{mainitem.value|safe}}{% else %}-{% endif %}
+                  {% endif %}
+                  {% endspaceless %}
+                </div>
+
+                <!-- This is where the editable input comes -->
+                {% if mainitem.allowing == "edit" %}
+                  <div class="edit-overal">
+                    {% if 'field_ta' in mainitem and 'key_ta' in mainitem and 'field_key' in mainitem %}
+                      <div class="{{mainitem.key_ta}} hidden">{{mainitem.field_key}}</div>
+                      <div class="edit-mode hidden">{{mainitem.field_ta}}</div>
+                    {% elif 'key_hide' in mainitem %}
+                      <div class="hidden">{{mainitem.field_key}}</div>
+                    {% elif 'field_key' in mainitem %}
+                      <div class="edit-mode hidden">{{mainitem.field_key}}</div>
+                    {% elif 'field_view' in mainitem %}
+                      <div class="hidden">{{mainitem.field_view}}</div>
+                    {% elif 'field_list' in mainitem or mainitem.nolist %}
+                      {% if 'field_list' in mainitem %}
+                        <div class="edit-mode hidden" 
+                              {% if 'inline_selection' in mainitem %}select2init="{{mainitem.inline_selection}}"{% endif %}>
+                          <div class="inner">
+                            {{mainitem.field_list}}
+                          </div>
+                        </div>
+                      {% endif %}
+                      {% if 'fso' in mainitem %}
+                        {% if is_app_editor or permission == "write" %}
+                          <div class="new-mode hidden {% if mainitem.nolist %}edit-mode{% endif %}" id="{{mainitem.fso.prefix}}_formset" 
+                                {% if 'template_selection' in mainitem %}select2init="{{mainitem.template_selection}}"{% endif %}>
+                            {% if mainitem.unique %}
+                              {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield unique=1 %}
+                            {% else %}
+                              {% include 'seeker/formset_new.html' with this_formset=mainitem.fso.formsetinstance prefix=mainitem.fso.prefix linkfield=mainitem.fso.linkfield %}
+                            {% endif %}
+                          </div>
+                        {% endif %}
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+        {% endif %}

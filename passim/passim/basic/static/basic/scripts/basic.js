@@ -2200,6 +2200,10 @@ var ru = (function ($, ru) {
           // Check if we need to take the table
           if ($(elTr).hasClass("table")) {
             elTr = $(el).closest("table");
+            if ($(elTr).hasClass("edit-form")) {
+              // Go one step higher
+              elTr = $(elTr).closest("form");
+            }
           }
           // Get the view and edit values
           elView = $(el).find(".view-mode").first();

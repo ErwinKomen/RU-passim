@@ -6797,6 +6797,13 @@ class BibRangeEdit(BasicDetails):
 
         context['mainitems'] = main_items + add_links
 
+        #context['mainsections'] = [
+        #    {'name': 'Experiment', 'id': 'bib_extra', 'fields': [
+        #        {'type': 'line',  'label': "Intro:",        'value': instance.intro,        'field_key': 'intro'},
+        #        {'type': 'line',  'label': "Extra:",        'value': instance.added,        'field_key': 'added'},
+        #        ]}
+        #    ]
+
         # Signal that we have select2
         context['has_select2'] = True
 
