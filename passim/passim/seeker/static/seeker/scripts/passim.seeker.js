@@ -1681,15 +1681,13 @@ var ru = (function ($, ru) {
 
           // Set up the x and y scales 
           xScale = d3.scaleLinear(d3.extent(data, d => d.date), [margin.left, width]);
-          yScale = d3.scaleLinear([0, d3.max(data, d => d.value)], [height, margin.bottom]);
+          yScale = d3.scaleLinear([0, Math.max(1.0, d3.max(data, d => d.value))], [height, margin.bottom]);
           // yScale = d3.scaleLinear([0, 1.0], [height, margin.bottom]);
 
           // Set up the axes (d3 v6)
           xAxis = d3.axisBottom(xScale);
-          yAxis = d3.axisLeft(yScale).ticks(Math.floor(d3.max(data, d => d.value) * 100));
-
-          //X = d3.map(data, x);
-          //Y = d3.map(data, y);
+          // Allow a maximum of 5 ticks vertically
+          yAxis = d3.axisLeft(yScale).ticks(Math.floor(Math.max(1.0, d3.max(data, d => d.value)) * 5));
 
           // Clear up what was there
           $("#" + divid).html("");
@@ -1715,7 +1713,7 @@ var ru = (function ($, ru) {
             .call(yAxis)
             //.call(g => g.select(".domain").remove())
             .call(g => g.selectAll(".tick line").clone()
-                .attr("x2", width) // - margin.left - margin.right)
+                .attr("x2", width - 50) // - margin.left - margin.right)
                 .attr("stroke-opacity", 0.1))
             .append("text")     // This 'text' is just the title of this axis
               .attr("transform", "rotate(-90)")
@@ -1738,38 +1736,6 @@ var ru = (function ($, ru) {
             .attr("stroke-width", 1.5)
             .attr("d", line);
 
-          //// Tooltip data respond function
-          //showTooltip = function (event, d) {
-          //  tooltip.transition().duration(100).style("opacity", 1.0);
-          //  // tooltip.html(d.length + " SSGs have a set of " + d.x0 + " sermon(s)")
-          //  tooltip.html(d.data.date +
-          //    ":</br> <b>" + d.data.value.toLocaleString() + "</b>")
-          //    .style("left", (event.x + 10) + "px")
-          //    .style("top", (event.y - 35) + "px");
-          //  // All arcs become transparent
-          //  $(event.target).closest("svg").find(".arc > path").attr("opacity", "0.2");
-          //  // I myself become my *FULL* color
-          //  $(event.target).attr("opacity", "1.0");
-          //};
-          //// Make sure the tooltip shows about where the user hovers
-          //moveTooltip = function (event, d) {
-          //  tooltip.style("left", (event.x + 10) + "px")
-          //         .style("top", (event.y - 35) + "px");
-          //};
-          //// Change the opacity again
-          //hideTooltip = function (event, d) {
-          //  tooltip.transition().duration(300).style("opacity", 0);
-          //  // Restore all colors to their original
-          //  $(event.target).closest("svg").find(".arc > path").each(function () {
-          //    $(this).attr("opacity", "0.8");
-          //  });
-          //};
-          //// Act on the CLICK function
-          //showGuide = function (event, d) {
-          //  var elDiv = null;
-          //  elDiv = $(event.target).closest("div[targeturl]");
-          //  window.location.href = $(elDiv).attr("targeturl");
-          //};
 
           // New way to handle click function
           openListview = function (event, d) {
@@ -1778,11 +1744,6 @@ var ru = (function ($, ru) {
             // window.location.href = elDiv;
             window.open(elDiv, "_blank");
           }
-
-          //path = d3.arc().outerRadius(radius - 10).innerRadius(0);
-          //label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
-          //arcLabel = d3.arc().innerRadius(arcRadius).outerRadius(arcRadius);
-          //arcs = line(data);
 
           // Add the title of this graph
           svg.append("g")
@@ -1809,7 +1770,6 @@ var ru = (function ($, ru) {
                 path = null,
                 text = null;
             // Start...
-            // i = d3.bisectCenter(X, xScale.invert(d3.pointer(event)[0]));
             i = bisect(data, xScale.invert(d3.pointer(event)[0])); // - data[0].date;
             tooltip.style("display", null);
             tooltip.attr("transform", `translate(${xScale(data[i].date)},${yScale(data[i].value)})`);
@@ -1833,7 +1793,7 @@ var ru = (function ($, ru) {
                   .attr("font-weight", (_, i) => i ? null : "bold")
                   .text(d => d));
 
-            size(text, path);
+            size(text, path, data[i].value);
           }
 
           function pointerleft() {
@@ -1841,14 +1801,29 @@ var ru = (function ($, ru) {
           }
 
           // Wraps the text with a callout path of the correct size, as measured in the page.
-          function size(text, path) {
+          function size(text, path, value) {
             var oRect, w, h, x, y;
-            oRect = text.node().getBoundingClientRect();
+            var direction = (value < 0.5) ? "down" : "up";
+
+            // oRect = text.node().getBoundingClientRect();
+            oRect = text.node().getBBox();
             w = oRect['width'];
             h = oRect['height'];
             y = oRect['y'];
-            text.attr("transform", `translate(${-w / 2},${15 - y})`);
-            path.attr("d", `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+
+            switch (direction) {
+              case "down":
+                // Alternative: pointing downwards
+                text.attr("transform", `translate(${-w / 2},${y - 15})`);
+                path.attr("d", `M${-w / 2 - 10},-5H-5l5,5l5,-5H${w / 2 + 10}v-${h + 20}h-${w + 20}z`);
+                break;
+              default:
+                // Pointing upwards:
+                text.attr("transform", `translate(${-w / 2},${15 - y})`);
+                path.attr("d", `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+                break;
+            }
+
           }
           
 

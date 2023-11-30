@@ -2133,6 +2133,23 @@ def sync_transcriptions(oStatus):
 def scan_transcriptions(oStatus=None, oMsg=None):
     """Scan the agreed-upon server location for (new) transcription files"""
 
+    def info_differs(sCurrentInfo, oNewInfo):
+        """Compare the current with the new information on particular fields"""
+        fields = ['status', 'count', 'msg', 'lst_obj', 'tsize', 'code', 'gr', 'cl', 'wordcount', 'biblerefs', 'equal_id']
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            if not sCurrentInfo is None and sCurrentInfo != "":
+                oCurrentInfo = json.loads(sCurrentInfo)
+                for field in fields:
+                    if oCurrentInfo.get(field) != oNewInfo.get(field):
+                        bResult = True
+                        break
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("info_differs")
+        return bResult
+
     oErr = ErrHandle()
     bResult = True
     SCAN_SUBDIR = "pasta/pasta/*.xml"
@@ -2197,8 +2214,10 @@ def scan_transcriptions(oStatus=None, oMsg=None):
                             obj.fulltext = text_sermon
                             bNeedSaving= True
                         if obj.fullinfo != sFullInfo:
-                            obj.fullinfo = sFullInfo
-                            bNeedSaving= True
+                            # Need a more precise comparison between the full information
+                            if info_differs(obj.fullinfo, full_info):
+                                obj.fullinfo = sFullInfo
+                                bNeedSaving= True
                         if obj.bibleref != bibleref:
                             obj.bibleref = bibleref
                             bNeedSaving = True
