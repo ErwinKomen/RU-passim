@@ -89,7 +89,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     EqualGoldExternal, SermonGoldExternal, SermonDescrExternal, ManuscriptExternal, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, ProjectApprover, ProjectEditor, \
     Codico, ProvenanceCod, OriginCod, CodicoKeyword, Reconstruction, Free, SermonDescrLink, \
-    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, DaterangeHistColl, \
+    Project2, ManuscriptProject, CollectionProject, EqualGoldProject, SermonDescrProject, OnlineSources, DaterangeHistColl, AltPages, \
     choice_value, get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_REL, LINK_BIDIR, LINK_BIDIR_MANU, \
     LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, STYPE_MANUAL, LINK_UNSPECIFIED
 from passim.reader.views import reader_uploads, get_huwa_opera_literature, read_transcription, scan_transcriptions, sync_transcriptions
@@ -4494,8 +4494,10 @@ class SermonEdit(BasicDetails):
         ] 
 
     stype_edi_fields = ['manu', 'locus', 'author', 'sectiontitle', 'title', 'subtitle', 'incipit', 'explicit', 'fulltext',
-                        'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional', 'note',
-                        #'kwlist',
+                        'postscriptum', 'quote', 'bibnotes', 'feast', 'bibleref', 'additional',  
+                        #'kwlist', 
+                        'altpage', 'altpageslist', 
+                        'note', 'notes_altpageslist',
                         'SermonSignature', 'siglist',
                         #'CollectionSerm', 'collist_s',
                         'SermonDescrEqual', 'superlist']
@@ -4582,8 +4584,8 @@ class SermonEdit(BasicDetails):
                 {'type': 'plain', 'label': "Manuscript id",         'value': manu_id,                   'field_key': "manu",        'empty': 'hide'},
                 # --------------------------------------------
                 {'type': 'safe',  'label': "Saved item:",           'value': saveditem_button          },
-                {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"}, 
-                #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.locus,      'field_key': "locus"}, 
+                {'type': 'plain', 'label': "Locus:",                'value': instance.locus,            'field_key': "locus"},                 
+                
                 {'type': 'safe',  'label': "Attributed author:",    'value': instance.get_author(),     'field_key': 'author'},
                 {'type': 'plain', 'label': "Author certainty:",     'value': instance.get_autype(),     'field_key': 'autype', 'editonly': True},
                 {'type': 'plain', 'label': "Section title:",        'value': instance.sectiontitle,     'field_key': 'sectiontitle'},
@@ -4600,12 +4602,14 @@ class SermonEdit(BasicDetails):
                  'field_key': 'postscriptum'}, 
                 {'type': 'safe',  'label': "Transcription:",        'value': self.get_transcription(instance),
                  'field_key': 'fulltext'}, 
+                {'type': 'plain', 'label': "Alt page numbering:",   'value': instance.get_altpages(),   'field_list': "altpageslist"},
                  ]
             # Add transcription file, if possible
             if user_is_ingroup(self.request, app_editor):
                 mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
             # some more items
             mainitems_add = [
+                {'type': 'plain', 'label': "Notes alt page numbering:",   'value': instance.get_notes_altpages(), 'field_list': "notes_altpageslist"},
                                 # Issue #23: delete bibliographic notes
                 {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
                  'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
@@ -13830,28 +13834,31 @@ class EqualGoldEdit(BasicDetails):
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Status:",        'value': instance.get_stype_light(),'field_key': 'stype'},
-                {'type': 'safe',  'label': "Saved item:",    'value': saveditem_button          },
-                {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
+                {'type': 'plain', 'label': "Status:",         'value': instance.get_stype_light(),'field_key': 'stype'},
+                {'type': 'safe',  'label': "Saved item:",     'value': saveditem_button          },
+                {'type': 'plain', 'label': "Gryson/Clavis :", 'value': instance.get_signatures_markdown_equal},
+                #{'type': 'plain', 'label': "Author:",         'value': instance.author_help(info), 'field_key': 'newauthor'},
 
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
-                {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
-                {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
-                {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
-                {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
-                {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
+                # {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
+                # {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
+                # {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
+                # {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
+                # {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
 
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
                 # 'title': 'This is the automatically assigned sermon number for this particular author' },
 
                 {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
-                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
-                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
-                 'field_key': 'newfulltext'}, 
+                
+                #{'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
+                # 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+                #{'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
+                # 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                
+                 #{'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                 #'field_key': 'newfulltext'}, 
                  ]
             # Add transcription file, if possible
             if user_is_ingroup(self.request, app_editor):
@@ -13863,29 +13870,29 @@ class EqualGoldEdit(BasicDetails):
             # some more items
             mainitems_add = [
                 # Hier project    
-                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
-                 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
-                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
-                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-                {'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+                #{'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+                #{'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
+                # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
+                #{'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                #'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
+                #{'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+                #{'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
+                #{'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                #    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
                 # Project2 HIER
-                {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
+                #{'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
             
-                {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
-                    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
-                {'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
-                    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
-                {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
-                    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
-                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
-                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-                 'title': 'All the literature references associated with the Gold Sermons in this equality set'}
+                #{'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                #    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
+                #{'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
+                #    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
+                #{'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
+                #    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
+                #    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+                #{'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+                # 'title': 'All the editions associated with the Gold Sermons in this equality set'},
+                #{'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                # 'title': 'All the literature references associated with the Gold Sermons in this equality set'}
                 ]
             for oItem in mainitems_add: 
                 context['mainitems'].append(oItem)
@@ -14604,26 +14611,60 @@ class EqualGoldDetails(EqualGoldEdit):
         info = render_to_string('seeker/author_info.html')
         # Need to know who this user (profile) is
         profile = Profile.get_user_profile(self.request.user.username)
+        username = profile.user.username
+        team_group = app_editor
 
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
 
         # Sections: Details / User contributions / Connections / Networks / Graphs / Manifestations
 
-        #context['sections'] = [
-        #    {'name': 'Details', 'id': 'equalgold_details', 'fields': [
-        #        {'type': 'safeline',    'label': "Author: ", 'value': instance.author_help(info), }, # plain?                     'field_key': 'newauthor'       
-        #        ]},
-        #    # {'type': 'plain', 'label': "Author:",        'value': instance.author_help(info), 'field_key': 'newauthor'},
-        #    {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
-        #        {'type': 'safeline',    'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
-        #        # {'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
-        #        # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                               
-        #        ]}]
-
-        
-
+        context['sections'] = [
+            {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
+                {'type': 'safeline', 'label': "Author:",   'value': instance.author_help(info), 'field_key': 'newauthor'},
+                #{'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},#
+                #{'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, #
+                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
+                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
+                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
+                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                 'title': 'All the literature references associated with the Gold Sermons in this equality set'},
+                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2()},
+                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                 'field_key': 'newfulltext'}, 
+                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
+                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
+                                 
+                ]},            
+            {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
+                {'type': 'plain', 'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 
+                 'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
+                {'type': 'line',  'label': "Personal datasets:", 'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+                ]},
+            {'name': 'Connections', 'id': 'equalgold_connections', 'fields': [                
+                {'type': 'line',  'label': "Equality set:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
+                    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },                
+                {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
+                {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
+                    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
+                    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+                  ]},
+            {'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
+                ], 'template': 'seeker/af_networks.html'},
+            {'name': 'Graphs', 'id': 'equalgold_graphs', 'fields': [ 
+                ], 'template': 'seeker/af_graphs.html'},
+            {'name': 'Manifestations', 'id': 'equalgold_manifestations', 'fields': [ 
+                ], 'template': 'seeker/af_manifestations.html'},
+                  ] 
+       
         # Use the 'graph' function or not?
         use_network_graph = True
 
@@ -14670,16 +14711,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 self.redirectpage = reverse('equalgold_details', kwargs={'pk': self.object.id})
             
             elif instance != None and instance.id != None and instance.moved is None:
-                # Add sections Details / User contributions / Connections / Networks / Graphs / Manifestations
-
-                context['sections'] = [
-                    {'name': 'Details', 'id': 'coll_details', 'fields': [
-                        {'type': 'safeline', 'label': "Author:", 'value': instance.author_id},
-                        {'type': 'safeline', 'label': "Author:", 'value': instance.author_id},
-                        ]},               
-                        ]
-            
-
+                
                 # Lists of related objects
                 related_objects = []
 
@@ -14705,7 +14737,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 count = str(qs_s.count())              
 
                 # Create title with count            
-                title_count = "Manifestations" + " " + "(" + count + ")"
+                title_count = "Total: " + count              
                 
                 # List of manuscripts related to the SSG via sermon descriptions
                 manuscripts = dict(title= title_count, prefix="manu", gridclass="resizable") 
@@ -14827,9 +14859,12 @@ class EqualGoldDetails(EqualGoldEdit):
                         ]
 
                 # Add the manuscript to the related objects
-                related_objects.append(manuscripts)
+                related_objects.append(manuscripts)               
+                                
+                context['related_objects_af'] = related_objects
 
-                context['related_objects'] = related_objects
+                # Old version, without this the table is not shown automatically, only when clicking on a button
+                #context['related_objects'] = related_objects
 
                 # ======== VISUALIZATION PREPARATION ===============================
                 # (see seeker/visualizations)
@@ -14864,8 +14899,8 @@ class EqualGoldDetails(EqualGoldEdit):
                 if 'after_details' in context:
                     lHtml.append(context['after_details'])
 
-                # Note (EK): this must be here, see issue #508
-                lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
+                # Note (EK): this must be here, see issue #508 OLD
+                #lHtml.append(render_to_string('seeker/super_graph.html', context, self.request))
 
                 context['after_details'] = "\n".join(lHtml)
 

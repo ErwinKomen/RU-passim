@@ -107,6 +107,26 @@ def order_search(qs, term):
 
 # ================= WIDGETS =====================================
 
+class AltPagesWidget(ModelSelect2MultipleWidget):
+    model = AltPages
+    search_fields = [ 'altpage__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.altpage
+
+    def get_queryset(self):
+        return AltPages.objects.all().order_by('altpage').distinct()
+
+class NoteAltPagesWidget(ModelSelect2MultipleWidget):
+    model = AltPages
+    search_fields = [ 'note__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.note
+
+    def get_queryset(self):
+        return AltPages.objects.all().order_by('note').distinct()
+
 
 class AuthorOneWidget(ModelSelect2Widget):
     model = Author
@@ -1972,6 +1992,10 @@ class SermonForm(PassimModelForm):
                     widget=ManualSignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    altpages = forms.CharField(label=_("Alternative page numbering"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+    note  = forms.CharField(label=_("Alternative page numbering"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -1997,6 +2021,12 @@ class SermonForm(PassimModelForm):
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
+
+    altpageslist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=AltPagesWidget(attrs={'data-placeholder': 'Select multiple pages...', 'style': 'width: 100%;', 'class': 'searching'}))
+
+    notes_altpageslist = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=NoteAltPagesWidget(attrs={'data-placeholder': 'Select multiple note...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
@@ -2062,7 +2092,7 @@ class SermonForm(PassimModelForm):
         model = SermonDescr
         fields = ['title', 'subtitle', 'author', 'locus', 'incipit', 'explicit', 'quote', 'manu', 'mtype',  #  'feast', 
                  'feast', 'bibnotes', 'additional', 'note', 'stype', 'sectiontitle', 'postscriptum',
-                 'fulltext', 'transcription'    ]       # , 'bibleref'
+                 'fulltext', 'transcription','altpages',]       # , 'bibleref' 
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -2070,6 +2100,8 @@ class SermonForm(PassimModelForm):
                  # forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'altpages':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'note':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
                  #'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'feast':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
@@ -2079,9 +2111,9 @@ class SermonForm(PassimModelForm):
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
                  # larger areas
-                 'postscriptum':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 'postscriptum': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'quote':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 # 'bibleref':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
+                 # 'bibleref':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'additional':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'note':        forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
 
@@ -2120,6 +2152,8 @@ class SermonForm(PassimModelForm):
             self.fields['manuone'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['feastlist'].queryset = Feast.objects.all().order_by('name')
+            self.fields['altpageslist'].queryset = AltPages.objects.all().order_by('altpage')
+            self.fields['notes_altpageslist'].queryset = AltPages.objects.all().order_by('note')
             # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
@@ -2203,6 +2237,8 @@ class SermonForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
+
+                #self.fields['altpageslist'].initial = [x.pk for x in instance.sermonaltpages.all().order_by('altpage')]
 
                 # Determine the initial collections
                 self.fields['collist_m'].initial = [x.pk for x in instance.collections.filter(type='manu').order_by('name')]

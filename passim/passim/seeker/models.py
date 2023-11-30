@@ -7720,6 +7720,22 @@ class EqualGold(models.Model):
             oErr.DoError("EqualGold/get_size")
         return sBack
 
+    def get_signatures_markdown_equal(self):
+        lHtml = []
+        # The prefered sequence of codes (Gryson, Clavis, Other)
+        editype_pref_seq = ['gr', 'cl', 'ot']
+        # Use the prefered sequence of codes 
+        for editype in editype_pref_seq:        
+            # Visit all signatures 
+            sublist = Signature.objects.filter(gold__equal=self, editype=editype).order_by('code')
+            for sig in sublist:
+                # Determine where clicking should lead to
+                url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                # Create a display for this topic
+                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            sBack = ", ".join(lHtml)
+        return sBack
+
     def get_siglist(self):
         """Get HTML list of signatures associated with me"""
 
@@ -9808,7 +9824,7 @@ class SermonDescr(models.Model):
     projects = models.ManyToManyField(Project2, through="SermonDescrProject", related_name="project2_sermons")
 
     # [m] Many-to-many: one sermon can have a series of alternative page numbering systems
-    # altpages = models.ManyToManyField(AltPageNumber, related_name="altpage_sermons")
+    #altpages = models.ManyToManyField(AltPages, related_name="altpages_sermon")
 
     # ========================================================================
     # [1] Every sermondescr belongs to exactly one manuscript
@@ -11473,7 +11489,26 @@ class SermonDescr(models.Model):
         # Get the URL to edit this sermon
         sUrl = "" if self.id == None else reverse("sermon_edit", kwargs={'pk': self.id})
         return sUrl
-          
+    
+    def get_altpages(self): 
+        lHtml = []
+        # Visit all altpages
+        for altpage in self.sermonaltpages.all().order_by('altpage'):            
+            # Create a display for this topic            
+            lHtml.append(str(altpage))
+            print (lHtml) # hier gaat het nog mis
+        sBack = ", ".join(lHtml)
+        return sBack 
+    
+    def get_notes_altpages(self): 
+        lHtml = []
+        # Visit all altpages
+        for note in self.sermonaltpages.all().order_by('note'):            
+            # Create a display for this topic            
+            lHtml.append(str(note))
+            print (lHtml) # hier gaat het nog mis
+        sBack = ", ".join(lHtml)
+        return sBack 
 
 class Range(models.Model):
     """A range in the bible from one place to another"""
@@ -13161,3 +13196,22 @@ class OnlineSources(models.Model):
         return sBack
 
 
+class AltPages(models.Model):
+    """One or more alternative pages that are be linked to a Manifestation (SermonDescr)"""
+      
+    # [1] Each alternative page combination is linked to a SermonDescr
+    sermon = models.ForeignKey(SermonDescr, related_name="sermonaltpages", on_delete=models.CASCADE)    
+    # [1] And a date: the date of saving this alternative pages
+    #created = models.DateTimeField(default=get_current_datetime)
+    # [0-1] Aternative location of this sermon 
+    altpage = models.CharField("Locus", null=True, blank=True, max_length=LONG_STRING)
+    # [0-1] Note on the alternative pages
+    note = models.TextField("Note on the alternative pages", blank=True, null=True)
+    
+    def __str__(self):
+        sAltpage = self.altpage
+        if sAltpage == None or sAltpage == "":
+            sAltpage = "(no alt pages)"
+        return sAltpage
+    
+    
