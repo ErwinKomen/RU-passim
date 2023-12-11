@@ -360,3 +360,5 @@ ModelManifest.xml
 /installtree.txt
 /requirements_aug2023.txt
 /passim/passim/basic/templates/basic/basic_edit_ORG.html
+/passim/passim/cms/migrations/0001_initial.py
+/passim/passim/cms/migrations/0002_citem_original.py

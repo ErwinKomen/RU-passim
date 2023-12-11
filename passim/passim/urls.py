@@ -22,6 +22,7 @@ from passim.dct.views import *
 from passim.stemma.views import *
 from passim.reader.views import *
 from passim.enrich.views import *
+from passim.cms.views import *
 from passim.reader.excel import ManuscriptUploadExcel, ManuscriptUploadJson, ManuscriptUploadGalway, LibraryUploadExcel, \
     SermonGoldUploadJson, EqualGoldUploadEdilit
 from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChangeUserEdit, EqualChangeUserDetails, \
@@ -398,6 +399,21 @@ urlpatterns = [
     url(r'^api/search/ecodex/$', passim.seeker.views.search_ecodex, name='search_ecodex'),
     url(r'^api/gold/get(?:/(?P<pk>\d+))?/$', passim.seeker.views.get_gold, name='get_gold'),
     url(r'^api/comment/send/$', CommentSend.as_view(), name='comment_send'),
+
+    # ================ CMS ========================================================================
+    url(r'^cpage/list', CpageListView.as_view(), name='cpage_list'),
+    url(r'^cpage/details(?:/(?P<pk>\d+))?/$', CpageDetails.as_view(), name='cpage_details'),
+    url(r'^cpage/edit(?:/(?P<pk>\d+))?/$', CpageEdit.as_view(), name='cpage_edit'),
+    url(r'^cpage/clocation/add(?:/(?P<pk>\d+))?/$', CpageAdd.as_view(), name='cpage_add_loc'),
+
+    url(r'^clocation/list', ClocationListView.as_view(), name='clocation_list'),
+    url(r'^clocation/details(?:/(?P<pk>\d+))?/$', ClocationDetails.as_view(), name='clocation_details'),
+    url(r'^clocation/edit(?:/(?P<pk>\d+))?/$', ClocationEdit.as_view(), name='clocation_edit'),
+    url(r'^clocation/citem/add(?:/(?P<pk>\d+))?/$', ClocationAdd.as_view(), name='clocation_add_item'),
+
+    url(r'^citem/list', CitemListView.as_view(), name='citem_list'),
+    url(r'^citem/details(?:/(?P<pk>\d+))?/$', CitemDetails.as_view(), name='citem_details'),
+    url(r'^citem/edit(?:/(?P<pk>\d+))?/$', CitemEdit.as_view(), name='citem_edit'),
 
     # ================ Any READER APP URLs should come here =======================================
     url(r'^reader/import/ecodex/$', ReaderEcodex.as_view(), name='import_ecodex'),
