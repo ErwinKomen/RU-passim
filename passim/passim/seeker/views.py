@@ -13906,6 +13906,61 @@ class EqualGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
 
+            ## HIER SECTIONS ?
+
+            context['mainsections'] = [
+                {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
+                    {'type': 'line', 'label': "Author:",   'value': instance.author_help(info), 'field_key': 'newauthor'},
+                
+                {'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},#
+                {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, #
+                
+                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
+                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
+                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
+                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
+                 {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
+                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
+                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
+                 'title': 'All the literature references associated with the Gold Sermons in this equality set'},
+                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
+                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2()},
+                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                 'field_key': 'newfulltext'}, 
+                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
+                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
+                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
+                                 
+                 ]},            
+            
+            {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
+                {'type': 'plain', 'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 
+                 'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
+                {'type': 'line',  'label': "Personal datasets:", 'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+                ]},
+            
+            {'name': 'Connections', 'id': 'equalgold_connections', 'fields': [                
+                {'type': 'line',  'label': "Equality set:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
+                    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },                
+                {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
+                {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
+                    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
+                    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
+                  ]},
+            #{'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
+            #    ], 'template': 'seeker/af_networks.html'},
+            #{'name': 'Graphs', 'id': 'equalgold_graphs', 'fields': [ 
+            #    ], 'template': 'seeker/af_graphs.html'},
+            #{'name': 'Manifestations', 'id': 'equalgold_manifestations', 'fields': [ 
+            #    ], 'template': 'seeker/af_manifestations.html'},
+            #      
+                 ]
+
+
+
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
@@ -14624,46 +14679,10 @@ class EqualGoldDetails(EqualGoldEdit):
         # Start by executing the standard handling
         context = super(EqualGoldDetails, self).add_to_context(context, instance)
 
-        # Sections: Details / User contributions / Connections / Networks / Graphs / Manifestations
+        # Sections: Networks / Graphs / Manifestations
 
         context['sections'] = [
-            {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
-                {'type': 'safeline', 'label': "Author:",   'value': instance.author_help(info), 'field_key': 'newauthor'},
-                #{'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},#
-                #{'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, #
-                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
-                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
-                {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
-                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-                 'title': 'All the literature references associated with the Gold Sermons in this equality set'},
-                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2()},
-                {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
-                 'field_key': 'newfulltext'}, 
-                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
-                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
-                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-                                 
-                ]},            
-            {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
-                {'type': 'plain', 'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 
-                 'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
-                {'type': 'line',  'label': "Personal datasets:", 'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
-                ]},
-            {'name': 'Connections', 'id': 'equalgold_connections', 'fields': [                
-                {'type': 'line',  'label': "Equality set:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
-                    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },                
-                {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
-                    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
-                {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
-                    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
-                  ]},
+            
             {'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
                 ], 'template': 'seeker/af_networks.html'},
             {'name': 'Graphs', 'id': 'equalgold_graphs', 'fields': [ 
