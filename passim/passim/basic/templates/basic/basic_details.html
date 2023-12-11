@@ -170,10 +170,12 @@
               <div class="row">
                 <div class="col-md-12">
                 {% for section in sections %}
-                  <span>
-                    <a class="btn btn-s jumbo-1" role="button" targetid="{{section.id}}" title="Show/Hide {{section.name}}"
-                       onclick="ru.basic.toggle_click(this);">{{section.name}}</a>
-                  </span>
+                  {% if not section.nobutton %}
+                    <span>
+                      <a class="btn btn-s jumbo-1" role="button" targetid="{{section.id}}" title="Show/Hide {{section.name}}"
+                         onclick="ru.basic.toggle_click(this);">{{section.name}}</a>
+                    </span>
+                  {% endif %}
                 {% endfor %}
                 </div>
               </div>
