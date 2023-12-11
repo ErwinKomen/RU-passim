@@ -13832,8 +13832,8 @@ class EqualGoldEdit(BasicDetails):
                 {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
                     {'type': 'line', 'label': "Author:",   'value': instance.author_help(info), 'field_key': 'newauthor'},
                 
-                {'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},#
-                {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, #
+                {'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
+                {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, 
                 
                 {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
                  'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
@@ -13869,17 +13869,8 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
                     'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
                     'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
-                  ]},
-            #{'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
-            #    ], 'template': 'seeker/af_networks.html'},
-            #{'name': 'Graphs', 'id': 'equalgold_graphs', 'fields': [ 
-            #    ], 'template': 'seeker/af_graphs.html'},
-            #{'name': 'Manifestations', 'id': 'equalgold_manifestations', 'fields': [ 
-            #    ], 'template': 'seeker/af_manifestations.html'},
-            #      
+                  ]},           
                  ]
-
-
 
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
