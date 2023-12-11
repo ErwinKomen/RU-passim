@@ -13767,11 +13767,11 @@ class EqualGoldEdit(BasicDetails):
                 #{'type': 'plain', 'label': "Author:",         'value': instance.author_help(info), 'field_key': 'newauthor'},
 
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
-                # {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
-                # {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
-                # {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
-                # {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
-                # {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
+                {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
+                {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
+                {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
 
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
@@ -13905,27 +13905,33 @@ class EqualGoldEdit(BasicDetails):
                 # Special processing for those with editing rights
                 if may_edit_project(self.request, profile, instance):
 
-                    # Adapt the PROJECT line in the mainitems list
-                    for oItem in context['mainitems']:
-                        if oItem['label'] == "Project:":
-                            # Add the list
-                            oItem['field_list'] = "projlist"
-                            # We can now leave from here
-                            break
-                    # Any editor may suggest that an SSG be added to other project(s)
-                    oItem = dict(type="plain", 
-                                 label="Add to project",
-                                 title="Submit a request to add this SSG to the following project(s)",
-                                 value=self.get_prj_submitted(instance, "other", profile))
-                    oItem['field_list'] = "addprojlist"
-                    context['mainitems'].append(oItem)
-                    # Any editor may suggest that an SSG be deleted from particular project(s)
-                    oItem = dict(type="plain", 
-                                 label="Remove from project",
-                                 title="Submit a request to remove this SSG from the following project(s)",
-                                 value=self.get_prj_submitted(instance, 'current'))
-                    oItem['field_list'] = "delprojlist"
-                    context['mainitems'].append(oItem)
+                    for oMainSection in context['mainsections']:
+                        oMainItems = oMainSection['fields']
+                        # Adapt the PROJECT line in the mainitems list
+                        for oItem in oMainItems:
+                            if oItem['label'] == "Project:":
+                                # Add the list
+                                oItem['field_list'] = "projlist"
+                                # We can now leave from here
+                                break
+
+                        # Any editor may suggest that an SSG be added to other project(s)
+                        oItem = dict(type="plain", 
+                                     label="Add to project",
+                                     title="Submit a request to add this SSG to the following project(s)",
+                                     value=self.get_prj_submitted(instance, "other", profile))
+                        oItem['field_list'] = "addprojlist"
+                        #context['mainitems'].append(oItem)
+                        oMainSection['fields'].append(oItem)
+
+                        # Any editor may suggest that an SSG be deleted from particular project(s)
+                        oItem = dict(type="plain", 
+                                     label="Remove from project",
+                                     title="Submit a request to remove this SSG from the following project(s)",
+                                     value=self.get_prj_submitted(instance, 'current'))
+                        oItem['field_list'] = "delprojlist"
+                        # context['mainitems'].append(oItem)
+                        oMainSection['fields'].append(oItem)
 
                 # THe SSG items that have a value in *moved* may not be editable
                 editable = (instance.moved == None)
@@ -14592,7 +14598,8 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Sections: Networks / Graphs / Manifestations
 
-        context['mainsections'] += [
+        #context['mainsections'] += [
+        context['sections'] = [
             
             {'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
                 ], 'template': 'seeker/af_networks.html'},
