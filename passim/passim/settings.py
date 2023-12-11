@@ -131,6 +131,7 @@ INSTALLED_APPS = [
     'passim.basic',
     'passim.approve',
     'passim.bible',
+    'passim.cms',
     'passim.reader',
     'passim.seeker',
     'passim.dct',
