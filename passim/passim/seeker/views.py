@@ -14601,7 +14601,7 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Sections: Networks / Graphs / Manifestations
 
-        context['sections'] = [
+        context['mainsections'] += [
             
             {'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
                 ], 'template': 'seeker/af_networks.html'},

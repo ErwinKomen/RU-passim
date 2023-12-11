@@ -123,6 +123,11 @@
             {% endfor %}
           </tbody>
         </table>
+        {% if section.template %}
+          <div>
+              {% include section.template %}
+          </div>
+        {% endif %}
 
       </div>
     {% endfor %}
