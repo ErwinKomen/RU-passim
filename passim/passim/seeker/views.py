@@ -13879,8 +13879,6 @@ class EqualGoldEdit(BasicDetails):
             #      
                  ]
 
-
-
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
@@ -14607,7 +14605,8 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Sections: Networks / Graphs / Manifestations
 
-        context['mainsections'] += [
+        #context['mainsections'] += [
+        context['sections'] = [
             
             {'name': 'Networks', 'id': 'equalgold_networks', 'fields': [ 
                 ], 'template': 'seeker/af_networks.html'},
