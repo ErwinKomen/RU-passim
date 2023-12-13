@@ -110,26 +110,28 @@
 
     <!-- Room for each section -->
     {% for section in mainsections %}
-      <div id="{{section.id}}" class="hidden panel panel-default">
-        <!-- Show this section in a standard way -->
-        <h4>{{section.name}}</h4>
+      {% if not section.button %}
+        <div id="{{section.id}}" class="hidden panel panel-default">
+          <!-- Show this section in a standard way -->
+          <h4>{{section.name}}</h4>
 
-        <table style="width: 100%;">
-          <tbody>
-            <!-- Walk all the fields in this section -->
-            {% for mainitem in section.fields %}
-              <!-- Load the appropriate row -->
-              {% include 'basic/basic_row.html' with mainitem=mainitem %}
-            {% endfor %}
-          </tbody>
-        </table>
-        {% if section.template %}
-          <div>
-              {% include section.template %}
-          </div>
-        {% endif %}
+          <table style="width: 100%;">
+            <tbody>
+              <!-- Walk all the fields in this section -->
+              {% for mainitem in section.fields %}
+                <!-- Load the appropriate row -->
+                {% include 'basic/basic_row.html' with mainitem=mainitem %}
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if section.template %}
+            <div>
+                {% include section.template %}
+            </div>
+          {% endif %}
 
-      </div>
+        </div>
+      {% endif %}
     {% endfor %}
     
   {% endif %}
