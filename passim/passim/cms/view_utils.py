@@ -51,19 +51,20 @@ def cms_translate(page, mainitems):
             for oItem in mainitems:
                 # Check if it has a title
                 title = oItem.get("title")
-                if not title is None:
-                    # Get the key and get the label
-                    label = oItem.get("label")
-                    fname = oItem.get("field_key")
+                # Note: if there is no 'title' defined by default, then NONE will result
+                # if not title is None:
+                # Get the key and get the label
+                label = oItem.get("label")
+                fname = oItem.get("field_key")
+                if fname is None:
+                    fname = oItem.get("field_list")
                     if fname is None:
-                        fname = oItem.get("field_list")
-                        if fname is None:
-                            fname = None
-                    # Get or add this
-                    newtitle = cms(page, fname, title, label=label)
-                    # Replace if needed
-                    if newtitle != title:
-                        oItem['title'] = newtitle
+                        fname = None
+                # Get or add this
+                newtitle = cms(page, fname, title, label=label)
+                # Replace if needed
+                if newtitle != title:
+                    oItem['title'] = newtitle
 
     except:
         msg = oErr.get_error_message()
