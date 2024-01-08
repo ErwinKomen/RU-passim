@@ -7,6 +7,7 @@ import re
 import json
 import os
 import csv
+import sqlite3
 import pandas as pd
 from unidecode import unidecode
 from passim.settings import MEDIA_DIR
@@ -26,7 +27,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, OnlineSources, \
-    ProjectApprover, ProjectEditor, \
+    ProjectApprover, ProjectEditor, ManuscriptExternal, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur, OperaLit
@@ -34,10 +35,11 @@ from passim.reader.views import read_kwcategories
 
 
 adaptation_list = {
-    "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
-                        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-                        'supplyname', 'usersearch_params'],
+    "manuscript_list": [
+        'sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
+        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
+        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
+        'supplyname', 'usersearch_params', 'huwamanudate'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
@@ -705,6 +707,150 @@ def adapt_huwaeditions():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def read_huwa():
+    oErr = ErrHandle()
+    table_info = {}
+    try:
+        # Get the location of the HUWA database
+        huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+        with sqlite3.connect(huwa_db) as db:
+            standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+            cursor = db.cursor()
+            db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+            tables = [x[0] for x in db_results]
+
+            count_tbl = len(tables)
+
+            # Walk all tables
+            for table_name in tables:
+                oInfo = {}
+                # Find out what fields this table has
+                db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                fields = []
+                for field in db_results:
+                    field_name = field[1]
+                    fields.append(field_name)
+
+                    field_info = dict(type=field[2],
+                                        not_null=(field[3] == 1),
+                                        default=field[4])
+                    oInfo[field_name] = field_info
+                oInfo['fields'] = fields
+                oInfo['links'] = []
+
+                # Read the table
+                table_contents = cursor.execute("SELECT * FROM {}".format(table_name)).fetchall()
+                oInfo['contents'] = table_contents
+
+                table_info[table_name] = oInfo
+
+            # Close the database again
+            cursor.close()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("read_huwa")
+    # Return the table that we found
+    return table_info
+
+def get_huwa_tables(table_info, lst_names):
+    """Read all tables in [lst_names] from [table_info]"""
+
+    oErr = ErrHandle()
+    oTables = {}
+    try:
+        for sName in lst_names:
+            oTable = table_info[sName]
+            lFields = oTable['fields']
+            lContent = oTable['contents']
+            lTable = []
+            for lRow in lContent:
+                oNew = {}
+                for idx, oPart in enumerate(lRow):
+                    oNew[lFields[idx]] = oPart
+                lTable.append(oNew)
+            oTables[sName] = lTable
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_huwa_tables")
+
+    return oTables
+
+def adapt_huwamanudate():
+    """Adapt the daterange table and date fields in Codico and Manuscript for those that have been read fromHUWA"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    huwa_tables = ['handschrift']
+    try:
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+        # Get the table of handschrift
+        lHandschrift = tables['handschrift']
+
+        # Walk the handschrift table
+        with transaction.atomic():
+            for oHandschrift in lHandschrift:
+                externalid = oHandschrift.get("id") 
+                # Get the century information
+                saeculum = oHandschrift.get("saeculum")
+                if not saeculum is None:
+                    # Get the Manuscript, Codico and Daterange (in Passim)
+                    external = ManuscriptExternal.objects.filter(externalid=externalid).first()
+                    if not external is None:
+                        # Get the manuscript, codico and daterang
+                        manu = external.manu
+                        codico = manu.manuscriptcodicounits.first()
+                        daterange = codico.codico_dateranges.first()
+                        # We now have a number
+                        saeculum= int(saeculum)
+                        # Action depends in the particular number
+                        if saeculum == 100 and not daterange is None:
+                            # This needs special treatment: 
+                            # 1 - either remove the manuscript info
+                            # 2 - or set it to 1000-1600 to indicate we don't really know
+                            yearstart = 900
+                            yearfinish = 1600
+                            # Remove the daterange
+                            daterange.delete()
+                            # Set the values in codico and manu
+                            codico.yearstart = yearstart
+                            codico.yearfinish = yearfinish
+                            manu.yearstart = yearstart
+                            manu.yearfinish = yearfinish
+                            # Save them
+                            codico.save()
+                            manu.save()
+                        elif not daterange is None and saeculum > 0:
+                            # Calculate the proper daterange
+                            yearstart = (saeculum - 1) * 100
+                            yearfinish = yearstart + 99
+                            # Do we need changing?
+                            if daterange.yearstart != yearstart or daterange.yearfinish != yearfinish:
+                                # Set the daterange, codico and manu
+                                daterange.yearstart = yearstart
+                                daterange.yearfinish = yearfinish
+                                codico.yearstart = yearstart
+                                codico.yearfinish = yearfinish
+                                manu.yearstart = yearstart
+                                manu.yearfinish = yearfinish
+                                # Save them
+                                daterange.save()
+                                codico.save()
+                                manu.save()
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 # =========== Part of sermon_list ==================
 def adapt_nicknames():
