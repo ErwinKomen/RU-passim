@@ -11510,6 +11510,7 @@ class SermonDescr(models.Model):
         sBack = ", ".join(lHtml)
         return sBack 
 
+
 class Range(models.Model):
     """A range in the bible from one place to another"""
 
