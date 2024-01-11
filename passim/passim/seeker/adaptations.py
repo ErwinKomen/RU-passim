@@ -40,7 +40,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate'],
-    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt'], # 'huwafolionumbers'],
+    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -1039,12 +1039,12 @@ def adapt_huwainhalt():
                 # We need to specify an additional filter for locus
                 qs = qs.filter(locus=sLocus)
                 if qs.count() > 1:
-                    oErr.Status("adapt_huwafolionumbers/get_sermon too many sermons for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
+                    oErr.Status("adapt_huwainhalt/get_sermon too many sermons for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
                     x = qs.last()
                 else:
                     obj = qs.first()
             elif qs.count() == 0:
-                oErr.Status("adapt_huwafolionumbers/get_sermon NO sermon for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
+                oErr.Status("adapt_huwainhalt/get_sermon NO sermon for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
 
             if not obj is None and not bProcessed:
                 # Add in results
@@ -1134,13 +1134,13 @@ def adapt_huwafolionumbers():
             # Calculate from
             lst_from = []
             if not von_bis is None: lst_from.append(von_bis)
-            if von_rv != "": lst_from.append(".{}".format(von_rv))
+            if von_rv != "": lst_from.append("{}".format(von_rv))
             sFrom = "".join(lst_from)
 
             # Calculate until
             lst_until = []
             if not bis_f is None: lst_until.append(bis_f)
-            if bis_rv != "": lst_until.append(".{}".format(bis_rv))
+            if bis_rv != "": lst_until.append("{}".format(bis_rv))
             sUntil = "".join(lst_until)
 
             # Combine the two
@@ -1211,10 +1211,12 @@ def adapt_huwafolionumbers():
         lInhalt = tables['inhalt']
         len_inhalt = len(lInhalt)
         iCount = 0
+        iNoNeed = 0
         for idx, oInhalt in enumerate(lInhalt):
             # Show where we are
             if (idx + 1) % 100 == 0:
-                oErr.Status("Processing {}/{} changes: {}".format(idx+1, len_inhalt, iCount))
+                oErr.Status("Processing {}/{} changes: {} leaving: {}".format(
+                    idx+1, len_inhalt, iCount, iNoNeed))
 
             bNeedAdaptation = False
 
@@ -1257,18 +1259,22 @@ def adapt_huwafolionumbers():
                             oResult = dict(sermon_id=sermon.id, locus=sLocus)
                             lst_result.append(oResult)
 
-                        #sermon.save()
-        # Do we have candidates to be processed?
-        if len(lst_result) > 0:
-            # Change them all together
-            with transaction.atomic():
-                for oResult in lst_result:
-                    sermon_id = oResult.get("sermon_id")
-                    locus = oResult.get("locus")
-                    sermon = SermonDescr.objects.filter(id=sermon_id).first()
-                    if not sermon is None:
-                        sermon.locus = locus
-                        sermon.save()
+                            # Be sure to save the sermon, when a change has occurred
+                            sermon.save()
+                        else:
+                            # No need to change this one
+                            iNoNeed += 1
+        ## Do we have candidates to be processed?
+        #if len(lst_result) > 0:
+        #    # Change them all together
+        #    with transaction.atomic():
+        #        for oResult in lst_result:
+        #            sermon_id = oResult.get("sermon_id")
+        #            locus = oResult.get("locus")
+        #            sermon = SermonDescr.objects.filter(id=sermon_id).first()
+        #            if not sermon is None:
+        #                sermon.locus = locus
+        #                sermon.save()
 
 
         # Everything has been processed correctly now
