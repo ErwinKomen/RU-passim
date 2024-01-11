@@ -40,7 +40,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate'],
-    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt', 'huwafolionumbers'],
+    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt'], # 'huwafolionumbers'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
