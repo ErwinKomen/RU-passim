@@ -5,7 +5,7 @@ Definition of forms.
 from django import forms
 from django.core import validators
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django.db.models import F, Case, Value, When, IntegerField

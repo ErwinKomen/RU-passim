@@ -1112,6 +1112,7 @@ var ru = (function ($, ru) {
         var elSpan = null,
             copyText = null,
             textarea = null,
+            text_to_copy = "",
             range = null,
             selector = null,
             bgcol = null,
@@ -1123,27 +1124,56 @@ var ru = (function ($, ru) {
           elSpan = $(el).closest("div").find("textarea").first();
           if (elSpan.length === 0) {
             elSpan = $(el).closest("div").find("span.stable").first();
-            textarea = document.getElementById(tmp);
-            if (textarea === undefined || textarea === null) {
-              textarea = document.createElement("textarea");
-              textarea.id = tmp;
-              document.body.appendChild(textarea);
+            text_to_copy = $(elSpan).text().trim();
+
+            // Check if we can use navigator or not
+            if (!navigator.clipboard) {
+              // Use the old commandExec() way
+              textarea = document.getElementById(tmp);
+              if (textarea === undefined || textarea === null) {
+                textarea = document.createElement("textarea");
+                textarea.id = tmp;
+                document.body.appendChild(textarea);
+              }
+              textarea.style.height = 0;
+              textarea.value = text_to_copy;
+              $(textarea).removeClass("hidden");
+
+              selector = document.querySelector("#" + tmp);
+              selector.select();
+              document.execCommand("copy");
+              if (bg_color !== undefined) {
+                // Get current bg color
+                bgcol = $(el).css('background-color');
+                // Temporarily show the background color
+                $(el).css('background-color', bg_color);
+                window.setTimeout(function () {
+                  $(el).css('background-color', bgcol);
+                  $(textarea).addClass("hidden");
+                },
+                  1000);
+              }
+            } else {
+              navigator.clipboard.writeText(text_to_copy).then(function () {
+                  // Show success
+                  if (bg_color !== undefined) {
+                    // Get current bg color
+                    bgcol = $(el).css('background-color');
+                    // Temporarily show the background color
+                    $(el).css('background-color', bg_color);
+                    window.setTimeout(function () {
+                      $(el).css('background-color', bgcol);
+                      $(textarea).addClass("hidden");
+                    },
+                      3000);
+                  }
+                })
+                .catch( function () {
+                    alert("err"); // error
+                  });
             }
-            textarea.style.height = 0;
-            textarea.value = $(elSpan).text().trim();
-            selector = document.querySelector("#" + tmp);
-            selector.select();
-            document.execCommand("copy");
-            if (bg_color !== undefined) {
-              // Get current bg color
-              bgcol = $(el).css('background-color');
-              // Temporarily show the background color
-              $(el).css('background-color', bg_color);
-              window.setTimeout(function () {
-                $(el).css('background-color', bgcol);
-              },
-              1000);
-            }
+
+    
           } else {
             copyText = document.getElementById("search_copy");
             copyText.select();

@@ -8,7 +8,7 @@
 {% if LANGUAGE_BIDI %}<link rel="stylesheet" type="text/css" href="{% block stylesheet_rtl %}{% static "admin/css/rtl.css" %}{% endblock %}" />{% endif %}
 {% block extrahead %}{% endblock %}
 {% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE" />{% endblock %}
-    {% load staticfiles %}
+    {% load static %}
     {% load static %}
     <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/bootstrap.min.css' %}" />
     <link rel="stylesheet" type="text/css" href="{% static 'seeker/content/site.css' %}" />

@@ -363,3 +363,5 @@ ModelManifest.xml
 /passim/passim/cms/migrations/0001_initial.py
 /passim/passim/cms/migrations/0002_citem_original.py
 /passim/passim/plugin/migrations
+/passim/passim/cms/migrations/0003_auto_20240124_1207.py
+/passim/req_tmp.txt

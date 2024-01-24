@@ -100,7 +100,7 @@ from passim.approve.views import approval_parse_changes, approval_parse_formset,
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
+from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search, is_ajax
 
 # ======= from RU-cms ==========================
 from passim.seeker.views_utils import passim_action_add, passim_get_history
@@ -3107,7 +3107,7 @@ def get_manuscripts(request):
     data = 'fail'
     errHandle = ErrHandle()
     # Only allow AJAX calls with POST
-    if request.is_ajax() and request.method == "POST":
+    if is_ajax(request) and request.method == "POST":
         get = request.POST
         # Get parameters city and library
         city = get.get("city", "")
@@ -3181,7 +3181,7 @@ def get_countries(request):
 
     data = 'fail'
     method = "useLocation"
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('country', '')
@@ -3213,7 +3213,7 @@ def get_cities(request):
 
     data = 'fail'
     method = "useLocation"
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             # Get the user-specified 'country' and 'city' strings
@@ -3279,7 +3279,7 @@ def get_libraries(request):
     """Get a list of libraries for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             # Get the user-specified 'country' and 'city' strings
@@ -3340,7 +3340,7 @@ def get_origins(request):
     """Get a list of origin names for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         sName = request.GET.get('name', '')
         lstQ = []
         lstQ.append(Q(name__icontains=sName))
@@ -3360,7 +3360,7 @@ def get_locations(request):
     """Get a list of location names for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('name', '')
@@ -3387,7 +3387,7 @@ def get_litref(request):
     """Get ONE particular short representation of a litref"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3412,7 +3412,7 @@ def get_litrefs(request):
     """Get a list of literature references for autocomplete"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('name', '')
@@ -3438,7 +3438,7 @@ def get_sg(request):
     """Get ONE particular short representation of a SG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3463,7 +3463,7 @@ def get_sglink(request):
     """Get ONE particular short representation of a *link* to a SG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3488,7 +3488,7 @@ def get_ssglink(request):
     """Get ONE particular short representation of a *link* from sermondescr to a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3513,7 +3513,7 @@ def get_ssg2ssg(request):
     """Get ONE particular short representation of a *link* from SSG to a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3539,7 +3539,7 @@ def get_ssg(request):
     """Get ONE particular short representation of a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3564,7 +3564,7 @@ def get_ssgdist(request):
     """Get ONE particular short representation of a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3593,7 +3593,7 @@ def get_manuidnos(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             idno = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(idno__icontains=idno))
@@ -3616,7 +3616,7 @@ def get_authors(request):
     """Get a list of authors for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         author = request.GET.get("name", "")
         lstQ = []
         lstQ.append(Q(name__icontains=author)|Q(abbr__icontains=author))
@@ -3638,7 +3638,7 @@ def get_nicknames(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(name__icontains=author))
@@ -3663,7 +3663,7 @@ def get_gldincipits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
@@ -3691,7 +3691,7 @@ def get_srmincipits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
@@ -3717,7 +3717,7 @@ def get_gldexplicits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchexplicit__icontains=author))
@@ -3743,7 +3743,7 @@ def get_srmexplicits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchexplicit__icontains=author))
@@ -3769,7 +3769,7 @@ def get_gldsignatures(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the editype, if that is specified
             editype = request.GET.get("type", "")
             # Get the complete code line, which could use semicolon-separation
@@ -3805,7 +3805,7 @@ def get_srmsignatures(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             codename = request.GET.get("name", "")
             editype = request.GET.get("type", "")
             lstQ = []
@@ -3831,7 +3831,7 @@ def get_sermosig(request):
     """Get the correct GOLD signature, given a SERMON signature"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3856,7 +3856,7 @@ def get_editions(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(name__icontains=author))
@@ -3881,7 +3881,7 @@ def get_keywords(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the complete code line, which could use semicolon-separation
             kwline = request.GET.get("name", "")
             kwlist = kwline.split(";")
@@ -3909,7 +3909,7 @@ def get_collections(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the complete code line, which could use semicolon-separation
             coll_line = request.GET.get("name", "")
             coll_list = coll_line.split(";")
@@ -3938,7 +3938,7 @@ def get_gold(request, pk=None):
     data = {'status': 'fail'}
     fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
     try:
-        if request.is_ajax() and user_is_authenticated(request):
+        if is_ajax(request) and user_is_authenticated(request):
             # Get the id of the gold sermon
             qd = request.GET if request.method == "GET" else request.POST
             goldid = qd.get("goldid", "")

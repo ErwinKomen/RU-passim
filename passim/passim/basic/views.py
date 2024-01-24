@@ -116,6 +116,9 @@ def user_is_superuser(request):
             bFound = user.is_superuser
     return bFound
 
+def is_ajax(request):
+    return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+
 def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
