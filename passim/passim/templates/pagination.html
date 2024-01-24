@@ -1,4 +1,4 @@
-﻿              <ul class='pagination pagination-xsm'>
+              <ul class='pagination pagination-xsm'>
               {% if page_obj.has_previous %}
                   <li><a href="?page={{ page_obj.previous_page_number }}
                          {% for key,value in request.GET.items %}{% ifnotequal key 'page' %}&{{ key }}={{ value }}{% endifnotequal %}{% endfor %}">&laquo;</a>
@@ -14,7 +14,7 @@
           
                   {% if not page_obj.has_previous or p != 1 %}
                     {% if p < page_obj.number|add:"10" and  p > page_obj.number|add:"-10" %}
-                    <li {% ifequal p page_obj.number %}class='active'{% endifequal %}>
+                    <li {% if p == page_obj.number %}class='active'{% endif %}>
                     <a href='?page={{ p }}{% for key,value in request.GET.items %}{% ifnotequal key 'page' %}&{{ key }}={{ value }}{% endifnotequal %}{% endfor %}'>{% ifequal p 0 %}Start{% else %}{{p}}{% endifequal %}</a>
                     </li>
                     {% endif %}
