@@ -467,7 +467,8 @@ class CitemEdit(BasicDetails):
         """Add to the existing context"""
 
         oErr = ErrHandle()
-        field_keys = [None, None, 'clocation', None, 'contents', None, None]
+        # field_keys = [None, None, 'clocation', None, 'contents', None, None]
+        field_keys = [None, None, None, None, 'contents', None, None]
         try:
             # Define the main items to show and edit
             context['mainitems'] = [

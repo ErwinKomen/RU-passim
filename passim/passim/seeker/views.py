@@ -5625,7 +5625,7 @@ class SermonListView(BasicList):
             # Check if a list of keywords is given
             if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
                 # Get the list
-                kwlist = fields['kwlist']
+                kwlist = fields['kwlist']   # NOTE: the kwlist does not contain id's, but actual items
                 # Get the user
                 username = self.request.user.username
                 user = User.objects.filter(username=username).first()
@@ -5635,7 +5635,7 @@ class SermonListView(BasicList):
                     kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")) # Thanks to LILAC, strip: .values('id')
                     fields['kwlist'] = kwlist
                 # Create Q expression that includes related ones
-                kwlist = ( Q(id__in=kwlist) | Q(equalgolds__keywords__id__in=kwlist) )
+                kwlist = ( Q(keywords__in=kwlist) | Q(equalgolds__keywords__in=kwlist) )
                 fields['kwlist'] = kwlist
             
             # Check if a list of projects is given

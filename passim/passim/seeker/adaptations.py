@@ -7,12 +7,13 @@ import re
 import json
 import os
 import csv
+import sqlite3
 import pandas as pd
 from unidecode import unidecode
 from passim.settings import MEDIA_DIR
 
 # ======= imports from my own application ======
-from passim.utils import ErrHandle
+from passim.utils import ErrHandle, RomanNumbers
 from passim.basic.models import UserSearch
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
@@ -26,7 +27,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
     CollectionProject, EqualGoldProject, OnlineSources, \
-    ProjectApprover, ProjectEditor, \
+    ProjectApprover, ProjectEditor, ManuscriptExternal, SermonDescrExternal, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur, OperaLit
@@ -34,11 +35,12 @@ from passim.reader.views import read_kwcategories
 
 
 adaptation_list = {
-    "manuscript_list": ['sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
-                        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
-                        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-                        'supplyname', 'usersearch_params'],
-    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo'],
+    "manuscript_list": [
+        'sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
+        'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
+        'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
+        'supplyname', 'usersearch_params', 'huwamanudate'],
+    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -706,6 +708,150 @@ def adapt_huwaeditions():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def read_huwa():
+    oErr = ErrHandle()
+    table_info = {}
+    try:
+        # Get the location of the HUWA database
+        huwa_db = os.path.abspath(os.path.join(MEDIA_DIR, "passim", "huwa_database_for_PASSIM.db"))
+        with sqlite3.connect(huwa_db) as db:
+            standard_fields = ['erstdatum', 'aenddatum', 'aenderer', 'bemerkungen', 'ersteller']
+
+            cursor = db.cursor()
+            db_results = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+            tables = [x[0] for x in db_results]
+
+            count_tbl = len(tables)
+
+            # Walk all tables
+            for table_name in tables:
+                oInfo = {}
+                # Find out what fields this table has
+                db_results = cursor.execute("PRAGMA table_info('{}')".format(table_name)).fetchall()
+                fields = []
+                for field in db_results:
+                    field_name = field[1]
+                    fields.append(field_name)
+
+                    field_info = dict(type=field[2],
+                                        not_null=(field[3] == 1),
+                                        default=field[4])
+                    oInfo[field_name] = field_info
+                oInfo['fields'] = fields
+                oInfo['links'] = []
+
+                # Read the table
+                table_contents = cursor.execute("SELECT * FROM {}".format(table_name)).fetchall()
+                oInfo['contents'] = table_contents
+
+                table_info[table_name] = oInfo
+
+            # Close the database again
+            cursor.close()
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("read_huwa")
+    # Return the table that we found
+    return table_info
+
+def get_huwa_tables(table_info, lst_names):
+    """Read all tables in [lst_names] from [table_info]"""
+
+    oErr = ErrHandle()
+    oTables = {}
+    try:
+        for sName in lst_names:
+            oTable = table_info[sName]
+            lFields = oTable['fields']
+            lContent = oTable['contents']
+            lTable = []
+            for lRow in lContent:
+                oNew = {}
+                for idx, oPart in enumerate(lRow):
+                    oNew[lFields[idx]] = oPart
+                lTable.append(oNew)
+            oTables[sName] = lTable
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("get_huwa_tables")
+
+    return oTables
+
+def adapt_huwamanudate():
+    """Adapt the daterange table and date fields in Codico and Manuscript for those that have been read fromHUWA"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    huwa_tables = ['handschrift']
+    try:
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+        # Get the table of handschrift
+        lHandschrift = tables['handschrift']
+
+        # Walk the handschrift table
+        with transaction.atomic():
+            for oHandschrift in lHandschrift:
+                externalid = oHandschrift.get("id") 
+                # Get the century information
+                saeculum = oHandschrift.get("saeculum")
+                if not saeculum is None:
+                    # Get the Manuscript, Codico and Daterange (in Passim)
+                    external = ManuscriptExternal.objects.filter(externalid=externalid).first()
+                    if not external is None:
+                        # Get the manuscript, codico and daterang
+                        manu = external.manu
+                        codico = manu.manuscriptcodicounits.first()
+                        daterange = codico.codico_dateranges.first()
+                        # We now have a number
+                        saeculum= int(saeculum)
+                        # Action depends in the particular number
+                        if saeculum == 100 and not daterange is None:
+                            # This needs special treatment: 
+                            # 1 - either remove the manuscript info
+                            # 2 - or set it to 1000-1600 to indicate we don't really know
+                            yearstart = 900
+                            yearfinish = 1600
+                            # Remove the daterange
+                            daterange.delete()
+                            # Set the values in codico and manu
+                            codico.yearstart = yearstart
+                            codico.yearfinish = yearfinish
+                            manu.yearstart = yearstart
+                            manu.yearfinish = yearfinish
+                            # Save them
+                            codico.save()
+                            manu.save()
+                        elif not daterange is None and saeculum > 0:
+                            # Calculate the proper daterange
+                            yearstart = (saeculum - 1) * 100
+                            yearfinish = yearstart + 99
+                            # Do we need changing?
+                            if daterange.yearstart != yearstart or daterange.yearfinish != yearfinish:
+                                # Set the daterange, codico and manu
+                                daterange.yearstart = yearstart
+                                daterange.yearfinish = yearfinish
+                                codico.yearstart = yearstart
+                                codico.yearfinish = yearfinish
+                                manu.yearstart = yearstart
+                                manu.yearfinish = yearfinish
+                                # Save them
+                                daterange.save()
+                                codico.save()
+                                manu.save()
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 # =========== Part of sermon_list ==================
 def adapt_nicknames():
     oErr = ErrHandle()
@@ -776,6 +922,363 @@ def adapt_passim_project_name_sermo():
                             SermonDescrProject.objects.create(project = projectfound, sermon = sermon)
                    
        
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_huwainhalt():
+    """Adapt the LOCI (folio numbers) of the sermons that have been read fromHUWA"""
+
+    def get_locus_org(oInhalt):
+        """Get a complete LOCUS string combining von_bis, von_rv and bis_f, bis_rv"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        oRom = RomanNumbers()
+        try:
+            lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
+            von_rv = str(oInhalt.get("von_rv", ""))
+            lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
+            bis_rv = str(oInhalt.get("bis_rv", ""))
+
+            von_bis = None if int(lst_von_bis[0]) == 0 else lst_von_bis[0]
+            bis_f = None if int(lst_bis_f[0]) == 0 else lst_bis_f[0]
+
+            # Treat negative numbers (see issue #532)
+            if not von_bis is None and re.match(r'-\d+', von_bis):
+                order_num = int(von_bis)
+                if order_num < -110: order_num = -110
+                if order_num < 0:
+                    # Add 110 + 1 and turn into romans
+                    von_bis = oRom.intToRoman(order_num+110+1)
+            if not bis_f is None and re.match(r'-\d+', bis_f):
+                order_num = int(bis_f)
+                if order_num < -110: order_num = -110
+                if order_num < 0:
+                    # Add 110 + 1 and turn into romans
+                    bis_f = oRom.intToRoman(order_num+110+1)
+
+            html = []
+            # Calculate from
+            lst_from = []
+            if von_rv != "": lst_from.append(von_rv)
+            if not von_bis is None: lst_from.append(von_bis)
+            sFrom = "".join(lst_from)
+
+            # Calculate until
+            lst_until = []
+            if bis_rv != "": lst_until.append(bis_rv)
+            if not bis_f is None: lst_until.append(bis_f)
+            sUntil = "".join(lst_until)
+
+            # Combine the two
+            if sFrom == sUntil:
+                sBack = sFrom
+            else:
+                sBack = "{}-{}".format(sFrom, sUntil)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_locus")
+
+        return sBack
+
+    def get_manuscript_id(handschrift):
+        """Get the correct manuscript, based on handschrift"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            manuext = [x['manu__id'] for x in ManuscriptExternal.objects.filter(externalid=handschrift).values('manu__id')]
+            if len(manuext) > 0:
+                obj = manuext[0]
+                if len(manuext) > 1:
+                    iStop = 1
+                    oErr.Status("get_manuscript_id: more than one candidate for handschrift [{}]".format(handschrift))
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_manuscript")
+        # Return our result
+        return obj
+
+    def get_sermon_org(oInhalt, sLocus, lResults):
+        """Get the correct sermon, based on opera and manuscript"""
+
+        obj = None
+        oErr = ErrHandle()
+        bProcessed = False
+        ext_inhalt = "huwin"    # HUWA inhalt
+        ext_opera = "huwop"     # HUWA opera
+        try:
+            manu_id = -1
+            # First try to get it one way
+            inhaltid = oInhalt.get("id")
+            sermon_ids = [x['sermon__id'] for x in SermonDescrExternal.objects.filter(
+                externaltype=ext_inhalt, externalid=inhaltid).values('sermon__id')]
+            if len(sermon_ids) > 0:
+                qs = SermonDescr.objects.filter(id__in=sermon_ids)
+                bProcessed = True
+            else:
+                handschrift = oInhalt.get("handschrift")
+                opera = oInhalt.get("opera")
+                manu_id = get_manuscript_id( handschrift)
+                # There could be a number of sermons with this opera
+                sermon_ids = [x['sermon__id'] for x in SermonDescrExternal.objects.filter(
+                    externaltype=ext_opera, externalid=opera).values('sermon__id')]
+
+                # Now find the correct one
+                manu_sermons = [x['id'] for x in SermonDescr.objects.filter(msitem__codico__manuscript__id=manu_id).values('id')]
+                lst_ids = [x for x in sermon_ids if x in manu_sermons]
+
+                qs = SermonDescr.objects.filter(id__in=lst_ids)
+            # Evaluate the outcome
+            if qs.count() == 1:
+                obj = qs.first()
+            elif qs.count() > 1:
+                # We need to specify an additional filter for locus
+                qs = qs.filter(locus=sLocus)
+                if qs.count() > 1:
+                    oErr.Status("adapt_huwainhalt/get_sermon too many sermons for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
+                    x = qs.last()
+                else:
+                    obj = qs.first()
+            elif qs.count() == 0:
+                oErr.Status("adapt_huwainhalt/get_sermon NO sermon for inhalt={} opera={}, manu={}".format(inhaltid, opera, manu_id))
+
+            if not obj is None and not bProcessed:
+                # Add in results
+                oResult = dict(externalid=inhaltid, externaltype=ext_inhalt, sermonid=obj.id)
+                lResults.append(oResult)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermon_org")
+        # Return our result
+        return obj
+
+
+    oErr = ErrHandle()
+    oRom = RomanNumbers()
+    bResult = True
+    msg = ""
+    ext_inhalt = "huwin" 
+    huwa_tables = ['inhalt']
+    try:
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+
+        lResults = []
+
+        # Walk the INHALT table
+        lInhalt = tables['inhalt']
+        len_inhalt = len(lInhalt)
+        iCount = 0
+        for idx, oInhalt in enumerate(lInhalt):
+            # Show where we are
+            if idx % 1000 == 0: 
+                oErr.Status("Huwa Inhalt {}/{} ".format(idx+1, len_inhalt))
+            bNeedAdaptation = False
+
+            # Get the original locus
+            sLocus = get_locus_org(oInhalt)
+
+            # Try to get the correct sermon
+            sermon = get_sermon_org(oInhalt, sLocus, lResults)
+
+        # Go over the results and store them
+        if len(lResults) > 0:
+            with transaction.atomic():
+                for oResult in lResults:
+                    inhaltid= oResult.get("inhaltid")
+                    sermonid = oResult.get("sermonid")
+                    # Add this link into SermonDescrExternal
+                    srm_ext = SermonDescrExternal.objects.create(externalid=inhaltid, externaltype=ext_inhalt, sermon_id=sermonid)
+
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_huwafolionumbers():
+    """Adapt the LOCI (folio numbers) of the sermons that have been read fromHUWA"""
+
+    def get_folio_number(lst_folio_num):
+        oErr = ErrHandle()
+        oRom = RomanNumbers()
+        try:
+            folio_num = None if int(lst_folio_num[0]) == 0 else lst_folio_num[0]
+            # Treat negative numbers (see issue #532)
+            if not folio_num is None and re.match(r'-\d+', folio_num):
+                order_num = int(folio_num)
+                if order_num < -110: order_num = -110
+                if order_num < 0:
+                    # Add 110 + 1 and turn into romans
+                    folio_num = oRom.intToRoman(order_num+110+1)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_folio_number")
+        # Return our result
+        return folio_num
+
+    def get_locus_new(von_bis, von_rv, bis_f, bis_rv):
+        sLocus = ""
+        oErr = ErrHandle()
+        try:
+            html = []
+            # Calculate from
+            lst_from = []
+            if not von_bis is None: lst_from.append(von_bis)
+            if von_rv != "": lst_from.append("{}".format(von_rv))
+            sFrom = "".join(lst_from)
+
+            # Calculate until
+            lst_until = []
+            if not bis_f is None: lst_until.append(bis_f)
+            if bis_rv != "": lst_until.append("{}".format(bis_rv))
+            sUntil = "".join(lst_until)
+
+            # Combine the two
+            if sFrom == sUntil:
+                sLocus = sFrom
+            else:
+                sLocus = "{}-{}".format(sFrom, sUntil)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_locus")
+        # Return our result
+        return sLocus
+
+    def get_sermon_new(oInhalt):
+        """Get the correct sermon, based on inhalt"""
+
+        obj = None
+        oErr = ErrHandle()
+        bProcessed = False
+        ext_inhalt = "huwin"    # HUWA inhalt
+        try:
+            qs = SermonDescr.objects.none()
+            manu_id = -1
+            # First try to get it one way
+            inhaltid = oInhalt.get("id")
+            sermon_ids = [x['sermon__id'] for x in SermonDescrExternal.objects.filter(
+                externaltype=ext_inhalt, externalid=inhaltid).values('sermon__id')]
+            if len(sermon_ids) > 0:
+                qs = SermonDescr.objects.filter(id__in=sermon_ids)
+                bProcessed = True
+            else:
+                # Something is wrong!!
+                oErr.Status("adapt_huwafolionumbers/get_sermon_new NO entry for inhalt={}".format(inhaltid))
+            # Evaluate the outcome
+            if qs.count() == 1:
+                obj = qs.first()
+            elif qs.count() > 1:
+                # We need to specify an additional filter for locus
+                qs = qs.filter(locus=sLocus)
+                if qs.count() > 1:
+                    oErr.Status("adapt_huwafolionumbers/get_sermon_new too many sermons for inhalt={}".format(inhaltid))
+                    x = qs.last()
+                else:
+                    obj = qs.first()
+            elif qs.count() == 0:
+                oErr.Status("adapt_huwafolionumbers/get_sermon_new NO sermon for inhalt={}".format(inhaltid))
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_sermon_new")
+        # Return our result
+        return obj
+
+    oErr = ErrHandle()
+    oRom = RomanNumbers()
+    bResult = True
+    msg = ""
+    huwa_tables = ['inhalt']
+    lst_result = []
+    try:
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+
+        # Walk the INHALT table
+        lInhalt = tables['inhalt']
+        len_inhalt = len(lInhalt)
+        iCount = 0
+        iNoNeed = 0
+        for idx, oInhalt in enumerate(lInhalt):
+            # Show where we are
+            if (idx + 1) % 100 == 0:
+                oErr.Status("Processing {}/{} changes: {} leaving: {}".format(
+                    idx+1, len_inhalt, iCount, iNoNeed))
+
+            bNeedAdaptation = False
+
+            # Try to get the correct sermon
+            sermon = get_sermon_new(oInhalt)
+
+            # Do we have one?
+            if not sermon is None:
+
+                # Get the value of the von_rv field and the bis_rv field
+                von_rv = str(oInhalt.get("von_rv", ""))
+                bis_rv = str(oInhalt.get("bis_rv", ""))
+            
+                # Check if this needs treatment: length of von_rv or bis_rv is larger than 0
+                if len(von_rv) > 1:
+                    lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
+                    von_bis = get_folio_number(lst_von_bis)
+                    bNeedAdaptation = True
+
+                if len(bis_rv) > 1:
+                    lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
+                    bis_f = get_folio_number(lst_bis_f)
+                    bNeedAdaptation = True
+
+                # Only perform adaptation if necessary
+                if bNeedAdaptation:
+                    # Calculate the locus as it should be set in MsItem
+                    sLocus = get_locus_new(von_bis, von_rv, bis_f, bis_rv)
+
+                    # We now have the locus: Check the PASSIM item
+                    if sermon is None:
+                        # Something went wrong
+                        oErr.Status("Could not get sermon for handschrift={}, opera={}".format(handschrift, opera))
+                    else:
+                        # See if we need to change the locus
+                        if sermon.locus != sLocus:
+                            # Collect all changes that are needed
+                            sermon.locus = sLocus
+                            iCount += 1
+                            oResult = dict(sermon_id=sermon.id, locus=sLocus)
+                            lst_result.append(oResult)
+
+                            # Be sure to save the sermon, when a change has occurred
+                            sermon.save()
+                        else:
+                            # No need to change this one
+                            iNoNeed += 1
+        ## Do we have candidates to be processed?
+        #if len(lst_result) > 0:
+        #    # Change them all together
+        #    with transaction.atomic():
+        #        for oResult in lst_result:
+        #            sermon_id = oResult.get("sermon_id")
+        #            locus = oResult.get("locus")
+        #            sermon = SermonDescr.objects.filter(id=sermon_id).first()
+        #            if not sermon is None:
+        #                sermon.locus = locus
+        #                sermon.save()
+
+
+        # Everything has been processed correctly now
+        msg = "ok"
     except:
         bResult = False
         msg = oErr.get_error_message()
