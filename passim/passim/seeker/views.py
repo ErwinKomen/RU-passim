@@ -4525,8 +4525,8 @@ class SermonEdit(BasicDetails):
                 {'type': 'plain', 'label': "Alt page numbering:",   'value': instance.get_altpages(),   'field_list': "altpageslist"},
                  ]
             # Add transcription file, if possible
-            if user_is_ingroup(self.request, app_editor):
-                mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+            #if user_is_ingroup(self.request, app_editor):
+            #    mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
             # some more items
             mainitems_add = [
                 {'type': 'plain', 'label': "Notes alt page numbering:",   'value': instance.get_notes_altpages(), 'field_list': "notes_altpageslist"},
@@ -13704,8 +13704,7 @@ class EqualGoldEdit(BasicDetails):
     use_team_group = True
     history_button = True
     comment_button = True
-
-    
+        
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
                                        fk_name="super", extra=0)
@@ -13763,95 +13762,47 @@ class EqualGoldEdit(BasicDetails):
             context['mainitems'] = [
                 {'type': 'plain', 'label': "Status:",         'value': instance.get_stype_light(),'field_key': 'stype'},
                 {'type': 'safe',  'label': "Saved item:",     'value': saveditem_button          },
-                {'type': 'plain', 'label': "Gryson/Clavis :", 'value': instance.get_signatures_markdown_equal},
-                #{'type': 'plain', 'label': "Author:",         'value': instance.author_help(info), 'field_key': 'newauthor'},
-
+                {'type': 'plain', 'label': "Gryson/Clavis :", 'value': instance.get_signatures_markdown_equal},               
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
                 {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},
                 {'type': 'plain', 'label': "Author id:",     'value': author_id,          'field_key': 'author',   'empty': 'hide'},
                 {'type': 'plain', 'label': "Incipit:",       'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
                 {'type': 'plain', 'label': "Explicit:",      'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'},
                 {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
-
                 # Issue #212: remove this sermon number
-                # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number', 
-                # 'title': 'This is the automatically assigned sermon number for this particular author' },
-
-                {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'}, 
-                
-                #{'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-                # 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
-                #{'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-                # 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
-                
-                 #{'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
-                 #'field_key': 'newfulltext'}, 
-                 ]
-            # Add transcription file, if possible
-            if user_is_ingroup(self.request, app_editor):
-                context['mainitems'].append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
-
-                # Make sure the spectypes are checked
-                instance.check_links()
-
-            # some more items
-            mainitems_add = [
-                # Hier project    
-                #{'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                #{'type': 'plain', 'label': "Keywords (user):", 'value': self.get_userkeywords(instance, profile, context),   'field_list': 'ukwlist',
-                # 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'},
-                #{'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-                #'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
-                #{'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
-                #{'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-                #{'type': 'line',  'label': "Personal datasets:",   'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
-                #    'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
-                # Project2 HIER
-                #{'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2()},
-            
-                #{'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
-                #    'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
-                #{'type': 'line',  'label': "Contains:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
-                #    'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },
-                #{'type': 'line',    'label': "Links:",  'title': "Authority file links:",  'value': instance.get_superlinks_markdown(), 
-                #    'multiple': True,  'field_list': 'superlist',       'fso': self.formset_objects[1], 
-                #    'inline_selection': 'ru.passim.ssg2ssg_template',   'template_selection': 'ru.passim.ssg_template'},
-                #{'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-                # 'title': 'All the editions associated with the Gold Sermons in this equality set'},
-                #{'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-                # 'title': 'All the literature references associated with the Gold Sermons in this equality set'}
+                # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number',             
+                {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'},   
                 ]
+
+            # some more items need to be added
+            mainitems_add = []
+
             for oItem in mainitems_add: 
                 context['mainitems'].append(oItem)
+            
             # Notes:
-            # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection
-
-            ## HIER SECTIONS ?
-
+            # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection           
             context['mainsections'] = [
-                {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
-                    {'type': 'line', 'label': "Author:",   'value': instance.author_help(info), 'field_key': 'newauthor'},
-                
-                {'type': 'plain', 'label': "Incipit:",  'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide'},
-                {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide'}, 
-                
-                {'type': 'safe',  'label': "Incipit:",       'value': instance.get_incipit_markdown("search"), 
-                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual")}, 
-                {'type': 'safe',  'label': "Explicit:",      'value': instance.get_explicit_markdown("search"),
-                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual")}, 
-                 {'type': 'line', 'label': "Editions:",              'value': instance.get_editions_markdown(),
-                 'title': 'All the editions associated with the Gold Sermons in this equality set'},
-                {'type': 'line', 'label': "Literature:",            'value': instance.get_litrefs_markdown(), 
-                 'title': 'All the literature references associated with the Gold Sermons in this equality set'},
-                {'type': 'line',  'label': "Keywords:",      'value': instance.get_keywords_markdown(), 'field_list': 'kwlist'},
-                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2()},
+            {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
+                {'type': 'line', 'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
+                {'type': 'plain', 'label': "Incipit:", 'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide', 'order': 2},
+                {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide', 'order': 3},                 
+                {'type': 'safe',  'label': "Incipit:", 'value': instance.get_incipit_markdown("search"), 
+                 'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual"), 'order': 2}, 
+                {'type': 'safe',  'label': "Explicit:", 'value': instance.get_explicit_markdown("search"),
+                 'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual"), 'order': 3}, 
+                 {'type': 'line', 'label': "Editions:", 'value': instance.get_editions_markdown(),
+                 'title': 'All the editions associated with the Gold Sermons in this equality set', 'order': 4},
+                {'type': 'line', 'label': "Literature:", 'value': instance.get_litrefs_markdown(), 
+                 'title': 'All the literature references associated with the Gold Sermons in this equality set', 'order': 6},
+                {'type': 'line',  'label': "Keywords:", 'value': instance.get_keywords_markdown(), 'field_list': 'kwlist', 'order': 7},
+                {'type': 'plain', 'label': "Bible reference(s):", 'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2], 'order': 8},                
                 {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
-                 'field_key': 'newfulltext'}, 
-                {'type': 'plain', 'label': "Bible reference(s):",   'value': instance.get_bibleref(),        
-                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2]},
-                {'type': 'bold',  'label': "Moved to:",      'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url()},
-                {'type': 'bold',  'label': "Previous:",      'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url()},
-                                 
+                 'field_key': 'newfulltext', 'order':9},
+                {'type': 'bold',  'label': "Moved to:",   'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url(),'order': 12},
+                {'type': 'bold',  'label': "Previous:",   'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url(),'order': 13},
+                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2(), 'order':11},                
                  ]},            
             
             {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
@@ -13872,8 +13823,7 @@ class EqualGoldEdit(BasicDetails):
                   ]},           
                  ]
 
-            context['mainsections'] += [
-            
+            context['mainsections'] += [            
                 {'name': 'Networks', 'id': 'equalgold_networks', 'button': True, 'fields': [ 
                     ]},
                 {'name': 'Graphs', 'id': 'equalgold_graphs',  'button': True,'fields': [ 
@@ -13881,28 +13831,7 @@ class EqualGoldEdit(BasicDetails):
                 {'name': 'Manifestations', 'id': 'equalgold_manifestations', 'button': True, 'fields': [ 
                     ]},
                       ] 
-
-            # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
-            if not instance is None:
-                # NOTE: this code should be extended to include other external projects, when the time is right
-                ext = EqualGoldExternal.objects.filter(equal=instance).first()
-                if not ext is None:
-                    # Get the field values
-                    externaltype = ext.externaltype
-                    externalid = ext.externalid
-                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
-                        # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid)
-                        context['mainitems'].insert(0, oItem)
-                        # The user also has the right to see EDITION information
-                        if not instance.edinote is None and instance.edinote[0] == "[":
-                            # Read the list of literature references
-                            lst_edilit = json.loads(instance.edinote)
-                            context['edilits'] = lst_edilit
-                            value = render_to_string('seeker/huwa_edilit.html', context, self.request)
-                            oItemEdi = dict(type="safe", label="HUWA editions", value=value)
-                            context['mainitems'].append(oItemEdi)
-
+                     
             # Some tests can only be performed if this is *not* a new instance
             if not instance is None and not instance.id is None:
                 pending = approval_pending(instance)
@@ -13914,36 +13843,88 @@ class EqualGoldEdit(BasicDetails):
 
                 # Special processing for those with editing rights
                 if may_edit_project(self.request, profile, instance):
+                    for oMainSection in context['mainsections']: 
+                    # Of course the items belowd need to be added only to the 'Details' section
+                        if oMainSection['name'] == "Details": 
+                            oMainItems = oMainSection['fields']
+                                
+                            # NOTE: this code should be extended to include other external projects, when the time is right
+                            ext = EqualGoldExternal.objects.filter(equal=instance).first()
+                            if not ext is None:
+                                # Get the field values
+                                externaltype = ext.externaltype
+                                externalid = ext.externalid
+                                if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                                    # Okay, the user has the right to see the externalid                                    
+                                    oItem = dict(type="plain", 
+                                            label="HUWA id", 
+                                            value=externalid)
+                                    context['mainitems'].insert(0, oItem) 
+                                  
+                                    # The user also has the right to see EDITION information
+                                    if not instance.edinote is None and instance.edinote[0] == "[":
+                                        # Read the list of literature references
+                                        lst_edilit = json.loads(instance.edinote)
+                                        context['edilits'] = lst_edilit
+                                        value = render_to_string('seeker/huwa_edilit.html', context, self.request)
+                                        oItem = dict(type="safe", 
+                                                        label="HUWA editions:", 
+                                                        value=value, 
+                                                        order=5)                                            
+                                        oMainSection['fields'].append(oItem)
 
-                    for oMainSection in context['mainsections']:
-                        oMainItems = oMainSection['fields']
-                        # Adapt the PROJECT line in the mainitems list
-                        for oItem in oMainItems:
-                            if oItem['label'] == "Project:":
-                                # Add the list
-                                oItem['field_list'] = "projlist"
-                                # We can now leave from here
-                                break
+                            # Any editor can add a Transcription file
+                            oItem = dict(type="plain", 
+                                            label="Transcription file:",
+                                            title="Add a transcription file to this Authority file",
+                                            value=instance.get_trans_file(),
+                                            field_key='transcription',
+                                            order=10)                             
+                            oMainSection['fields'].append(oItem)
 
-                        # Any editor may suggest that an SSG be added to other project(s)
-                        oItem = dict(type="plain", 
-                                     label="Add to project",
-                                     title="Submit a request to add this SSG to the following project(s)",
-                                     value=self.get_prj_submitted(instance, "other", profile))
-                        oItem['field_list'] = "addprojlist"
-                        #context['mainitems'].append(oItem)
-                        oMainSection['fields'].append(oItem)
+                            # Make sure the spectypes are checked
+                            instance.check_links()  
+                        
+                            # Adapt the PROJECT line in the mainitems list
+                            for oItem in oMainItems:
+                                if oItem['label'] == "Project:":
+                                    # Add the list
+                                    oItem['field_list'] = "projlist"
+                                    # We can now leave from here
+                                    break
 
-                        # Any editor may suggest that an SSG be deleted from particular project(s)
-                        oItem = dict(type="plain", 
-                                     label="Remove from project",
-                                     title="Submit a request to remove this SSG from the following project(s)",
-                                     value=self.get_prj_submitted(instance, 'current'))
-                        oItem['field_list'] = "delprojlist"
-                        # context['mainitems'].append(oItem)
-                        oMainSection['fields'].append(oItem)
+                            # Any editor may suggest that an SSG be added to other project(s)
+                            oItem = dict(type="plain", 
+                                            label="Add to project:",
+                                            title="Submit a request to add this SSG to the following project(s)",
+                                            value=self.get_prj_submitted(instance, "other", profile), 
+                                            order=12)
+                            oItem['field_list']="addprojlist"                                
+                            oMainSection['fields'].append(oItem)
 
-                # THe SSG items that have a value in *moved* may not be editable
+                            # Any editor may suggest that an SSG be deleted from particular project(s)
+                            oItem = dict(type="plain", 
+                                            label="Remove from project:",
+                                            title="Submit a request to remove this SSG from the following project(s)",
+                                            value=self.get_prj_submitted(instance, 'current'),
+                                            order=13)
+                            oItem['field_list']="delprojlist"                             
+                            oMainSection['fields'].append(oItem)                                 
+                        else:
+                            pass
+                
+                # Now the correct sequence of items can be realized by sorting on the 'order' key in each of the 
+                # dictionaries.
+                for oMainSection in context['mainsections']: 
+                    # Of course only for the 'Details' section...
+                    if oMainSection['name'] == "Details":
+                        # Sort all items
+                        oMainSection['fields'] = sorted(oMainSection['fields'], key=itemgetter('order')) 
+                    # All other sections can be disregarded.
+                    else: 
+                        pass
+
+                # The SSG items that have a value in *moved* may not be editable
                 editable = (instance.moved == None)
                 if not editable:
                     self.permission = "readonly"
@@ -14608,9 +14589,8 @@ class EqualGoldDetails(EqualGoldEdit):
 
         # Sections: Networks / Graphs / Manifestations
 
-        context['mainsections'] += [
-        #context['sections'] = [
-            
+        context['sections'] = [
+                    
             {'name': 'Networks', 'id': 'equalgold_networks', 'nobutton': True, 'fields': [ 
                 ], 'template': 'seeker/af_networks.html'},
             {'name': 'Graphs', 'id': 'equalgold_graphs',  'nobutton': True,'fields': [ 
