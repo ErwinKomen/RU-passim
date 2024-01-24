@@ -136,7 +136,8 @@ INSTALLED_APPS = [
     'passim.seeker',
     'passim.dct',
     'passim.stemma',
-    'passim.enrich'
+    'passim.enrich',
+    'passim.plugin'
 ]
 
 # MIDDLEWARE_CLASSES = [
