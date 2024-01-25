@@ -47,3 +47,5 @@ sphinx==4.2.0
 
 # Needed for the 'plugin' app:
 django_plotly_dash==2.2.2
+dash-bootstrap-templates==1.1.2
+umap-learn==0.5.5

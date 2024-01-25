@@ -157,7 +157,7 @@ class EqualSelectForm(BasicSimpleForm):
     """Simply allow selection of one EqualGold"""
 
     ssgone = ModelChoiceField(queryset=None, required=False,
-            widget = EqualGoldWidget(attrs={'data-placeholder': 'Select an Authority File...', 'style': 'width: 100%;', 'class': 'searching'}))
+            widget = EqualGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an Authority File...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -191,7 +191,7 @@ class EqualSelectForm(BasicSimpleForm):
 class StemmaSetForm(BasicModelForm):
     profileid = forms.CharField(required=False)
     ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = StemmaSet

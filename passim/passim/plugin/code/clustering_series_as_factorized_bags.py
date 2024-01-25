@@ -1,0 +1,38 @@
+# coding: utf-8
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from scipy.cluster.hierarchy import *
+from sklearn.decomposition import TruncatedSVD
+from sklearn.metrics.pairwise import cosine_similarity
+
+if __name__ == "__main__":
+    bag_file = "../preprocessed_data/bag_of_3_sermons.csv"
+
+    df = pd.read_csv(bag_file)
+    order_of_scripts = list(df["SeriesName"])
+    df.drop("SeriesName", axis=1, inplace=True)
+
+    order_of_originals = df.columns
+    X = df.fillna(0).values
+
+    # u, s, vh = np.linalg.svd(X, full_matrices=True)
+    svd = TruncatedSVD(n_components=25, n_iter=200, random_state=42)
+    u = svd.fit_transform(X)
+    print(u.shape)
+
+    dist_matrix = 1.0 - cosine_similarity(u)
+    linkage_matrix = ward(dist_matrix)
+    fig, ax = plt.subplots(figsize=(16, 10))
+
+    ax = dendrogram(linkage_matrix, orientation='right', labels=order_of_scripts)
+
+    plt.tick_params(
+        axis='x',
+        which='both',
+        bottom='off',
+        top='off',
+        labelbottom='off')
+
+    plt.tight_layout()
+    plt.savefig(f"../output/clustered-scripts-as-factorized-bags_{bag_file.split('/')[-1]}.png")

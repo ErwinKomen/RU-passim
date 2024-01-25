@@ -121,7 +121,7 @@ class ClocationForm(forms.ModelForm):
         widgets={
             'name':     forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
             'htmlid':   forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-            'page':     CpageOneWidget(attrs={'data-placeholder': 'Select a page...', 'style': 'width: 100%;'})
+            'page':     CpageOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a page...', 'style': 'width: 100%;'})
             }
 
     def __init__(self, *args, **kwargs):
@@ -155,7 +155,7 @@ class CitemForm(forms.ModelForm):
     #page_ta = forms.CharField(label=_("Page"), required=False,
     #            widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 'placeholder': 'Page...', 'style': 'width: 100%;'}))
     pagelist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CpageWidget(attrs={'data-placeholder': 'Select pages...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CpageWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select pages...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = []
 
     class Meta:
@@ -164,7 +164,7 @@ class CitemForm(forms.ModelForm):
         model = Citem
         fields = ['clocation', 'contents']
         widgets={
-            'clocation': ClocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;'}),
+            'clocation': ClocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a location...', 'style': 'width: 100%;'}),
             'contents': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
                                                       'class': 'searching', 'placeholder': 'Contents (use markdown to enter)...'})
             }

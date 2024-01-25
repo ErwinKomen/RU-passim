@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.utils import timezone
+import pytz
 
 import json
 
@@ -15,10 +16,24 @@ from .utils import ErrHandle
 
 LONG_STRING=255
 MAX_TEXT_LEN = 200
+TIME_ZONE = 'Europe/Amsterdam'
 
 def get_current_datetime():
     """Get the current time"""
     return timezone.now()
+
+def get_crpp_date(dtThis, readable=False):
+    """Convert datetime to string"""
+
+    if readable:
+        # Convert the computer-stored timezone...
+        dtThis = dtThis.astimezone(pytz.timezone(TIME_ZONE))
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%d/%B/%Y (%H:%M)")
+    else:
+        # Model: yyyy-MM-dd'T'HH:mm:ss
+        sDate = dtThis.strftime("%Y-%m-%dT%H:%M:%S")
+    return sDate
 
 
 # Create your models here.

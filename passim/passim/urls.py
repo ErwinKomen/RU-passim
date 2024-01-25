@@ -30,15 +30,26 @@ from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChang
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
     EqualAddDetails, EqualAddEdit, EqualAddUserDetails, EqualAddUserEdit, EqualAddApprovalList, EqualAddApprovalUList,\
     EqualAddApprovalDetails, EqualAddApprovalEdit, EqualAddApprovalUserDetails, EqualAddApprovalUserEdit 
+from passim.plugin.views import sermonboard
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
 
 # Other Django stuff
-# from django.core import urlresolvers
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import RedirectView
+from django.views.generic import TemplateView
+
+# ================== Load plotly apps - this triggers their registration =======================
+USE_DASH = False
+try:
+    import passim.plugin.simple
+    import passim.plugin.dashboard
+    USE_DASH = False
+except:
+    print("Not loading plugin simple and dashboard")
+# ==============================================================================================
 
 admin.autodiscover()
 
@@ -442,9 +453,19 @@ urlpatterns = [
     re_path(r'^enrich/download', TestsetDownload.as_view(), name='testset_results'),
     re_path(r'^api/enrich/testsets/$', passim.enrich.views.get_testsets, name='api_testsets'),
 
+    # =============================================================================================
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
     re_path(r'^select2/', include('django_select2.urls')),
 
+    # ========================= PLUGIN ============================================================
+    re_path(r'^plugin/sermboard', passim.plugin.views.sermonboard, name='sermonboard'),
+    ## My plotly apps
+    #path('simple', TemplateView.as_view(template_name='plugin/simple.html'), name="simple"),
+    #path('plugin/dashboard', TemplateView.as_view(template_name='plugin/dashboard.html'), name="dashboard"),
+    ## Needed for django-plotly-dash
+    #path('django_plotly_dash/', include('django_plotly_dash.urls')),
+
+    # =============================================================================================
     re_path(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     re_path(r'^signup/$', passim.seeker.views.signup, name='signup'),
 
@@ -463,3 +484,14 @@ urlpatterns = [
     re_path(r'^admin/', admin.site.urls, name='admin_base'),
 ]
 
+if USE_DASH:
+    print("Using dash")
+    lst_dash = [
+        # My plotly apps
+        path('simple', TemplateView.as_view(template_name='plugin/simple.html'), name="simple"),
+        path('plugin/dashboard', TemplateView.as_view(template_name='plugin/dashboard.html'), name="dashboard"),
+        # Needed for django-plotly-dash
+        path('django_plotly_dash/', include('django_plotly_dash.urls')),
+    ]
+    for oItem in lst_dash:
+        urlpatterns.append(oItem)

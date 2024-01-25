@@ -76,17 +76,17 @@ class EqualAddForm(BasicModelForm):
     """Form to list and to edit EqualAdd items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
+                widget=AtypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = EqualAdd
         fields = ['super', 'profile', 'atype']
-        widgets={'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+        widgets={'profile': ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -122,17 +122,17 @@ class EqualAddApprovalForm(BasicModelForm):
     """Form to list and to edit EqualAddApproval items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
+                widget=AtypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = EqualAddApproval
         fields = ['add', 'profile', 'comment', 'atype']
-        widgets={'profile':  ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+        widgets={'profile':  ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  'comment':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
                                                    'class': 'searching', 'placeholder': 'Any comment on your choice...'}),
                  'atype':    forms.Select(attrs={'style': 'width: 100%;'})
@@ -172,18 +172,18 @@ class EqualChangeForm(BasicModelForm):
     """Form to list and to edit EqualChange items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
+                widget=AtypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = EqualChange
         fields = ['super', 'field', 'profile', 'atype']
         widgets={'field':    forms.TextInput(attrs={'style': 'width: 100%;', 'placeholder': 'Field name...'}),
-                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+                 'profile': ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -220,17 +220,17 @@ class EqualApprovalForm(BasicModelForm):
     """Form to list and to edit EqualApproval items"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     atypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AtypeWidget(attrs={'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
+                widget=AtypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple approval types...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = EqualApproval
         fields = ['change', 'profile', 'comment', 'atype']
-        widgets={'profile':  ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+        widgets={'profile':  ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  'comment':  forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
                                                    'class': 'searching', 'placeholder': 'Any comment on your choice...'}),
                  'atype':    forms.Select(attrs={'style': 'width: 100%;'})

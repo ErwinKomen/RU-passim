@@ -95,6 +95,9 @@ SECRET_KEY = '561c5400-4ebf-4e45-a2ec-12d856638e45'
 
 ALLOWED_HOSTS = ['localhost', 'applejack.science.ru.nl', 'passim.rich.ru.nl', 'testserver', '131.174.114.236' ]
 
+# For django-plotly-dash:
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # Caching
 if USE_REDIS:
     CACHES = {
@@ -126,6 +129,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_extensions',
     'reportlab',
+    'django_plotly_dash.apps.DjangoPlotlyDashConfig',
     # Add your apps here to enable them
     'django_select2',
     'passim.basic',
@@ -156,19 +160,27 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'passim.urls'
 
+default_loaders = [
+    "django.template.loaders.filesystem.Loader",
+    "django.template.loaders.app_directories.Loader",
+]
+
+cached_loaders = [("django.template.loaders.cached.Loader", default_loaders)]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'passim/templates')],
-        'APP_DIRS': True,
+        # 'APP_DIRS': True,
         'OPTIONS': {
-            'debug': True,
+            'debug': DEBUG,
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            "loaders": default_loaders if DEBUG else cached_loaders,
         },
     },
 ]

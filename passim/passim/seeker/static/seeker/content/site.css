@@ -17,6 +17,10 @@ body {
 .container-large {
     margin-left: 50px;
 }
+.container-wide {
+    margin-left: 150px;
+    margin-right: 150px;
+}
 .container {
   max-width: 1350px;
 }
