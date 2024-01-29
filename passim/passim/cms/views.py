@@ -470,8 +470,13 @@ class CitemEdit(BasicDetails):
         # field_keys = [None, None, 'clocation', None, 'contents', None, None]
         field_keys = [None, None, None, None, 'contents', None, None]
         try:
+            # Get the location id
+            clocation_id = instance.clocation.id
             # Define the main items to show and edit
             context['mainitems'] = [
+                # -------- HIDDEN field values ---------------
+                {'type': 'plain', 'label': "Location id",   'value': clocation_id,  'field_key': "clocation",     'empty': 'hide'},
+                # --------------------------------------------
                 {'type': 'plain', 'label': "Page:",         'value': instance.get_page()      },
                 {'type': 'line',  'label': "Identifier:",   'value': instance.get_htmlid()    },
                 {'type': 'line',  'label': "Location:",     'value': instance.get_location(True) },
