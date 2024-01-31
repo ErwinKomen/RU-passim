@@ -46,9 +46,9 @@ class EqualGoldWidget(ModelSelect2Widget):
             qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(id=self.exclude).order_by(*self.order).distinct()
         return qs
 
-    def filter_queryset(self, term, queryset = None, **dependent_fields):
+    def filter_queryset(self,request, term, queryset = None, **dependent_fields):
         term_for_now = ""
-        qs = super(EqualGoldWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        qs = super(EqualGoldWidget, self).filter_queryset(request,term_for_now, queryset, **dependent_fields)
         
         # Check if this contains a string literal
         bAdapted = False
