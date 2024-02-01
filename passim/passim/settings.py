@@ -39,6 +39,8 @@ elif "/applejack" in BASE_DIR:
 MEDIA_DIR = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
 MEDIA_ROOT = os.path.abspath(os.path.join(WRITABLE_DIR, "../media/"))
 
+PLUGIN_DIR = os.path.abspath(os.path.join(MEDIA_DIR, "plugin/"))
+
 APP_PREFIX = ""
 USE_REDIS = False
 ADMIN_SITE_URL = ""
@@ -129,7 +131,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_extensions',
     'reportlab',
-    'django_plotly_dash.apps.DjangoPlotlyDashConfig',
+    # 'django_plotly_dash.apps.DjangoPlotlyDashConfig',
     # Add your apps here to enable them
     'django_select2',
     'passim.basic',

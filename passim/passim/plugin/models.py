@@ -11,14 +11,19 @@ from markdown import markdown
 
 import re, copy
 import pytz
+import os
 
 # From own stuff
-from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE
+from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, PLUGIN_DIR
 from passim.utils import *
 from passim.basic.models import get_current_datetime, get_crpp_date
+from passim.seeker.models import build_abbr_list
 
 LONG_STRING=255
 STANDARD_LENGTH=100
+
+# Any fieldchoice stuff
+BOARD_DSET_STATUS = "plugin.dset_status"
 
 # Create your models here.
 
@@ -32,6 +37,9 @@ class BoardDataset(models.Model):
 
     # [0-1] Optional notes for this set
     notes = models.TextField("Notes", blank=True, null=True)
+
+    # [1] Whether this location is usable right now or not
+    status = models.CharField("Board dataset status", choices=build_abbr_list(BOARD_DSET_STATUS), default="act", max_length=6)
 
     # [1] And a date: the date of saving this manuscript
     created = models.DateTimeField(default=get_current_datetime)
@@ -60,6 +68,37 @@ class BoardDataset(models.Model):
 
         sDate = get_crpp_date(self.saved, True)
         return sDate
+
+    def scan():
+        """Scan the plugin dir for possible preprocessed data and adapt the BoardDataset table"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            # Get to the plugin's preprocessed data location
+            dir_loc = os.path.abspath(os.path.join(PLUGIN_DIR, "preprocessed_data"))
+            if os.path.exists(dir_loc):
+                # It exists: scan through all board dataset items
+                for obj in BoardDataset.objects.all():
+                    # Get the location here
+                    dset_loc = os.path.abspath(os.path.join(dir_loc, obj.location))
+                    bNeedSaving = False
+                    if not os.path.exists(dset_loc):
+                        # Make sure the status is set to inactive
+                        if not obj.status == "ina":
+                            obj.status = "ina"
+                            bNeedSaving = True
+                    else:
+                        if not obj.status == "act":
+                            obj.status = "act"
+                            bNeedSaving = True
+                    if bNeedSaving:
+                        obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("BoardDataset/scan")
+            bResult = False
+        return bResult
 
 
 class SermonsDistance(models.Model):

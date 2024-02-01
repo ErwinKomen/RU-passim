@@ -271,10 +271,10 @@ more important info about this two series???
 
 
 
-if __name__ == '__main__':
-    data = series_data(os.listdir(preproc_data_dir)[1])
-    print(data)
-    print(data.get_umap_hovertext())
+#if __name__ == '__main__':
+#    data = series_data(os.listdir(preproc_data_dir)[1])
+#    print(data)
+#    print(data.get_umap_hovertext())
 
 
 

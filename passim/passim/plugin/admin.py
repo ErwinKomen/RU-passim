@@ -9,8 +9,8 @@ from passim.plugin.models import *
 # Register your models here.
 
 class BoardDatasetAdmin(admin.ModelAdmin):
-    fields = ['name', 'location', 'notes']
-    list_display = ['name', 'location', 'saved']
+    fields = ['name', 'location', 'notes', 'status']
+    list_display = ['name', 'location', 'status', 'saved']
     formfield_overrides = {
         models.TextField: {'widget': admin.widgets.AdminTextareaWidget(attrs={'rows': 1, 'class': 'mytextarea'})},
         }

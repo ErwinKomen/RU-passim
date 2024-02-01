@@ -175,6 +175,11 @@ class BoardForm(BasicSimpleForm):
             if not dimension is None:
                 self.fields['umap_dim'].initial = dimension
 
+            # Initial clustering method
+            cl_method = ClMethod.objects.filter(abbr="ward").first()
+            if not cl_method is None:
+                self.fields['cl_method'].initial = cl_method
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BoardForm")

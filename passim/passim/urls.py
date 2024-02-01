@@ -30,7 +30,7 @@ from passim.approve.views import EqualChangeDetails, EqualChangeEdit, EqualChang
     EqualChangeList, EqualChangeUlist, EqualApprovalList, EqualApprovalUlist, EqualAddList, EqualAddUList, \
     EqualAddDetails, EqualAddEdit, EqualAddUserDetails, EqualAddUserEdit, EqualAddApprovalList, EqualAddApprovalUList,\
     EqualAddApprovalDetails, EqualAddApprovalEdit, EqualAddApprovalUserDetails, EqualAddApprovalUserEdit 
-from passim.plugin.views import sermonboard
+from passim.plugin.views import sermonboard, BoardApply
 # Import from PASSIM as a whole
 from passim.settings import APP_PREFIX
 
@@ -458,7 +458,8 @@ urlpatterns = [
     re_path(r'^select2/', include('django_select2.urls')),
 
     # ========================= PLUGIN ============================================================
-    re_path(r'^plugin/sermboard', passim.plugin.views.sermonboard, name='sermonboard'),
+    re_path(r'^plugin/sermboard/$', passim.plugin.views.sermonboard, name='sermonboard'),
+    re_path(r'^plugin/apply/$', BoardApply.as_view(),  name='board_apply'),
     ## My plotly apps
     #path('simple', TemplateView.as_view(template_name='plugin/simple.html'), name="simple"),
     #path('plugin/dashboard', TemplateView.as_view(template_name='plugin/dashboard.html'), name="dashboard"),
