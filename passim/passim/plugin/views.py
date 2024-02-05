@@ -1,13 +1,17 @@
 """ Passim-tailored version of dashboard
 """
-from django.shortcuts import render
+
 import re
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.template.loader import render_to_string
+import plotly.graph_objects as go
 
 from passim.plugin.forms import BoardForm
 from passim.utils import ErrHandle
 from passim.basic.views import BasicPart
 from passim.plugin.calculate import GenGraph
-from passim.plugin.models import ClMethod
+from passim.plugin.models import ClMethod, Highlight
 
 
 def sermonboard(request):
@@ -16,11 +20,30 @@ def sermonboard(request):
     prefix = 'brd'
     # Specify the template
     template_name = 'plugin/sermonboard.html'
-    boardForm = BoardForm(prefix=prefix)
-    context = dict(title="SermonBoard", boardForm=boardForm)
-    # context = get_application_context(request, context)
+    boardForm = None
+    context = {}
+    response = HttpResponse("empty sermonboard")
+    oErr = ErrHandle()
+    try:
+        # Check if Highlight needs loading
+        Highlight.initialize()
 
-    return render(request,template_name, context)
+        # Figure out what the proper context should be
+        boardForm = BoardForm(prefix=prefix)
+        context = dict(title="SermonBoard", boardForm=boardForm)
+
+        # Calculate the response as a string
+        response = render_to_string( template_name, context, request)
+
+        # Repair the django_select2 css type
+        response = response.replace('django_select2/django_select2.css"', 'django_select2/django_select2.css" type="text/css"')
+        # Calculate the HTTP response
+        response = HttpResponse(response)
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("sermonboard")
+    # Return the correct response
+    return response
 
 
 class BoardApply(BasicPart):
@@ -28,6 +51,7 @@ class BoardApply(BasicPart):
 
     prefix = 'brd'
     form_objects = [{'form': BoardForm, 'prefix': prefix, 'readonly': True}]
+    template_name = None
 
     empty_graph_data = {} # {k: None for k in ["hm_series", "hm_sermons", "umap", "clusters"]}
     store = {}
@@ -58,6 +82,13 @@ class BoardApply(BasicPart):
                 nb_closest = self.qd.get("brd-nb_closest")
                 min_length = self.qd.get("brd-min_length")
                 umap_md = self.qd.get("brd-umap_md")
+                umap_nb = self.qd.get("brd-umap_nb")
+
+                # Convert the integers and floats where possible
+                nb_closest = int(nb_closest)
+                min_length = int(min_length)
+                umap_md = float(umap_md)
+                umap_nb = int(umap_nb)
 
                 # Pick up what the active tab is 
                 active_tab = self.qd.get("brd-active_tab")
@@ -89,13 +120,14 @@ class BoardApply(BasicPart):
                     data = None
                     dict_lgs = dict(hm_series=hm_series, hm_sermons=hm_sermons,
                                     umap=umap, data=data)
+                    dict_tab = dict(ser_hm="hm_series", clustering="clusters", serm_hm="hm_sermons", umap="umap")
                     # (2) Initialize store
-                    dict_st = dict(passim_core_custom=None)
+                    dict_st = None # dict(passim_core_custom=None)
                     # (3) Create a GenGraph object
                     gengraph = GenGraph(dict_lgs, dict_st)
                     # (4) Call the object with appropriate values for its arguments
                     arg_dic = {}
-                    arg_dic['active_tab'] = active_tab
+                    arg_dic['active_tab'] = dict_tab[active_tab]
                     arg_dic['dataset'] = dataset.location
                     arg_dic['serdist'] = serdist.name
                     arg_dic['sermdist'] = sermdist.name
@@ -106,12 +138,26 @@ class BoardApply(BasicPart):
                     arg_dic['anchor_ms'] = None if anchorman is None else anchorman.get_name()
                     arg_dic['nb_closest'] = nb_closest
                     arg_dic['umap_md'] = umap_md
-                    arg_dic['umap_nb'] = min_length
+                    arg_dic['umap_nb'] = umap_nb
                     arg_dic['min_length'] = min_length
 
-                    dict_lgs, msg = gengraph.generate_graphs(arg_dic)
+                    # Generate the Plotly graph
+                    dict_of_fig, msg = gengraph.generate_graphs(arg_dic)
 
-                    pass
+                    # Check if all is okay
+                    if msg == "":
+                        # Figure out which one to show
+                        
+                        # All is well, now show the figure
+                        fig = dict_of_fig.get("current")
+                        fig.update_layout(showlegend=True)
+                        html_code = fig.to_html(full_html=False)
+                        context['data'] = dict(html=html_code)
+                    else:
+                        errMsg = "BoardApply cannot generate figure: {}".format(msg)
+                        oErr.Status(errMsg)
+                        self.arErr.append(errMsg)
+                        context['data'] = dict(msg=errMsg)
                 else:
                     # There is an error message: return that
                     context['data'] = dict(msg=msg)

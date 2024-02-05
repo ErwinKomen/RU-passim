@@ -2,7 +2,7 @@
 
 This plugin has originally been created by Gleb Schmidt.
 """
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -17,7 +17,7 @@ import os
 from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, PLUGIN_DIR
 from passim.utils import *
 from passim.basic.models import get_current_datetime, get_crpp_date
-from passim.seeker.models import build_abbr_list
+from passim.seeker.models import build_abbr_list, Manuscript
 
 LONG_STRING=255
 STANDARD_LENGTH=100
@@ -272,6 +272,9 @@ class Highlight(models.Model):
     # [0-1] Optional notes for this UMAP highlight
     notes = models.TextField("Notes", blank=True, null=True)
 
+    # [1] Order level: first fixed, then manuscripts
+    otype = models.IntegerField("Order type", default=0)
+
     # [1] And a date: the date of saving this item
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(default=get_current_datetime)
@@ -287,6 +290,29 @@ class Highlight(models.Model):
 
         # Return the response when saving
         return response
+
+    def initialize():
+        """If this is empty, then initialize"""
+
+        oErr = ErrHandle()
+        lst_fixed = ['library', 'idno', 'lcity', 'lcountry', 'date', 'total', 'sermons', 'content', 'century', 'age', 'is_emblamatic']
+        try:
+            if Highlight.objects.count() == 0:
+                # Start filling it with the fixed ones
+                for sFix in lst_fixed:
+                    obj = Highlight.objects.create(name=sFix, info=sFix, otype=1, notes="Automatically added from fixed list")
+                # Add all manuscripts that are active
+                with transaction.atomic():
+                    for manu in Manuscript.objects.filter(mtype="man"):
+                        sName = manu.get_full_name()
+                        if not sName is None:
+                            sName = sName.strip()
+                            sInfo = "{}".format(manu.id)
+                            obj = Highlight.objects.create(name=sName, info=sInfo, otype=2, notes="Automatically added manuscript")
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Highlight/initialize")
+        return None
 
     def get_created(self):
         """REturn the created date in a readable form"""

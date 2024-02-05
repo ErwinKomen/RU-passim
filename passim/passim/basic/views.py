@@ -2807,7 +2807,11 @@ class BasicPart(View):
                 sHtml = treat_bom(sHtml)
                 self.data['html'] = sHtml
             else:
-                self.data['html'] = 'no template_name specified'
+                if not 'html' in self.data:
+                    self.data['html'] = 'no template_name specified'
+                else:
+                    # No need to do anything, because the data already contains html
+                    pass
 
             # At any rate: empty the error basket
             self.arErr = []

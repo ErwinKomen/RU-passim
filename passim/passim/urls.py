@@ -459,7 +459,7 @@ urlpatterns = [
 
     # ========================= PLUGIN ============================================================
     re_path(r'^plugin/sermboard/$', passim.plugin.views.sermonboard, name='sermonboard'),
-    re_path(r'^plugin/apply/$', BoardApply.as_view(),  name='board_apply'),
+    path('plugin/apply/', BoardApply.as_view(),  name='board_apply'),
     ## My plotly apps
     #path('simple', TemplateView.as_view(template_name='plugin/simple.html'), name="simple"),
     #path('plugin/dashboard', TemplateView.as_view(template_name='plugin/dashboard.html'), name="dashboard"),

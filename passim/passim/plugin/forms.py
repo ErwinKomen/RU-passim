@@ -87,7 +87,7 @@ class HighlightWidget(ModelSelect2MultipleWidget):
         return obj.name
 
     def get_queryset(self):
-        qs = Highlight.objects.all().order_by('name')
+        qs = Highlight.objects.all().order_by('otype', 'name')
         return qs
 
 
@@ -150,18 +150,22 @@ class BoardForm(BasicSimpleForm):
         oErr = ErrHandle()
         try:
             # Fill in the querysets
-            self.fields['dataset'].queryset = BoardDataset.objects.all().order_by('name')
+            self.fields['dataset'].queryset = BoardDataset.objects.filter(status="act").order_by('name')
             self.fields['sermdist'].queryset = SermonsDistance.objects.all().order_by('name')
             self.fields['serdist'].queryset = SeriesDistance.objects.all().order_by('name')
             self.fields['umap_dim'].queryset = Dimension.objects.all().order_by('name')
             self.fields['sermons'].queryset = Signature.objects.all().order_by('code')
             self.fields['anchorman'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['cl_method'].queryset = ClMethod.objects.all().order_by('name')
-            self.fields['highlights'].queryset = Highlight.objects.all().order_by('name')
+            self.fields['highlights'].queryset = Highlight.objects.all().order_by('otype', 'name')
 
             # Set initial values
             if BoardDataset.objects.all().count() > 0:
-                self.fields['dataset'].initial = BoardDataset.objects.first()
+                # Initial dataset: passim core sample
+                dset = BoardDataset.objects.filter(location__iexact="passim_core_custom").first()
+                if dset is None:
+                    dset = BoardDataset.objects.filter(status="act").first()
+                self.fields['dataset'].initial = dset
             # Initial sermons distance: uniform
             sermdist = SermonsDistance.objects.filter(name__iexact="uniform").first()
             if not sermdist is None:
@@ -179,6 +183,11 @@ class BoardForm(BasicSimpleForm):
             cl_method = ClMethod.objects.filter(abbr="ward").first()
             if not cl_method is None:
                 self.fields['cl_method'].initial = cl_method
+
+            # Initialize highlight
+            highlights = Highlight.objects.filter(name="lcountry")
+            if highlights.count() > 0:
+                self.fields['highlights'].initial = [x.pk for x in highlights]
 
         except:
             msg = oErr.get_error_message()

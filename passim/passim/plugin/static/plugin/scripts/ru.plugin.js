@@ -8,8 +8,7 @@ var $ = jQuery;
   $(function () {
     $(document).ready(function () {
       // Initialize event listeners
-      ru.dct.load_dct();
-      ru.dct.init_selection();
+      ru.plugin.init_events();
 
       // Initialize Bootstrap popover
       // Note: this is used when hovering over the question mark button
@@ -137,6 +136,28 @@ var ru = (function ($, ru) {
     }
     // Public methods
     return {
+
+      init_events: function () {
+        var i;
+
+        try {
+          // Make sure slider values get updated
+          $(".slider").change(function () {
+            var el = $(this),
+                elvalue = null,
+                value = 0 ;
+
+            value = $(el).val();
+            elvalue = "#" + $(el).attr("valueid");
+            $(elvalue).html(value);
+          });
+          // Right now no events need to be initialized here
+          i = 1;
+        } catch (ex) {
+          private_methods.errMsg("init_events", ex);
+        }
+      },
+
       /**
        * do_board
        *    Perform apply or reset in the sermonboard
@@ -148,8 +169,12 @@ var ru = (function ($, ru) {
             afterurl = "",
             elActiveTab = "#brd-id_active_tab",
             sActive = "",
+            lHtml = [],
             elAct = null,
+            sHtml = "",
             targeturl = null,
+            err = "",
+            targetid = "#tab-content",
             elWait = "#loading";
 
         try {
@@ -158,19 +183,21 @@ var ru = (function ($, ru) {
           if ($(frm).length === 0) { return; }
 
           // get the targeturl
-          targeturl = $(frm).attr("targeturl");
+          targeturl = $(el).attr("targeturl");
           if (targeturl === undefined || targeturl === "") { return; }
 
           // Find out what the active tab is
           elAct = $("#tabs").parent().find(".tab-pane.active").first();
           sActive = $(elAct).attr("id");
           $(elActiveTab).val(sActive);
+          // targetid = "#"+ sActive;
+          err = targetid;
 
           // Actually prepare the data
           data = $(frm).serializeArray();
 
           // Show the waiting symbol in 'loading'
-          $(elWait).html(loc_sWaiting);
+          $(elWait).removeClass("hidden");
           // We have a form, submit it and get the results back
           $.post(targeturl, data, function (response) {
             // Action depends on the response
@@ -180,20 +207,13 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
-                  // Do we have afterdelurl afterurl?
-                  // If an 'afternewurl' is specified, go there
-                  if ('afterdelurl' in response && response['afterdelurl'] !== "") {
-                    window.location = response['afterdelurl'];
-                    return;
-                  } else if (afterurl === undefined || afterurl === "") {
-                    // Delete visually
-                    $(targetid).remove();
-                    $(targethead).remove();
-                  } else {
-                    // Make sure we go to the afterurl
-                    window.location = afterurl;
-                    return;
+                  // Everything is okay, try to show the HTML
+                  sHtml = response.html;
+                  if (sHtml === undefined || sHtml === "") {
+                    sHtml = "The response is empty";
                   }
+                  // Show it
+                  $(targetid).html(sHtml);
                   break;
                 case "error":
                   if ("html" in response) {
@@ -226,12 +246,12 @@ var ru = (function ($, ru) {
               }
             }
             // Return to view mode
-            $(elTr).find(".view-mode").removeClass("hidden");
-            $(elTr).find(".edit-mode").addClass("hidden");
+            $(".view-mode").removeClass("hidden");
+            $(".edit-mode").addClass("hidden");
             // Hide waiting symbol
-            $(elTr).find(".waiting").addClass("hidden");
+            $(".waiting").addClass("hidden");
             // Perform init again
-            ru.basic.init_events();
+            ru.plugin.init_events();
           });
 
         } catch (ex) {
