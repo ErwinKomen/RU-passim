@@ -158,10 +158,10 @@
               <a id="nav-umap" href="#tab-umap" data-toggle="tab" class="nav-link active" role="tab">Umap</a>
             </li>
             <li class="nav-item">
-              <a id="nav-ser-hm" href="#tab-ser_hm" data-toggle="tab" class="nav-link" role="tab">Series Heatmap</a>
+              <a id="nav-ser_hm" href="#tab-ser_hm" data-toggle="tab" class="nav-link" role="tab">Series Heatmap</a>
             </li>
             <li class="nav-item">
-              <a id="nav-serm-hm" href="#tab-serm_hm" data-toggle="tab" class="nav-link" role="tab">Sermons Heatmap</a>
+              <a id="nav-serm_hm" href="#tab-serm_hm" data-toggle="tab" class="nav-link" role="tab">Sermons Heatmap</a>
             </li>
           </ul>
           <div class="tab-content">
@@ -181,6 +181,14 @@
           </div>
           <div style=""><div id="loading" class="p-4 hidden waiting"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></div></div>
           <div id="tab-content" class="p-4 js-plotly-plot" style="width: 100%; height: 100%;"></div>
+
+          <!-- Hidden 'backup' of content -->
+          <div id="tab-backup" class="hidden">
+            <div id="tab-clustering-backup"></div>
+            <div id="tab-umap-backup"></div>
+            <div id="tab-ser_hm-backup"></div>
+            <div id="tab-serm_hm-backup"></div>
+          </div>
         </div>
       </div>
     </div>

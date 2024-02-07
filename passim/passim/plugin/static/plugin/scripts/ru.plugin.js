@@ -151,8 +151,38 @@ var ru = (function ($, ru) {
             elvalue = "#" + $(el).attr("valueid");
             $(elvalue).html(value);
           });
-          // Right now no events need to be initialized here
-          i = 1;
+
+          // When a .nav-item is pressed, we need to respond
+          $(".nav-item a").on("click", function () {
+            var el = $(this),
+                backupid = "",
+                targetid = "",
+                name = "";
+            // Determine what the name is
+            name = $(el).attr("id").replace("nav-", "");
+            targetid = "#tab-" + name;
+            backupid = targetid + "-backup";
+            switch (name) {
+              case "clustering":
+                $("#clustering_params").removeClass("hidden");
+                $("#umap_params").addClass("hidden");
+                break;
+              case "umap":
+                $("#umap_params").removeClass("hidden");
+                $("#clustering_params").addClass("hidden");
+                break;
+              case "ser_hm":  // series heatmap
+                $("#umap_params").addClass("hidden");
+                $("#clustering_params").addClass("hidden");
+                break;
+              case "serm_hm": // sermons heatmap
+                $("#umap_params").addClass("hidden");
+                $("#clustering_params").addClass("hidden");
+                break;
+            }
+            // Show the backup stuff
+            $("#tab-content").html($(backupid).html());
+          });
         } catch (ex) {
           private_methods.errMsg("init_events", ex);
         }
@@ -175,6 +205,7 @@ var ru = (function ($, ru) {
             targeturl = null,
             err = "",
             targetid = "#tab-content",
+            backupid = "",
             elWait = "#loading";
 
         try {
@@ -192,6 +223,9 @@ var ru = (function ($, ru) {
           $(elActiveTab).val(sActive);
           // targetid = "#"+ sActive;
           err = targetid;
+          backupid = "#" + sActive + "-backup";
+          // Clear the current target
+          $(targetid).html("calculating...")
 
           // Actually prepare the data
           data = $(frm).serializeArray();
@@ -214,6 +248,9 @@ var ru = (function ($, ru) {
                   }
                   // Show it
                   $(targetid).html(sHtml);
+
+                  // Copy to the correct backup id
+                  $(backupid).html(sHtml);
                   break;
                 case "error":
                   if ("html" in response) {

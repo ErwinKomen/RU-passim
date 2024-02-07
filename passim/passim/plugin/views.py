@@ -129,8 +129,8 @@ class BoardApply(BasicPart):
                     arg_dic = {}
                     arg_dic['active_tab'] = dict_tab[active_tab]
                     arg_dic['dataset'] = dataset.location
-                    arg_dic['serdist'] = serdist.name
-                    arg_dic['sermdist'] = sermdist.name
+                    arg_dic['serdist'] = serdist.codepath
+                    arg_dic['sermdist'] = sermdist.codepath
                     arg_dic['method'] = cl_method.abbr
                     arg_dic['umap_dim'] = umap_dim.name
                     arg_dic['umap_hl'] = [x.name for x in highlights]
@@ -145,14 +145,20 @@ class BoardApply(BasicPart):
                     dict_of_fig, msg = gengraph.generate_graphs(arg_dic)
 
                     # Check if all is okay
-                    if msg == "":
+                    if msg == "" and "current" in dict_of_fig:
                         # Figure out which one to show
                         
                         # All is well, now show the figure
                         fig = dict_of_fig.get("current")
-                        fig.update_layout(showlegend=True)
-                        html_code = fig.to_html(full_html=False)
-                        context['data'] = dict(html=html_code)
+                        if isinstance(fig,dict):
+                            fig.update_layout(showlegend=True)
+                            html_code = fig.to_html(full_html=False)
+                            context['data'] = dict(html=html_code)
+                        else:
+                            errMsg = "BoardApply generate_graphs did not produce figure {}".format(arg_dic['active_tab'])
+                            oErr.Status(errMsg)
+                            self.arErr.append(errMsg)
+                            context['data'] = dict(msg=errMsg)
                     else:
                         errMsg = "BoardApply cannot generate figure: {}".format(msg)
                         oErr.Status(errMsg)

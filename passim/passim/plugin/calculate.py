@@ -1,7 +1,12 @@
-
+"""
+This hosts the calculations for the 'dashboard' plugin originally created by Gleb Schmidt.
+Adaptation for Passim: Erwin R. Komen, 2024
+"""
 import os
 import json
+import re
 
+# Any plotly imports
 import plotly
 import plotly.express as px
 import plotly.graph_objs as go
@@ -10,14 +15,15 @@ import plotly.figure_factory as ff
 from collections.abc import Mapping
 
 import pandas as pd
+
 # This is not used import seaborn as sns
 from itertools import cycle
+from scipy.cluster.hierarchy import *
 from umap.umap_ import UMAP
 
 # Imports from passim itself
 from passim.settings import PLUGIN_DIR
 from passim.plugin.models import BoardDataset
-# from passim.plugin.utils import plotly_heatmap
 from passim.utils import ErrHandle
 
 # Make sure we have the 'store' available to all
@@ -38,50 +44,58 @@ def plotly_heatmap( distances:pd.DataFrame, title:str = "", save_as:str=None, ho
     fig = go.Figure()
     fig.update_layout(width=800, height=800)
 
+    oErr = ErrHandle()
     try:
-        distances.index = distances.index.to_series().apply( lambda x: int(x.split("_")[1]) )
-        distances.sort_index(axis=0, ascending=True, inplace=True)
-        distances.index = distances.index.to_series().apply( lambda x: "ms_"+str(x) )
+        # The following code could go wrong, but that is by intention
+        #  It will be taken up again in the except part
+        try:
+            distances.index = distances.index.to_series().apply( lambda x: int(x.split("_")[1]) )
+            distances.sort_index(axis=0, ascending=True, inplace=True)
+            distances.index = distances.index.to_series().apply( lambda x: "ms_"+str(x) )
         
-        distances.columns = distances.columns.to_series().apply( lambda x: int(x.split("_")[1]) )
-        distances.sort_index(axis=1, ascending=True, inplace=True)
-        distances.columns = distances.columns.to_series().apply( lambda x: "ms_"+str(x) )
+            distances.columns = distances.columns.to_series().apply( lambda x: int(x.split("_")[1]) )
+            distances.sort_index(axis=1, ascending=True, inplace=True)
+            distances.columns = distances.columns.to_series().apply( lambda x: "ms_"+str(x) )
 
-        if text is not None:
-            text.index = text.index.to_series().apply( lambda x: int(x.split("_")[1]) )
-            text.sort_index(axis=0, ascending=True, inplace=True)
-            text.index = text.index.to_series().apply( lambda x: "ms_"+str(x) )
+            if text is not None:
+                text.index = text.index.to_series().apply( lambda x: int(x.split("_")[1]) )
+                text.sort_index(axis=0, ascending=True, inplace=True)
+                text.index = text.index.to_series().apply( lambda x: "ms_"+str(x) )
 
-            text.columns = text.columns.to_series().apply( lambda x: int(x.split("_")[1]) )
-            text.sort_index(axis=1, ascending=True, inplace=True)
-            text.columns = text.columns.to_series().apply( lambda x: "ms_"+str(x) )
+                text.columns = text.columns.to_series().apply( lambda x: int(x.split("_")[1]) )
+                text.sort_index(axis=1, ascending=True, inplace=True)
+                text.columns = text.columns.to_series().apply( lambda x: "ms_"+str(x) )
 
 
-    except:
-        distances.sort_index(axis=0, ascending=True, inplace=True)
-        distances.sort_index(axis=1, ascending=True, inplace=True)
-        if text is not None:
-            text.sort_index(axis=0, ascending=True, inplace=True)
-            text.sort_index(axis=1, ascending=True, inplace=True)
+        except:
+            distances.sort_index(axis=0, ascending=True, inplace=True)
+            distances.sort_index(axis=1, ascending=True, inplace=True)
+            if text is not None:
+                text.sort_index(axis=0, ascending=True, inplace=True)
+                text.sort_index(axis=1, ascending=True, inplace=True)
             
 
-    if text is None or hoverinfo is None:
-        fig.add_trace(go.Heatmap(z=distances,
-                                 x=distances.columns,
-                                 y=distances.columns,
-                        ))
-    else:
-        fig.add_trace(go.Heatmap(z=distances,
-                                 x=distances.columns,
-                                 y=distances.columns,
-                                 hoverinfo=hoverinfo,
-                                 text=text
-                        ))
+        if text is None or hoverinfo is None:
+            fig.add_trace(go.Heatmap(z=distances,
+                                     x=distances.columns,
+                                     y=distances.columns,
+                            ))
+        else:
+            fig.add_trace(go.Heatmap(z=distances,
+                                     x=distances.columns,
+                                     y=distances.columns,
+                                     hoverinfo=hoverinfo,
+                                     text=text
+                            ))
     
 
-    fig.update_layout(
-        title=title
-    )
+        fig.update_layout(
+            title=title
+        )
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("plotly_heatmap")
+
     return fig
 
 def fill_store(bForce = False):
@@ -92,7 +106,7 @@ def fill_store(bForce = False):
     preproc_data_dir = absjoin(PLUGIN_DIR, "preprocessed_data")
     try:
         # Do we need to proceed?
-        if len(store) > 0:
+        if not bForce and len(store) > 0:
             return None
         # Walk all available dataset
         for obj in BoardDataset.objects.all():
@@ -351,6 +365,31 @@ class GenGraph(object):
         """
         # OLD: global local_graph_store, store, reset_length
 
+        def check_series(dataset, serdist, sermdist):
+            oErr = ErrHandle()
+            msg = ""
+            try:
+                # Check if the Series distance are in line with the chosen Sermons distance
+                series_keys = self.local_store[dataset].serie_distances[sermdist].keys()
+                if not serdist in series_keys:
+                    # Complain about this
+                    msg = "Sermons distance [{}] requires Series distance in: {}".format(sermdist, series_keys)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("check_series")
+            return msg
+
+        # adding filtering by content (for now, mere presence of all the specified sermons)
+        def all_sermons_present(content, desired_sermons):
+            keep = True
+            # print(content)
+            for serm in desired_sermons:
+                # print(store[dataset].char_codes.loc[serm])
+                if not self.local_store[dataset].char_codes.loc[serm]["Code"] in content:
+                    keep = False
+                    break
+            return keep
+
         oErr = ErrHandle()
         msg = ""
         try:
@@ -369,29 +408,22 @@ class GenGraph(object):
             umap_md = arg_dic.get("umap_md")
             umap_nb = arg_dic.get("umap_nb")
 
+            # Clear the 'current' item
+            self.local_graph_store['current'] = ""
+
             if dataset is None:
                 # generate empty graphs when app loads
                 return self.local_graph_store, ""
 
+            msg = check_series(dataset, serdist, sermdist)
     
-            if serdist is not None:
+            if msg == "" and serdist is not None:
                 # todo: lazy loading
-
-                # adding filtering by content (for now, mere presence of all the specified sermons)
-                def all_sermons_present(content, desired_sermons):
-                    keep = True
-                    # print(content)
-                    for serm in desired_sermons:
-                        # print(store[dataset].char_codes.loc[serm])
-                        if not self.local_store[dataset].char_codes.loc[serm]["Code"] in content:
-                            keep = False
-                            break
-                    return keep
 
                 long_serie = self.local_store[dataset].char_series['EncodedWorks'].apply(lambda x: len(x) >= min_length and all_sermons_present(x, contains) if contains and len(contains) > 0 else len(
                     x) >= min_length)
                 dist_matrix = self.local_store[dataset].serie_distances[sermdist][serdist].loc[long_serie, long_serie]
-
+                
                 # if anchor manuscript is given, we need to update our dist_matrix
                 if anchor_ms:
                     anchor_ms_idx = self.local_store[dataset].metadata[self.local_store[dataset].metadata["ms_identifier"] == anchor_ms].index.tolist()
@@ -580,22 +612,32 @@ class GenGraph(object):
                     # Set the current graph
                     self.local_graph_store['current'] = self.local_graph_store['umap']
     
-            if active_tab == 'hm_sermons' and sermdist is not None and sermdist != "Uniform":
+            if msg == "" and active_tab == 'hm_sermons':
         
-                dist_matrix =  self.local_store[dataset].char_distances[sermdist]
-                rename      =  self.local_store[dataset].char_codes
-                rename["SermonName"] = rename.index
-                rename.set_index("Code", inplace=True)
-                dist_matrix.rename(
-                    columns= lambda x: rename["SermonName"].loc[x],
-                    index  = lambda x: rename["SermonName"].loc[x],
-                    inplace=True
-                    )
+                # Check if all is in order:
+                if sermdist is None:
+                    msg = "Sermons Heatmap: first specify the sermons distance"
+                elif sermdist == "Uniform":
+                    msg = "Sermons Heatmap: the sermons distance may *NOT* be 'Uniform'"
+                else:
+                    # Re-initialize the local_store
+                    fill_store(True)
 
-                self.local_graph_store['hm_sermons'] = plotly_heatmap(dist_matrix)
+                    # Only now can we continue
+                    dist_matrix =  self.local_store[dataset].char_distances[sermdist]
+                    rename      =  self.local_store[dataset].char_codes
+                    rename["SermonName"] = rename.index
+                    rename.set_index("Code", inplace=True)
+                    dist_matrix.rename(
+                        columns= lambda x: rename["SermonName"].loc[x],
+                        index  = lambda x: rename["SermonName"].loc[x],
+                        inplace=True
+                        )
 
-                # Set the current graph
-                self.local_graph_store['current'] = self.local_graph_store['hm_sermons']
+                    self.local_graph_store['hm_sermons'] = plotly_heatmap(dist_matrix)
+
+                    # Set the current graph
+                    self.local_graph_store['current'] = self.local_graph_store['hm_sermons']
 
         except:
             msg = oErr.get_error_message()
