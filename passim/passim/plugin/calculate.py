@@ -369,11 +369,15 @@ class GenGraph(object):
             oErr = ErrHandle()
             msg = ""
             try:
-                # Check if the Series distance are in line with the chosen Sermons distance
-                series_keys = self.local_store[dataset].serie_distances[sermdist].keys()
-                if not serdist in series_keys:
-                    # Complain about this
-                    msg = "Sermons distance [{}] requires Series distance in: {}".format(sermdist, series_keys)
+                # Check if this dataset can handle the sermons distance
+                if sermdist in self.local_store[dataset].char_dist_names:
+                    # Check if the Series distance are in line with the chosen Sermons distance
+                    series_keys = self.local_store[dataset].serie_distances[sermdist].keys()
+                    if not serdist in series_keys:
+                        # Complain about this
+                        msg = "Sermons distance [{}] requires Series distance in: {}".format(sermdist, series_keys)
+                else:
+                    msg = "Dataset [{}] can only handle these sermon distances: {}".format(dataset, self.local_store[dataset].char_dist_names)
             except:
                 msg = oErr.get_error_message()
                 oErr.DoError("check_series")

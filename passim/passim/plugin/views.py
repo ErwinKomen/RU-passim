@@ -150,17 +150,17 @@ class BoardApply(BasicPart):
                         
                         # All is well, now show the figure
                         fig = dict_of_fig.get("current")
-                        if isinstance(fig,dict):
-                            fig.update_layout(showlegend=True)
-                            html_code = fig.to_html(full_html=False)
-                            context['data'] = dict(html=html_code)
-                        else:
-                            errMsg = "BoardApply generate_graphs did not produce figure {}".format(arg_dic['active_tab'])
+                        if fig is None or isinstance(fig,str):
+                            errMsg = "BoardApply generate_graphs did not produce figure <code>{}</code>".format(arg_dic['active_tab'])
                             oErr.Status(errMsg)
                             self.arErr.append(errMsg)
                             context['data'] = dict(msg=errMsg)
+                        else:
+                            fig.update_layout(showlegend=True)
+                            html_code = fig.to_html(full_html=False)
+                            context['data'] = dict(html=html_code)
                     else:
-                        errMsg = "BoardApply cannot generate figure: {}".format(msg)
+                        errMsg = "<code>BoardApply cannot generate figure:</code><br /><code>{}</code>".format(msg)
                         oErr.Status(errMsg)
                         self.arErr.append(errMsg)
                         context['data'] = dict(msg=errMsg)
