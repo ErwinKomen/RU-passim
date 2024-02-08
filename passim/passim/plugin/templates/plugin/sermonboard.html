@@ -11,8 +11,8 @@
 
 
 <div class="container-wide body-content">
-  <h1>Sermon Collections</h1>
-  <hr />
+  <h1 style="margin-bottom:0px;">Sermon Collections</h1>
+  <hr style="margin-bottom:0px; margin-top: 0px;" />
 
   <form id="board_form" method="post" action="" >
     {% csrf_token %}
@@ -48,13 +48,13 @@
     </div>
 
     <!-- Border between parts -->
-    <hr />
+    <hr style="margin-bottom:10px; margin-top: 10px;" />
 
     <!-- Lower content filter part-->
     <div>
       <div class="row">
         <!-- The Content filter settings -->
-        <div class="col-md-4">
+        <div class="col-md-4" style="border: 1px solid lightgray; border-radius: 4px;">
           <div class="card">
             <div class="card-body">
               <div id="filtering-container">
@@ -132,7 +132,7 @@
                 </div>
               </div>
 
-              <div id="buttons-container" class="pull-right">
+              <div id="buttons-container" class="pull-right" style="margin-bottom: 10px;">
                 <a id="reset-button" role="button" class="btn  jumbo-1" style="margin-right: 10px;"
                         formid="#board_form" targeturl="{% url 'board_apply' %}"
                         onclick="ru.plugin.do_board(this, 'reset');">

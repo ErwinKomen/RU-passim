@@ -424,20 +424,26 @@ class GenGraph(object):
             if msg == "" and serdist is not None:
                 # todo: lazy loading
 
+                # Set a shortcut to the metadata and do an additional check
+                dset_metadata = self.local_store[dataset].metadata
+                ms_ident = dset_metadata.get("ms_identifier")
+                if ms_ident is None:
+                    oErr.Status("generate_graphs for [{}] has no ms_identifier".format(dataset))
+
                 long_serie = self.local_store[dataset].char_series['EncodedWorks'].apply(lambda x: len(x) >= min_length and all_sermons_present(x, contains) if contains and len(contains) > 0 else len(
                     x) >= min_length)
                 dist_matrix = self.local_store[dataset].serie_distances[sermdist][serdist].loc[long_serie, long_serie]
                 
                 # if anchor manuscript is given, we need to update our dist_matrix
-                if anchor_ms:
-                    anchor_ms_idx = self.local_store[dataset].metadata[self.local_store[dataset].metadata["ms_identifier"] == anchor_ms].index.tolist()
+                if anchor_ms and not ms_ident is None:
+                    anchor_ms_idx = dset_metadata[dset_metadata["ms_identifier"] == anchor_ms].index.tolist()
                     # in length of anchor manuscript is less than minimal lenght of the series,
                     # setting minimal length to length of the anchor ms (see callback above)
                     try:
                         closest_mss_idx = dist_matrix[anchor_ms_idx[0]].sort_values(ascending=True).head(nb_closest).index.tolist()
                     except KeyError:
                         reset_length = True
-                        anchor_ms_length = self.local_store[dataset].metadata.loc[anchor_ms_idx[0]]["total"]
+                        anchor_ms_length = dset_metadata.loc[anchor_ms_idx[0]]["total"]
                         long_serie = self.local_store[dataset].char_series['EncodedWorks'].apply(
                             lambda x: len(x) >= anchor_ms_length)
                         dist_matrix = self.local_store[dataset].serie_distances[sermdist][serdist].loc[long_serie, long_serie]
@@ -460,7 +466,7 @@ class GenGraph(object):
                 if active_tab == 'clusters':
 
                     # creating labels for dendrogram
-                    clustering_metadata = self.local_store[dataset].metadata[self.local_store[dataset].metadata.index.isin(dist_matrix.index)]
+                    clustering_metadata = dset_metadata[dset_metadata.index.isin(dist_matrix.index)]
                     clustering_metadata["SeriesName"] = clustering_metadata.index
                     hovertext = self.local_store[dataset].get_clustering_hovertext(clustering_metadata)
 
@@ -485,136 +491,140 @@ class GenGraph(object):
                     self.local_graph_store['current'] = self.local_graph_store['clusters']
 
                 if active_tab == 'umap':
-                    n_components = 2 if umap_dim == '2D' else 3
-                    umap_= UMAP(
-                        n_components = n_components,
-                        min_dist=umap_md,
-                        n_neighbors=umap_nb,
-                        init='random', 
-                        random_state=123, 
-                        metric='precomputed'
-                        )
+                    # Additional check before we continue
+                    if ms_ident is None:
+                        # Cannot show this for the given dataset
+                        msg = "UMAP: cannot work with dataset [{}], because ms_identifier does not exist".format(dataset)
+                    else:
+                        n_components = 2 if umap_dim == '2D' else 3
+                        umap_= UMAP(
+                            n_components = n_components,
+                            min_dist=umap_md,
+                            n_neighbors=umap_nb,
+                            init='random', 
+                            random_state=123, 
+                            metric='precomputed'
+                            )
 
-                    if len(umap_hl) == 1 and umap_hl[0] in self.local_store[dataset].metadata.columns.tolist():
-                        color_col = umap_hl[0]
-                        cont_coloring = True
-                        if self.local_store[dataset].metadata[color_col].dtype != 'float':
+                        if len(umap_hl) == 1 and umap_hl[0] in dset_metadata.columns.tolist():
+                            color_col = umap_hl[0]
+                            cont_coloring = True
+                            if dset_metadata[color_col].dtype != 'float':
+                                cont_coloring = False
+                                colorize = {x:x for x in dset_metadata[umap_hl[0]].unique().tolist()}
+                        else:            
                             cont_coloring = False
-                            colorize = {x:x for x in self.local_store[dataset].metadata[umap_hl[0]].unique().tolist()}
-                    else:            
-                        cont_coloring = False
-                        color_col = "SeriesName"
-                        # getting index from actual ms_identifiers
-                        mask = (self.local_store[dataset].metadata["ms_identifier"].isin(umap_hl))
-                        umap_hl = self.local_store[dataset].metadata.index[mask]
+                            color_col = "SeriesName"
+                            mask = ( ms_ident.isin(umap_hl))
+                            umap_hl = dset_metadata.index[mask]
 
-                        colorize = {x:x for x in umap_hl}
+                            colorize = {x:x for x in umap_hl}
 
-                    # go_colors = cycle(plotly.colors.sequential.Viridis)
-                    go_colors = cycle(px.colors.qualitative.Dark24)
+                        # go_colors = cycle(plotly.colors.sequential.Viridis)
+                        go_colors = cycle(px.colors.qualitative.Dark24)
 
-                    proj = umap_.fit_transform(dist_matrix)
-                    proj_df = pd.DataFrame(proj) 
+                        proj = umap_.fit_transform(dist_matrix)
+                        proj_df = pd.DataFrame(proj) 
 
-                    # print(store[dataset].metadata.shape)
-                    proj_df["SeriesName"] = dist_matrix.index
-                    proj_df = pd.concat( [ proj_df.set_index("SeriesName"), self.local_store[dataset].metadata], axis=1)
-                    proj_df["SeriesName"] = proj_df.index
+                        # print(store[dataset].metadata.shape)
+                        proj_df["SeriesName"] = dist_matrix.index
+                        proj_df = pd.concat( [ proj_df.set_index("SeriesName"), dset_metadata], axis=1)
+                        proj_df["SeriesName"] = proj_df.index
 
-                    hovertext = self.local_store[dataset].get_umap_hovertext(proj_df)
+                        hovertext = self.local_store[dataset].get_umap_hovertext(proj_df)
 
-                    if not cont_coloring:
-                        # changing ms_id to actual shelfmark; of course, for publication one should generalize and write a proper mapper, if needed
-                        if color_col == "SeriesName":
-                            proj_df['color'] = proj_df[color_col].apply(lambda x: proj_df.loc[colorize[x]]["ms_identifier"] if x in colorize else "other")
-                        else:
-                            proj_df['color'] = proj_df[color_col].apply(lambda x: colorize[x] if x in colorize else "other")
-                    else:
-                        proj_df['color'] = proj_df[color_col]
-                    proj_df['text'] = hovertext['text']
-
-                    fig = go.Figure()
-                    fig.update_layout(width=800, height=800)
-
-                    # adding correct descending sorting if color column is "century"
-                    color_descrete_values = proj_df.color.unique()
-
-                    for v in color_descrete_values:
-                        if v == "other": continue
-
-                    if color_col == "century":
-                        color_descrete_values = sorted(proj_df.color.unique(), key=lambda x: int(x) if x.isnumeric() else 0,
-                                                       reverse=True)
-                    if n_components == 2:
                         if not cont_coloring:
-                            for s in color_descrete_values:
-                                p_df = proj_df[proj_df.color == s]
+                            # changing ms_id to actual shelfmark; of course, for publication one should generalize and write a proper mapper, if needed
+                            if color_col == "SeriesName":
+                                proj_df['color'] = proj_df[color_col].apply(lambda x: proj_df.loc[colorize[x]]["ms_identifier"] if x in colorize else "other")
+                            else:
+                                proj_df['color'] = proj_df[color_col].apply(lambda x: colorize[x] if x in colorize else "other")
+                        else:
+                            proj_df['color'] = proj_df[color_col]
+                        proj_df['text'] = hovertext['text']
 
+                        fig = go.Figure()
+                        fig.update_layout(width=800, height=800)
+
+                        # adding correct descending sorting if color column is "century"
+                        color_descrete_values = proj_df.color.unique()
+
+                        for v in color_descrete_values:
+                            if v == "other": continue
+
+                        if color_col == "century":
+                            color_descrete_values = sorted(proj_df.color.unique(), key=lambda x: int(x) if x.isnumeric() else 0,
+                                                           reverse=True)
+                        if n_components == 2:
+                            if not cont_coloring:
+                                for s in color_descrete_values:
+                                    p_df = proj_df[proj_df.color == s]
+
+                                    fig.add_trace(go.Scatter(
+                                        x=p_df[0], 
+                                        y=p_df[1], 
+                                        marker_color=next(go_colors),
+                                        # hoverinfo='text',
+                                        name=str(s),
+                                        customdata=p_df.text,
+                                        mode='markers',
+                                        hovertemplate='%{customdata}'
+                                        # customdata=proj_df.text,
+                                        # hovertemplate="%{custom_data}"
+                                        )
+                                    )
+                            else:
                                 fig.add_trace(go.Scatter(
-                                    x=p_df[0], 
-                                    y=p_df[1], 
-                                    marker_color=next(go_colors),
-                                    # hoverinfo='text',
-                                    name=str(s),
-                                    customdata=p_df.text,
-                                    mode='markers',
-                                    hovertemplate='%{customdata}'
-                                    # customdata=proj_df.text,
-                                    # hovertemplate="%{custom_data}"
+                                        x=proj_df[0], 
+                                        y=proj_df[1], 
+                                        marker_color=proj_df.color,
+                                        # hoverinfo='text',
+                                        customdata=proj_df.text,
+                                        mode='markers',
+                                        hovertemplate='%{customdata}'
+                                        # customdata=proj_df.text,
+                                        # hovertemplate="%{custom_data}"
+                                        )
                                     )
-                                )
                         else:
-                            fig.add_trace(go.Scatter(
-                                    x=proj_df[0], 
-                                    y=proj_df[1], 
-                                    marker_color=proj_df.color,
-                                    # hoverinfo='text',
-                                    customdata=proj_df.text,
-                                    mode='markers',
-                                    hovertemplate='%{customdata}'
-                                    # customdata=proj_df.text,
-                                    # hovertemplate="%{custom_data}"
-                                    )
-                                )
-                    else:
-                        if not cont_coloring:
-                            for s in color_descrete_values:
-                                p_df = proj_df[proj_df.color == s]
+                            if not cont_coloring:
+                                for s in color_descrete_values:
+                                    p_df = proj_df[proj_df.color == s]
 
+                                    fig.add_trace(go.Scatter3d(
+                                        x=p_df[0], 
+                                        y=p_df[1], 
+                                        z=p_df[2],
+                                        marker_color=next(go_colors),
+                                        # hoverinfo='text',
+                                        name=str(s),
+                                        customdata=p_df.text,
+                                        mode='markers',
+                                        hovertemplate='%{customdata}'
+                                        # customdata=proj_df.text,
+                                        # hovertemplate="%{custom_data}"
+                                        )
+                                    )
+                            else:
                                 fig.add_trace(go.Scatter3d(
-                                    x=p_df[0], 
-                                    y=p_df[1], 
-                                    z=p_df[2],
-                                    marker_color=next(go_colors),
-                                    # hoverinfo='text',
-                                    name=str(s),
-                                    customdata=p_df.text,
-                                    mode='markers',
-                                    hovertemplate='%{customdata}'
-                                    # customdata=proj_df.text,
-                                    # hovertemplate="%{custom_data}"
+                                        x=proj_df[0], 
+                                        y=proj_df[1],
+                                        z=proj_df[2],
+                                        marker_color=proj_df.color,
+                                        # hoverinfo='text',
+                                        customdata=proj_df.text,
+                                        mode='markers',
+                                        hovertemplate='%{customdata}'
+                                        # customdata=proj_df.text,
+                                        # hovertemplate="%{custom_data}"
+                                        )
                                     )
-                                )
-                        else:
-                            fig.add_trace(go.Scatter3d(
-                                    x=proj_df[0], 
-                                    y=proj_df[1],
-                                    z=proj_df[2],
-                                    marker_color=proj_df.color,
-                                    # hoverinfo='text',
-                                    customdata=proj_df.text,
-                                    mode='markers',
-                                    hovertemplate='%{customdata}'
-                                    # customdata=proj_df.text,
-                                    # hovertemplate="%{custom_data}"
-                                    )
-                                )
-                    self.local_graph_store['umap'] = fig
-                    self.local_graph_store['umap'].update_traces(marker_size=5)
-                    self.local_graph_store['umap'].update_layout(width=800, height=800)
+                        self.local_graph_store['umap'] = fig
+                        self.local_graph_store['umap'].update_traces(marker_size=5)
+                        self.local_graph_store['umap'].update_layout(width=800, height=800)
 
-                    # Set the current graph
-                    self.local_graph_store['current'] = self.local_graph_store['umap']
+                        # Set the current graph
+                        self.local_graph_store['current'] = self.local_graph_store['umap']
     
             if msg == "" and active_tab == 'hm_sermons':
         
