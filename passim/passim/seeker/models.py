@@ -8788,17 +8788,19 @@ class SermonGold(models.Model):
         return True
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        istop = 1
-        srchincipit = get_searchable(self.incipit)
-        srchexplicit = get_searchable(self.explicit)
-        if self.srchincipit != srchincipit: self.srchincipit = srchincipit
-        if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
-        lSign = []
-        for item in self.goldsignatures.all().order_by('-editype'):
-            lSign.append(item.short())
-        siglist = json.dumps(lSign)
-        if siglist != self.siglist: self.siglist = siglist
+
+        if not self.id is None:
+            # Adapt the incipit and explicit
+            istop = 1
+            srchincipit = get_searchable(self.incipit)
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchincipit != srchincipit: self.srchincipit = srchincipit
+            if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
+            lSign = []
+            for item in self.goldsignatures.all().order_by('-editype'):
+                lSign.append(item.short())
+            siglist = json.dumps(lSign)
+            if siglist != self.siglist: self.siglist = siglist
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
 
