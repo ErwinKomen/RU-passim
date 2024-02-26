@@ -266,7 +266,7 @@
 
                           <!-- Show the different filters in the list -->
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name or filter.head_id == "hidden" %}
+                            {% if filter.head_id == "filter_"|add:section.name %}
                               <div id="{{filter.id}}" class="{% if filter.hasvalue %} {% else %}hidden {% endif %}"
                                addview="{% if filter.include_id %}{{filter.include_id}}{% endif %}">
                                 <table style="width: 100%;">

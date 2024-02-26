@@ -4524,9 +4524,8 @@ class SermonEdit(BasicDetails):
                  'field_key': 'fulltext'}, 
                 {'type': 'plain', 'label': "Alt page numbering:",   'value': instance.get_altpages(),   'field_list': "altpageslist"},
                  ]
-            # Add transcription file, if possible
-            #if user_is_ingroup(self.request, app_editor):
-            #    mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+            # issue #715: full-text may not be visible to 'regular' users
+
             # some more items
             mainitems_add = [
                 {'type': 'plain', 'label': "Notes alt page numbering:",   'value': instance.get_notes_altpages(), 'field_list': "notes_altpageslist"},
@@ -4720,13 +4719,18 @@ class SermonEdit(BasicDetails):
                 if not sInfo is None:
                     oInfo = json.loads(sInfo)
                 wordcount = oInfo.get("wordcount", 0)
-                # Combine with button click + default hidden
-                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
-                               delete_message="",
-                               wordcount=wordcount,
-                               transdelurl=transdelurl,
-                               fulltext=sText)
-                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
+                # Check whether this is a regular user or not
+                if user_is_ingroup(self.request, app_editor) or user_is_ingroup(self.request, app_moderator):
+                    # Combine with button click + default hidden
+                    context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                                   delete_message="",
+                                   wordcount=wordcount,
+                                   transdelurl=transdelurl,
+                                   fulltext=sText)
+                    sBack = render_to_string("seeker/ftext_buttons.html", context, None)
+                else:
+                    # issue #715: only show non-clickable word count
+                    sBack = "{}".format(wordcount)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
@@ -11897,7 +11901,7 @@ class ManuscriptListView(BasicList):
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
         {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "hidden"}, 
+        # issue #717{"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "hidden"}, 
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
         #{"name": "Passim code",                         "id": "filter_authority_file_code",        "enabled": False, "head_id": "filter_authority_file"},        
         #{"name": "Gryson/Clavis/Other code",            "id": "filter_authority_file_signature",   "enabled": False, "head_id": "filter_authority_file"},

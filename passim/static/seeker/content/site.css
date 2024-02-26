@@ -2093,9 +2093,9 @@ svg tspan:hover {
 
 /* Plugin */
 div.acknowledgement {
-    background-color: lightyellow;
-    color: darkgray;
-    font-size: smaller;
+    color: #6c757d;
+    font-weight: 400;
+    font-size: small;
     padding: 4px 4px 4px 4px;
     margin-bottom: 10px;
     margin-top: 10px;

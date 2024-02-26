@@ -46,17 +46,17 @@
                           <li><a href="{% url 'researchset_list' %}" title="Research Sets for Dynamic comparative tables">DCT tool</a></li>
                           <li><a href="{% url 'sermonboard' %}" title="Gleb's plugin'">Plugin</a></li>
                           {% if is_stemma_user %}
-                          <li><a href="{% url 'stemmaset_list' %}" title="Research Sets for Stemmatology">Stemmatology</a></li>
+                            <li><a href="{% url 'stemmaset_list' %}" title="Research Sets for Stemmatology">Stemmatology</a></li>
                           {% endif %}
                           {% if is_app_editor %}
-                          <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li>
-                          <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li>
-                          <li><a href="{% url 'onlinesources_list' %}" title="Online Sources">Online Sources</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'userkeyword_list' %}" title="User Keywords">User Keywords</a></li>
+                            <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li>
                           {% endif %}
+                          <li><a href="{% url 'onlinesources_list' %}" title="Online Sources">Online Sources</a></li>
                           {% if is_app_uploader %}
-                          <li role="separator" class="divider"></li>
-                          <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>
                           {% endif %}
                         </ul>
                       </li>
