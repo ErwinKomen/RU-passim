@@ -8017,10 +8017,11 @@ class CollAnyEdit(BasicDetails):
                         
             # Add comment modal stuff
             if instance.settype == "hc":
+                lhtml = []
+
                 initial = dict(otype="hc", objid=instance.id, profile=profile)
                 context['commentForm'] = CommentForm(initial=initial, prefix="com")
                 context['comment_list'] = get_usercomments('hc', instance, profile)            
-                lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
 
@@ -13404,10 +13405,10 @@ class SermonGoldEdit(BasicDetails):
                             context['mainitems'].append(oItemEdi)
 
             # Add comment modal stuff
+            lhtml = []
             initial = dict(otype="gold", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('gold', instance, profile)
-            lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['after_details'] = "\n".join(lhtml)
 
@@ -13935,10 +13936,10 @@ class EqualGoldEdit(BasicDetails):
                     context['permission'] = self.permission
 
                 # Add comment modal stuff
+                lhtml = []
                 initial = dict(otype="super", objid=instance.id, profile=profile)
                 context['commentForm'] = CommentForm(initial=initial, prefix="com")
                 context['comment_list'] = get_usercomments('super', instance, profile)                
-                lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
 
