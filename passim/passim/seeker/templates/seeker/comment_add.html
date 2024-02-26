@@ -17,7 +17,7 @@
               <a role="button" class=""  data-dismiss="modal"><span class="glyphicon glyphicon-remove-sign" style="color: lightblue;"></span>Cancel</a>
             </span>
             <h4 class="modal-title">
-              Submit a comment on this
+              {% if is_app_editor %}Submit a comment on this{% else %}View comment history on this{% endif %}
               {% if commentForm.otype.value == "sermo" %}Sermon
               {% elif commentForm.otype.value == "gold" %}Sermon Gold
               {% elif commentForm.otype.value == "super" %}Authority File
