@@ -2091,3 +2091,13 @@ svg tspan:hover {
     fill: red;
 }
 
+/* Plugin */
+div.acknowledgement {
+    background-color: lightyellow;
+    color: darkgray;
+    font-size: smaller;
+    padding: 4px 4px 4px 4px;
+    margin-bottom: 10px;
+    margin-top: 10px;
+}
+
