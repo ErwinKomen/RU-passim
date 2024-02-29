@@ -3596,6 +3596,10 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
 
+                # issue #736: include projects in the queryset, to which the current user does *not* necessarily have rights
+                self.fields['projlist'].queryset = profile.get_myprojects(instance)
+                self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+
                 # TO BE DELETED in time...
                 #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))

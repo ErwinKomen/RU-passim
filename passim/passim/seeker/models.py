@@ -1773,7 +1773,7 @@ class Profile(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_myprojects(self):
+    def get_myprojects(self, ssg = None):
         """Get a queryset of projects to which I am editor or approver"""
 
         qs = []
@@ -1781,7 +1781,13 @@ class Profile(models.Model):
         try:
             ids_edit = [x['project__id'] for x in self.project_editor.values("project__id") ]
             ids_appr = [x['project__id'] for x in self.project_approver.values("project__id") ]
-            ids = list( set( ids_edit + ids_appr ) )
+            # Issue #736: if a SSG (AF) is specified, then the id's this currently refers to must also be included
+            if ssg is None:
+                ids = list( set( ids_edit + ids_appr ) )
+            else:
+                # Get the id's of the current ssg
+                ids_curr = [x['id'] for x in ssg.projects.all().values("id")]
+                ids = list( set( ids_edit + ids_appr + ids_curr ) )
             qs = Project2.objects.filter(id__in=ids).order_by('name')
         except:
             msg = oErr.get_error_message()
