@@ -1193,6 +1193,8 @@ class BasicList(ListView):
                             if 'help' in item:
                                 filteritem['helptext'] = self.get_helptext(item['help']) 
                                 filteritem['help'] = item['help']
+                            if 'title' in item:
+                                filteritem['title'] = item['title']
                             # Make sure we indicate that there is a value
                             if bHasItemValue: filteritem['hasvalue'] = True                            
 
@@ -1977,7 +1979,7 @@ class BasicDetails(DetailView):
         try:
             # Prepare form
             frm = self.prepare_form(instance, context, initial)
-
+            
             if frm:
 
                 if instance == None:

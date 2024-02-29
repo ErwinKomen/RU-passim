@@ -7630,7 +7630,7 @@ class ProjectEdit(BasicDetails):
         try:
             
             # Is the user allowed to edit/delete or not?
-            bMayDelete = user_is_ingroup(self.request, app_moderator)
+            bMayDelete = user_is_ingroup(self.request, app_moderator) or user_is_superuser(self.request)
 
             # Standard behaviour: no_delete to True
             if not bMayDelete:
@@ -11938,14 +11938,14 @@ class ManuscriptListView(BasicList):
 
         {'section': 'collection', 'filterlist': [
             # === Overlap with a specific manuscript ===
-            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id'},            
+            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id', 'help': 'overlap_manu'},            
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc', 
              'title': 'Percentage overlap between the Historical Collection SSGs and the SSGs referred to in the manuscripts'},             
             #{'filter': 'collection_manuptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
             # 'title': 'Percentage overlap between the "Comparison manuscript" SSGs and the SSGs referred to in other manuscripts'},
 
             # === Historical Collection ===
-            {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
+            {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections', 'help': 'overlap_hc',                         
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },             
 
             # === Personal Dataset ===
@@ -11956,7 +11956,7 @@ class ManuscriptListView(BasicList):
             # Issue #416: Delete the option to search for a GoldSermon dataset 
             #{'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
             # 'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 'help': 'overlap_af',
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
             ]},
@@ -12234,10 +12234,18 @@ class ManuscriptListView(BasicList):
                     if len(coll_list) > 0:
                         # Yes, overlap specified
                         if isinstance(overlap, int):
+                            # We also need to have the profile
+                            profile = Profile.get_user_profile(self.request.user.username)
+
                             # Make sure the string is interpreted as an integer
                             overlap = int(overlap)
-                            # Now add a Q expression
-                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                            # Now add a Q expression that includes:
+                            # 1 - Greater than or equal the overlap percentage
+                            # 2 - The list of historical collections
+                            # 3 - This particular user
+                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap) & \
+                               Q(manu_colloverlaps__collection__in=coll_list) & \
+                               Q(manu_colloverlaps__profile=profile)
 
                             # Make sure to actually *calculate* the overlap between the different collections and manuscripts
                 
@@ -12248,8 +12256,6 @@ class ManuscriptListView(BasicList):
                             lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
 
-                            # We also need to have the profile
-                            profile = Profile.get_user_profile(self.request.user.username)
                             # Now calculate the overlap for all
                             with transaction.atomic():
                                 for coll in coll_list:

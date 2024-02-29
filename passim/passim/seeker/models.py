@@ -13073,6 +13073,7 @@ class ProjectEditor(models.Model):
     def delete(self, using = None, keep_parents = False):
         # First delete the person as editor for the indicated project
         response = super(ProjectEditor, self).delete(using, keep_parents)
+        oErr = ErrHandle()
         try:
             # Check for an equivalent ProjectApprover entry
             obj = ProjectApprover.objects.filter(profile=self.profile, project=self.project).first()
@@ -13152,27 +13153,34 @@ class CollOverlap(models.Model):
     def get_overlap(profile, collection, manuscript):
         """Calculate and set the overlap between collection and manuscript"""
 
-        obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
-        if obj == None:
-            obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
-        # Get the ids of the SSGs in the collection
-        coll_list = [ collection ]
-        ssg_coll = EqualGold.objects.filter(collections__in=coll_list).values('id')
-        if len(ssg_coll) == 0:
-            ptc = 0
-        else:
-            # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
-            ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
-            # Now calculate the overlap
-            count = 0
-            for item in ssg_coll:
-                if item in ssg_manu: count += 1
-            ptc = 100 * count // len(ssg_coll)
-        # Check if there is a change in percentage
-        if ptc != obj.overlap:
-            # Set the percentage
-            obj.overlap = ptc
-            obj.save()
+        ptc = 0
+        oErr = ErrHandle()
+        try:
+            obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
+            if obj == None:
+                obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
+            # Get the ids of the SSGs in the collection
+            coll_list = [ collection ]
+            ssg_coll = [x['id'] for x in EqualGold.objects.filter(collections__in=coll_list).values('id')]
+            if len(ssg_coll) == 0:
+                ptc = 0
+            else:
+                # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
+                # Old; ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
+                ssg_manu = [x['super__id'] for x in  manuscript.sermondescr_super.all().values('super__id') ]
+                # Now calculate the overlap
+                count = 0
+                for item in ssg_coll:
+                    if item in ssg_manu: count += 1
+                ptc = 100 * count // len(ssg_coll)
+            # Check if there is a change in percentage
+            if ptc != obj.overlap:
+                # Set the percentage
+                obj.overlap = ptc
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollOverlap/get_overlap")
         return ptc
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
