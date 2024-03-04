@@ -1442,6 +1442,9 @@ var ru = (function ($, ru) {
   
                 $(target).find("input").each(function (idx, elThis) {
                   $(elThis).val("");
+                  if ($(elThis).attr("type") == "range") {
+                    $(elThis).closest("div").addClass("hidden");
+                  }
                 });
                 // Also reset all select 2 items
                 $(target).find("select").each(function (idx, elThis) {
