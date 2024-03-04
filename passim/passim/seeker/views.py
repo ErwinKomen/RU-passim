@@ -11884,7 +11884,7 @@ class ManuscriptListView(BasicList):
         
         # Issue #717: rename into "Comparative search..."
         # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
-        {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
+        {"name": "Comparative search...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
