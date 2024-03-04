@@ -11888,8 +11888,10 @@ class ManuscriptListView(BasicList):
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
-        {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
-        {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
+        # issue #718: remove options to search for Gryson/Clavis/other code - for sermons
+        # {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
+        # {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
+
         {"name": "Attr. author",            "id": "filter_sermo_author",        "enabled": False, "head_id": "filter_sermon"},
         {"name": "Author type",             "id": "filter_sermo_authortype",    "enabled": False, "head_id": "filter_sermon"},
         {"name": "Incipit",                 "id": "filter_sermo_incipit",       "enabled": False, "head_id": "filter_sermon"},
@@ -11910,7 +11912,9 @@ class ManuscriptListView(BasicList):
         {"name": "Author",                              "id": "filter_authority_file_author",      "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Incipit",                             "id": "filter_authority_file_incipit",     "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Explicit",                            "id": "filter_authority_file_explicit",    "enabled": False, "head_id": "filter_authority_file"},
-      ]
+        # issue #718: add *ONE* option to search for Gryson/Clavis/other code - for AFs
+        {"name": "Gryson/Clavis/Other code",    "id": "filter_authority_file_signature",     "enabled": False, "head_id": "filter_authority_file"},
+    ]
 
     searches = [
         {'section': '', 'filterlist': [
@@ -11958,10 +11962,11 @@ class ManuscriptListView(BasicList):
             # ===================
             ]},
         {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
-             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
-             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, # KAN WEG
+            # issue #717: delete the PD:Manuscript and PD:Sermon options
+            #{'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+            # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            #{'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+            # 'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, # KAN WEG
             {'filter': 'sermo_authortype', 'keyS': 'authortype',  'help': 'authorhelp'}, 
             {'filter': 'sermo_author',        'fkfield': 'manuitems__itemsermons__author',            
                      'keyS': 'sermo_authorname', 'keyFk': 'name', 'keyList': 'sermo_authorlist', 'infield': 'id', 'external': 'sermo-authorname'},            
@@ -11979,13 +11984,13 @@ class ManuscriptListView(BasicList):
             {'filter': 'authority_file_signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature', # HOE MOET DIE fkfield worden genoemd? Filteren op twee links
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }, # Q expressie toevoegen
              
-            # Sign manual SERMON KAN LATER WEG
-            {'filter': 'authority_file_signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
-             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            ## Sign manual SERMON KAN LATER WEG
+            #{'filter': 'authority_file_signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+            # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             
-            # Sign auto SSG KAN LATER WEG
-            {'filter': 'authority_file_signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
-             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' },                   
+            ## Sign auto SSG KAN LATER WEG
+            #{'filter': 'authority_file_signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+            # 'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' },                   
                          
             {'filter': 'authority_file_author', 'fkfield': 'manuitems__itemsermons__sermondescr_super__super__author',            
                      'keyS': 'ssg_authorname', 'keyFk': 'name', 'keyList': 'ssg_authorlist', 'infield': 'id', 'external': 'gold-authorname' },
@@ -12312,6 +12317,34 @@ class ManuscriptListView(BasicList):
                 fields['date_from'] = qThis
                 fields['date_until'] = ""
 
+            # Issue #718: combine search for Signature *automatic* and *manual*
+            af_siglist = fields.get("siglist")
+            if not af_siglist is None:
+                af_siglist_list = [dict(code=x.code, editype=x.editype) for x in af_siglist]
+                lst_code = [x['code'] for x in af_siglist_list]
+                qs_sermonsig = SermonSignature.objects.filter(code__in=lst_code).distinct()
+                exclude_id = []
+                for oItem in af_siglist_list:
+                    # Check if the combination of code and editype is in here
+                    res_list = qs_sermonsig.filter(code=oItem['code'])
+                    if res_list.count() > 1:
+                        # Check which to exclude
+                        for obj in res_list:
+                            if obj.editype != oItem['editype']:
+                                # This one must be excluded
+                                exclude_id.append(obj.id)
+                # Adapt the code list if needed
+                if len(exclude_id) > 0:
+                    qs_sermonsig = qs_sermonsig.exclude(id__in=exclude_id)
+
+
+                # Build a Q-expression to facilitate this
+                q1 = Q(manuitems__itemsermons__sermonsignatures__in=qs_sermonsig)
+                q2 = Q(manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures__in=af_siglist)
+                fields['siglist'] = ( q1 | q2 )
+
+                # Debugging: 
+                # qs = Manuscript.objects.filter(q1)
 
             # Adapt the bible reference list
             bibrefbk = fields.get("bibrefbk", "")
