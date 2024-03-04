@@ -52,6 +52,14 @@
         </a>
       </li>
       <li>
+        <a id="basket_shared" title="Keep the search results shared with the basket, remove the rest" href="#" operation="shared" 
+            targetid="basket_buttons"
+            ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">
+          <span class="glyphicon glyphicon-adjust"></span>
+          <span>Shared</span>
+        </a>
+      </li>
+      <li>
         <a id="basket_reset" title="Clear the basket" href="#" operation="reset" 
             targetid="basket_buttons"
             ajaxurl="{{basket_update}}" onclick="ru.passim.seeker.do_basket(this);">

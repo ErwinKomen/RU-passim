@@ -1370,6 +1370,60 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
+#class SignatureCombiWidget(forms.MultiWidget):
+#    def __init__(self, attrs = None):
+#        # Define possible logical choices
+#        logi_choices = [ ("and", "and"), ("or", "or"), ("not", "not") ]
+#        add_field = [ ("-", "-"), ("Add", "add") ]
+#        # Define the list of widgets
+#        widgets = [
+#            # The signature selection widget
+#            SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+#                                    'style': 'width: 100%;', 'class': 'searching'}),
+#            # Possible logical operators
+#            forms.Select(attrs=attrs, choices=logi_choices),
+#            # Option to add another operator
+#            forms.Select(attrs=attrs, choices=add_field)
+#        ]
+#        super(SignatureCombiWidget, self).__init__(widgets, attrs)
+
+#    def decompress(self, value):
+#        """Return the different values"""
+
+#        if value:
+#            data = value.split(',')
+#            response = [ data[0], data[1], data[2] ]
+#        else:
+#            response = [None, None, None]
+#        return response
+
+#    def value_from_datadict(self, data, files, name):
+#        sig, logi, add = super(SignatureCombiWidget, self).value_from_datadict(data, files, name)
+#        sCombi = "{}-{}-{}".format()
+#        return sCombi
+
+
+#class SignatureCombiField(forms.MultiValueField):
+#    def __init__(self, required=True, widget=None, label=None, initial=None):
+#        # Define possible logical choices
+#        logi_choices = [ ("and", "and"), ("or", "or"), ("not", "not") ]
+#        add_field = [ ("-", "-"), ("Add", "add") ]
+#        fields = (
+#            ModelMultipleChoiceField(queryset=None, required=False,
+#                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+#                                                          'style': 'width: 100%;', 'class': 'searching'})),
+#            forms.ChoiceField(choices=logi_choices),
+#            forms.ChoiceField(choices=add_field)
+#        )
+#        super(SignatureCombiField, self).__init__(fields=fields, required=required, widget=widget, label=label, initial=initial)
+
+#    def compress(self, data_list):
+#        sCombi = None
+#        if data_list:
+#            sCombi = "{}, {}, {}".format(''.joint(data_list[0]), data_list[1], data_list[2])
+#        return sCombi
+
+
 class SignatureOneWidget(ModelSelect2Widget):
     model = Signature
     search_fields = [ 'code__icontains' ]
@@ -1776,18 +1830,21 @@ class SearchManuForm(PassimModelForm):
     signatureaid = forms.CharField(label=_("Signature ID"), required=False) 
        
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+                    widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
                                                           'style': 'width: 100%;', 'class': 'searching'}))
+    #combilist   = SignatureCombiField(label=_("Combination"), required=False,
+    #                widget = SignatureCombiWidget()),
+ 
     # KAN WEG na afronden issue # 658 
     siglist_a   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...',
                                                           'style': 'width: 100%;', 'class': 'searching'}))
 
-    keyword = forms.CharField(label=_("Keyword"), required=False,
+    keyword     = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
-    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
     
@@ -1806,9 +1863,9 @@ class SearchManuForm(PassimModelForm):
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     collist_hist =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_m   =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_s   =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_sg  =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
@@ -1820,7 +1877,7 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) 
     rsetone     = ModelChoiceField(queryset=None, required=False)
-    overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
+    overlap     = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1',
                                           'label': 'Percentage of overlap'})) # , 'value':'100'
     searchname = forms.CharField(label=_("Name of this search"), required=False,

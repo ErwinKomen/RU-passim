@@ -11983,7 +11983,7 @@ class ManuscriptListView(BasicList):
             # Signature NEW signature
             {'filter': 'authority_file_signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature', # HOE MOET DIE fkfield worden genoemd? Filteren op twee links
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }, # Q expressie toevoegen
-             
+
             ## Sign manual SERMON KAN LATER WEG
             #{'filter': 'authority_file_signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
             # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -11996,6 +11996,7 @@ class ManuscriptListView(BasicList):
                      'keyS': 'ssg_authorname', 'keyFk': 'name', 'keyList': 'ssg_authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'authority_file_incipit',   'dbfield': 'manuitems__itemsermons__sermondescr_super__super__srchincipit',   'keyS': 'ssg_incipit'},             
             {'filter': 'authority_file_explicit',  'dbfield': 'manuitems__itemsermons__sermondescr_super__super__srchexplicit',  'keyS': 'ssg_explicit'}, 
+
             ]},
         {'section': 'other', 'filterlist': [
             #{'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
@@ -12319,7 +12320,7 @@ class ManuscriptListView(BasicList):
 
             # Issue #718: combine search for Signature *automatic* and *manual*
             af_siglist = fields.get("siglist")
-            if not af_siglist is None:
+            if not af_siglist is None and af_siglist.count() > 0:
                 af_siglist_list = [dict(code=x.code, editype=x.editype) for x in af_siglist]
                 lst_code = [x['code'] for x in af_siglist_list]
                 qs_sermonsig = SermonSignature.objects.filter(code__in=lst_code).distinct()
@@ -16864,7 +16865,7 @@ class BasketUpdate(BasicPart):
             team_group=app_editor
 
             # Note: only operations in either of these two lists will be executed
-            lst_basket_target = ["create", "add", "remove", "reset"]
+            lst_basket_target = ["create", "add", "remove", "shared", "missing", "reset"]
             lst_basket_source = ["collcreate", "colladd", "rsetcreate", "rsetadd", "dctlaunch"]
 
             # Get our profile
@@ -16920,6 +16921,24 @@ class BasketUpdate(BasicPart):
                                 for item in search_id:
                                     kwargs["{}_id".format(self.s_field)] = item
                                     self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "shared":
+                            # What are the current id's?
+                            current_ids = [x['id'] for x in self.clsBasket.objects.filter(**kwargs).values('id')]
+                            # Filter out those who are allowed to stay...
+                            kwargs["{}_id__in".format(self.s_field)] = search_id
+                            # Find out the id's of basket items that may stay
+                            maystay_ids = [x['id'] for x in self.clsBasket.objects.filter(**kwargs).values('id')]
+                            # Remove all the id's from the basket, whose s_field is not in search_id
+                            delete_id = []
+                            for this_id in current_ids:
+                                if not this_id in maystay_ids:
+                                    delete_id.append(this_id)
+                            # Possibly remove some
+                            if len(delete_id) > 0:
+                                self.clsBasket.objects.filter(id__in=delete_id).delete()
+
                             # Process history
                             profile.history(operation, self.colltype, oFields)
                         elif operation == "reset":
