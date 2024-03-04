@@ -11909,11 +11909,11 @@ class ManuscriptListView(BasicList):
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
         
-        {"name": "Author",                              "id": "filter_authority_file_author",      "enabled": False, "head_id": "filter_authority_file"},
-        {"name": "Incipit",                             "id": "filter_authority_file_incipit",     "enabled": False, "head_id": "filter_authority_file"},
-        {"name": "Explicit",                            "id": "filter_authority_file_explicit",    "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Author",                  "id": "filter_authority_file_author",       "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Incipit",                 "id": "filter_authority_file_incipit",      "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Explicit",                "id": "filter_authority_file_explicit",     "enabled": False, "head_id": "filter_authority_file"},
         # issue #718: add *ONE* option to search for Gryson/Clavis/other code - for AFs
-        {"name": "Gryson/Clavis/Other code",    "id": "filter_authority_file_signature",     "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Gryson/Clavis/Other code","id": "filter_authority_file_signature",    "enabled": False, "head_id": "filter_authority_file"},
     ]
 
     searches = [
