@@ -22,7 +22,8 @@ class RangeSlider(NumberInput):
         # Check for none-type
         if value == None: value = ""
         # Add the visible value of the range
-        output.append("<span>Value: <span class='basic-range-input'><i>(move slider)</i></span></span>")
+        label = "Value" if not 'label' in self.attrs else self.attrs.get("label")
+        output.append("<span>{}: <span class='basic-range-input'><i>(move slider)</i></span></span>".format(label))
         # Add a hidden input for text
         output.append("<div class='hidden'><input id='id_{}' type='text' name='{}' /></div>".format(org_name, org_name))
         # Combine and return

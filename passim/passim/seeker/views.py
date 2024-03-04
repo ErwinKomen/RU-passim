@@ -11882,6 +11882,8 @@ class ManuscriptListView(BasicList):
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
         
+        # Issue #717: rename into "Comparative search..."
+        # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
         {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
@@ -11897,18 +11899,13 @@ class ManuscriptListView(BasicList):
                
         {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
+        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection", "hide_button": True},
+        # issue #717: delete the PD:Manuscript and PD:Sermon options
+        #{"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
+        #{"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        # issue #717{"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "hidden"}, 
-        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
-        #{"name": "Passim code",                         "id": "filter_authority_file_code",        "enabled": False, "head_id": "filter_authority_file"},        
-        #{"name": "Gryson/Clavis/Other code",            "id": "filter_authority_file_signature",   "enabled": False, "head_id": "filter_authority_file"},
-        
-        #{"name": "Gryson/Clavis/Other code: manual",    "id": "filter_authority_file_signature_m", "enabled": False, "head_id": "filter_authority_file"},
-        #{"name": "Gryson/Clavis/Other code: automatic", "id": "filter_authority_file_signature_a", "enabled": False, "head_id": "filter_authority_file"},
         
         {"name": "Author",                              "id": "filter_authority_file_author",      "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Incipit",                             "id": "filter_authority_file_incipit",     "enabled": False, "head_id": "filter_authority_file"},

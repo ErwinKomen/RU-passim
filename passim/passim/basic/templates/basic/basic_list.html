@@ -245,7 +245,7 @@
                         <!-- Sub filters from this section -->
                         <div>
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name  %}
+                            {% if filter.head_id == "filter_"|add:section.name and not filter.hide_button %}
                               <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " 
                                     targetid="{{filter.id}}" targetaddid="{{filter.include_id}}">{{filter.name}}</span>
                             {% endif %}

@@ -867,7 +867,11 @@ class ManuscriptWidget(ModelSelect2MultipleWidget):
         return obj.get_full_name()
 
     def get_queryset(self):
-        qs = self.queryset.order_by('lcity__name', 'library__name', 'idno')
+        qs = self.queryset
+        if qs is None:
+            qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno')
+        else:
+            qs = qs.order_by('lcity__name', 'library__name', 'idno')
         #if qs == None:
         #    qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
         return qs
@@ -1731,9 +1735,9 @@ class SearchManuForm(PassimModelForm):
     """Manuscript search form"""
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
                             widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     title_ta = forms.CharField(label=_("Codico_title"), required=False, 
@@ -1817,7 +1821,8 @@ class SearchManuForm(PassimModelForm):
     collone     = ModelChoiceField(queryset=None, required=False) 
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
-                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'})) # , 'value':'100'
+                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1',
+                                          'label': 'Percentage of overlap'})) # , 'value':'100'
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     
@@ -1882,8 +1887,8 @@ class SearchManuForm(PassimModelForm):
             self.fields['authortype'].required = False                       
             self.fields['authortype'].choices = AUTHOR_TYPE
 
-            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
-            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('library__lcity__name', 'library__name', 'idno')
+            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('library__lcity__name', 'library__name', 'idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code') # KAN LATER WEG
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)

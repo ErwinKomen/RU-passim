@@ -1692,6 +1692,26 @@ var ru = (function ($, ru) {
         }
       },
 
+      slider_change: function () {
+        var el = $(this),
+          elvalueid = "",
+          elvalue = null;
+        // Do we have a valueid?
+        if ($(el)[0].hasAttribute("valueid")) {
+          // Get the value id
+          elvalueid = "#" + $(el).attr("valueid");
+          // Show the value
+          $(elvalueid).html(this.value);
+        } else {
+          // get the value element
+          elvalue = $(el).closest("td").find(".basic-range-input").first();
+          $(elvalue).html(this.value);
+          // Get the text element
+          elvalue = $(el).closest("td").find("input[type='text']").first();
+          $(elvalue)[0].value = this.value;
+        }
+      },
+
       /**
        *  init_events
        *      Bind main necessary events
@@ -1740,25 +1760,8 @@ var ru = (function ($, ru) {
           }
 
           // Make sure we catch changes
-          $("input[type='range']").on("change", function (evt) {
-            var el = $(this),
-                elvalueid = "",
-                elvalue = null;
-            // Do we have a valueid?
-            if ($(el)[0].hasAttribute("valueid")) {
-              // Get the value id
-              elvalueid = "#" + $(el).attr("valueid");
-              // Show the value
-              $(elvalueid).html(this.value);
-            } else {
-              // get the value element
-              elvalue = $(el).closest("td").find(".basic-range-input").first();
-              $(elvalue).html(this.value);
-              // Get the text element
-              elvalue = $(el).closest("td").find("input[type='text']").first();
-              $(elvalue)[0].value = this.value;
-            }
-          });
+          $("input[type='range']").on("change", ru.basic.slider_change);
+          $("input[type='range']").on("input", ru.basic.slider_change);
           // $(".basic-range-input")
 
           // Look for .blinded
