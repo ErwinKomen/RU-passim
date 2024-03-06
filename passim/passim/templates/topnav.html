@@ -54,10 +54,8 @@
                             <li><a href="{% url 'comment_list' %}" title="User Comments">User Comments</a></li>
                           {% endif %}
                           <li><a href="{% url 'onlinesources_list' %}" title="Online Sources">Online Sources</a></li>
-                          {% if is_app_uploader %}
-                            <li role="separator" class="divider"></li>
-                            <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>
-                          {% endif %}
+                          <li role="separator" class="divider"></li>
+                          <li><a href="{% url 'project2_list' %}" title="Projects">Projects</a></li>
                         </ul>
                       </li>
                     

@@ -2101,3 +2101,12 @@ div.acknowledgement {
     margin-top: 10px;
 }
 
+/* other */
+a.email {
+    background-color: lightgreen;
+    padding: 2px 2px 2px 2px;
+    font-weight: 400;
+    font-size: small;
+    border-radius: 2px;
+}
+

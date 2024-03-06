@@ -5371,6 +5371,7 @@ class SermonListView(BasicList):
     basketview = False
     plural_name = "Manifestations"
     basic_name = "sermon"    
+    sg_name = "Manifestation"
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
@@ -5400,7 +5401,7 @@ class SermonListView(BasicList):
                 {"name": "Author type",      "id": "filter_autype",         "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
-                {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
+                {"name": "Section titles",   "id": "filter_sectiontitle",   "enabled": False},
                 {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
@@ -7641,13 +7642,17 @@ class ProjectEdit(BasicDetails):
 
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Name:",     'value': instance.name},        #, 'field_key': "name"},
+                {'type': 'plain', 'label': "Name:",             'value': instance.name              },        #, 'field_key': "name"},
+                {'type': 'safe',  'label': "Description:",      'value': instance.get_description() },        #, 'field_key': "name"},
                 {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
-                    'title': 'All the current users that have approval rights for this project'}
+                    'title': 'All the current users that have approval rights for this project'     },
+                {'type': 'safe',  'label': "Contact:",          'value': instance.get_contact_info(),
+                    'title': 'The project editor that can be contacted for details'},
                 ]   
         
             if bMayDelete:
-                context['mainitems'][0]['field_key'] = "name"    
+                context['mainitems'][0]['field_key'] = "name"
+                context['mainitems'][1]['field_key'] = "description"
 
             # Also add a delete Warning Statistics message (see issue #485)
             lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
@@ -7702,7 +7707,7 @@ class ProjectListView(BasicList):
     order_default = order_cols
     order_heads = [{'name': 'Project',                'order': 'o=1', 'type': 'str', 'custom': 'project',   'main': True, 'linkdetails': True},
                    {'name': 'Manuscripts',            'order': 'o=2', 'type': 'str', 'custom': 'manulink',  'align': 'right' },
-                   {'name': 'Sermons',                'order': 'o=3', 'type': 'str', 'custom': 'sermolink', 'align': 'right'},
+                   {'name': 'Manifestations',         'order': 'o=3', 'type': 'str', 'custom': 'sermolink', 'align': 'right'},
                    {'name': 'Authority files',        'order': 'o=4', 'type': 'str', 'custom': 'ssglink',   'align': 'right'},
                    {'name': 'Historical collections', 'order': 'o=5', 'type': 'str', 'custom': 'hclink',    'align': 'right'}]
                    
@@ -9636,7 +9641,7 @@ class CollectionListView(BasicList):
                 {"name": "Collection",             "id": "filter_collection",     "enabled": False},
                 {"name": "Project",                "id": "filter_project",        "enabled": False},
                 {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},
-                {"name": "Sermon...",              "id": "filter_sermon",         "enabled": False, "head_id": "none"},
+                {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},
                 {"name": "Manuscript...",          "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 # Section SSG
                 {"name": "Author",          "id": "filter_ssgauthor",       "enabled": False, "head_id": "filter_authority_file"},
@@ -9674,7 +9679,7 @@ class CollectionListView(BasicList):
                     {'filter': 'project',       'fkfield': 'projects', 'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
                     ]},
                 # Section SSG
-                {'section': 'authority_file', 'filterlist': [
+                {'section': 'authority_file', 'name': 'Authority File', 'filterlist': [
                     {'filter': 'ssgauthor',    'fkfield': 'super_col__super__author',            
                      'keyS': 'ssgauthorname', 'keyFk': 'name', 'keyList': 'ssgauthorlist', 'infield': 'id', 'external': 'gold-authorname' },
                     {'filter': 'ssgincipit',   'dbfield': 'super_col__super__srchincipit',   'keyS': 'ssgincipit'},
@@ -9689,8 +9694,8 @@ class CollectionListView(BasicList):
                     {'filter': 'ssgstype',     'dbfield': 'super_col__super__stype',             
                      'keyList': 'ssgstypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
                     ]},
-                # Section S
-                {'section': 'sermon', 'filterlist': [
+                # Section S = Sermon = Manifestation
+                {'section': 'sermon', 'name': 'Manifestation', 'filterlist': [
                     {'filter': 'sermoincipit',       'dbfield': 'super_col__super__equalgold_sermons__srchincipit',   'keyS': 'sermoincipit'},
                     {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
                     {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},                    
@@ -11961,7 +11966,7 @@ class ManuscriptListView(BasicList):
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
             ]},
-        {'section': 'sermon', 'filterlist': [
+        {'section': 'sermon', 'name': 'manifestation', 'filterlist': [
             # issue #717: delete the PD:Manuscript and PD:Sermon options
             #{'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
             # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
@@ -11976,7 +11981,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'sermo_bibref',    'dbfield': '$dummy', 'keyS': 'bibrefbk'}, #toevoegen sermo_?
             {'filter': 'sermo_bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},        
-        {'section': 'authority_file', 'filterlist': [
+        {'section': 'authority_file', 'name': 'Authority File', 'filterlist': [
             {'filter': 'authority_file_code', 'fkfield': 'manuitems__itemsermons__sermondescr_super__super', 'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             
@@ -15020,7 +15025,7 @@ class EqualGoldListView(BasicList):
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
         {'name': 'Contains',                'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Linked AFs',              'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
         {'name': 'Hist. Coll.',             'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
@@ -15039,6 +15044,7 @@ class EqualGoldListView(BasicList):
         {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
         {"name": "Transcription",   "id": "filter_transcr",           "enabled": False},        
+        {"name": "Linked via manuscript","id": "filter_manuscript",   "enabled": False},        
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -15064,13 +15070,14 @@ class EqualGoldListView(BasicList):
             {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'       },
             {'filter': 'ssgcount',  'dbfield': 'ssgcount',          'keyS': 'ssgcount',
              'title': 'The number of links an Authority file has to other Authority files'      },
+            {'filter': 'manuscript','dbfield': '$dummy',            'keyS': 'manulink'          }, 
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures',    'help': 'signature',
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code'},
-            {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'lstprojlist', 'infield': 'name'}            
+            {'filter': 'project',   'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'lstprojlist', 'infield': 'name'},
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
@@ -15288,49 +15295,61 @@ class EqualGoldListView(BasicList):
         # Adapt the search to the keywords that *may* be shown
         lstExclude= None
         qAlternative = None
+        oErr = ErrHandle()
 
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        try:
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
 
-        scount = fields.get('scount', -1)
-        soperator = fields.pop('soperator', None)
-        if scount != None and scount >= 0 and soperator != None:
-            # Action depends on the operator
-            fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
+            scount = fields.get('scount', -1)
+            soperator = fields.pop('soperator', None)
+            if scount != None and scount >= 0 and soperator != None:
+                # Action depends on the operator
+                fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
 
-        ssgcount = fields.get('ssgcount', -1)
-        ssgoperator = fields.pop('ssgoperator', None)
-        if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
-            # Action depends on the operator
-            fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
+            ssgcount = fields.get('ssgcount', -1)
+            ssgoperator = fields.pop('ssgoperator', None)
+            if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
+                # Action depends on the operator
+                fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
 
-        foperator = fields.get('foperator')
-        srchfulltext = fields.get('srchfulltext')
-        if not foperator is None and foperator != "":
-            # Choices are: "obl" and "txt"
-            if foperator == "obl":
-                # Just check whether a text is there or not
-                fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
-            else:
-                # Well, if we are really looking for the full text, we don't have to do anything
+            # Look for manulink
+            manulink = fields.get('manulink')
+            if not manulink is None:
+                # We have one Manuscript that serves as a basis to search for AFs
+                qThis = Q(sermondescr_super__manu=manulink)
+                fields['manulink'] = qThis
+
+            foperator = fields.get('foperator')
+            srchfulltext = fields.get('srchfulltext')
+            if not foperator is None and foperator != "":
+                # Choices are: "obl" and "txt"
+                if foperator == "obl":
+                    # Just check whether a text is there or not
+                    fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
+                else:
+                    # Well, if we are really looking for the full text, we don't have to do anything
+                    pass
+            elif not srchfulltext is None and srchfulltext != "":
+                # This just means that we are really looking for the full text
                 pass
-        elif not srchfulltext is None and srchfulltext != "":
-            # This just means that we are really looking for the full text
-            pass
         
-        # Make sure we only show the SSG/AF's that have accepted modifications
-        # (fields['atype'] = 'acc'), so exclude the others:
-        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]      
+            # Make sure we only show the SSG/AF's that have accepted modifications
+            # (fields['atype'] = 'acc'), so exclude the others:
+            lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]     
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldListView/adapt_search")
        
         return fields, lstExclude, qAlternative        
 

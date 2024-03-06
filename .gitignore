@@ -367,3 +367,4 @@ ModelManifest.xml
 /passim/req_tmp.txt
 /passim/passim/cms/migrations/0003_alter_citem_id_alter_clocation_id_alter_cpage_id.py
 /passim/passim/plugin/archive
+/passim/static/seeker/content/site.css

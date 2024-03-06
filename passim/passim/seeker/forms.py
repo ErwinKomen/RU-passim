@@ -445,6 +445,7 @@ class DaterangeHistCollWidget(ModelSelect2MultipleWidget):
             qs = DaterangeHistColl.objects.all().order_by('yearstart').distinct()
         return qs
 
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -1856,7 +1857,7 @@ class SearchManuForm(PassimModelForm):
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
@@ -2079,7 +2080,7 @@ class SermonForm(PassimModelForm):
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
@@ -2677,20 +2678,31 @@ class ProjectForm(BasicModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Project2
-        fields = ['name']
-        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+        fields = ['name', 'description']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'description': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ProjectForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['name'].required = False
-        #self.fields['prjlist'].queryset = Project.objects.all().order_by('name') 
-        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']    
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['description'].required = False
+
+            # Set the querysets where relevant
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']    
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectForm/init")
+        return None
     
 
 class CollectionForm(PassimModelForm):
@@ -2777,7 +2789,7 @@ class CollectionForm(PassimModelForm):
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
                 widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     sermonote  = forms.CharField(label=_("Note"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Note'}))
     sermoauthorname = forms.CharField(label=_("Author"), required=False, 
@@ -3492,6 +3504,8 @@ class SuperSermonGoldForm(PassimModelForm):
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                     widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
+    manulink = ModelChoiceField(queryset=None, required=False,
+                 widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript as a basis for viewing linked AFs...', 'style': 'width: 100%;'}))
     bibreflist = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=BibrefAddonlyWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -3581,6 +3595,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['manulink'].queryset = Manuscript.objects.filter(mtype='man').order_by('library__lcity__name', 'library__name', 'idno')
 
             # issue #576: this one is for the details view
             self.fields['projlist'].queryset = profile.get_myprojects()

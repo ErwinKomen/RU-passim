@@ -59,7 +59,7 @@ def cms_translate(page, mainitems):
                 if fname is None:
                     fname = oItem.get("field_list")
                     if fname is None:
-                        fname = None
+                        fname = label.lower()
                 # Get or add this
                 newtitle = cms(page, fname, title, label=label)
                 # Replace if needed

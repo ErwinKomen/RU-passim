@@ -3370,6 +3370,36 @@ class Project2(models.Model):
 
         return response
 
+    def get_contact_info(self):
+        """Contact information of at least one editor of the project: name, email address"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        name = "(unknown)"
+        email = "N.A."
+        try:
+            # Find out who the editors are, excluding 
+            editors = self.project_editor.exclude(profile__user__is_superuser=True).order_by('profile__user__date_joined')
+            if editors.count() > 0:
+                # Take the first one
+                editor = editors.first().profile
+                email = editor.user.email
+                name = editor.user.username
+                if editor.user.first_name != "" and editor.user.last_name != "":
+                    # Give the first-name / last-name instead
+                    name = "{} {}".format(editor.user.first_name, editor.user.last_name)
+                sBack = 'name: <b>{}</b>, email: <a href="mailto:{}" class="email">{}</a>'.format(name, email, email)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_contact_info")
+        return sBack
+
+    def get_description(self):
+        sBack = "" if self.description is None else self.description
+        if sBack != "":
+            sBack = adapt_markdown(sBack, lowercase=False)
+        return sBack
+
     def get_editor_markdown(self):
         """List of users (=profiles) that have editing rights"""
 
