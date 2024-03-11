@@ -2454,7 +2454,7 @@ class ProvenanceForm(BasicModelForm):
     """Provenance list"""
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
@@ -2822,7 +2822,7 @@ class CollectionForm(PassimModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     manukwlist  = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     manustypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
@@ -4790,7 +4790,7 @@ class CodicoForm(PassimModelForm):
     origone     = ModelChoiceField(queryset=None, required=False,
                 widget=OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     manuidno   = forms.CharField(label=_("Manuscript"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Manuscript...',  'style': 'width: 100%;'}))
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
@@ -5309,7 +5309,7 @@ class FeastForm(BasicModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     typeaheads = ["cities", "countries"]
 
     class Meta:
@@ -5387,7 +5387,7 @@ class BibRangeForm(BasicModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
     typeaheads = ["cities", "countries"]
     action_log = ['book', 'chvslist', 'intro', 'added']

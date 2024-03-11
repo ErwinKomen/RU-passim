@@ -5565,12 +5565,14 @@ class SermonListView(BasicList):
                 html.append("-")
             else:
                 if manu.idno == None:
-                    sIdNo = "-"
+                    value = "-"
                 else:
-                    sIdNo = manu.idno[:20]
+                    # issue #610
+                    # value = manu.idno[:20]
+                    value = manu.get_full_name()
                 html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
-                    sIdNo))
+                    value))
                 sTitle = manu.idno
         elif custom == "saved":
             # Prepare saveditem handling
@@ -6157,7 +6159,9 @@ class UserKeywordEdit(BasicDetails):
         if instance.type == "manu" and instance.manu: 
             # Manuscript: shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
-            value = instance.manu.idno
+            # issue #610
+            # value = instance.manu.idno
+            value = instance.get_full_name()
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
         elif instance.type == "sermo" and instance.sermo: 
             # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
@@ -6169,7 +6173,10 @@ class UserKeywordEdit(BasicDetails):
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
-            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, instance.sermo.manu.idno)
+            # issue #610
+            # value = instance.sermo.manu.idno
+            value = instance.get_full_name()
+            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
             # Combine
             sBack = "{} {} {}".format(sermo, manu, sig)
         elif instance.type == "gold" and instance.gold: 
@@ -6310,7 +6317,9 @@ class UserKeywordListView(BasicList):
         if instance.type == "manu" and instance.manu: 
             # Manuscript: shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
-            value = instance.manu.idno
+            # issue #610
+            # value = instance.manu.idno
+            value = instance.get_full_name()
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
         elif instance.type == "sermo" and instance.sermo: 
             # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
@@ -6322,6 +6331,9 @@ class UserKeywordListView(BasicList):
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': manu_obj.id})
+            # issue #610
+            # value = manu_obj.idno
+            value = manu_obj.get_full_name()
             manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, manu_obj.idno)
             # Combine
             sBack = "{} {} {}".format(sermo, manu, sig)
@@ -6398,14 +6410,6 @@ class ProvenanceEdit(BasicDetails):
             url = reverse("manuscript_details", kwargs = {'pk': manu.id})
             shelfmark = manu.idno[:20]
             sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
-        #lManu = []
-        #for obj in instance.manuscripts_provenances.all():
-        #    # Add the shelfmark of this one
-        #    manu = obj.manuscript
-        #    url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-        #    shelfmark = manu.idno[:20]
-        #    lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-        #sBack = ", ".join(lManu)
         return sBack
 
 
@@ -6533,7 +6537,7 @@ class ProvenanceListView(BasicList):
         {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field':  'name', 'main': True, 'linkdetails': True},
         # Issue #289: remove this note from here
         # {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
-        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        {'name': 'Manuscript',  'order': 'o=3', 'type': 'str', 'custom': 'manuscript', 'allowwrap': True}
         ]
     filters = [ {"name": "Name",        "id": "filter_name",    "enabled": False},
                 {"name": "Location",    "id": "filter_location","enabled": False},
@@ -6575,8 +6579,10 @@ class ProvenanceListView(BasicList):
                 # Add the shelfmark of this one
                 manu = obj.manuscript
                 url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-                shelfmark = manu.idno[:20]
-                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+                # issue #610
+                # value = manu.idno
+                value = manu.get_full_name()
+                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, value))
             sBack = ", ".join(lManu)
             # Issue #289: the innovation below is turned back to the original above
             ## find the shelfmark
@@ -6793,7 +6799,7 @@ class BibRangeListView(BasicList):
         {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
         {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
-        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon'},
+        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon', 'allowwrap': True},
         {'name': 'Authority File',  'order': 'o=6', 'type': 'str', 'custom': 'equal'},
         ]
     filters = [ 
@@ -6841,6 +6847,9 @@ class BibRangeListView(BasicList):
                 # find the shelfmark
                 manu = sermon.msitem.manu
                 url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                # issue #610
+                # value = manu.idno
+                value = manu.get_full_name()
                 sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
         elif custom == "equal":
             if not instance.equal is None:
@@ -7096,12 +7105,16 @@ class FeastListView(BasicList):
         oErr = ErrHandle()
         try:
             if custom == "sermon":
+                # NOTE: this is not accessed!!!
                 html = []
                 for sermon in instance.feastsermons.all().order_by('feast__name'):
                     # find the shelfmark
                     manu = sermon.msitem.manu
                     url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
+                    # issue #610
+                    # value = sermon.msitem.manu.idno
+                    value = sermon.msitem.manu.get_full_name()
+                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, value, sermon.locus))
                 sBack = ", ".join(html)
             elif custom == "sermons":
                 # sBack = "{}".format(instance.feastsermons.count())
@@ -7733,8 +7746,6 @@ class ProjectListView(BasicList):
                 count = instance.project2_manuscripts.exclude(mtype="tem").count()
                 url = reverse('search_manuscript')
                 if count > 0:
-                 #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
-                 #       url, instance.id, count, count)) 
                     html.append("<a href='{}?manu-projlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
                         url, instance.id, count, count))
 
@@ -8801,7 +8812,7 @@ class CollPrivDetails(CollAnyEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
             elif custom == "name":
                 sBack = instance.name
             elif custom == "origprov":
@@ -9356,13 +9367,9 @@ class CollHistDetails(CollHistEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
             elif custom == "name":
                 sBack = instance.name
-            #elif custom == "origprov":
-            #    sBack = "origin: {} (provenance[s]: {})".format(instance.get_origin(), instance.get_provenance_markdown(table=False))
-            #elif custom == "daterange":
-            #    sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
             elif custom == "sermons":
                 sBack = instance.get_sermon_count()
         elif type == "manucodicos":
@@ -14759,8 +14766,12 @@ class EqualGoldDetails(EqualGoldEdit):
                                          'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                     elif method == "Issue216":
                         # Shelfmark = IDNO
-                        manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
-                        manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                        # manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
+                        manu_full = item.get_full_name()
+                        # issue #610
+                        # value = item.idno
+                        value = manu_full
+                        manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, value)
                         # Name as CITY - LIBRARY - IDNO + Name
                         manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
                         rel_item.append({'value': manu_name, 'title': item.idno, 'main': False, 'myclasses': 'shelfm',
