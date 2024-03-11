@@ -3528,6 +3528,9 @@ class SuperSermonGoldForm(PassimModelForm):
     ssgoperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
     foperator   = forms.ChoiceField(required=False, choices=TRANSCR_OPERATOR,widget=forms.Select())
 
+    externalid = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'External ID...', 'style': 'width: 20%;'}))
+
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg  = ModelMultipleChoiceField(queryset=None, required=False)
@@ -3676,6 +3679,11 @@ class SuperSermonGoldForm(PassimModelForm):
                 # issue #736: include projects in the queryset, to which the current user does *not* necessarily have rights
                 self.fields['projlist'].queryset = profile.get_myprojects(instance)
                 self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+
+                # If there is an external it, then initialize it here
+                ext = instance.equalexternals.first()
+                if not ext is None:
+                    self.fields['externalid'].initial = ext.externalid
 
                 # TO BE DELETED in time...
                 #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
@@ -4949,6 +4957,9 @@ class ManuscriptForm(PassimModelForm):
                 widget=ManuscriptExtWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
     mlinklist   = ModelMultipleChoiceField(queryset=None, required=False)
 
+    externalid = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'External ID...', 'style': 'width: 20%;'}))
+
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'project',
@@ -5056,6 +5067,11 @@ class ManuscriptForm(PassimModelForm):
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
+
+                # If there is an external it, then initialize it here
+                ext = instance.manuexternals.first()
+                if not ext is None:
+                    self.fields['externalid'].initial = ext.externalid
 
                 # Look after origin
                 origin = instance.origin

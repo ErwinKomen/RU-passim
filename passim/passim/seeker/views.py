@@ -10789,9 +10789,12 @@ class ManuscriptEdit(BasicDetails):
                     # Get the field values
                     externaltype = ext.externaltype
                     externalid = ext.externalid
-                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                    # Issue #730.3
+                    # bEditHuwa = profile.is_project_approver("huwa")
+                    bEditHuwa = profile.is_project_editor("huwa")
+                    if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        oItem = dict(type="plain", label="HUWA id", value=externalid, field_key="externalid")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items
@@ -11252,6 +11255,26 @@ class ManuscriptEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            # External id changes
+            externalid = form.cleaned_data.get('externalid')
+            if not externalid is None and externalid != "":
+                # See if we can turn it into an integer
+                externalid = int(externalid)
+                # Check if this is the correct id
+                exts = instance.manuexternals.all()
+                if exts.count() > 0:
+                    # Take the HUWA one
+                    exts = instance.manuexternals.filter(externaltype="huwop")
+                ext = exts.first()
+                if ext is None:
+                    # Need to make one
+                    ext = ManuscriptExternal.objects.create(equal=instance, externaltype="huwop", externalid=externalid)
+                else:
+                    # Do we need changing?
+                    if externalid != ext.externalid:
+                        ext.externalid = externalid
+                        ext.save()
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'collections'
             collist_m = form.cleaned_data['collist']
@@ -13909,11 +13932,16 @@ class EqualGoldEdit(BasicDetails):
                                 # Get the field values
                                 externaltype = ext.externaltype
                                 externalid = ext.externalid
-                                if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                                # Issue #730.3
+                                # bEditHuwa = profile.is_project_approver("huwa")
+                                bEditHuwa = profile.is_project_editor("huwa")
+                                if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                                     # Okay, the user has the right to see the externalid                                    
                                     oItem = dict(type="plain", 
                                             label="HUWA id", 
-                                            value=externalid)
+                                            value=externalid,
+                                            field_key="externalid"
+                                            )
                                     context['mainitems'].insert(0, oItem) 
                                   
                                     # The user also has the right to see EDITION information
@@ -14461,6 +14489,27 @@ class EqualGoldEdit(BasicDetails):
         try:
             # Need to know who I am for some operations
             profile = Profile.get_user_profile(self.request.user.username)
+
+            # External id changes
+            externalid = form.cleaned_data.get('externalid')
+            if not externalid is None and externalid != "":
+                # See if we can turn it into an integer
+                externalid = int(externalid)
+                # Check if this is the correct id
+                exts = instance.equalexternals.all()
+                if exts.count() > 0:
+                    # Take the HUWA one
+                    exts = instance.equalexternals.filter(externaltype="huwop")
+                ext = exts.first()
+                if ext is None:
+                    # Need to make one
+                    ext = EqualGoldExternal.objects.create(equal=instance, externaltype="huwop", externalid=externalid)
+                else:
+                    # Do we need changing?
+                    if externalid != ext.externalid:
+                        ext.externalid = externalid
+                        ext.save()
+
 
             # ====== Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'

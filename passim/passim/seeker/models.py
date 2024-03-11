@@ -1920,6 +1920,18 @@ class Profile(models.Model):
             oErr.DoError("is_project_approver")
         return bResult
 
+    def is_project_editor(self, sProject):
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            prj = Project2.objects.filter(name__icontains=sProject).first()
+            edi = ProjectEditor.objects.filter(profile=self, project=prj).first()
+            bResult = (not edi is None)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("is_project_editor")
+        return bResult
+
 
 class Visit(models.Model):
     """One visit to part of the application"""
