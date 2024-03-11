@@ -1242,8 +1242,30 @@ class SelectItem(models.Model):
     saveditem = models.ForeignKey(SavedItem, blank=True, null=True, on_delete=models.SET_NULL, related_name="saveditem_selectitems")
 
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.setlisttype)
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
         return sBack
+
+    def get_item(self):
+        """Return the item to which this one points"""
+
+        obj = None
+        oErr = ErrHandle()
+        try:
+            # Find out if this object exists
+            if self.selitemtype == "manu":
+                obj = self.manuscript
+            elif self.selitemtype == "serm":
+                obj = self.sermon
+            elif self.selitemtype == "ssg":
+                obj = self.equal
+            elif self.selitemtype == "hc" or self.selitemtype == "pd":
+                obj = self.collection
+            elif self.selitemtype == "svdi":
+                obj = self.SavedItem
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SelectItem/get_item")
+        return obj
 
     def get_selectitem(item, profile, selitemtype):
         """If this is a selected item for the indicated user, get that item"""
