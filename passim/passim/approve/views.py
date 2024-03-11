@@ -538,6 +538,13 @@ def approval_parse_changes(profile, cleaned_data, super):
         projects = current.projects.all()
         if projects.count() > 1:
 
+            # Check if this person has approval rights in the projects above
+            profile_projects = [x['project__id'] for x in profile.project_approver.all().values("project__id")]
+            lst_need = []
+            for project in projects:
+                if not project.id in profile_projects:
+                    lst_need.append(project.id)
+
             # Check for changes
             for oField in EqualChange.approve_fields:
                 # Get all possible field attributes
@@ -596,8 +603,17 @@ def approval_parse_changes(profile, cleaned_data, super):
                         oChange[listfield] = lst_id_change
                         bAddChange = True
 
+                # Do we need the consent of other projects?
+                if len(lst_need) == 0:
+                    # The current person may approve any other pending changes that result in [oChange]
+                    change = json.dumps(oChange, sort_keys=True)
+                    qs = EqualChange.objects.filter(super=super, field=to_field, change=change)
+                    for obj in qs:
+                        obj.atype = "app"
+                        obj.save()
+
                 # Does the change need to be processed?
-                if bAddChange:
+                elif bAddChange:
                     # Create a new EqualChange object
                     obj = EqualChange.add_item(super, profile, to_field, oChange, oCurrent)
                     # Signal the amount of changes that are to be approved
