@@ -603,27 +603,28 @@ def approval_parse_changes(profile, cleaned_data, super):
                         oChange[listfield] = lst_id_change
                         bAddChange = True
 
-                # Do we need the consent of other projects?
-                if len(lst_need) == 0:
-                    # The current person may approve any other pending changes that result in [oChange]
-                    change = json.dumps(oChange, sort_keys=True)
-                    qs = EqualChange.objects.filter(super=super, field=to_field, change=change)
-                    for obj in qs:
-                        obj.atype = "app"
-                        obj.save()
-
                 # Does the change need to be processed?
-                elif bAddChange:
-                    # Create a new EqualChange object
-                    obj = EqualChange.add_item(super, profile, to_field, oChange, oCurrent)
-                    # Signal the amount of changes that are to be approved
-                    iCount += 1
-                    # Signal that the user needs to do a clean-reloading of the page
-                    if listfield == "superlist":
-                        # Signal reloading
-                        bNeedReload = True
-                        ## Repair the cleaned_data - doesn't work like that, unfortunately...
-                        #cleaned_data['superlist'] = EqualGoldLink.objects.filter(id__in=lst_id_current)
+                if bAddChange:
+                    # Do we need the consent of other projects?
+                    if len(lst_need) == 0:
+                        # The current person may approve any other pending changes that result in [oChange]
+                        change = json.dumps(oChange, sort_keys=True)
+                        qs = EqualChange.objects.filter(super=super, field=to_field, change=change)
+                        for obj in qs:
+                            obj.atype = "app"
+                            obj.save()
+
+                    else:
+                        # Create a new EqualChange object
+                        obj = EqualChange.add_item(super, profile, to_field, oChange, oCurrent)
+                        # Signal the amount of changes that are to be approved
+                        iCount += 1
+                        # Signal that the user needs to do a clean-reloading of the page
+                        if listfield == "superlist":
+                            # Signal reloading
+                            bNeedReload = True
+                            ## Repair the cleaned_data - doesn't work like that, unfortunately...
+                            #cleaned_data['superlist'] = EqualGoldLink.objects.filter(id__in=lst_id_current)
 
     except:
         msg = oErr.get_error_message()
