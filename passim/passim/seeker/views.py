@@ -63,7 +63,7 @@ from reportlab.rl_config import defaultPageSize
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
     SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
@@ -4248,8 +4248,9 @@ class OriginListView(BasicList):
                    {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
                    {'name': 'Note',     'order': 'o=3', 'type': 'str', 'custom': 'note'},
                    {'name': '',         'order': '',    'type': 'str', 'custom': 'manulink' }]
-    filters = [ {"name": "Location",        "id": "filter_location",    "enabled": False},
-                {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
+    filters = [ 
+        {"name": "Location",        "id": "filter_location",    "enabled": False},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -5467,7 +5468,7 @@ class SermonListView(BasicList):
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'manuid',        'fkfield': 'manu',  'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},

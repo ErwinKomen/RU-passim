@@ -4066,8 +4066,8 @@ class Manuscript(models.Model):
                 # OLD: project = Project.get_default(username)
 
                 # ===================================
-                if idno == "Cod. 404":
-                    iStop = 1
+                #if idno == "Cod. 404":
+                #    iStop = 1
                 # ===================================
 
                 # Retrieve or create a new manuscript with default values
@@ -4085,7 +4085,7 @@ class Manuscript(models.Model):
                     libCountry, libCity, lLibrary, note = Library.get_best_match(sCountry, sCity, sLibrary)
 
                 # Second attempt: try to at least get lCity and lCountry
-                if sCity != "":
+                if lCity is None and sCity != "":
                     # DOuble check city co-occurrence
                     lCity = Location.get_location(sCity, sCountry)
                     lCountry = lCity.lcountry

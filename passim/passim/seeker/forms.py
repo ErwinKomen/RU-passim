@@ -1768,22 +1768,22 @@ class ManuReconForm(BasicSimpleForm):
             oErr.DoError("manureconform")
 
 
-class SearchManuscriptForm(BasicSimpleForm):
-    """Note: only for SEARCHING"""
+#class SearchManuscriptForm(BasicSimpleForm):
+#    """Note: only for SEARCHING"""
 
-    country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    library = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    signature = forms.CharField(label=_("Signature"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
-    name = forms.CharField(label=_("Title"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
-    idno = forms.CharField(label=_("Idno"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
-    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
+#    country = forms.CharField(label=_("Country"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+#    city = forms.CharField(label=_("City"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+#    library = forms.CharField(label=_("Library"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+#    signature = forms.CharField(label=_("Signature"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
+#    name = forms.CharField(label=_("Title"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
+#    idno = forms.CharField(label=_("Idno"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
+#    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
 class SearchManuForm(PassimModelForm):
@@ -2037,7 +2037,7 @@ class SermonForm(PassimModelForm):
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=ManuidWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     manuone = ModelChoiceField(queryset=None, required=False,
                  widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
