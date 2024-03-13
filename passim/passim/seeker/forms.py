@@ -2309,7 +2309,8 @@ class SermonForm(PassimModelForm):
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
-                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
+                # issue #730: changed from 'projects' (approver) to 'editprojects' (editor)
+                self.fields['projlist'].initial = [x.pk for x in instance.editprojects.all().order_by('name')] 
 
                 #self.fields['altpageslist'].initial = [x.pk for x in instance.sermonaltpages.all().order_by('altpage')]
 

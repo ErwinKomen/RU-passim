@@ -1582,6 +1582,7 @@ class Profile(models.Model):
 
     # Many-to-many field that links this person/profile with particular projects
     projects = models.ManyToManyField("Project2", through="ProjectApprover", related_name="projects_profile")
+    editprojects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="editprojects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -1798,7 +1799,11 @@ class Profile(models.Model):
     def get_project_ids(self):
         """List of id's this person had editing rights for"""
 
-        id_list = [x['id'] for x in self.projects.all().values('id')]
+        # This only picks the approvers
+        # id_list = [x['id'] for x in self.projects.all().values('id')]
+        # This here selects the projects that I have *editing* rights on
+        id_list = [x['id'] for x in self.editprojects.all().values('id')]
+
         return id_list
 
     def get_stack(username):

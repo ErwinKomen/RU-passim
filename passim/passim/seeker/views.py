@@ -369,6 +369,7 @@ def get_non_editable_projects(profile, projects):
 def evaluate_projlist(profile, instance, projlist, sText):
     bBack = True
     msg = ""
+    oErr = ErrHandle()
     try:
         if projlist is None or len(projlist) == 0:
             # Check how many projects the user does *NOT* have rights for
@@ -13955,7 +13956,7 @@ class EqualGoldEdit(BasicDetails):
                     context['approval_pending_list'] = approval_pending_list(instance)
                     context['mainitems'].append(dict(
                         type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
-
+                
                 # Special processing for those with editing rights
                 if may_edit_project(self.request, profile, instance):
                     for oMainSection in context['mainsections']: 
