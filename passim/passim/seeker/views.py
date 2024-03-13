@@ -4488,14 +4488,18 @@ class SermonEdit(BasicDetails):
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
-                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
-                if not ext is None:
+                bHuwaEditor = profile.is_project_editor("huwa")
+                for ext in SermonDescrExternal.objects.filter(sermon=instance):
                     # Get the field values
                     externaltype = ext.externaltype
                     externalid = ext.externalid
-                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                    if externaltype == "huwop" and externalid > 0 and bHuwaEditor:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        oItem = dict(type="plain", label="HUWA opera id", value=externalid, field_key="ext_huwop")
+                        context['mainitems'].insert(0, oItem)
+                    elif externaltype == "huwin" and externalid > 0 and bHuwaEditor:
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA inhalt id", value=externalid, field_key="ext_huwin")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items
@@ -5042,6 +5046,28 @@ class SermonEdit(BasicDetails):
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
 
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.sermonexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = SermonDescrExternal.objects.create(sermon=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
@@ -5050,6 +5076,11 @@ class SermonEdit(BasicDetails):
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             if getattr(form, 'cleaned_data') != None:
+
+                # External id changes
+                adapt_external("ext_huwop", "huwop")
+                adapt_external("ext_huwin", "huwin")
+
                 # (1) 'keywords'
                 kwlist = form.cleaned_data['kwlist']
                 adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
@@ -5455,7 +5486,7 @@ class SermonListView(BasicList):
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures', 'help': 'signature',     
             #                            'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
-            {'filter': 'project',       'fkfield': 'projects',          'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
+            {'filter': 'project',       'fkfield': 'projects',          'keyFk': 'name', 'keyList': 'projectslist', 'infield': 'name'},
             {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -11250,30 +11281,36 @@ class ManuscriptEdit(BasicDetails):
         return bBack, msg
 
     def after_save(self, form, instance):
+
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.manuexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = ManuscriptExternal.objects.create(manu=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
         
         try:
             # External id changes
-            externalid = form.cleaned_data.get('externalid')
-            if not externalid is None and externalid != "":
-                # See if we can turn it into an integer
-                externalid = int(externalid)
-                # Check if this is the correct id
-                exts = instance.manuexternals.all()
-                if exts.count() > 0:
-                    # Take the HUWA one
-                    exts = instance.manuexternals.filter(externaltype="huwop")
-                ext = exts.first()
-                if ext is None:
-                    # Need to make one
-                    ext = ManuscriptExternal.objects.create(equal=instance, externaltype="huwop", externalid=externalid)
-                else:
-                    # Do we need changing?
-                    if externalid != ext.externalid:
-                        ext.externalid = externalid
-                        ext.save()
+            adapt_external("externalid", "huwop")
 
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'collections'
@@ -14481,6 +14518,28 @@ class EqualGoldEdit(BasicDetails):
                 oErr.DoError("get_proj_add_remove")
             return addprojlist, delprojlist
 
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.equalexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = EqualGoldExternal.objects.create(equal=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         # Initialisations
         msg = ""
         bResult = True
@@ -14491,25 +14550,7 @@ class EqualGoldEdit(BasicDetails):
             profile = Profile.get_user_profile(self.request.user.username)
 
             # External id changes
-            externalid = form.cleaned_data.get('externalid')
-            if not externalid is None and externalid != "":
-                # See if we can turn it into an integer
-                externalid = int(externalid)
-                # Check if this is the correct id
-                exts = instance.equalexternals.all()
-                if exts.count() > 0:
-                    # Take the HUWA one
-                    exts = instance.equalexternals.filter(externaltype="huwop")
-                ext = exts.first()
-                if ext is None:
-                    # Need to make one
-                    ext = EqualGoldExternal.objects.create(equal=instance, externaltype="huwop", externalid=externalid)
-                else:
-                    # Do we need changing?
-                    if externalid != ext.externalid:
-                        ext.externalid = externalid
-                        ext.save()
-
+            adapt_external("externalid", "huwop")
 
             # ====== Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'

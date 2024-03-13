@@ -2065,6 +2065,8 @@ class SermonForm(PassimModelForm):
                 widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projectslist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     feastlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=FeastWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
@@ -2123,6 +2125,13 @@ class SermonForm(PassimModelForm):
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSermoWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     slinklist   = ModelMultipleChoiceField(queryset=None, required=False)
+
+    # ExternalId fields
+    ext_huwop = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'HUWA opera ID...', 'style': 'width: 20%;'}))
+    ext_huwin = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'HUWA inhalt ID...', 'style': 'width: 20%;'}))
+
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -2220,6 +2229,7 @@ class SermonForm(PassimModelForm):
             # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            self.fields['projectslist'].queryset = Project2.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['slinklist'].queryset = SermonDescrLink.objects.none()
@@ -2323,6 +2333,15 @@ class SermonForm(PassimModelForm):
                 self.fields['bibreflist'].queryset = BibRange.objects.filter(id__in=self.fields['bibreflist'].initial)
 
                 self.fields['autype'].initial = instance.autype
+
+                # If there are externalis, then initialize them here
+                for ext in instance.sermonexternals.all():
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop":
+                        self.fields['ext_huwop'].initial = ext.externalid
+                    elif externaltype == "huwin":
+                        self.fields['ext_huwin'].initial = ext.externalid
 
                 iStop = 1
         except:
