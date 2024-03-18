@@ -2310,7 +2310,7 @@ class SermonForm(PassimModelForm):
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 # issue #730: changed from 'projects' (approver) to 'editprojects' (editor)
-                self.fields['projlist'].initial = [x.pk for x in instance.editprojects.all().order_by('name')] 
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
 
                 #self.fields['altpageslist'].initial = [x.pk for x in instance.sermonaltpages.all().order_by('altpage')]
 

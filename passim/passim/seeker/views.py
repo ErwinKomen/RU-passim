@@ -13873,6 +13873,12 @@ class EqualGoldEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="ssg")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="ssg")
 
+            # Determine the passim code and possibly a warning if this is a moved item
+            str_code = instance.get_code()
+            if not instance.moved is None:
+                message = "this AF is an old copy of one that has moved. See Details."
+                str_code = '{} <span><b>NOTE</b>:</span>&nbsp;<span style="color: red;">{}</span>'.format(str_code, message)
+
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
@@ -13887,7 +13893,7 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number',             
-                {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'},   
+                {'type': 'plain', 'label': "Passim Code:",   'value': str_code,   'title': 'The Passim Code is automatically determined'},   
                 ]
 
             # some more items need to be added
