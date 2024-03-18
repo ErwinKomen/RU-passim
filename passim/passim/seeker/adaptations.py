@@ -40,14 +40,15 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate'],
-    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers'],
+    'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
+                    'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
         'hccount', 'scount', 'sgcount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
         'huwa_edilit_remove', 'searchable'],
-    'profile_list': ['projecteditors'],
+    'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc'],
@@ -1284,6 +1285,38 @@ def adapt_huwafolionumbers():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_projectorphans():
+    """Try to re-locate sermons that are project-less"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    iCount = 0
+    iSermons = 0
+    try:
+        # Review all project-less sermons
+        qs = SermonDescr.objects.filter(sermondescr_proj__isnull=True)
+        iSermons = qs.count()
+        with transaction.atomic():
+            for obj in qs:
+                # Get the manuscript
+                manu = obj.msitem.codico.manuscript
+                if not manu is None:
+                    # Get the manuscript object count
+                    for project in manu.projects.all():
+                        # Add this sermon to the project
+                        sermo_proj = SermonDescrProject.objects.create(sermon=obj, project=project)
+                        iCount += 1
+
+        # Give feedback
+        oErr.Status("ProjectOrphans: {} sermons, {} repairs".format(iSermons, iCount))
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 # =========== Part of sermongold_list ==================
 def adapt_sermon_gsig():
     oErr = ErrHandle()
@@ -2001,6 +2034,36 @@ def adapt_projecteditors():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_projectdefaults():
+    """Make sure that project defaults are stored in ProjectEditors"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # Set all projecteditor rights status fields to excl
+        with transaction.atomic():
+            for obj in ProjectEditor.objects.all():
+                obj.status = "excl"
+                obj.save()
+
+        # There are no editors yet: copy them from ProjectApprover
+        with transaction.atomic():
+            for obj in ProjectApprover.objects.all():
+                project = obj.project
+                profile = obj.profile
+                editor = ProjectEditor.objects.filter(project=project, profile=profile).first()
+                if not editor is None:
+                    # Carry over the 'status' setting from Approver to Editor
+                    editor.status = obj.status
+                    editor.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 # ========== Part of onlinesources_list ======================

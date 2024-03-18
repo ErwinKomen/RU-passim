@@ -2653,13 +2653,16 @@ class ProfileForm(BasicModelForm):
                 self.fields['user'].initial = instance.user
                 self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
 
-                self.fields['deflist'].queryset = instance.projects.all().order_by('name')
+                # issue #742: default projects should be taken from the EDITOR list
+                # changed 'projects' to 'editprojects'
+                self.fields['deflist'].queryset = instance.editprojects.all().order_by('name')
                 self.fields['deflist'].widget.queryset = self.fields['deflist'].queryset
 
                 self.fields['editlist'].initial = [x.project.pk for x in instance.project_editor.all().order_by('project__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
-                self.fields['deflist'].initial = [x.project.pk for x in instance.project_approver.filter(status="incl").order_by('project__name')]
+                # issue #742: change from project_approver to project_editor
+                self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
 
                 # Fill in the user informatino
                 self.fields['newusername'].initial = instance.user.username

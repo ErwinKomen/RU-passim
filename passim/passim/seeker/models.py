@@ -1652,7 +1652,8 @@ class Profile(models.Model):
         try:
             if not deflist is None:
                 with transaction.atomic():
-                    for obj in self.project_approver.all():
+                    # issue #742: change from project_approver to project_editor
+                    for obj in self.project_editor.all():
                         project = obj.project
                         if project in deflist:
                             obj.status = "incl"
@@ -1685,7 +1686,8 @@ class Profile(models.Model):
         bUseEditorProjects = False
 
         # Get a list of project id's that are my default
-        lst_id = [x['project__id'] for x in self.project_approver.filter(status="incl").values('project__id')]
+        # issue #742: change from project_approver to project_editor
+        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
         # Select all the relevant projects
         if len(lst_id) == 0:
             if bUseEditorProjects:
@@ -1706,8 +1708,9 @@ class Profile(models.Model):
         """List of projects to which this user (profile) has APPROVER rights"""
 
         lHtml = []
-        # Visit all keywords
-        for obj in self.project_approver.filter(status="incl").order_by('project__name'):
+        # Visit all applicable projects
+        # issue #742: change from project_approver to project_editor
+        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
             project = obj.project
             # Find the URL of the related project
             url = reverse('project2_details', kwargs={'pk': project.id})
@@ -13108,6 +13111,10 @@ class ProjectEditor(models.Model):
     profile = models.ForeignKey(Profile, related_name="project_editor", on_delete=models.CASCADE)
     # [1] ...and a project instance
     project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
+
+    # [1] Whether this project is to be included ('incl') or not ('excl') 
+    #     NOTE: this is for default project assignment 
+    status = models.CharField("Default assignment", choices=build_abbr_list(PROJ_DEFAULT), max_length=5, default="incl")
 
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)

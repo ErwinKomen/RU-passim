@@ -15023,15 +15023,28 @@ class EqualGoldDetails(EqualGoldEdit):
         oErr = ErrHandle()
         bBack = True
         msg = ""
+        method = "before_issue742"
+        method = "after_issue742"
         try:
             if self.isnew:
                 # Try default project assignment
                 profile = Profile.get_user_profile(self.request.user.username)
-                qs = profile.project_approver.filter(status="incl")
-                for obj in qs:
-                    EqualGoldProject.objects.create(project=obj.project, equal=instance)
-                # is it just one project?
-                if qs.count() == 1:
+
+                if method == "before_issue742":
+                    qs = profile.project_approver.filter(status="incl")
+                    for obj in qs:
+                        EqualGoldProject.objects.create(project=obj.project, equal=instance)
+                    # is it just one project?
+                    if qs.count() == 1:
+                        # Make sure the atype is set correctly
+                        instance.atype = "acc"
+                        instance.save()
+                else:
+                    # Method is "after_issue742"
+                    # Determine what the projects are to which the user has default editing rights.
+                    qs = profile.project_editor.filter(status="incl")
+                    for obj in qs:
+                        EqualGoldProject.objects.create(project=obj.project, equal=instance)
                     # Make sure the atype is set correctly
                     instance.atype = "acc"
                     instance.save()
