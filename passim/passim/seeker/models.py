@@ -4256,27 +4256,34 @@ class Manuscript(models.Model):
                                     # Set the KV in a special way
                                     obj.custom_set(path, value, **kwargs)
 
-                        # Check what we now have for Country/City/Library
-                        lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
-                        # The country can safely added
-                        if lcountry != None and lcountry != obj.lcountry:
-                            obj.lcountry = lcountry
-                        # The city too can safely be added
-                        if lcity != None and lcity != obj.lcity:
-                            obj.lcity = lcity
-                        # But the library can only be added under the strictest conditions
-                        if library != None and library != obj.library:
-                            if lib_note == "":
-                                # No notes, so add the library
-                                obj.library = library
-                            else:
-                                # There is a note, so the library may not be added
-                                notes = [] if obj.notes is None else [ obj.notes ]
-                                notes.append(lib_note)
-                                obj.notes = "\n".join(notes)
-                        elif library is None and not obj.library is None:
-                            # A wrong library has been chosen: *REMOVE* the chosen library!
-                            obj.library = None
+                        # Did we already have a library?
+                        if lLibrary is None:
+                            # Check what we now have for Country/City/Library
+                            lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
+                            # The country can safely added
+                            if lcountry != None and lcountry != obj.lcountry:
+                                obj.lcountry = lcountry
+                            # The city too can safely be added
+                            if lcity != None and lcity != obj.lcity:
+                                obj.lcity = lcity
+                            # But the library can only be added under the strictest conditions
+                            if library != None and library != obj.library:
+                                if lib_note == "":
+                                    # No notes, so add the library
+                                    obj.library = library
+                                else:
+                                    # There is a note, so the library may not be added
+                                    notes = [] if obj.notes is None else [ obj.notes ]
+                                    notes.append(lib_note)
+                                    obj.notes = "\n".join(notes)
+                            elif library is None and not obj.library is None:
+                                # A wrong library has been chosen: *REMOVE* the chosen library!
+                                obj.library = None
+                        else:
+                            # Actually assign the library, city and country
+                            obj.library = lLibrary
+                            obj.lcity = lCity
+                            obj.lcountry = lCountry
 
                         # Process the title for this manuscript
                         if obj.name == "SUPPLY A NAME": obj.name="-"
