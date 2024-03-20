@@ -116,6 +116,9 @@ def user_is_superuser(request):
             bFound = user.is_superuser
     return bFound
 
+def is_ajax(request):
+    return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+
 def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
     """Process one visit and return updated breadcrumbs"""
 
@@ -1145,7 +1148,10 @@ class BasicList(ListView):
         for section in self.searches:
             oFsection = {}
             bHasValue = False
-            section_name = section['section']
+            if 'name' in section:
+                section_name = section['name']
+            else:
+                section_name = section['section']
             if section_name != "" and section_name not in fsections:          
                 oFsection = dict(name=section_name, has_value=False)
                 # fsections.append(dict(name=section_name))
@@ -1190,6 +1196,8 @@ class BasicList(ListView):
                             if 'help' in item:
                                 filteritem['helptext'] = self.get_helptext(item['help']) 
                                 filteritem['help'] = item['help']
+                            if 'title' in item:
+                                filteritem['title'] = item['title']
                             # Make sure we indicate that there is a value
                             if bHasItemValue: filteritem['hasvalue'] = True                            
 
@@ -1974,7 +1982,7 @@ class BasicDetails(DetailView):
         try:
             # Prepare form
             frm = self.prepare_form(instance, context, initial)
-
+            
             if frm:
 
                 if instance == None:
@@ -2804,7 +2812,11 @@ class BasicPart(View):
                 sHtml = treat_bom(sHtml)
                 self.data['html'] = sHtml
             else:
-                self.data['html'] = 'no template_name specified'
+                if not 'html' in self.data:
+                    self.data['html'] = 'no template_name specified'
+                else:
+                    # No need to do anything, because the data already contains html
+                    pass
 
             # At any rate: empty the error basket
             self.arErr = []

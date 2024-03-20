@@ -1,0 +1,209 @@
+{% extends "layout.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block scripts %}
+    {{boardForm.media.css}}
+    <script src="{% static 'plugin/scripts/ru.plugin.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="container-wide body-content">
+  <h1 style="margin-bottom:0px;">Sermon Collections</h1>
+  <hr style="margin-bottom:0px; margin-top: 0px;" />
+
+  <form id="board_form" method="post" action="" >
+    {% csrf_token %}
+    <div class="hidden">
+      <input name="brd-active_tab" id="brd-id_active_tab" type="text" value="" />
+    </div>
+
+    <!-- Upper part Dataset -->
+    <div>
+      <div class="row">
+        <div class="col-md-3">
+          <h4>Dataset</h4>
+          <!-- Allow selecting one dataset -->
+          {{boardForm.dataset}}
+        </div>
+        <div class="col-md-3">
+          <h4>Sermons Distance</h4>
+          <!-- Allow selecting one distance type -->
+          {{boardForm.sermdist}}
+        </div>
+        <div class="col-md-3">
+          <h4>Series Distance</h4>
+          <!-- Allow selecting one series distance -->
+          {{boardForm.serdist}}
+        </div>
+        <div class="col-md-3">
+          <a id="recompute-btn" role="button" class="btn btn-primary" disabled="">
+            <div style=""><div id="recomputing"></div></div>
+            Recompute
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Border between parts -->
+    <hr style="margin-bottom:10px; margin-top: 10px;" />
+
+    <!-- Lower content filter part-->
+    <div>
+      <div class="row">
+        <!-- The Content filter settings -->
+        <div class="col-md-4" style="border: 1px solid lightgray; border-radius: 4px;">
+          <div class="card">
+            <div class="card-body">
+              <div id="filtering-container">
+                <h4>Content filter</h4>
+
+                <!-- Adjust minimum length -->
+                <div>
+                  <div id="min_length-output-container">Minimal Collection Length <span id="min_length_value">5</span></div>
+                  <div>
+                    <input name="brd-min_length" id="id_min_length" valueid="min_length_value"
+                           type="range" min="1" max="100" value="5" class="slider" />
+                  </div>
+                </div>
+
+                <!-- Select sermons -->
+                <div>
+                  <div class="form-label">Sermons</div>
+                  {{boardForm.sermons}}
+                </div>
+
+                <!-- Select anchor manuscript -->
+                <div>
+                  <div class="form-label">Anchor manuscript</div>
+                  {{boardForm.anchorman}}
+                </div>
+
+                <!-- Set number of closest manuscripts -->
+                <div>
+                  <div id="nb_closest-container">Number of closest manuscripts <span id="nb_closest_value">10</span></div>
+                  <div>
+                    <input name="brd-nb_closest" id="id_nb_closest" valueid="nb_closest_value"
+                           type="range" min="1" max="200" value="10" class="slider" />
+                  </div>
+                </div>
+
+              </div>
+
+              <div id="clustering_params" class="hidden">
+                <!-- Specify clustering method -->
+                <div>
+                  <label class="form-label">Clustering method</label>
+                  {{boardForm.cl_method}}
+                </div>
+              </div>
+
+              <div id="umap_params">
+                <!-- Target dimension selection -->
+                <div>
+                  <div class="form-label">Target dimension</div>
+                  {{boardForm.umap_dim}}
+                </div>
+
+                <!-- Highlight -->
+                <div>
+                  <div class="form-label">Highlight(s)</div>
+                  {{boardForm.highlights}}
+                </div>
+
+                <!-- Number of neighbours -->
+                <div>
+                  <div id="umap_nb-output-container">Number of neighbours <span id="umap_nb_value">10</span></div>
+                  <div>
+                    <input name="brd-umap_nb" id="id_umap_nb" valueid="umap_nb_value"
+                           type="range" min="1" max="100" value="10" class="slider" />
+                  </div>
+                </div>
+
+                <!-- Minimal distance -->
+                <div>
+                  <div id="umap-md-output-container">Minimal distance <span id="umap_md_value">0.1</span></div>
+                  <div>
+                    <input name="brd-umap_md" id="id_umap_md" valueid="umap_md_value"
+                           type="range" min="0" max="1" step="0.01" value="0.1" class="slider" />
+                  </div>
+                </div>
+              </div>
+
+              <div id="buttons-container" class="pull-right" style="margin-bottom: 10px;">
+                <a id="reset-button" role="button" class="btn  jumbo-1" style="margin-right: 10px;"
+                        formid="#board_form" targeturl="{% url 'board_apply' %}"
+                        onclick="ru.plugin.do_board(this, 'reset');">
+                  Reset
+                </a>
+                <a id="apply-button" role="button" class="btn jumbo-3"
+                        formid="#board_form" targeturl="{% url 'board_apply' %}"
+                        onclick="ru.plugin.do_board(this, 'apply');">
+                  Apply
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- The visualization: different maps -->
+        <div class="col-md-8">
+          <ul id="tabs" class="nav nav-tabs" role="tablist">
+            <li class="nav-item">
+              <a id="nav-clustering" href="#tab-clustering" data-toggle="tab" class="nav-link" role="tab">Clustering</a>
+            </li>
+            <li class="nav-item active">
+              <a id="nav-umap" href="#tab-umap" data-toggle="tab" class="nav-link active" role="tab">Umap</a>
+            </li>
+            <li class="nav-item">
+              <a id="nav-ser_hm" href="#tab-ser_hm" data-toggle="tab" class="nav-link" role="tab">Series Heatmap</a>
+            </li>
+            <li class="nav-item">
+              <a id="nav-serm_hm" href="#tab-serm_hm" data-toggle="tab" class="nav-link" role="tab">Sermons Heatmap</a>
+            </li>
+          </ul>
+          <div class="tab-content">
+            <div id="tab-clustering" class="tab-pane fade">
+              <div>&nbsp;</div>
+              Specify clustering method and series distance
+            </div>
+            <div id="tab-umap" class="tab-pane fade in active">
+              Specify series distance
+            </div>
+            <div id="tab-ser_hm" class="tab-pane fade">
+              Specify series distance
+            </div>
+            <div id="tab-serm_hm" class="tab-pane fade">
+              Specify sermons distance
+            </div>
+          </div>
+          <div style=""><div id="loading" class="p-4 hidden waiting"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></div></div>
+          <div id="tab-content" class="p-4 js-plotly-plot" style="width: 100%; height: 100%;"></div>
+
+          <!-- Hidden 'backup' of content -->
+          <div id="tab-backup" class="hidden">
+            <div id="tab-clustering-backup"></div>
+            <div id="tab-umap-backup"></div>
+            <div id="tab-ser_hm-backup"></div>
+            <div id="tab-serm_hm-backup"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </form>
+  <div class="row">
+    <div class="col-md-12">
+      <div class="acknowledgement">
+        Conceptualization and prototype of the PLUGIN tools: Mikhail Shirokikh
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block endcontent %}
+{{boardForm.media.js }}
+{% endblock %}

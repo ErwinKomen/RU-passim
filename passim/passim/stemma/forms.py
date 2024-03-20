@@ -4,7 +4,7 @@ Definition of forms.
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django.db.models import F
@@ -46,9 +46,9 @@ class EqualGoldWidget(ModelSelect2Widget):
             qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(id=self.exclude).order_by(*self.order).distinct()
         return qs
 
-    def filter_queryset(self, term, queryset = None, **dependent_fields):
+    def filter_queryset(self,request, term, queryset = None, **dependent_fields):
         term_for_now = ""
-        qs = super(EqualGoldWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        qs = super(EqualGoldWidget, self).filter_queryset(request,term_for_now, queryset, **dependent_fields)
         
         # Check if this contains a string literal
         bAdapted = False
@@ -157,7 +157,7 @@ class EqualSelectForm(BasicSimpleForm):
     """Simply allow selection of one EqualGold"""
 
     ssgone = ModelChoiceField(queryset=None, required=False,
-            widget = EqualGoldWidget(attrs={'data-placeholder': 'Select an Authority File...', 'style': 'width: 100%;', 'class': 'searching'}))
+            widget = EqualGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an Authority File...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -191,7 +191,7 @@ class EqualSelectForm(BasicSimpleForm):
 class StemmaSetForm(BasicModelForm):
     profileid = forms.CharField(required=False)
     ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = StemmaSet

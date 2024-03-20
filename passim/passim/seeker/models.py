@@ -1469,7 +1469,7 @@ class Report(models.Model):
     # [1] And a date: the date of saving this report
     created = models.DateTimeField(default=get_current_datetime)
     # [1] A report should have a type to know what we are reporting about
-    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), max_length=5)
+    reptype = models.CharField("Report type", choices=build_abbr_list(REPORT_TYPE), max_length=6)
     # [0-1] A report should have some contents: stringified JSON
     contents = models.TextField("Contents", default="{}")
 
@@ -1582,6 +1582,7 @@ class Profile(models.Model):
 
     # Many-to-many field that links this person/profile with particular projects
     projects = models.ManyToManyField("Project2", through="ProjectApprover", related_name="projects_profile")
+    editprojects = models.ManyToManyField("Project2", through="ProjectEditor", related_name="editprojects_profile")
               
     def __str__(self):
         sStack = self.stack
@@ -1651,7 +1652,8 @@ class Profile(models.Model):
         try:
             if not deflist is None:
                 with transaction.atomic():
-                    for obj in self.project_approver.all():
+                    # issue #742: change from project_approver to project_editor
+                    for obj in self.project_editor.all():
                         project = obj.project
                         if project in deflist:
                             obj.status = "incl"
@@ -1684,7 +1686,8 @@ class Profile(models.Model):
         bUseEditorProjects = False
 
         # Get a list of project id's that are my default
-        lst_id = [x['project__id'] for x in self.project_approver.filter(status="incl").values('project__id')]
+        # issue #742: change from project_approver to project_editor
+        lst_id = [x['project__id'] for x in self.project_editor.filter(status="incl").values('project__id')]
         # Select all the relevant projects
         if len(lst_id) == 0:
             if bUseEditorProjects:
@@ -1705,8 +1708,9 @@ class Profile(models.Model):
         """List of projects to which this user (profile) has APPROVER rights"""
 
         lHtml = []
-        # Visit all keywords
-        for obj in self.project_approver.filter(status="incl").order_by('project__name'):
+        # Visit all applicable projects
+        # issue #742: change from project_approver to project_editor
+        for obj in self.project_editor.filter(status="incl").order_by('project__name'):
             project = obj.project
             # Find the URL of the related project
             url = reverse('project2_details', kwargs={'pk': project.id})
@@ -1773,7 +1777,7 @@ class Profile(models.Model):
         sBack = ", ".join(lHtml)
         return sBack
 
-    def get_myprojects(self):
+    def get_myprojects(self, ssg = None):
         """Get a queryset of projects to which I am editor or approver"""
 
         qs = []
@@ -1781,7 +1785,13 @@ class Profile(models.Model):
         try:
             ids_edit = [x['project__id'] for x in self.project_editor.values("project__id") ]
             ids_appr = [x['project__id'] for x in self.project_approver.values("project__id") ]
-            ids = list( set( ids_edit + ids_appr ) )
+            # Issue #736: if a SSG (AF) is specified, then the id's this currently refers to must also be included
+            if ssg is None:
+                ids = list( set( ids_edit + ids_appr ) )
+            else:
+                # Get the id's of the current ssg
+                ids_curr = [x['id'] for x in ssg.projects.all().values("id")]
+                ids = list( set( ids_edit + ids_appr + ids_curr ) )
             qs = Project2.objects.filter(id__in=ids).order_by('name')
         except:
             msg = oErr.get_error_message()
@@ -1792,7 +1802,11 @@ class Profile(models.Model):
     def get_project_ids(self):
         """List of id's this person had editing rights for"""
 
-        id_list = [x['id'] for x in self.projects.all().values('id')]
+        # This only picks the approvers
+        # id_list = [x['id'] for x in self.projects.all().values('id')]
+        # This here selects the projects that I have *editing* rights on
+        id_list = [x['id'] for x in self.editprojects.all().values('id')]
+
         return id_list
 
     def get_stack(username):
@@ -1912,6 +1926,18 @@ class Profile(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("is_project_approver")
+        return bResult
+
+    def is_project_editor(self, sProject):
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            prj = Project2.objects.filter(name__icontains=sProject).first()
+            edi = ProjectEditor.objects.filter(profile=self, project=prj).first()
+            bResult = (not edi is None)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("is_project_editor")
         return bResult
 
 
@@ -3364,6 +3390,36 @@ class Project2(models.Model):
 
         return response
 
+    def get_contact_info(self):
+        """Contact information of at least one editor of the project: name, email address"""
+
+        oErr = ErrHandle()
+        sBack = ""
+        name = "(unknown)"
+        email = "N.A."
+        try:
+            # Find out who the editors are, excluding 
+            editors = self.project_editor.exclude(profile__user__is_superuser=True).order_by('profile__user__date_joined')
+            if editors.count() > 0:
+                # Take the first one
+                editor = editors.first().profile
+                email = editor.user.email
+                name = editor.user.username
+                if editor.user.first_name != "" and editor.user.last_name != "":
+                    # Give the first-name / last-name instead
+                    name = "{} {}".format(editor.user.first_name, editor.user.last_name)
+                sBack = 'name: <b>{}</b>, email: <a href="mailto:{}" class="email">{}</a>'.format(name, email, email)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_contact_info")
+        return sBack
+
+    def get_description(self):
+        sBack = "" if self.description is None else self.description
+        if sBack != "":
+            sBack = adapt_markdown(sBack, lowercase=False)
+        return sBack
+
     def get_editor_markdown(self):
         """List of users (=profiles) that have editing rights"""
 
@@ -4030,8 +4086,8 @@ class Manuscript(models.Model):
                 # OLD: project = Project.get_default(username)
 
                 # ===================================
-                if idno == "Cod. 404":
-                    iStop = 1
+                #if idno == "Cod. 404":
+                #    iStop = 1
                 # ===================================
 
                 # Retrieve or create a new manuscript with default values
@@ -4049,7 +4105,7 @@ class Manuscript(models.Model):
                     libCountry, libCity, lLibrary, note = Library.get_best_match(sCountry, sCity, sLibrary)
 
                 # Second attempt: try to at least get lCity and lCountry
-                if sCity != "":
+                if lCity is None and sCity != "":
                     # DOuble check city co-occurrence
                     lCity = Location.get_location(sCity, sCountry)
                     lCountry = lCity.lcountry
@@ -4200,27 +4256,34 @@ class Manuscript(models.Model):
                                     # Set the KV in a special way
                                     obj.custom_set(path, value, **kwargs)
 
-                        # Check what we now have for Country/City/Library
-                        lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
-                        # The country can safely added
-                        if lcountry != None and lcountry != obj.lcountry:
-                            obj.lcountry = lcountry
-                        # The city too can safely be added
-                        if lcity != None and lcity != obj.lcity:
-                            obj.lcity = lcity
-                        # But the library can only be added under the strictest conditions
-                        if library != None and library != obj.library:
-                            if lib_note == "":
-                                # No notes, so add the library
-                                obj.library = library
-                            else:
-                                # There is a note, so the library may not be added
-                                notes = [] if obj.notes is None else [ obj.notes ]
-                                notes.append(lib_note)
-                                obj.notes = "\n".join(notes)
-                        elif library is None and not obj.library is None:
-                            # A wrong library has been chosen: *REMOVE* the chosen library!
-                            obj.library = None
+                        # Did we already have a library?
+                        if lLibrary is None:
+                            # Check what we now have for Country/City/Library
+                            lcountry, lcity, library, lib_note = Library.get_best_match(country, city, library)
+                            # The country can safely added
+                            if lcountry != None and lcountry != obj.lcountry:
+                                obj.lcountry = lcountry
+                            # The city too can safely be added
+                            if lcity != None and lcity != obj.lcity:
+                                obj.lcity = lcity
+                            # But the library can only be added under the strictest conditions
+                            if library != None and library != obj.library:
+                                if lib_note == "":
+                                    # No notes, so add the library
+                                    obj.library = library
+                                else:
+                                    # There is a note, so the library may not be added
+                                    notes = [] if obj.notes is None else [ obj.notes ]
+                                    notes.append(lib_note)
+                                    obj.notes = "\n".join(notes)
+                            elif library is None and not obj.library is None:
+                                # A wrong library has been chosen: *REMOVE* the chosen library!
+                                obj.library = None
+                        else:
+                            # Actually assign the library, city and country
+                            obj.library = lLibrary
+                            obj.lcity = lCity
+                            obj.lcountry = lCountry
 
                         # Process the title for this manuscript
                         if obj.name == "SUPPLY A NAME": obj.name="-"
@@ -8788,17 +8851,19 @@ class SermonGold(models.Model):
         return True
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
-        # Adapt the incipit and explicit
-        istop = 1
-        srchincipit = get_searchable(self.incipit)
-        srchexplicit = get_searchable(self.explicit)
-        if self.srchincipit != srchincipit: self.srchincipit = srchincipit
-        if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
-        lSign = []
-        for item in self.goldsignatures.all().order_by('-editype'):
-            lSign.append(item.short())
-        siglist = json.dumps(lSign)
-        if siglist != self.siglist: self.siglist = siglist
+
+        if not self.id is None:
+            # Adapt the incipit and explicit
+            istop = 1
+            srchincipit = get_searchable(self.incipit)
+            srchexplicit = get_searchable(self.explicit)
+            if self.srchincipit != srchincipit: self.srchincipit = srchincipit
+            if self.srchexplicit != srchexplicit: self.srchexplicit = srchexplicit
+            lSign = []
+            for item in self.goldsignatures.all().order_by('-editype'):
+                lSign.append(item.short())
+            siglist = json.dumps(lSign)
+            if siglist != self.siglist: self.siglist = siglist
         # Do the saving initially
         response = super(SermonGold, self).save(force_insert, force_update, using, update_fields)
 
@@ -13058,6 +13123,10 @@ class ProjectEditor(models.Model):
     # [1] ...and a project instance
     project = models.ForeignKey(Project2, related_name="project_editor", on_delete=models.CASCADE)
 
+    # [1] Whether this project is to be included ('incl') or not ('excl') 
+    #     NOTE: this is for default project assignment 
+    status = models.CharField("Default assignment", choices=build_abbr_list(PROJ_DEFAULT), max_length=5, default="incl")
+
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(null=True, blank=True)
@@ -13069,6 +13138,7 @@ class ProjectEditor(models.Model):
     def delete(self, using = None, keep_parents = False):
         # First delete the person as editor for the indicated project
         response = super(ProjectEditor, self).delete(using, keep_parents)
+        oErr = ErrHandle()
         try:
             # Check for an equivalent ProjectApprover entry
             obj = ProjectApprover.objects.filter(profile=self.profile, project=self.project).first()
@@ -13148,27 +13218,34 @@ class CollOverlap(models.Model):
     def get_overlap(profile, collection, manuscript):
         """Calculate and set the overlap between collection and manuscript"""
 
-        obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
-        if obj == None:
-            obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
-        # Get the ids of the SSGs in the collection
-        coll_list = [ collection ]
-        ssg_coll = EqualGold.objects.filter(collections__in=coll_list).values('id')
-        if len(ssg_coll) == 0:
-            ptc = 0
-        else:
-            # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
-            ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
-            # Now calculate the overlap
-            count = 0
-            for item in ssg_coll:
-                if item in ssg_manu: count += 1
-            ptc = 100 * count // len(ssg_coll)
-        # Check if there is a change in percentage
-        if ptc != obj.overlap:
-            # Set the percentage
-            obj.overlap = ptc
-            obj.save()
+        ptc = 0
+        oErr = ErrHandle()
+        try:
+            obj = CollOverlap.objects.filter(profile=profile,collection=collection, manuscript=manuscript).first()
+            if obj == None:
+                obj = CollOverlap.objects.create(profile=profile,collection=collection, manuscript=manuscript)
+            # Get the ids of the SSGs in the collection
+            coll_list = [ collection ]
+            ssg_coll = [x['id'] for x in EqualGold.objects.filter(collections__in=coll_list).values('id')]
+            if len(ssg_coll) == 0:
+                ptc = 0
+            else:
+                # Get the id's of the SSGs in the manuscript: Manu >> MsItem >> SermonDescr >> SSG
+                # Old; ssg_manu = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=manuscript).values('id')
+                ssg_manu = [x['super__id'] for x in  manuscript.sermondescr_super.all().values('super__id') ]
+                # Now calculate the overlap
+                count = 0
+                for item in ssg_coll:
+                    if item in ssg_manu: count += 1
+                ptc = 100 * count // len(ssg_coll)
+            # Check if there is a change in percentage
+            if ptc != obj.overlap:
+                # Set the percentage
+                obj.overlap = ptc
+                obj.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollOverlap/get_overlap")
         return ptc
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):

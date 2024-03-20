@@ -63,7 +63,7 @@ from reportlab.rl_config import defaultPageSize
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
-from passim.seeker.forms import SearchCollectionForm, SearchManuscriptForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
+from passim.seeker.forms import SearchCollectionForm, SearchManuForm, LibrarySearchForm, SignUpForm, \
     AuthorSearchForm, UploadFileForm, UploadFilesForm, ManuscriptForm, SermonForm, SermonGoldForm, CommentForm, \
     SelectGoldForm, SermonGoldSameForm, SermonGoldSignatureForm, AuthorEditForm, BibRangeForm, FeastForm, \
     SermonGoldEditionForm, SermonGoldFtextlinkForm, SermonDescrGoldForm, SermonDescrSuperForm, SearchUrlForm, \
@@ -100,7 +100,7 @@ from passim.approve.views import approval_parse_changes, approval_parse_formset,
 from passim.seeker.adaptations import listview_adaptations, adapt_codicocopy, add_codico_to_manuscript
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search
+from passim.basic.views import BasicPart, BasicList, BasicDetails, make_search_list, add_rel_item, adapt_search, is_ajax
 
 # ======= from RU-cms ==========================
 from passim.seeker.views_utils import passim_action_add, passim_get_history
@@ -369,6 +369,7 @@ def get_non_editable_projects(profile, projects):
 def evaluate_projlist(profile, instance, projlist, sText):
     bBack = True
     msg = ""
+    oErr = ErrHandle()
     try:
         if projlist is None or len(projlist) == 0:
             # Check how many projects the user does *NOT* have rights for
@@ -3107,7 +3108,7 @@ def get_manuscripts(request):
     data = 'fail'
     errHandle = ErrHandle()
     # Only allow AJAX calls with POST
-    if request.is_ajax() and request.method == "POST":
+    if is_ajax(request) and request.method == "POST":
         get = request.POST
         # Get parameters city and library
         city = get.get("city", "")
@@ -3181,7 +3182,7 @@ def get_countries(request):
 
     data = 'fail'
     method = "useLocation"
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('country', '')
@@ -3213,7 +3214,7 @@ def get_cities(request):
 
     data = 'fail'
     method = "useLocation"
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             # Get the user-specified 'country' and 'city' strings
@@ -3279,7 +3280,7 @@ def get_libraries(request):
     """Get a list of libraries for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             # Get the user-specified 'country' and 'city' strings
@@ -3340,7 +3341,7 @@ def get_origins(request):
     """Get a list of origin names for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         sName = request.GET.get('name', '')
         lstQ = []
         lstQ.append(Q(name__icontains=sName))
@@ -3360,7 +3361,7 @@ def get_locations(request):
     """Get a list of location names for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('name', '')
@@ -3387,7 +3388,7 @@ def get_litref(request):
     """Get ONE particular short representation of a litref"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3412,7 +3413,7 @@ def get_litrefs(request):
     """Get a list of literature references for autocomplete"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sName = request.GET.get('name', '')
@@ -3438,7 +3439,7 @@ def get_sg(request):
     """Get ONE particular short representation of a SG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3463,7 +3464,7 @@ def get_sglink(request):
     """Get ONE particular short representation of a *link* to a SG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3488,7 +3489,7 @@ def get_ssglink(request):
     """Get ONE particular short representation of a *link* from sermondescr to a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3513,7 +3514,7 @@ def get_ssg2ssg(request):
     """Get ONE particular short representation of a *link* from SSG to a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3539,7 +3540,7 @@ def get_ssg(request):
     """Get ONE particular short representation of a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3564,7 +3565,7 @@ def get_ssgdist(request):
     """Get ONE particular short representation of a SSG"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3593,7 +3594,7 @@ def get_manuidnos(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             idno = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(idno__icontains=idno))
@@ -3616,7 +3617,7 @@ def get_authors(request):
     """Get a list of authors for autocomplete"""
 
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         author = request.GET.get("name", "")
         lstQ = []
         lstQ.append(Q(name__icontains=author)|Q(abbr__icontains=author))
@@ -3638,7 +3639,7 @@ def get_nicknames(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(name__icontains=author))
@@ -3663,7 +3664,7 @@ def get_gldincipits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
@@ -3691,7 +3692,7 @@ def get_srmincipits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
@@ -3717,7 +3718,7 @@ def get_gldexplicits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchexplicit__icontains=author))
@@ -3743,7 +3744,7 @@ def get_srmexplicits(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(srchexplicit__icontains=author))
@@ -3769,7 +3770,7 @@ def get_gldsignatures(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the editype, if that is specified
             editype = request.GET.get("type", "")
             # Get the complete code line, which could use semicolon-separation
@@ -3805,7 +3806,7 @@ def get_srmsignatures(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             codename = request.GET.get("name", "")
             editype = request.GET.get("type", "")
             lstQ = []
@@ -3831,7 +3832,7 @@ def get_sermosig(request):
     """Get the correct GOLD signature, given a SERMON signature"""
     
     data = 'fail'
-    if request.is_ajax():
+    if is_ajax(request):
         oErr = ErrHandle()
         try:
             sId = request.GET.get('id', '')
@@ -3856,7 +3857,7 @@ def get_editions(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             author = request.GET.get("name", "")
             lstQ = []
             lstQ.append(Q(name__icontains=author))
@@ -3881,7 +3882,7 @@ def get_keywords(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the complete code line, which could use semicolon-separation
             kwline = request.GET.get("name", "")
             kwlist = kwline.split(";")
@@ -3909,7 +3910,7 @@ def get_collections(request):
     oErr = ErrHandle()
     try:
         data = 'fail'
-        if request.is_ajax():
+        if is_ajax(request):
             # Get the complete code line, which could use semicolon-separation
             coll_line = request.GET.get("name", "")
             coll_list = coll_line.split(";")
@@ -3938,7 +3939,7 @@ def get_gold(request, pk=None):
     data = {'status': 'fail'}
     fields = ['author', 'incipit', 'explicit', 'critlinks', 'bibliography' ]
     try:
-        if request.is_ajax() and user_is_authenticated(request):
+        if is_ajax(request) and user_is_authenticated(request):
             # Get the id of the gold sermon
             qd = request.GET if request.method == "GET" else request.POST
             goldid = qd.get("goldid", "")
@@ -4248,8 +4249,9 @@ class OriginListView(BasicList):
                    {'name': 'Location', 'order': 'o=2', 'type': 'str', 'custom': 'location'},
                    {'name': 'Note',     'order': 'o=3', 'type': 'str', 'custom': 'note'},
                    {'name': '',         'order': '',    'type': 'str', 'custom': 'manulink' }]
-    filters = [ {"name": "Location",        "id": "filter_location",    "enabled": False},
-                {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
+    filters = [ 
+        {"name": "Location",        "id": "filter_location",    "enabled": False},
+        {"name": "Shelfmark",       "id": "filter_manuid",      "enabled": False, "head_id": "filter_other"},
                ]
     searches = [
         {'section': '', 'filterlist': [
@@ -4487,14 +4489,18 @@ class SermonEdit(BasicDetails):
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
-                ext = SermonDescrExternal.objects.filter(sermon=instance).first()
-                if not ext is None:
+                bHuwaEditor = profile.is_project_editor("huwa")
+                for ext in SermonDescrExternal.objects.filter(sermon=instance):
                     # Get the field values
                     externaltype = ext.externaltype
                     externalid = ext.externalid
-                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                    if externaltype == "huwop" and externalid > 0 and bHuwaEditor:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        oItem = dict(type="plain", label="HUWA opera id", value=externalid, field_key="ext_huwop")
+                        context['mainitems'].insert(0, oItem)
+                    elif externaltype == "huwin" and externalid > 0 and bHuwaEditor:
+                        # Okay, the user has the right to see the externalid
+                        oItem = dict(type="plain", label="HUWA inhalt id", value=externalid, field_key="ext_huwin")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items
@@ -4524,9 +4530,8 @@ class SermonEdit(BasicDetails):
                  'field_key': 'fulltext'}, 
                 {'type': 'plain', 'label': "Alt page numbering:",   'value': instance.get_altpages(),   'field_list': "altpageslist"},
                  ]
-            # Add transcription file, if possible
-            #if user_is_ingroup(self.request, app_editor):
-            #    mainitems_main.append({'type': 'plain', 'label': "Transcription file:",   'value': instance.get_trans_file(), 'field_key': "transcription"})
+            # issue #715: full-text may not be visible to 'regular' users
+
             # some more items
             mainitems_add = [
                 {'type': 'plain', 'label': "Notes alt page numbering:",   'value': instance.get_notes_altpages(), 'field_list': "notes_altpageslist"},
@@ -4720,13 +4725,18 @@ class SermonEdit(BasicDetails):
                 if not sInfo is None:
                     oInfo = json.loads(sInfo)
                 wordcount = oInfo.get("wordcount", 0)
-                # Combine with button click + default hidden
-                context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
-                               delete_message="",
-                               wordcount=wordcount,
-                               transdelurl=transdelurl,
-                               fulltext=sText)
-                sBack = render_to_string("seeker/ftext_buttons.html", context, None)
+                # Check whether this is a regular user or not
+                if user_is_ingroup(self.request, app_editor) or user_is_ingroup(self.request, app_moderator):
+                    # Combine with button click + default hidden
+                    context = dict(delete_permission=user_is_ingroup(self.request, stemma_editor),
+                                   delete_message="",
+                                   wordcount=wordcount,
+                                   transdelurl=transdelurl,
+                                   fulltext=sText)
+                    sBack = render_to_string("seeker/ftext_buttons.html", context, None)
+                else:
+                    # issue #715: only show non-clickable word count
+                    sBack = "{}".format(wordcount)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SermonEdit/get_transcription")
@@ -5037,6 +5047,28 @@ class SermonEdit(BasicDetails):
     def after_save(self, form, instance):
         """This is for processing items from the list of available ones"""
 
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.sermonexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = SermonDescrExternal.objects.create(sermon=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
@@ -5045,6 +5077,11 @@ class SermonEdit(BasicDetails):
         try:
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             if getattr(form, 'cleaned_data') != None:
+
+                # External id changes
+                adapt_external("ext_huwop", "huwop")
+                adapt_external("ext_huwin", "huwin")
+
                 # (1) 'keywords'
                 kwlist = form.cleaned_data['kwlist']
                 adapt_m2m(SermonDescrKeyword, instance, "sermon", kwlist, "keyword")
@@ -5367,6 +5404,7 @@ class SermonListView(BasicList):
     basketview = False
     plural_name = "Manifestations"
     basic_name = "sermon"    
+    sg_name = "Manifestation"
 
     order_cols = ['author__name;nickname__name', 'siglist', 'srchincipit;srchexplicit', 'manu__idno', 
                   'msitem__codico__manuscript__yearstart;msitem__codico__manuscript__yearfinish', 
@@ -5396,7 +5434,7 @@ class SermonListView(BasicList):
                 {"name": "Author type",      "id": "filter_autype",         "enabled": False},
                 {"name": "Incipit",          "id": "filter_incipit",        "enabled": False},
                 {"name": "Explicit",         "id": "filter_explicit",       "enabled": False},                
-                {"name": "Section",          "id": "filter_sectiontitle",   "enabled": False},
+                {"name": "Section titles",   "id": "filter_sectiontitle",   "enabled": False},
                 {"name": "Title",            "id": "filter_title",          "enabled": False},
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
@@ -5449,7 +5487,7 @@ class SermonListView(BasicList):
             #{'filter': 'signature',     'fkfield': 'signatures|goldsermons__goldsignatures', 'help': 'signature',     
             #                            'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             {'filter': 'keyword',       'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id' }, 
-            {'filter': 'project',       'fkfield': 'projects',          'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
+            {'filter': 'project',       'fkfield': 'projects',          'keyFk': 'name', 'keyList': 'projectslist', 'infield': 'name'},
             {'filter': 'stype',         'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' }
             ]},
         {'section': 'collection', 'filterlist': [
@@ -5462,7 +5500,7 @@ class SermonListView(BasicList):
             # {'filter': 'collsuper',     'fkfield': 'goldsermons__equal__collections', 'keyFk': 'name', 'keyList': 'collist_ssg','infield': 'id' }
             ]},
         {'section': 'manuscript', 'filterlist': [
-            {'filter': 'manuid',        'fkfield': 'manu',                    'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
+            {'filter': 'manuid',        'fkfield': 'manu',  'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
             {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
@@ -5559,12 +5597,14 @@ class SermonListView(BasicList):
                 html.append("-")
             else:
                 if manu.idno == None:
-                    sIdNo = "-"
+                    value = "-"
                 else:
-                    sIdNo = manu.idno[:20]
+                    # issue #610
+                    # value = manu.idno[:20]
+                    value = manu.get_full_name()
                 html.append("<a href='{}' class='nostyle'><span style='font-size: small;'>{}</span></a>".format(
                     reverse('manuscript_details', kwargs={'pk': manu.id}),
-                    sIdNo))
+                    value))
                 sTitle = manu.idno
         elif custom == "saved":
             # Prepare saveditem handling
@@ -6151,7 +6191,9 @@ class UserKeywordEdit(BasicDetails):
         if instance.type == "manu" and instance.manu: 
             # Manuscript: shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
-            value = instance.manu.idno
+            # issue #610
+            # value = instance.manu.idno
+            value = instance.get_full_name()
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
         elif instance.type == "sermo" and instance.sermo: 
             # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
@@ -6163,7 +6205,10 @@ class UserKeywordEdit(BasicDetails):
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.sermo.manu.id})
-            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, instance.sermo.manu.idno)
+            # issue #610
+            # value = instance.sermo.manu.idno
+            value = instance.get_full_name()
+            manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
             # Combine
             sBack = "{} {} {}".format(sermo, manu, sig)
         elif instance.type == "gold" and instance.gold: 
@@ -6304,7 +6349,9 @@ class UserKeywordListView(BasicList):
         if instance.type == "manu" and instance.manu: 
             # Manuscript: shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': instance.manu.id})
-            value = instance.manu.idno
+            # issue #610
+            # value = instance.manu.idno
+            value = instance.get_full_name()
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, value)
         elif instance.type == "sermo" and instance.sermo: 
             # Sermon (manifestation): Gryson/Clavis + shelf mark (of M)
@@ -6316,6 +6363,9 @@ class UserKeywordListView(BasicList):
             sermo = "<span><a href='{}'>sermon {}</a></span>".format(url, value)
             # Manuscript shelfmark
             url = reverse('manuscript_details', kwargs = {'pk': manu_obj.id})
+            # issue #610
+            # value = manu_obj.idno
+            value = manu_obj.get_full_name()
             manu = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, manu_obj.idno)
             # Combine
             sBack = "{} {} {}".format(sermo, manu, sig)
@@ -6392,14 +6442,6 @@ class ProvenanceEdit(BasicDetails):
             url = reverse("manuscript_details", kwargs = {'pk': manu.id})
             shelfmark = manu.idno[:20]
             sBack = "<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno)
-        #lManu = []
-        #for obj in instance.manuscripts_provenances.all():
-        #    # Add the shelfmark of this one
-        #    manu = obj.manuscript
-        #    url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-        #    shelfmark = manu.idno[:20]
-        #    lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
-        #sBack = ", ".join(lManu)
         return sBack
 
 
@@ -6527,7 +6569,7 @@ class ProvenanceListView(BasicList):
         {'name': 'Name',        'order': 'o=2', 'type': 'str', 'field':  'name', 'main': True, 'linkdetails': True},
         # Issue #289: remove this note from here
         # {'name': 'Note',        'order': 'o=3', 'type': 'str', 'custom': 'note', 'linkdetails': True},
-        {'name': 'Manuscript',  'order': 'o=4', 'type': 'str', 'custom': 'manuscript'}
+        {'name': 'Manuscript',  'order': 'o=3', 'type': 'str', 'custom': 'manuscript', 'allowwrap': True}
         ]
     filters = [ {"name": "Name",        "id": "filter_name",    "enabled": False},
                 {"name": "Location",    "id": "filter_location","enabled": False},
@@ -6569,8 +6611,10 @@ class ProvenanceListView(BasicList):
                 # Add the shelfmark of this one
                 manu = obj.manuscript
                 url = reverse("manuscript_details", kwargs = {'pk': manu.id})
-                shelfmark = manu.idno[:20]
-                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, manu.idno))
+                # issue #610
+                # value = manu.idno
+                value = manu.get_full_name()
+                lManu.append("<span class='badge signature cl'><a href='{}'>{}</a></span>".format(url, value))
             sBack = ", ".join(lManu)
             # Issue #289: the innovation below is turned back to the original above
             ## find the shelfmark
@@ -6787,7 +6831,7 @@ class BibRangeListView(BasicList):
         {'name': 'Chapter/verse',   'order': 'o=2', 'type': 'str', 'field': 'chvslist', 'main': True, 'linkdetails': True},
         {'name': 'Intro',           'order': 'o=3', 'type': 'str', 'custom': 'intro', 'linkdetails': True},
         {'name': 'Extra',           'order': 'o=4', 'type': 'str', 'custom': 'added', 'linkdetails': True},
-        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon'},
+        {'name': 'Manifestation',   'order': 'o=5', 'type': 'str', 'custom': 'sermon', 'allowwrap': True},
         {'name': 'Authority File',  'order': 'o=6', 'type': 'str', 'custom': 'equal'},
         ]
     filters = [ 
@@ -6835,6 +6879,9 @@ class BibRangeListView(BasicList):
                 # find the shelfmark
                 manu = sermon.msitem.manu
                 url = reverse("sermon_details", kwargs = {'pk': sermon.id})
+                # issue #610
+                # value = manu.idno
+                value = manu.get_full_name()
                 sBack = "<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus)
         elif custom == "equal":
             if not instance.equal is None:
@@ -7090,12 +7137,16 @@ class FeastListView(BasicList):
         oErr = ErrHandle()
         try:
             if custom == "sermon":
+                # NOTE: this is not accessed!!!
                 html = []
                 for sermon in instance.feastsermons.all().order_by('feast__name'):
                     # find the shelfmark
                     manu = sermon.msitem.manu
                     url = reverse("sermon_details", kwargs = {'pk': sermon.id})
-                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, manu.idno, sermon.locus))
+                    # issue #610
+                    # value = sermon.msitem.manu.idno
+                    value = sermon.msitem.manu.get_full_name()
+                    html.append("<span class='badge signature cl'><a href='{}'>{}: {}</a></span>".format(url, value, sermon.locus))
                 sBack = ", ".join(html)
             elif custom == "sermons":
                 # sBack = "{}".format(instance.feastsermons.count())
@@ -7626,7 +7677,7 @@ class ProjectEdit(BasicDetails):
         try:
             
             # Is the user allowed to edit/delete or not?
-            bMayDelete = user_is_ingroup(self.request, app_moderator)
+            bMayDelete = user_is_ingroup(self.request, app_moderator) or user_is_superuser(self.request)
 
             # Standard behaviour: no_delete to True
             if not bMayDelete:
@@ -7637,13 +7688,17 @@ class ProjectEdit(BasicDetails):
 
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Name:",     'value': instance.name},        #, 'field_key': "name"},
+                {'type': 'plain', 'label': "Name:",             'value': instance.name              },        #, 'field_key': "name"},
+                {'type': 'safe',  'label': "Description:",      'value': instance.get_description() },        #, 'field_key': "name"},
                 {'type': 'line',  'label': "Approval rights:",  'value': instance.get_editor_markdown(),
-                    'title': 'All the current users that have approval rights for this project'}
+                    'title': 'All the current users that have approval rights for this project'     },
+                {'type': 'safe',  'label': "Contact:",          'value': instance.get_contact_info(),
+                    'title': 'The project editor that can be contacted for details'},
                 ]   
         
             if bMayDelete:
-                context['mainitems'][0]['field_key'] = "name"    
+                context['mainitems'][0]['field_key'] = "name"
+                context['mainitems'][1]['field_key'] = "description"
 
             # Also add a delete Warning Statistics message (see issue #485)
             lst_proj_m = ManuscriptProject.objects.filter(project=instance).values('manuscript__id')
@@ -7698,7 +7753,7 @@ class ProjectListView(BasicList):
     order_default = order_cols
     order_heads = [{'name': 'Project',                'order': 'o=1', 'type': 'str', 'custom': 'project',   'main': True, 'linkdetails': True},
                    {'name': 'Manuscripts',            'order': 'o=2', 'type': 'str', 'custom': 'manulink',  'align': 'right' },
-                   {'name': 'Sermons',                'order': 'o=3', 'type': 'str', 'custom': 'sermolink', 'align': 'right'},
+                   {'name': 'Manifestations',         'order': 'o=3', 'type': 'str', 'custom': 'sermolink', 'align': 'right'},
                    {'name': 'Authority files',        'order': 'o=4', 'type': 'str', 'custom': 'ssglink',   'align': 'right'},
                    {'name': 'Historical collections', 'order': 'o=5', 'type': 'str', 'custom': 'hclink',    'align': 'right'}]
                    
@@ -7723,8 +7778,6 @@ class ProjectListView(BasicList):
                 count = instance.project2_manuscripts.exclude(mtype="tem").count()
                 url = reverse('search_manuscript')
                 if count > 0:
-                 #   html.append("<a href='{}?manu-prjlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
-                 #       url, instance.id, count, count)) 
                     html.append("<a href='{}?manu-projlist={}'><span class='badge jumbo-3 clickable' title='{} manuscripts in this project'>{}</span></a>".format(
                         url, instance.id, count, count))
 
@@ -8013,10 +8066,11 @@ class CollAnyEdit(BasicDetails):
                         
             # Add comment modal stuff
             if instance.settype == "hc":
+                lhtml = []
+
                 initial = dict(otype="hc", objid=instance.id, profile=profile)
                 context['commentForm'] = CommentForm(initial=initial, prefix="com")
                 context['comment_list'] = get_usercomments('hc', instance, profile)            
-                lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
 
@@ -8790,7 +8844,7 @@ class CollPrivDetails(CollAnyEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
             elif custom == "name":
                 sBack = instance.name
             elif custom == "origprov":
@@ -9345,13 +9399,9 @@ class CollHistDetails(CollHistEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_city(), instance.get_library(), instance.idno)
+                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
             elif custom == "name":
                 sBack = instance.name
-            #elif custom == "origprov":
-            #    sBack = "origin: {} (provenance[s]: {})".format(instance.get_origin(), instance.get_provenance_markdown(table=False))
-            #elif custom == "daterange":
-            #    sBack = "{}-{}".format(instance.yearstart, instance.yearfinish)
             elif custom == "sermons":
                 sBack = instance.get_sermon_count()
         elif type == "manucodicos":
@@ -9631,7 +9681,7 @@ class CollectionListView(BasicList):
                 {"name": "Collection",             "id": "filter_collection",     "enabled": False},
                 {"name": "Project",                "id": "filter_project",        "enabled": False},
                 {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},
-                {"name": "Sermon...",              "id": "filter_sermon",         "enabled": False, "head_id": "none"},
+                {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},
                 {"name": "Manuscript...",          "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
                 # Section SSG
                 {"name": "Author",          "id": "filter_ssgauthor",       "enabled": False, "head_id": "filter_authority_file"},
@@ -9669,7 +9719,7 @@ class CollectionListView(BasicList):
                     {'filter': 'project',       'fkfield': 'projects', 'keyFk': 'name', 'keyList': 'projlist', 'infield': 'name'},
                     ]},
                 # Section SSG
-                {'section': 'authority_file', 'filterlist': [
+                {'section': 'authority_file', 'name': 'Authority File', 'filterlist': [
                     {'filter': 'ssgauthor',    'fkfield': 'super_col__super__author',            
                      'keyS': 'ssgauthorname', 'keyFk': 'name', 'keyList': 'ssgauthorlist', 'infield': 'id', 'external': 'gold-authorname' },
                     {'filter': 'ssgincipit',   'dbfield': 'super_col__super__srchincipit',   'keyS': 'ssgincipit'},
@@ -9684,8 +9734,8 @@ class CollectionListView(BasicList):
                     {'filter': 'ssgstype',     'dbfield': 'super_col__super__stype',             
                      'keyList': 'ssgstypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
                     ]},
-                # Section S
-                {'section': 'sermon', 'filterlist': [
+                # Section S = Sermon = Manifestation
+                {'section': 'sermon', 'name': 'Manifestation', 'filterlist': [
                     {'filter': 'sermoincipit',       'dbfield': 'super_col__super__equalgold_sermons__srchincipit',   'keyS': 'sermoincipit'},
                     {'filter': 'sermoexplicit',      'dbfield': 'super_col__super__equalgold_sermons__srchexplicit',  'keyS': 'sermoexplicit'},
                     {'filter': 'sermotitle',         'dbfield': 'super_col__super__equalgold_sermons__title',         'keyS': 'sermotitle'},                    
@@ -10771,9 +10821,12 @@ class ManuscriptEdit(BasicDetails):
                     # Get the field values
                     externaltype = ext.externaltype
                     externalid = ext.externalid
-                    if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                    # Issue #730.3
+                    # bEditHuwa = profile.is_project_approver("huwa")
+                    bEditHuwa = profile.is_project_editor("huwa")
+                    if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid)
+                        oItem = dict(type="plain", label="HUWA id", value=externalid, field_key="externalid")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items
@@ -11229,11 +11282,37 @@ class ManuscriptEdit(BasicDetails):
         return bBack, msg
 
     def after_save(self, form, instance):
+
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.manuexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = ManuscriptExternal.objects.create(manu=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         msg = ""
         bResult = True
         oErr = ErrHandle()
         
         try:
+            # External id changes
+            adapt_external("externalid", "huwop")
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'collections'
             collist_m = form.cleaned_data['collist']
@@ -11877,12 +11956,16 @@ class ManuscriptListView(BasicList):
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
         
-        {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
+        # Issue #717: rename into "Comparative search..."
+        # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
+        {"name": "Comparative search...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
-        {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
-        {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
+        # issue #718: remove options to search for Gryson/Clavis/other code - for sermons
+        # {"name": "Gryson/Clavis/Other code: manual",    "id": "filter_signature_m",     "enabled": False, "head_id": "filter_sermon"},
+        # {"name": "Gryson/Clavis/Other code: automatic", "id": "filter_signature_a",     "enabled": False, "head_id": "filter_sermon"},
+
         {"name": "Attr. author",            "id": "filter_sermo_author",        "enabled": False, "head_id": "filter_sermon"},
         {"name": "Author type",             "id": "filter_sermo_authortype",    "enabled": False, "head_id": "filter_sermon"},
         {"name": "Incipit",                 "id": "filter_sermo_incipit",       "enabled": False, "head_id": "filter_sermon"},
@@ -11892,23 +11975,20 @@ class ManuscriptListView(BasicList):
                
         {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
+        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
+        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection", "hide_button": True},
+        # issue #717: delete the PD:Manuscript and PD:Sermon options
+        #{"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
+        #{"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
-        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "hidden"}, 
-        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection"},
-        #{"name": "Passim code",                         "id": "filter_authority_file_code",        "enabled": False, "head_id": "filter_authority_file"},        
-        #{"name": "Gryson/Clavis/Other code",            "id": "filter_authority_file_signature",   "enabled": False, "head_id": "filter_authority_file"},
         
-        #{"name": "Gryson/Clavis/Other code: manual",    "id": "filter_authority_file_signature_m", "enabled": False, "head_id": "filter_authority_file"},
-        #{"name": "Gryson/Clavis/Other code: automatic", "id": "filter_authority_file_signature_a", "enabled": False, "head_id": "filter_authority_file"},
-        
-        {"name": "Author",                              "id": "filter_authority_file_author",      "enabled": False, "head_id": "filter_authority_file"},
-        {"name": "Incipit",                             "id": "filter_authority_file_incipit",     "enabled": False, "head_id": "filter_authority_file"},
-        {"name": "Explicit",                            "id": "filter_authority_file_explicit",    "enabled": False, "head_id": "filter_authority_file"},
-      ]
+        {"name": "Author",                  "id": "filter_authority_file_author",       "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Incipit",                 "id": "filter_authority_file_incipit",      "enabled": False, "head_id": "filter_authority_file"},
+        {"name": "Explicit",                "id": "filter_authority_file_explicit",     "enabled": False, "head_id": "filter_authority_file"},
+        # issue #718: add *ONE* option to search for Gryson/Clavis/other code - for AFs
+        {"name": "Gryson/Clavis/Other code","id": "filter_authority_file_signature",    "enabled": False, "head_id": "filter_authority_file"},
+    ]
 
     searches = [
         {'section': '', 'filterlist': [
@@ -11933,14 +12013,14 @@ class ManuscriptListView(BasicList):
 
         {'section': 'collection', 'filterlist': [
             # === Overlap with a specific manuscript ===
-            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id'},            
+            {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id', 'help': 'overlap_manu'},            
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc', 
              'title': 'Percentage overlap between the Historical Collection SSGs and the SSGs referred to in the manuscripts'},             
             #{'filter': 'collection_manuptc', 'keyS': 'overlap', 'dbfield': 'hcptc',
             # 'title': 'Percentage overlap between the "Comparison manuscript" SSGs and the SSGs referred to in other manuscripts'},
 
             # === Historical Collection ===
-            {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections',                            
+            {'filter': 'collection_hc',  'fkfield': 'manuitems__itemsermons__equalgolds__collections', 'help': 'overlap_hc',                         
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },             
 
             # === Personal Dataset ===
@@ -11951,15 +12031,16 @@ class ManuscriptListView(BasicList):
             # Issue #416: Delete the option to search for a GoldSermon dataset 
             #{'filter': 'collection_gold',  'fkfield': 'manuitems__itemsermons__goldsermons__collections',  
             # 'keyS': 'collection_sg', 'keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' },
-            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 
+            {'filter': 'collection_super', 'fkfield': 'manuitems__itemsermons__equalgolds__collections', 'help': 'overlap_af',
              'keyS': 'collection_ssg','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' },
             # ===================
             ]},
-        {'section': 'sermon', 'filterlist': [
-            {'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
-             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
-            {'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
-             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, # KAN WEG
+        {'section': 'sermon', 'name': 'manifestation', 'filterlist': [
+            # issue #717: delete the PD:Manuscript and PD:Sermon options
+            #{'filter': 'signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+            # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+            #{'filter': 'signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+            # 'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' }, # KAN WEG
             {'filter': 'sermo_authortype', 'keyS': 'authortype',  'help': 'authorhelp'}, 
             {'filter': 'sermo_author',        'fkfield': 'manuitems__itemsermons__author',            
                      'keyS': 'sermo_authorname', 'keyFk': 'name', 'keyList': 'sermo_authorlist', 'infield': 'id', 'external': 'sermo-authorname'},            
@@ -11969,26 +12050,27 @@ class ManuscriptListView(BasicList):
             {'filter': 'sermo_bibref',    'dbfield': '$dummy', 'keyS': 'bibrefbk'}, #toevoegen sermo_?
             {'filter': 'sermo_bibref',    'dbfield': '$dummy', 'keyS': 'bibrefchvs'}
             ]},        
-        {'section': 'authority_file', 'filterlist': [
+        {'section': 'authority_file', 'name': 'Authority File', 'filterlist': [
             {'filter': 'authority_file_code', 'fkfield': 'manuitems__itemsermons__sermondescr_super__super', 'help': 'passimcode',
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             
             # Signature NEW signature
             {'filter': 'authority_file_signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature', # HOE MOET DIE fkfield worden genoemd? Filteren op twee links
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }, # Q expressie toevoegen
-             
-            # Sign manual SERMON KAN LATER WEG
-            {'filter': 'authority_file_signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
-             'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
+
+            ## Sign manual SERMON KAN LATER WEG
+            #{'filter': 'authority_file_signature_m', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature',
+            # 'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' },
             
-            # Sign auto SSG KAN LATER WEG
-            {'filter': 'authority_file_signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
-             'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' },                   
+            ## Sign auto SSG KAN LATER WEG
+            #{'filter': 'authority_file_signature_a', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     'help': 'signature',
+            # 'keyS': 'signaturea', 'keyFk': 'code', 'keyId': 'signatureaid', 'keyList': 'siglist_a', 'infield': 'code' },                   
                          
             {'filter': 'authority_file_author', 'fkfield': 'manuitems__itemsermons__sermondescr_super__super__author',            
                      'keyS': 'ssg_authorname', 'keyFk': 'name', 'keyList': 'ssg_authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'authority_file_incipit',   'dbfield': 'manuitems__itemsermons__sermondescr_super__super__srchincipit',   'keyS': 'ssg_incipit'},             
             {'filter': 'authority_file_explicit',  'dbfield': 'manuitems__itemsermons__sermondescr_super__super__srchexplicit',  'keyS': 'ssg_explicit'}, 
+
             ]},
         {'section': 'other', 'filterlist': [
             #{'filter': 'other_project',   'fkfield': 'project',  'keyS': 'project', 'keyFk': 'id', 'keyList': 'prjlist', 'infield': 'name' },
@@ -12229,10 +12311,18 @@ class ManuscriptListView(BasicList):
                     if len(coll_list) > 0:
                         # Yes, overlap specified
                         if isinstance(overlap, int):
+                            # We also need to have the profile
+                            profile = Profile.get_user_profile(self.request.user.username)
+
                             # Make sure the string is interpreted as an integer
                             overlap = int(overlap)
-                            # Now add a Q expression
-                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
+                            # Now add a Q expression that includes:
+                            # 1 - Greater than or equal the overlap percentage
+                            # 2 - The list of historical collections
+                            # 3 - This particular user
+                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap) & \
+                               Q(manu_colloverlaps__collection__in=coll_list) & \
+                               Q(manu_colloverlaps__profile=profile)
 
                             # Make sure to actually *calculate* the overlap between the different collections and manuscripts
                 
@@ -12243,8 +12333,6 @@ class ManuscriptListView(BasicList):
                             lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
 
-                            # We also need to have the profile
-                            profile = Profile.get_user_profile(self.request.user.username)
                             # Now calculate the overlap for all
                             with transaction.atomic():
                                 for coll in coll_list:
@@ -12304,6 +12392,34 @@ class ManuscriptListView(BasicList):
                 fields['date_from'] = qThis
                 fields['date_until'] = ""
 
+            # Issue #718: combine search for Signature *automatic* and *manual*
+            af_siglist = fields.get("siglist")
+            if not af_siglist is None and af_siglist.count() > 0:
+                af_siglist_list = [dict(code=x.code, editype=x.editype) for x in af_siglist]
+                lst_code = [x['code'] for x in af_siglist_list]
+                qs_sermonsig = SermonSignature.objects.filter(code__in=lst_code).distinct()
+                exclude_id = []
+                for oItem in af_siglist_list:
+                    # Check if the combination of code and editype is in here
+                    res_list = qs_sermonsig.filter(code=oItem['code'])
+                    if res_list.count() > 1:
+                        # Check which to exclude
+                        for obj in res_list:
+                            if obj.editype != oItem['editype']:
+                                # This one must be excluded
+                                exclude_id.append(obj.id)
+                # Adapt the code list if needed
+                if len(exclude_id) > 0:
+                    qs_sermonsig = qs_sermonsig.exclude(id__in=exclude_id)
+
+
+                # Build a Q-expression to facilitate this
+                q1 = Q(manuitems__itemsermons__sermonsignatures__in=qs_sermonsig)
+                q2 = Q(manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures__in=af_siglist)
+                fields['siglist'] = ( q1 | q2 )
+
+                # Debugging: 
+                # qs = Manuscript.objects.filter(q1)
 
             # Adapt the bible reference list
             bibrefbk = fields.get("bibrefbk", "")
@@ -13400,10 +13516,10 @@ class SermonGoldEdit(BasicDetails):
                             context['mainitems'].append(oItemEdi)
 
             # Add comment modal stuff
+            lhtml = []
             initial = dict(otype="gold", objid=instance.id, profile=profile)
             context['commentForm'] = CommentForm(initial=initial, prefix="com")
             context['comment_list'] = get_usercomments('gold', instance, profile)
-            lhtml = []
             lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
             context['after_details'] = "\n".join(lhtml)
 
@@ -13757,6 +13873,12 @@ class EqualGoldEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="ssg")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="ssg")
 
+            # Determine the passim code and possibly a warning if this is a moved item
+            str_code = instance.get_code()
+            if not instance.moved is None:
+                message = "this AF is an old copy of one that has moved. See Details."
+                str_code = '{} <span><b>NOTE</b>:</span>&nbsp;<span style="color: red;">{}</span>'.format(str_code, message)
+
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
@@ -13771,7 +13893,7 @@ class EqualGoldEdit(BasicDetails):
                 {'type': 'plain', 'label': "Transcription:", 'value': instance.fulltext,  'field_key': 'fulltext', 'empty': 'hide'},
                 # Issue #212: remove this sermon number
                 # {'type': 'plain', 'label': "Sermon number:", 'value': instance.number, 'field_view': 'number',             
-                {'type': 'plain', 'label': "Passim Code:",   'value': instance.code,   'title': 'The Passim Code is automatically determined'},   
+                {'type': 'plain', 'label': "Passim Code:",   'value': str_code,   'title': 'The Passim Code is automatically determined'},   
                 ]
 
             # some more items need to be added
@@ -13840,7 +13962,7 @@ class EqualGoldEdit(BasicDetails):
                     context['approval_pending_list'] = approval_pending_list(instance)
                     context['mainitems'].append(dict(
                         type='safe', label='', value=render_to_string('seeker/pending_changes.html', context, self.request)))
-
+                
                 # Special processing for those with editing rights
                 if may_edit_project(self.request, profile, instance):
                     for oMainSection in context['mainsections']: 
@@ -13854,11 +13976,16 @@ class EqualGoldEdit(BasicDetails):
                                 # Get the field values
                                 externaltype = ext.externaltype
                                 externalid = ext.externalid
-                                if externaltype == "huwop" and externalid > 0 and profile.is_project_approver("huwa"):
+                                # Issue #730.3
+                                # bEditHuwa = profile.is_project_approver("huwa")
+                                bEditHuwa = profile.is_project_editor("huwa")
+                                if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                                     # Okay, the user has the right to see the externalid                                    
                                     oItem = dict(type="plain", 
                                             label="HUWA id", 
-                                            value=externalid)
+                                            value=externalid,
+                                            field_key="externalid"
+                                            )
                                     context['mainitems'].insert(0, oItem) 
                                   
                                     # The user also has the right to see EDITION information
@@ -13931,10 +14058,10 @@ class EqualGoldEdit(BasicDetails):
                     context['permission'] = self.permission
 
                 # Add comment modal stuff
+                lhtml = []
                 initial = dict(otype="super", objid=instance.id, profile=profile)
                 context['commentForm'] = CommentForm(initial=initial, prefix="com")
                 context['comment_list'] = get_usercomments('super', instance, profile)                
-                lhtml = []
                 lhtml.append(render_to_string("seeker/comment_add.html", context, self.request))
                 context['comment_count'] = instance.comments.count()
 
@@ -14398,6 +14525,28 @@ class EqualGoldEdit(BasicDetails):
                 oErr.DoError("get_proj_add_remove")
             return addprojlist, delprojlist
 
+        def adapt_external(field, externaltype):
+            """Save the externalid"""
+
+            oErr = ErrHandle()
+            try:
+                externalid = form.cleaned_data.get(field)
+                if not externalid is None and externalid != "":
+                    # Check if this is the correct id
+                    ext = instance.equalexternals.filter(externaltype=externaltype).first()
+                    if ext is None:
+                        # Need to make one
+                        ext = EqualGoldExternal.objects.create(equal=instance, externaltype=externaltype, externalid=externalid)
+                    else:
+                        # Do we need changing?
+                        if externalid != ext.externalid:
+                            ext.externalid = externalid
+                            ext.save()
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("adapt_external")
+                bResult = False
+
         # Initialisations
         msg = ""
         bResult = True
@@ -14406,6 +14555,9 @@ class EqualGoldEdit(BasicDetails):
         try:
             # Need to know who I am for some operations
             profile = Profile.get_user_profile(self.request.user.username)
+
+            # External id changes
+            adapt_external("externalid", "huwop")
 
             # ====== Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'Personal Datasets' and 'Historical Collections'
@@ -14711,8 +14863,12 @@ class EqualGoldDetails(EqualGoldEdit):
                                          'link': reverse('sermon_details', kwargs={'pk': sermon.id})})
                     elif method == "Issue216":
                         # Shelfmark = IDNO
-                        manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
-                        manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, item.idno)
+                        # manu_full = "{}, {}, {}".format(item.get_city(), item.get_library(), item.idno)
+                        manu_full = item.get_full_name()
+                        # issue #610
+                        # value = item.idno
+                        value = manu_full
+                        manu_name = "<span class='signature' title='{}'>{}</span>".format(manu_full, value)
                         # Name as CITY - LIBRARY - IDNO + Name
                         manu_name = "{}, {}, <span class='signature'>{}</span> {}".format(item.get_city(), item.get_library(), item.idno, item.name)
                         rel_item.append({'value': manu_name, 'title': item.idno, 'main': False, 'myclasses': 'shelfm',
@@ -14873,15 +15029,28 @@ class EqualGoldDetails(EqualGoldEdit):
         oErr = ErrHandle()
         bBack = True
         msg = ""
+        method = "before_issue742"
+        method = "after_issue742"
         try:
             if self.isnew:
                 # Try default project assignment
                 profile = Profile.get_user_profile(self.request.user.username)
-                qs = profile.project_approver.filter(status="incl")
-                for obj in qs:
-                    EqualGoldProject.objects.create(project=obj.project, equal=instance)
-                # is it just one project?
-                if qs.count() == 1:
+
+                if method == "before_issue742":
+                    qs = profile.project_approver.filter(status="incl")
+                    for obj in qs:
+                        EqualGoldProject.objects.create(project=obj.project, equal=instance)
+                    # is it just one project?
+                    if qs.count() == 1:
+                        # Make sure the atype is set correctly
+                        instance.atype = "acc"
+                        instance.save()
+                else:
+                    # Method is "after_issue742"
+                    # Determine what the projects are to which the user has default editing rights.
+                    qs = profile.project_editor.filter(status="incl")
+                    for obj in qs:
+                        EqualGoldProject.objects.create(project=obj.project, equal=instance)
                     # Make sure the atype is set correctly
                     instance.atype = "acc"
                     instance.save()
@@ -14978,7 +15147,7 @@ class EqualGoldListView(BasicList):
          'title': "Number of Sermon (manifestation)s that are connected with this Authority file"},
         {'name': 'Contains',                'order': 'o=7'   , 'type': 'int', 'custom': 'size',
          'title': "Number of Sermons Gold that are part of the equality set of this Authority file"},
-        {'name': 'Links',                   'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
+        {'name': 'Linked AFs',              'order': 'o=8'   , 'type': 'int', 'custom': 'ssgcount',
          'title': "Number of other Authority files this Authority file links to"},
         {'name': 'Hist. Coll.',             'order': 'o=9'   , 'type': 'int', 'custom': 'hccount',
          'title': "Number of historical collections associated with this Authority file"},
@@ -14997,6 +15166,7 @@ class EqualGoldListView(BasicList):
         {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
         {"name": "Transcription",   "id": "filter_transcr",           "enabled": False},        
+        {"name": "Linked via manuscript","id": "filter_manuscript",   "enabled": False},        
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
@@ -15022,13 +15192,14 @@ class EqualGoldListView(BasicList):
             {'filter': 'ssgcount',  'dbfield': 'ssgoperator',       'keyS': 'ssgoperator'       },
             {'filter': 'ssgcount',  'dbfield': 'ssgcount',          'keyS': 'ssgcount',
              'title': 'The number of links an Authority file has to other Authority files'      },
+            {'filter': 'manuscript','dbfield': '$dummy',            'keyS': 'manulink'          }, 
             {'filter': 'keyword',   'fkfield': 'keywords',          'keyFk': 'name', 'keyList': 'kwlist', 'infield': 'id'},
             {'filter': 'author',    'fkfield': 'author',            
              'keyS': 'authorname', 'keyFk': 'name', 'keyList': 'authorlist', 'infield': 'id', 'external': 'gold-authorname' },
             {'filter': 'stype',     'dbfield': 'stype',             'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr' },
             {'filter': 'signature', 'fkfield': 'equal_goldsermons__goldsignatures',    'help': 'signature',
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code'},
-            {'filter': 'project',  'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'lstprojlist', 'infield': 'name'}            
+            {'filter': 'project',   'fkfield': 'projects',   'keyFk': 'name', 'keyList': 'lstprojlist', 'infield': 'name'},
             ]},
         {'section': 'collection', 'filterlist': [
             {'filter': 'collmanu',  'fkfield': 'equal_goldsermons__sermondescr__manu__collections',  
@@ -15246,49 +15417,61 @@ class EqualGoldListView(BasicList):
         # Adapt the search to the keywords that *may* be shown
         lstExclude= None
         qAlternative = None
+        oErr = ErrHandle()
 
-        # Check if a list of keywords is given
-        if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
-            # Get the list
-            kwlist = fields['kwlist']
-            # Get the user
-            username = self.request.user.username
-            user = User.objects.filter(username=username).first()
-            # Check on what kind of user I am
-            if not user_is_ingroup(self.request, app_editor):
-                # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
-                kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
-                fields['kwlist'] = kwlist
+        try:
+            # Check if a list of keywords is given
+            if 'kwlist' in fields and fields['kwlist'] != None and len(fields['kwlist']) > 0:
+                # Get the list
+                kwlist = fields['kwlist']
+                # Get the user
+                username = self.request.user.username
+                user = User.objects.filter(username=username).first()
+                # Check on what kind of user I am
+                if not user_is_ingroup(self.request, app_editor):
+                    # Since I am not an app-editor, I may not filter on keywords that have visibility 'edi'
+                    kwlist = Keyword.objects.filter(id__in=kwlist).exclude(Q(visibility="edi")).values('id')
+                    fields['kwlist'] = kwlist
 
-        scount = fields.get('scount', -1)
-        soperator = fields.pop('soperator', None)
-        if scount != None and scount >= 0 and soperator != None:
-            # Action depends on the operator
-            fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
+            scount = fields.get('scount', -1)
+            soperator = fields.pop('soperator', None)
+            if scount != None and scount >= 0 and soperator != None:
+                # Action depends on the operator
+                fields['scount'] = Q(**{"scount__{}".format(soperator): scount})
 
-        ssgcount = fields.get('ssgcount', -1)
-        ssgoperator = fields.pop('ssgoperator', None)
-        if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
-            # Action depends on the operator
-            fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
+            ssgcount = fields.get('ssgcount', -1)
+            ssgoperator = fields.pop('ssgoperator', None)
+            if ssgcount != None and ssgcount >= 0 and ssgoperator != None:
+                # Action depends on the operator
+                fields['ssgcount'] = Q(**{"ssgcount__{}".format(ssgoperator): ssgcount})
 
-        foperator = fields.get('foperator')
-        srchfulltext = fields.get('srchfulltext')
-        if not foperator is None and foperator != "":
-            # Choices are: "obl" and "txt"
-            if foperator == "obl":
-                # Just check whether a text is there or not
-                fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
-            else:
-                # Well, if we are really looking for the full text, we don't have to do anything
+            # Look for manulink
+            manulink = fields.get('manulink')
+            if not manulink is None:
+                # We have one Manuscript that serves as a basis to search for AFs
+                qThis = Q(sermondescr_super__manu=manulink)
+                fields['manulink'] = qThis
+
+            foperator = fields.get('foperator')
+            srchfulltext = fields.get('srchfulltext')
+            if not foperator is None and foperator != "":
+                # Choices are: "obl" and "txt"
+                if foperator == "obl":
+                    # Just check whether a text is there or not
+                    fields['srchfulltext'] = Q(transcription__isnull=False) & ~ Q(transcription="")
+                else:
+                    # Well, if we are really looking for the full text, we don't have to do anything
+                    pass
+            elif not srchfulltext is None and srchfulltext != "":
+                # This just means that we are really looking for the full text
                 pass
-        elif not srchfulltext is None and srchfulltext != "":
-            # This just means that we are really looking for the full text
-            pass
         
-        # Make sure we only show the SSG/AF's that have accepted modifications
-        # (fields['atype'] = 'acc'), so exclude the others:
-        lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]      
+            # Make sure we only show the SSG/AF's that have accepted modifications
+            # (fields['atype'] = 'acc'), so exclude the others:
+            lstExclude = [ Q(atype__in=['mod', 'def', 'rej']) | Q(moved__isnull=False) ]     
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGoldListView/adapt_search")
        
         return fields, lstExclude, qAlternative        
 
@@ -16823,7 +17006,7 @@ class BasketUpdate(BasicPart):
             team_group=app_editor
 
             # Note: only operations in either of these two lists will be executed
-            lst_basket_target = ["create", "add", "remove", "reset"]
+            lst_basket_target = ["create", "add", "remove", "shared", "missing", "reset"]
             lst_basket_source = ["collcreate", "colladd", "rsetcreate", "rsetadd", "dctlaunch"]
 
             # Get our profile
@@ -16879,6 +17062,24 @@ class BasketUpdate(BasicPart):
                                 for item in search_id:
                                     kwargs["{}_id".format(self.s_field)] = item
                                     self.clsBasket.objects.filter(**kwargs).delete()
+                            # Process history
+                            profile.history(operation, self.colltype, oFields)
+                        elif search_count > 0  and operation == "shared":
+                            # What are the current id's?
+                            current_ids = [x['id'] for x in self.clsBasket.objects.filter(**kwargs).values('id')]
+                            # Filter out those who are allowed to stay...
+                            kwargs["{}_id__in".format(self.s_field)] = search_id
+                            # Find out the id's of basket items that may stay
+                            maystay_ids = [x['id'] for x in self.clsBasket.objects.filter(**kwargs).values('id')]
+                            # Remove all the id's from the basket, whose s_field is not in search_id
+                            delete_id = []
+                            for this_id in current_ids:
+                                if not this_id in maystay_ids:
+                                    delete_id.append(this_id)
+                            # Possibly remove some
+                            if len(delete_id) > 0:
+                                self.clsBasket.objects.filter(id__in=delete_id).delete()
+
                             # Process history
                             profile.history(operation, self.colltype, oFields)
                         elif operation == "reset":

@@ -5,7 +5,7 @@ Definition of forms.
 from django import forms
 from django.core import validators
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django.db.models import F, Case, Value, When, IntegerField
@@ -446,6 +446,7 @@ class DaterangeHistCollWidget(ModelSelect2MultipleWidget):
             qs = DaterangeHistColl.objects.all().order_by('yearstart').distinct()
         return qs
 
+
 class EdirefSgWidget(ModelSelect2MultipleWidget):
     model = EdirefSG
     search_fields = [ 'reference__full__icontains' ]
@@ -539,9 +540,9 @@ class EqualGoldWidget(ModelSelect2Widget):
                 qs = EqualGold.objects.filter(moved__isnull=True, atype='acc').exclude(id=self.exclude).order_by(*self.order).distinct()
         return qs
 
-    def filter_queryset(self, term, queryset = None, **dependent_fields):
+    def filter_queryset(self, request, term, queryset = None, **dependent_fields):
         term_for_now = ""
-        qs = super(EqualGoldWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        qs = super(EqualGoldWidget, self).filter_queryset(request, term_for_now, queryset, **dependent_fields)
         
         # Check if this contains a string literal
         bAdapted = False
@@ -761,8 +762,8 @@ class LibraryOneWidget(ModelSelect2Widget):
     def get_queryset(self):
         return Library.objects.all().order_by('name').distinct()
 
-    def filter_queryset(self, term, queryset = None, **dependent_fields):
-        response = super(LibraryOneWidget, self).filter_queryset(term, queryset, **dependent_fields)
+    def filter_queryset(self,request, term, queryset = None, **dependent_fields):
+        response = super(LibraryOneWidget, self).filter_queryset(request,term, queryset, **dependent_fields)
         return response
 
 
@@ -868,7 +869,11 @@ class ManuscriptWidget(ModelSelect2MultipleWidget):
         return obj.get_full_name()
 
     def get_queryset(self):
-        qs = self.queryset.order_by('lcity__name', 'library__name', 'idno')
+        qs = self.queryset
+        if qs is None:
+            qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno')
+        else:
+            qs = qs.order_by('lcity__name', 'library__name', 'idno')
         #if qs == None:
         #    qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
         return qs
@@ -1367,6 +1372,60 @@ class SignatureWidget(ModelSelect2MultipleWidget):
         return Signature.objects.all().order_by('code').distinct()
 
 
+#class SignatureCombiWidget(forms.MultiWidget):
+#    def __init__(self, attrs = None):
+#        # Define possible logical choices
+#        logi_choices = [ ("and", "and"), ("or", "or"), ("not", "not") ]
+#        add_field = [ ("-", "-"), ("Add", "add") ]
+#        # Define the list of widgets
+#        widgets = [
+#            # The signature selection widget
+#            SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+#                                    'style': 'width: 100%;', 'class': 'searching'}),
+#            # Possible logical operators
+#            forms.Select(attrs=attrs, choices=logi_choices),
+#            # Option to add another operator
+#            forms.Select(attrs=attrs, choices=add_field)
+#        ]
+#        super(SignatureCombiWidget, self).__init__(widgets, attrs)
+
+#    def decompress(self, value):
+#        """Return the different values"""
+
+#        if value:
+#            data = value.split(',')
+#            response = [ data[0], data[1], data[2] ]
+#        else:
+#            response = [None, None, None]
+#        return response
+
+#    def value_from_datadict(self, data, files, name):
+#        sig, logi, add = super(SignatureCombiWidget, self).value_from_datadict(data, files, name)
+#        sCombi = "{}-{}-{}".format()
+#        return sCombi
+
+
+#class SignatureCombiField(forms.MultiValueField):
+#    def __init__(self, required=True, widget=None, label=None, initial=None):
+#        # Define possible logical choices
+#        logi_choices = [ ("and", "and"), ("or", "or"), ("not", "not") ]
+#        add_field = [ ("-", "-"), ("Add", "add") ]
+#        fields = (
+#            ModelMultipleChoiceField(queryset=None, required=False,
+#                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+#                                                          'style': 'width: 100%;', 'class': 'searching'})),
+#            forms.ChoiceField(choices=logi_choices),
+#            forms.ChoiceField(choices=add_field)
+#        )
+#        super(SignatureCombiField, self).__init__(fields=fields, required=required, widget=widget, label=label, initial=initial)
+
+#    def compress(self, data_list):
+#        sCombi = None
+#        if data_list:
+#            sCombi = "{}, {}, {}".format(''.joint(data_list[0]), data_list[1], data_list[2])
+#        return sCombi
+
+
 class SignatureOneWidget(ModelSelect2Widget):
     model = Signature
     search_fields = [ 'code__icontains' ]
@@ -1470,9 +1529,9 @@ class SuperOneWidget(ModelSelect2Widget):
     def get_queryset(self):
         return EqualGold.objects.filter(moved__isnull=True, atype = 'acc').order_by('code', 'id').distinct()
 
-    def filter_queryset(self, term, queryset = None, **dependent_fields):
+    def filter_queryset(self,request, term, queryset = None, **dependent_fields):
         term_for_now = ""
-        qs = super(SuperOneWidget, self).filter_queryset(term_for_now, queryset, **dependent_fields)
+        qs = super(SuperOneWidget, self).filter_queryset(request,term_for_now, queryset, **dependent_fields)
         
         bAdapted = False
         bIssue432 = True
@@ -1692,9 +1751,9 @@ class ManuReconForm(BasicSimpleForm):
     """Search through reconstructed manuscripts"""
 
     rmanu = ModelChoiceField(queryset=None, required=False,
-            widget=ManuReconWidget(attrs={'data-placeholder': 'Select a reconstructed manuscript...', 'style': 'width: 100%;'}))
+            widget=ManuReconWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a reconstructed manuscript...', 'style': 'width: 100%;'}))
     rcodico = ModelChoiceField(queryset=None, required=False,
-            widget=CodicoOneWidget(attrs={'data-placeholder': 'Select a codicological unit...', 'style': 'width: 100%;'}))
+            widget=CodicoOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a codicological unit...', 'style': 'width: 100%;'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -1710,33 +1769,33 @@ class ManuReconForm(BasicSimpleForm):
             oErr.DoError("manureconform")
 
 
-class SearchManuscriptForm(BasicSimpleForm):
-    """Note: only for SEARCHING"""
+#class SearchManuscriptForm(BasicSimpleForm):
+#    """Note: only for SEARCHING"""
 
-    country = forms.CharField(label=_("Country"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-    city = forms.CharField(label=_("City"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-    library = forms.CharField(label=_("Library"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-    signature = forms.CharField(label=_("Signature"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
-    name = forms.CharField(label=_("Title"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
-    idno = forms.CharField(label=_("Idno"), required=False, 
-                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
-    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
+#    country = forms.CharField(label=_("Country"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
+#    city = forms.CharField(label=_("City"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+#    library = forms.CharField(label=_("Library"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
+#    signature = forms.CharField(label=_("Signature"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
+#    name = forms.CharField(label=_("Title"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
+#    idno = forms.CharField(label=_("Idno"), required=False, 
+#                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
+#    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
 class SearchManuForm(PassimModelForm):
     """Manuscript search form"""
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     cmpmanuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                            widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     title_ta = forms.CharField(label=_("Codico_title"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching codico_titles input-sm', 'placeholder': 'Title...', 'style': 'width: 100%;'}))
     country     = forms.CharField(required=False)
@@ -1773,39 +1832,42 @@ class SearchManuForm(PassimModelForm):
     signatureaid = forms.CharField(label=_("Signature ID"), required=False) 
        
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
+                    widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 
                                                           'style': 'width: 100%;', 'class': 'searching'}))
+    #combilist   = SignatureCombiField(label=_("Combination"), required=False,
+    #                widget = SignatureCombiWidget()),
+ 
     # KAN WEG na afronden issue # 658 
     siglist_a   = ModelMultipleChoiceField(queryset=None, required=False, 
-                            widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...',
+                            widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...',
                                                           'style': 'width: 100%;', 'class': 'searching'}))
 
-    keyword = forms.CharField(label=_("Keyword"), required=False,
+    keyword     = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
-    kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
-    projlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     srclist     = ModelMultipleChoiceField(queryset=None, required=False)
     
     srch_title = forms.CharField(required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching names input -sm', 'placeholder': 'Title (use wildcards)...', 'style': 'width: 100%;'}))
 
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=ManutypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                    widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     collist_hist =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
-    collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_m   =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_s   =  ModelMultipleChoiceField(queryset=None, required=False)
+    collist_sg  =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False)
     collection_m = forms.CharField(label=_("Collection m"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
@@ -1817,8 +1879,9 @@ class SearchManuForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) 
     rsetone     = ModelChoiceField(queryset=None, required=False)
-    overlap    = forms.IntegerField(label=_("percentage overlap"), required=False, 
-                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1'})) # , 'value':'100'
+    overlap     = forms.IntegerField(label=_("percentage overlap"), required=False, 
+                widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1',
+                                          'label': 'Percentage of overlap'})) # , 'value':'100'
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     
@@ -1826,7 +1889,7 @@ class SearchManuForm(PassimModelForm):
     sermo_authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     sermo_authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))    
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))    
     authortype  = forms.ChoiceField(label=_("Author type"), required=False, 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Author...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))    
     sermo_incipit  = forms.CharField(label=_("Incipit"), required=False,
@@ -1836,13 +1899,13 @@ class SearchManuForm(PassimModelForm):
     sermo_feast  = forms.CharField(label=_("Feast"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))    
     sermo_feastlist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=FeastWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # SSG-specific
     ssg_authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))    
     ssg_authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssg_incipit  = forms.CharField(label=_("Incipit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     ssg_explicit = forms.CharField(label=_("Explicit"), required=False,
@@ -1883,8 +1946,8 @@ class SearchManuForm(PassimModelForm):
             self.fields['authortype'].required = False                       
             self.fields['authortype'].choices = AUTHOR_TYPE
 
-            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
-            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('idno')
+            self.fields['manuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('library__lcity__name', 'library__name', 'idno')
+            self.fields['cmpmanuidlist'].queryset = Manuscript.objects.exclude(mtype='tem').order_by('library__lcity__name', 'library__name', 'idno')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['siglist_a'].queryset = Signature.objects.all().order_by('code') # KAN LATER WEG
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
@@ -1901,19 +1964,19 @@ class SearchManuForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
-                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'pd',
-                        'data-placeholder': 'Select multiple manuscript datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple manifestation datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manifestation datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple sermongold datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple sermongold datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select multiple authority file datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authority file datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneManuWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
-                        'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_hist'].queryset = Collection.get_scoped_queryset('super', username, team_group, settype="hc")
@@ -1965,32 +2028,32 @@ class SearchManuForm(PassimModelForm):
 class SermonForm(PassimModelForm):
     # Helper fields for SermonDescr fields
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                    widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname  = forms.CharField(label=_("Author"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author (wildcards can be used)...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     authortype  = forms.ChoiceField(label=_("Author type"), required=False, 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Author...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmarks using wildcards...', 'style': 'width: 100%;'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                    widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     manuone = ModelChoiceField(queryset=None, required=False,
-                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
+                 widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
     manutype    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=ManutypeWidget(attrs={'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=ManutypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a manuscript type...', 'style': 'width: 30%;', 'class': 'searching'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
                     widget=forms.TextInput(attrs={'class': 'typeahead searching srmsignatures input-sm', 'placeholder': 'Signatures (Gryson, Clavis) using wildcards...', 'style': 'width: 100%;'}))
     signature_a = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     #siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     siglist_a = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     siglist_m = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=ManualSignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                    widget=ManualSignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     altpages = forms.CharField(label=_("Alternative page numbering"), required=False,
@@ -1998,36 +2061,38 @@ class SermonForm(PassimModelForm):
     note  = forms.CharField(label=_("Alternative page numbering"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Note on alternative pages...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    projectslist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     feastlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=FeastWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     superlist = ModelMultipleChoiceField(queryset=None, required=False,
-                widget=SermonDescrSuperAddOnlyWidget(attrs={'data-placeholder': 'Add links with the green "+" sign...', 
+                widget=SermonDescrSuperAddOnlyWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Add links with the green "+" sign...', 
                                                   'placeholder': 'Linked Authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                    widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
     passimcode  = forms.CharField(label=_("Passim code"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))
     bibreflist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=BibrefAddonlyWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     sermonlist = forms.CharField(label=_("List of sermon IDs"), required=False)
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
 
     altpageslist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AltPagesWidget(attrs={'data-placeholder': 'Select multiple pages...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AltPagesWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple pages...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     notes_altpageslist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=NoteAltPagesWidget(attrs={'data-placeholder': 'Select multiple note...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=NoteAltPagesWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple note...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # Free text searching
     free_term  = forms.CharField(label=_("Term to look for"), required=False, 
@@ -2035,9 +2100,9 @@ class SermonForm(PassimModelForm):
                                              'class': 'searching', 'placeholder': 'Term to look for (use * or # or @)'}))
                 #widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Term to look for (use * or #)'}))
     free_include = forms.ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=FreeWidget(attrs={'data-placeholder': 'May occur in any of...', 'style': 'width: 35%;', 'class': 'searching'}))
+                widget=FreeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'May occur in any of...', 'style': 'width: 35%;', 'class': 'searching'}))
     free_exclude = forms.ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=FreeWidget(attrs={'data-placeholder': 'Must NOT occur in...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=FreeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Must NOT occur in...', 'style': 'width: 30%;', 'class': 'searching'}))
 
     # Specifically for searching...
     srch_title = forms.CharField(required=False, 
@@ -2059,8 +2124,15 @@ class SermonForm(PassimModelForm):
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
-                # widget=CollOneSermoWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+                # widget=CollOneSermoWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     slinklist   = ModelMultipleChoiceField(queryset=None, required=False)
+
+    # ExternalId fields
+    ext_huwop = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'HUWA opera ID...', 'style': 'width: 20%;'}))
+    ext_huwin = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'HUWA inhalt ID...', 'style': 'width: 20%;'}))
+
    
     # Fields for searching sermons through their containing manuscripts
     country     = forms.CharField(required=False)
@@ -2097,7 +2169,7 @@ class SermonForm(PassimModelForm):
         widgets={'title':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
                  'sectiontitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'subtitle':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'author':      AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  # forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'nickname':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'locus':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
@@ -2105,7 +2177,7 @@ class SermonForm(PassimModelForm):
                  'note':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'bibnotes':    forms.TextInput(attrs={'placeholder': 'Bibliography notes...', 'style': 'width: 100%;', 'class': 'searching'}),
                  #'feast':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
-                 'feast':    FeastOneWidget(attrs={'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'feast':    FeastOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one feast...', 'style': 'width: 100%;', 'class': 'searching'}),
 
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching srmincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching srmexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
@@ -2158,6 +2230,7 @@ class SermonForm(PassimModelForm):
             # self.fields['projlist'].queryset = profile.projects.all().order_by('name').distinct()
             self.fields['projlist'].queryset = profile.get_myprojects()
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+            self.fields['projectslist'].queryset = Project2.objects.all().order_by('name')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['slinklist'].queryset = SermonDescrLink.objects.none()
@@ -2185,7 +2258,7 @@ class SermonForm(PassimModelForm):
             self.fields['free_exclude'].widget.main = "SermonDescr"
 
             self.fields['slinklist'].widget = SermonDescrLinkAddOnlyWidget(attrs={
-                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Some lists need to be initialized to NONE:
             self.fields['bibreflist'].queryset = BibRange.objects.none()
@@ -2194,17 +2267,17 @@ class SermonForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple sermon manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple sermon manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple sermon gold collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'pd',
-                        'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
-                        'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSermoWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['collist_m'].queryset = Collection.get_scoped_queryset('manu', username, team_group)
@@ -2237,6 +2310,7 @@ class SermonForm(PassimModelForm):
                 # Set initial values for lists, where appropriate. NOTE: need to have the initial ID values
                 self.fields['kwlist'].initial = [x.pk for x in instance.keywords.all().order_by('name')]
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.sermo_userkeywords.filter(profile=profile).order_by('keyword__name')]
+                # issue #730: changed from 'projects' (approver) to 'editprojects' (editor)
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
 
                 #self.fields['altpageslist'].initial = [x.pk for x in instance.sermonaltpages.all().order_by('altpage')]
@@ -2261,6 +2335,15 @@ class SermonForm(PassimModelForm):
                 self.fields['bibreflist'].queryset = BibRange.objects.filter(id__in=self.fields['bibreflist'].initial)
 
                 self.fields['autype'].initial = instance.autype
+
+                # If there are externalis, then initialize them here
+                for ext in instance.sermonexternals.all():
+                    externaltype = ext.externaltype
+                    externalid = ext.externalid
+                    if externaltype == "huwop":
+                        self.fields['ext_huwop'].initial = ext.externalid
+                    elif externaltype == "huwin":
+                        self.fields['ext_huwin'].initial = ext.externalid
 
                 iStop = 1
         except:
@@ -2307,9 +2390,9 @@ class KeywordForm(BasicModelForm):
     keyword_ta = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwcatlist    = forms.ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordCategoryWidget(attrs={'data-placeholder': 'Select multiple categories...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordCategoryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple categories...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["keywords"]
 
     class Meta:
@@ -2354,17 +2437,17 @@ class UserKeywordForm(BasicModelForm):
     """User Keyword list"""
 
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = UserKeyword
         fields = ['keyword', 'profile', 'type']
-        widgets={'keyword': KeywordOneWidget(attrs={'data-placeholder': 'Select one keyword...', 'style': 'width: 100%;'}),
-                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+        widgets={'keyword': KeywordOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one keyword...', 'style': 'width: 100%;'}),
+                 'profile': ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  'type':    forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Item type...',  'style': 'width: 100%;'})
                  }
 
@@ -2392,11 +2475,11 @@ class ProvenanceForm(BasicModelForm):
     """Provenance list"""
 
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
+                widget=LocationWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:
@@ -2405,7 +2488,7 @@ class ProvenanceForm(BasicModelForm):
         model = Provenance
         fields = ['name', 'location']   # , 'note'
         widgets={'name':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching', 'placeholder': 'Name for this provenance'}),
-                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
+                 'location': LocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
                  #'note':    forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 
                  #                                     'class': 'searching', 'placeholder': 'Notes on this provenance...'})
                  }
@@ -2510,13 +2593,13 @@ class ProfileForm(BasicModelForm):
     username_ta = forms.CharField(label=_("User name"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'User name(s)...', 'style': 'width: 100%;'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     editlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     deflist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     userlist   = ModelMultipleChoiceField(queryset=None, required=False,
-                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=UserWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # Issue #435: facilitate changing [email, (user)name]
     newusername = forms.CharField(label=_("User name"), required=False,
@@ -2571,13 +2654,16 @@ class ProfileForm(BasicModelForm):
                 self.fields['user'].initial = instance.user
                 self.fields['user'].queryset = User.objects.filter(id=instance.user.id)
 
-                self.fields['deflist'].queryset = instance.projects.all().order_by('name')
+                # issue #742: default projects should be taken from the EDITOR list
+                # changed 'projects' to 'editprojects'
+                self.fields['deflist'].queryset = instance.editprojects.all().order_by('name')
                 self.fields['deflist'].widget.queryset = self.fields['deflist'].queryset
 
                 self.fields['editlist'].initial = [x.project.pk for x in instance.project_editor.all().order_by('project__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')]
                 # self.fields['deflist'].initial = [x.pk for x in instance.projects.filter(status="incl").order_by('name')]
-                self.fields['deflist'].initial = [x.project.pk for x in instance.project_approver.filter(status="incl").order_by('project__name')]
+                # issue #742: change from project_approver to project_editor
+                self.fields['deflist'].initial = [x.project.pk for x in instance.project_editor.filter(status="incl").order_by('project__name')]
 
                 # Fill in the user informatino
                 self.fields['newusername'].initial = instance.user.username
@@ -2608,7 +2694,7 @@ class ProjectForm(BasicModelForm):
     project_ta = forms.CharField(label=_("Project"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 'placeholder': 'Project(s)...', 'style': 'width: 100%;'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["projects"]
     
     # Typeahead werkt niet
@@ -2616,20 +2702,31 @@ class ProjectForm(BasicModelForm):
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = Project2
-        fields = ['name']
-        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
+        fields = ['name', 'description']
+        widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
+                 'description': forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
         super(ProjectForm, self).__init__(*args, **kwargs)
-        # Some fields are not required
-        self.fields['name'].required = False
-        #self.fields['prjlist'].queryset = Project.objects.all().order_by('name') 
-        self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
-        # Get the instance
-        if 'instance' in kwargs:
-            instance = kwargs['instance']    
+
+        oErr = ErrHandle()
+        try:
+            # Some fields are not required
+            self.fields['name'].required = False
+            self.fields['description'].required = False
+
+            # Set the querysets where relevant
+            self.fields['projlist'].queryset = Project2.objects.all().order_by('name').distinct() 
+
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']    
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ProjectForm/init")
+        return None
     
 
 class CollectionForm(PassimModelForm):
@@ -2638,32 +2735,32 @@ class CollectionForm(PassimModelForm):
     collection_ta = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionSermoWidget(attrs={'data-placeholder': 'Select multiple sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionSermoWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_ssg =  ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionSuperWidget(attrs={'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionSuperWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple super sg collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collone     = ModelChoiceField(queryset=None, required=False)  
     rsetone     = ModelChoiceField(queryset=None, required=False)
     ownlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=LitrefColWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=LitrefColWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     colscope    = ModelChoiceField(queryset=None, required=False, 
-                widget=ScopeTypeWidget(attrs={'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=ScopeTypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a scope type...', 'style': 'width: 30%;', 'class': 'searching'}))
     sitemlist_gold = ModelMultipleChoiceField(queryset=None, required=False,
-                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple gold sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SermonGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple gold sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
     sitemlist_sermo = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SermonWidget(attrs={'data-placeholder': 'Select multiple sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SermonWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple sermons...', 'style': 'width: 100%;', 'class': 'searching'}))
     sitemlist_manu = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuscriptWidget(attrs={'data-placeholder': 'Select multiple manuscripts...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscripts...', 'style': 'width: 100%;'}))
     sitemlist_super = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EqualGoldSitemWidget(attrs={'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=EqualGoldSitemWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authority files...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # HC specific
     date_from   = forms.IntegerField(label=_("Date start"), required = False,
@@ -2671,27 +2768,27 @@ class CollectionForm(PassimModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=DaterangeHistCollWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=DaterangeHistCollWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # SSG-specific
     ssgstypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     ssgauthorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     ssgauthorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgsiglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))    
+                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))    
     ssgcode     = forms.CharField(label=_("Passim code"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
                                     'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}))    
     ssgpassimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                    widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))    
     ssgkwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgnumber   = forms.CharField(label=_("Author Number"), required=False,
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Author number'}))
     ssgincipit  = forms.CharField(label=_("Incipit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     ssgexplicit = forms.CharField(label=_("Explicit"), required=False,
@@ -2711,25 +2808,25 @@ class CollectionForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Feast'}))
     
     sermofeastlist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=FeastWidget(attrs={'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=FeastWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple feasts...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
-                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 30%;', 'placeholder': 'Use Chapter or Chapter:verse'}))
+                widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 50%;', 'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
     sermonote  = forms.CharField(label=_("Note"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'placeholder': 'Note'}))
     sermoauthorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
 
     sermokwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     sermostypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     sermosiglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     sermoauthorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     
     # MANUSCRIPT-specific
     manuidno    = forms.CharField(label=_("Manuscript"), required=False,
@@ -2749,11 +2846,11 @@ class CollectionForm(PassimModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     manukwlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     manustypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
 
     typeaheads = ["collections", "authors", "signatures", "gldincipits", "gldexplicits",
                   "countries", "cities", "libraries", "origins", "manuidnos"]
@@ -2810,15 +2907,15 @@ class CollectionForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
-                        'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
             # The rsetone information is needed for "selection-to-DCT" processing
             self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
@@ -2853,13 +2950,13 @@ class CollectionForm(PassimModelForm):
 
             if prefix == "priv" or prefix == "publ":
                 self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
-                            'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
+                            'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple datasets...', 'style': 'width: 100%;', 'class': 'searching'})
             elif prefix == "hist":
                 self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,'settype': "hc",
-                            'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                            'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             else:
                 self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group,
-                            'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                            'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'})
 
             self.fields['litlist'].queryset = LitrefCol.objects.all().order_by('reference__full', 'pages').distinct()
 
@@ -3030,7 +3127,7 @@ class SermonDescrGoldForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;'}))
     newgold  = forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
-                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select links...', 
+                widget=SermonGoldOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select links...', 
                                                   'placeholder': 'Select a sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
@@ -3071,15 +3168,15 @@ class SermonDescrSuperForm(BasicModelForm):
                widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 100px;'}))
     # For the method "nodistance"
     newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
-                widget=SuperOneWidget(attrs={'data-placeholder': 'Select links...', 
+                widget=SuperOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select links...', 
                         'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
     #newsuper    = forms.CharField(label=_("Authority File"), required=False, help_text="editable", 
-    #            widget=EqualGoldWidget(attrs={'data-placeholder': 'Select links...', 
+    #            widget=EqualGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select links...', 
     #                    'placeholder': 'Select an Authority file...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     # For the method "superdist"
     #newsuperdist= forms.CharField(label=_("Sermon Gold"), required=False, help_text="editable", 
-    #            widget=SuperDistWidget(attrs={'data-placeholder': 'Select links...', 
+    #            widget=SuperDistWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select links...', 
     #                                              'placeholder': 'Select a super sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
@@ -3173,17 +3270,17 @@ class SermonDescrKeywordForm(BasicModelForm):
 
 class SermonGoldForm(PassimModelForm):
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname  = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     signature   = forms.CharField(label=_("Signature"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     # passimlist ipc codelist
     passimlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                    widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))    
     codetype  = forms.ChoiceField(label=_("Passim code type"), required=False, 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of Passim code...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
@@ -3192,21 +3289,21 @@ class SermonGoldForm(PassimModelForm):
     keyword    = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwnew       = forms.CharField(label=_("New keyword"), required=False, 
                 widget=forms.TextInput(attrs={'placeholder': 'Keyword...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     edilist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=EdirefSgWidget(attrs={'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=EdirefSgWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple editions...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=LitrefSgWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=LitrefSgWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     ftxtlist    = ModelMultipleChoiceField(queryset=None, required=False,
-                widget=FtextlinkWidget(attrs={'data-placeholder': 'Select links to full texts...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=FtextlinkWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select links to full texts...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_s =  ModelMultipleChoiceField(queryset=None, required=False)
     collist_sg =  ModelMultipleChoiceField(queryset=None, required=False)
@@ -3221,7 +3318,7 @@ class SermonGoldForm(PassimModelForm):
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
-                # widget=CollOneGoldWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+                # widget=CollOneGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "signatures", "keywords", "gldincipits", "gldexplicits", "projects"]
 
     class Meta:
@@ -3229,12 +3326,12 @@ class SermonGoldForm(PassimModelForm):
 
         model = SermonGold
         fields = ['author', 'incipit', 'explicit', 'bibliography', 'stype', 'srchincipit', 'srchexplicit', 'equal', 'retractationes' ]
-        widgets={'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'author':      AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
                  'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
                  'bibliography':forms.Textarea(attrs={'rows': 2, 'cols': 40, 'style': 'height: 80px; width: 100%; font-family: monospace', 'class': 'searching'}),
                  'retractationes':forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 'equal':       SuperOneWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'equal':       SuperOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'})
                  }
 
@@ -3271,18 +3368,18 @@ class SermonGoldForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group,
                         'settype': 'hc',
-                        'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneGoldWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group, userplus):
                 self.fields['kwlist'].widget.is_team = True
@@ -3358,7 +3455,7 @@ class SermonGoldSameForm(BasicModelForm):
 
 class EqualGoldForm(BasicModelForm):
     newgold = ModelChoiceField(queryset=None, required=False,
-                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SermonGoldOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     gold = forms.CharField(label=_("Destination gold sermon"), required=True)
     
     class Meta:
@@ -3381,7 +3478,7 @@ class EqualGoldForm(BasicModelForm):
 
 class SuperToGoldForm(BasicModelForm):
     newgold = ModelChoiceField(queryset=None, required=False,
-                widget=SermonGoldOneWidget(attrs={'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SermonGoldOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one sermon gold...', 'style': 'width: 100%;', 'class': 'searching'}))
     gold = forms.CharField(label=_("Destination gold sermon"), required=True)
     
     class Meta:
@@ -3404,13 +3501,13 @@ class SuperToGoldForm(BasicModelForm):
 
 class SuperSermonGoldForm(PassimModelForm):
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     authorname = forms.CharField(label=_("Author"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Author...', 'style': 'width: 100%;'}))
     authorlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple authors...', 'style': 'width: 100%;', 'class': 'searching'}))
     newauthor = ModelChoiceField(queryset=None, required=False,
-                widget=AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}))
     newincipit = forms.CharField(label=_("Incipit"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
@@ -3424,34 +3521,39 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature/code (Gryson, Clavis)...', 'style': 'width: 100%;'}))
     signatureid = forms.CharField(label=_("Signature ID"), required=False)
     siglist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SignatureWidget(attrs={'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=SignatureWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple signatures (Gryson, Clavis)...', 'style': 'width: 100%;', 'class': 'searching'}))
     goldlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=SermonGoldWidget(attrs={'data-placeholder': 'Select multiple Sermons Gold...', 
+                widget=SermonGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Sermons Gold...', 
                                                 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'}))
     passimlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                    widget=EqualGoldMultiWidget(attrs={'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
+                    widget=EqualGoldMultiWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple passim codes...', 'style': 'width: 100%;', 
                                                        'class': 'searching'}))
+    manulink = ModelChoiceField(queryset=None, required=False,
+                 widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript as a basis for viewing linked AFs...', 'style': 'width: 100%;'}))
     bibreflist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=BibrefAddonlyWidget(attrs={'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=BibrefAddonlyWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Use the "+" sign to add references...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     lstprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     addprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     delprojlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     scount      = forms.IntegerField(min_value=-1, required=False,
-                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Sermon set size'}))
+                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Sermon set size'}))
     ssgcount    = forms.IntegerField(min_value=-1, required=False,
-                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-placeholder': 'Relation set size'}))
+                widget=forms.NumberInput(attrs={'class': 'searching', 'style': 'width: 20%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Relation set size'}))
     soperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
     ssgoperator   = forms.ChoiceField(required=False, choices=SCOUNT_OPERATOR,widget=forms.Select())
     foperator   = forms.ChoiceField(required=False, choices=TRANSCR_OPERATOR,widget=forms.Select())
+
+    externalid = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'External ID...', 'style': 'width: 20%;'}))
 
     collist_m   = ModelMultipleChoiceField(queryset=None, required=False)
     collist_s   = ModelMultipleChoiceField(queryset=None, required=False)
@@ -3468,7 +3570,7 @@ class SuperSermonGoldForm(PassimModelForm):
     collection_ssg = forms.CharField(label=_("Collection ssg"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
-                # widget=CollOneSuperWidget(attrs={'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
+                # widget=CollOneSuperWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
     initial_fields = ['author', 'incipit', 'explicit']
 
@@ -3478,10 +3580,10 @@ class SuperSermonGoldForm(PassimModelForm):
         model = EqualGold
         fields = ['author', 'incipit', 'explicit', 'fulltext', 'code', 'number', 'stype', 'transcription' ]
         widgets={
-            # 'author':      AuthorOneWidget(attrs={'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
+            # 'author':      AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}),
             'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
                                 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
-            'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-placeholder': 'Author number'}),
+            'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Author number'}),
             'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
             'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
             'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
@@ -3520,6 +3622,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True).order_by('code')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['ukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
+            self.fields['manulink'].queryset = Manuscript.objects.filter(mtype='man').order_by('library__lcity__name', 'library__name', 'idno')
 
             # issue #576: this one is for the details view
             self.fields['projlist'].queryset = profile.get_myprojects()
@@ -3536,20 +3639,20 @@ class SuperSermonGoldForm(PassimModelForm):
 
             # Set the widgets correctly
             self.fields['collist_m'].widget = CollectionManuWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple Manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Manuscript collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_s'].widget = CollectionSermoWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple Manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Manifestation collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_sg'].widget = CollectionGoldWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple Gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Gold sermon collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_ssg'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
-                        'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Authority file collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collist_hist'].widget = CollectionSuperWidget( attrs={'username': username, 'team_group': team_group, 'data-allow-clear': 'false',
                         'settype': 'hc', 'data-debug': 'true', 'data-ajax--cache': "false",
-                        'data-placeholder': 'Select multiple Historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple Historical collections...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['collone'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,
-                        'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a dataset...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['superlist'].widget = EqualGoldLinkAddOnlyWidget(attrs={
-                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True
@@ -3597,6 +3700,15 @@ class SuperSermonGoldForm(PassimModelForm):
                 self.fields['ukwlist'].initial = [x.keyword.pk for x in instance.super_userkeywords.filter(profile=profile).order_by('keyword__name')]
                 self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] #
 
+                # issue #736: include projects in the queryset, to which the current user does *not* necessarily have rights
+                self.fields['projlist'].queryset = profile.get_myprojects(instance)
+                self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
+
+                # If there is an external it, then initialize it here
+                ext = instance.equalexternals.first()
+                if not ext is None:
+                    self.fields['externalid'].initial = ext.externalid
+
                 # TO BE DELETED in time...
                 #self.fields['superlist'].initial = [x.pk for x in instance.equalgold_src.all().order_by('dst__code', 'dst__author__name', 'dst__number')]
                 #self.fields['superlist'].queryset = EqualGoldLink.objects.filter(Q(id__in=self.fields['superlist'].initial))
@@ -3620,7 +3732,7 @@ class ManuscriptLinkForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     newmanu = ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget=ManuidOneWidget(attrs={'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+                widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
                 widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
                     'tdstyle': 'width: 300px;', 'rows': 1, 
@@ -3709,7 +3821,7 @@ class SermonDescrLinkForm(BasicModelForm):
     newlinktype = forms.ChoiceField(label=_("Linktype"), required=False, help_text="editable", 
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of link...',  'style': 'width: 100%;', 'tdstyle': 'width: 150px;'}))
     newsermo = ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget=SermonOneWidget(attrs={'data-placeholder': 'Select one sermon manifestation...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+                widget=SermonOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one sermon manifestation...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     note = forms.CharField(label=_("Notes"), required=False, help_text="editable", 
                 widget=forms.Textarea(attrs={'class': 'input-sm', 'placeholder': 'Notes...',  'style': 'height: 40px; width: 100%;', 
                     'tdstyle': 'width: 300px;', 'rows': 1, 
@@ -3801,7 +3913,7 @@ class EqualGoldLinkForm(BasicModelForm):
                 widget=forms.Select(attrs={'class': 'input-sm', 'placeholder': 'Type of specification...',  'style': 'width: 100%;', 'tdstyle': 'width: 130px;',
                     'title': 'Direction specification (optional)'}))
     newsuper = ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget=EqualGoldWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
+                widget=EqualGoldWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching select2-ssg'}))
     newalt = forms.CharField(label=_("Alternatives"), required=False, help_text="editable", 
                 widget=CheckboxString(attrs={'class': 'input-sm', 'placeholder': 'Alternatives...',  'style': 'width: 20px;', 
                     'title': 'one of several alternatives: check this box when there are several options for a source (of a part of a text), but it is not clear which of these is the direct source'}))
@@ -3815,7 +3927,7 @@ class EqualGoldLinkForm(BasicModelForm):
         model = EqualGoldLink
         fields = ['src', 'linktype', 'dst', 'spectype', 'alternatives', 'note' ]
         widgets={'linktype':    forms.Select(attrs={'style': 'width: 100%;'}),
-                 # 'dst':         SuperOneWidget(attrs={'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'})
+                 # 'dst':         SuperOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one Authority file...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -3968,7 +4080,7 @@ class SermonGoldSignatureForm(BasicModelForm):
 class SermonGoldEditionForm(BasicModelForm):
     # EK: Added for Sermon Gold new approach 
     oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+               widget=LitrefWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     # ORIGINAL:
@@ -4190,7 +4302,7 @@ class SermonDescrCollectionForm(BasicModelForm):
 class SermonGoldLitrefForm(BasicModelForm):
     # EK: Added for Sermon Gold new approach 
     oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+               widget=LitrefWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     # ORIGINAL:
@@ -4238,13 +4350,13 @@ class SermonGoldLitrefForm(BasicModelForm):
 
 class ManuscriptProvForm(BasicModelForm):
     prov_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget = ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget = ProvenanceOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}))
     #name = forms.CharField(label=_("Name"), required=False, help_text="editable",
     #                       widget=forms.TextInput(attrs={'placeholder': 'Name...',  'style': 'width: 100%;'}))
     note = forms.CharField(label=_("Note"), required=False, help_text="editable",
                            widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
     #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-    #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #                       widget = LocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
     #location_ta = forms.CharField(label=_("Location"), required=False, 
     #                       widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     typeaheads = ["locations"]
@@ -4254,7 +4366,7 @@ class ManuscriptProvForm(BasicModelForm):
 
         model = ProvenanceMan
         fields = ['provenance', 'manuscript']
-        widgets={'provenance':     ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'provenance':     ProvenanceOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}),
  
                  }
 
@@ -4285,7 +4397,7 @@ class ManuscriptProvForm(BasicModelForm):
 
 class CodicoProvForm(BasicModelForm):
     prov_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget = ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget = ProvenanceOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}))
     note = forms.CharField(label=_("Note"), required=False, help_text="editable",
                 widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
     typeaheads = ["locations"]
@@ -4295,7 +4407,7 @@ class CodicoProvForm(BasicModelForm):
 
         model = ProvenanceCod
         fields = ['provenance', 'codico']
-        widgets={'provenance':  ProvenanceOneWidget(attrs={'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'provenance':  ProvenanceOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a provenance...', 'style': 'width: 100%;', 'class': 'searching'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -4320,7 +4432,7 @@ class CodicoProvForm(BasicModelForm):
 
 class CodicoOriginForm(BasicModelForm):
     origin_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget = OriginOneWidget(attrs={'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget = OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}))
     note = forms.CharField(label=_("Note"), required=False, help_text="editable",
                 widget = forms.Textarea(attrs={'placeholder': 'Note (optional)...',  'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}))
     typeaheads = ["locations"]
@@ -4331,7 +4443,7 @@ class CodicoOriginForm(BasicModelForm):
 
         model = OriginCod
         fields = ['origin', 'codico']
-        widgets={'origin':  OriginOneWidget(attrs={'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'origin':  OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a origin...', 'style': 'width: 100%;', 'class': 'searching'}),
                  }
 
     def __init__(self, *args, **kwargs):
@@ -4356,7 +4468,7 @@ class CodicoOriginForm(BasicModelForm):
 
 class CollectionLitrefForm(BasicModelForm):
     oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+               widget=LitrefWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     # ORIGINAL:
@@ -4402,7 +4514,7 @@ class CollectionLitrefForm(BasicModelForm):
 class ManuscriptLitrefForm(BasicModelForm):
     # EK: Added for Sermon Gold new approach 
     oneref = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-               widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+               widget=LitrefWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages  = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     # ORIGINAL:
@@ -4505,14 +4617,14 @@ class ManuscriptProjectForm(BasicModelForm):
 
     # kan nog niet toevoegen, mag sowieso niet, moet via Tools etc.
     proj_new = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-                widget = Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget = Project2OneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
 
         model = ManuscriptProject
         fields = ['manuscript', 'project']
-        widgets={'project':     Project2OneWidget(attrs={'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'project':     Project2OneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a project...', 'style': 'width: 100%;', 'class': 'searching'}),
  
                  }
 
@@ -4534,7 +4646,7 @@ class OriginForm(BasicModelForm):
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                            widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
+                            widget=LocationWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:
@@ -4543,7 +4655,7 @@ class OriginForm(BasicModelForm):
         model = Origin
         fields = ['name', 'location', 'note']
         widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
-                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
+                 'location': LocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one location...', 'style': 'width: 100%;'}),
                  'note':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'placeholder': 'Note on this origin...', 'style': 'height: 40px; width: 100%;'})
                  }
 
@@ -4601,11 +4713,11 @@ class LibrarySearchForm(BasicModelForm):
     name = forms.CharField(label=_("Library"), required=False, 
                  widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
     countrylist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=CountryWidget(attrs={'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
+                 widget=CountryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
     citylist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=CityWidget(attrs={'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
+                 widget=CityWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
     librarylist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=LibraryWidget(attrs={'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
+                 widget=LibraryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
     library_ta = forms.CharField(label=_("Libraru"), required=False, 
                  widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Library...',  'style': 'width: 100%;'}))
     typeaheads = ["countries", "cities", "libraries"]
@@ -4637,7 +4749,7 @@ class LibrarySearchForm(BasicModelForm):
 
 class LibraryForm(BasicModelForm):
     #location = forms.ModelChoiceField(queryset=None, required=False, help_text="editable",
-    #                       widget = LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #                       widget = LocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                            widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  'style': 'width: 100%;'}))
     typeaheads = ["locations"]
@@ -4648,7 +4760,7 @@ class LibraryForm(BasicModelForm):
         model = Library
         fields = ['name', 'libtype', 'idLibrEtab', 'location', 'lcity', 'lcountry']
         widgets={'name':     forms.TextInput(attrs={'placeholder': 'Name...', 'style': 'width: 100%;'}),
-                 'location': LocationOneWidget(attrs={'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'location': LocationOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a location...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'lcity':    forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'lcountry': forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'libtype':  forms.Select(attrs={'style': 'width: 100%;'})
@@ -4702,15 +4814,15 @@ class SermonGoldFtextlinkForm(BasicModelForm):
 
 class CodicoForm(PassimModelForm):
     stypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=StypeWidget(attrs={'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
+                widget=StypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple status types...', 'style': 'width: 100%;'}))
     name_ta   = forms.CharField(label=_("Title"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching codicos input-sm', 'placeholder': 'Title...',  'style': 'width: 100%;'}))
     origin_ta   = forms.CharField(label=_("Origin"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching  input-sm', 'placeholder': 'Origin (location)...',  'style': 'width: 100%;'}))
     origone     = ModelChoiceField(queryset=None, required=False,
-                widget=OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
     manuidno   = forms.CharField(label=_("Manuscript"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Manuscript...',  'style': 'width: 100%;'}))
     prov_ta     = forms.CharField(label=_("Provenance"), required=False, 
@@ -4720,15 +4832,15 @@ class CodicoForm(PassimModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     cprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProvenanceCodWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProvenanceCodWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     corilist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=OriginCodWidget(attrs={'data-placeholder': 'Select origin-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=OriginCodWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select origin-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     datelist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=DaterangeWidget(attrs={'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=DaterangeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Use the "+" sign to add dates...', 'style': 'width: 100%;', 'class': 'searching'}))
     #prjlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-    #            widget=ProjectWidget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #            widget=ProjectWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["origins"]
     action_log = ['name', 'origin', 'support', 'extent', 'format', 'stype', 'kwlist', 'cprovlist', 'corilist', 'datelist']
     exclude = ['origin_ta']
@@ -4739,7 +4851,7 @@ class CodicoForm(PassimModelForm):
         model = Codico
         fields = ['name', 'notes', 'origin', 'support', 'extent', 'format', 'stype', 'manuscript']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
-                 'origin':      OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'origin':      OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'support':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -4812,7 +4924,7 @@ class CodicoForm(PassimModelForm):
 
 class UserKwForm(BasicSimpleForm):
     ukwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -4850,24 +4962,27 @@ class ManuscriptForm(PassimModelForm):
     origname_ta = forms.CharField(label=_("Origin"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'typeahead searching origins input-sm', 'placeholder': 'Origin...',  'style': 'width: 100%;'}))
     origone     = ModelChoiceField(queryset=None, required=False,
-                widget=OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}))
     collection  = forms.CharField(label=_("Collection"), required=False,
                 widget=forms.TextInput(attrs={'class': 'searching input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=CollectionManuWidget(attrs={'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=CollectionManuWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     kwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=Project2Widget(attrs={'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist      = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=KeywordWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple user-keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     litlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=LitrefManWidget(attrs={'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=LitrefManWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple literature references...', 'style': 'width: 100%;', 'class': 'searching'}))
     mprovlist    = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProvenanceManWidget(attrs={'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProvenanceManWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select provenance-note combinations...', 'style': 'width: 100%;', 'class': 'searching'}))
     extlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuscriptExtWidget(attrs={'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ManuscriptExtWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple external links...', 'style': 'width: 100%;', 'class': 'searching'}))
     mlinklist   = ModelMultipleChoiceField(queryset=None, required=False)
+
+    externalid = forms.IntegerField(label=_("ID in external dataset"), required=False,
+                widget=forms.NumberInput(attrs={'class': 'searching', 'placeholder': 'External ID...', 'style': 'width: 20%;'}))
 
     typeaheads = ["countries", "cities", "libraries", "origins", "manuidnos"]
     action_log = ['name', 'library', 'lcity', 'lcountry', 'idno', 
@@ -4881,14 +4996,14 @@ class ManuscriptForm(PassimModelForm):
         model = Manuscript
         fields = ['name', 'library', 'lcity', 'lcountry', 'idno', 'notes', # 'yearstart', 'yearfinish', 'project' 
                   'origin', 'url', 'support', 'extent', 'format', 'stype', 'editornotes']
-        widgets={'library':     LibraryOneWidget(attrs={'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'lcity':       CityMonasteryOneWidget(attrs={'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
-                 'lcountry':    CountryOneWidget(attrs={'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'library':     LibraryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'lcity':       CityMonasteryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'lcountry':    CountryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a country...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  #'yearstart':   forms.TextInput(attrs={'style': 'width: 40%;'}),
                  #'yearfinish':  forms.TextInput(attrs={'style': 'width: 40%;'}),
                  'idno':        forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Identifier...',  'style': 'width: 100%;'}),
-                 'origin':      OriginOneWidget(attrs={'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}),
+                 'origin':      OriginOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select an origin...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'url':         forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'format':      forms.TextInput(attrs={'style': 'width: 100%;'}),
                  'extent':      forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
@@ -4897,7 +5012,7 @@ class ManuscriptForm(PassimModelForm):
                  'notes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
                  'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
                  'editornotes':       forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;'}),
-                 # 'project':     ProjectOneWidget(attrs={'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
+                 # 'project':     ProjectOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one project...', 'style': 'width: 100%;', 'class': 'searching'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -4945,7 +5060,7 @@ class ManuscriptForm(PassimModelForm):
             self.fields['origone'].queryset = Origin.objects.all().order_by('name')
 
             self.fields['mlinklist'].widget = ManuscriptLinkAddOnlyWidget(attrs={
-                        'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Use the + sign to add links...', 'data-allow-clear': 'false', 'style': 'width: 100%;', 'class': 'searching'})
 
             # Some lists need to be initialized to NONE:
             self.fields['mprovlist'].queryset = ProvenanceMan.objects.none()
@@ -4976,6 +5091,11 @@ class ManuscriptForm(PassimModelForm):
                     self.fields['country_ta'].initial = country
                     # Also: make sure we put the library NAME in the initial
                     self.fields['libname_ta'].initial = library.name
+
+                # If there is an external it, then initialize it here
+                ext = instance.manuexternals.first()
+                if not ext is None:
+                    self.fields['externalid'].initial = ext.externalid
 
                 # Look after origin
                 origin = instance.origin
@@ -5012,7 +5132,7 @@ class TemplateImportForm(BasicSimpleForm):
     manu_id  = forms.CharField(required=False,
                widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Manuscript id...',  'style': 'width: 100%;'}))
     template = ModelChoiceField(queryset=None, required=False, 
-               widget=TemplateOneWidget(attrs={'data-placeholder': 'Select a template...', 'style': 'width: 100%;', 'class': 'searching'}))
+               widget=TemplateOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a template...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     def __init__(self, *args, **kwargs):
         # Start by executing the standard handling
@@ -5061,14 +5181,14 @@ class TemplateForm(PassimModelForm):
 
 class LocationForm(BasicModelForm):
     loctypechooser = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=LocTypeWidget(attrs={'data-placeholder': 'Location type...', 'style': 'width: 100%;'}))
+                 widget=LocTypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Location type...', 'style': 'width: 100%;'}))
     location_ta = forms.CharField(label=_("Location"), required=False, 
                  widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'Location...',  
                                                'style': 'width: 100%;'}))
     locchooser = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=LocationWidget(attrs={'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
+                 widget=LocationWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Location...', 'style': 'width: 100%;'}))
     locationlist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=LocationWidget(attrs={'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
+                 widget=LocationWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select containing locations...', 'style': 'width: 100%;'}))
     typeaheads = ["locations"]
 
     class Meta:
@@ -5078,7 +5198,7 @@ class LocationForm(BasicModelForm):
         fields = ['name', 'loctype']
         widgets={'name':        forms.TextInput(attrs={'style': 'width: 100%;'}),
                  #'loctype':     forms.Select(attrs={'style': 'width: 100%;'})
-                 'loctype':     LoctypeOneWidget(attrs={'data-placeholder': 'Select one type...', 'style': 'width: 100%;'})
+                 'loctype':     LoctypeOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one type...', 'style': 'width: 100%;'})
                  }
 
     def __init__(self, *args, **kwargs):
@@ -5176,7 +5296,7 @@ class DaterangeForm(BasicModelForm):
     newfinish   = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Finish (optional)...',  'style': 'width: 100%;'}))
     oneref      = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-                widget=LitrefWidget(attrs={'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=LitrefWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one reference...', 'style': 'width: 100%;', 'class': 'searching'}))
     newpages    = forms.CharField(label=_("Page range"), required=False, help_text="editable", 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Page range...',  'style': 'width: 100%;'}))
     action_log = ['yearstart', 'yearfinish', 'pages', 'reference']
@@ -5229,7 +5349,7 @@ class FeastForm(BasicModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript shelfmarks...', 'style': 'width: 100%;'}))
     typeaheads = ["cities", "countries"]
 
     class Meta:
@@ -5276,7 +5396,7 @@ class BibRangeForm(BasicModelForm):
     newintro    = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Intro...',  'style': 'width: 100%;'}))
     onebook    = forms.ModelChoiceField(queryset=None, required=False, help_text="editable", 
-                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}))
     newchvs    = forms.CharField(required=False, help_text='editable', 
                 widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Chapter-verse list...',  'style': 'width: 100%;'}))
     newadded    = forms.CharField(required=False, help_text='editable', 
@@ -5284,7 +5404,7 @@ class BibRangeForm(BasicModelForm):
 
     # =========== SEarching for bible references ===============
     bibrefbk    = forms.ModelChoiceField(queryset=None, required=False, 
-                widget=BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
+                widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 30%;', 'class': 'searching'}))
     bibrefchvs  = forms.CharField(label=_("Bible reference"), required=False, 
                 widget=forms.TextInput(attrs={'class': 'searching', 'style': 'width: 69%;', 
                                               'placeholder': 'Use Chapter or Chapter:verse (do *NOT* use a wildcard)'}))
@@ -5307,7 +5427,7 @@ class BibRangeForm(BasicModelForm):
     date_until  = forms.IntegerField(label=_("Date until"), required = False,
                 widget=forms.TextInput(attrs={'placeholder': 'Until (including)...',  'style': 'width: 30%;', 'class': 'searching'}))
     manuidlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ManuidWidget(attrs={'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
+                widget=ManuscriptWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple manuscript identifiers...', 'style': 'width: 100%;'}))
 
     typeaheads = ["cities", "countries"]
     action_log = ['book', 'chvslist', 'intro', 'added']
@@ -5317,7 +5437,7 @@ class BibRangeForm(BasicModelForm):
 
         model = BibRange
         fields = ['book', 'chvslist', 'intro', 'added']
-        widgets={'book':        BookWidget(attrs={'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
+        widgets={'book':        BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a book...', 'style': 'width: 100%;', 'class': 'searching'}),
                  'chvslist':    forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'intro':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'}),
                  'added':       forms.TextInput(attrs={'style': 'width: 100%;', 'class': 'searching'})
@@ -5370,7 +5490,7 @@ class SearchCollectionForm(BasicSimpleForm):
 
 class ReportEditForm(BasicModelForm):
     userlist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=UserWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=UserWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = Report
@@ -5399,9 +5519,9 @@ class SourceEditForm(BasicModelForm):
     profile_ta = forms.CharField(label=_("Collector"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching users input-sm', 'placeholder': 'Collector(s)...', 'style': 'width: 100%;'}))
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select collector(s)...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select collector(s)...', 'style': 'width: 100%;', 'class': 'searching'}))
     manulist = ModelChoiceField(queryset=None, required=False,
-                 widget=ManuidOneWidget(attrs={'data-placeholder': 'Select corresponding manuscript...', 'style': 'width: 100%;'}))
+                 widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select corresponding manuscript...', 'style': 'width: 100%;'}))
 
     class Meta:
         model = SourceInfo
@@ -5464,7 +5584,7 @@ class AuthorSearchForm(BasicModelForm):
     author_ta = forms.CharField(label=_("Author"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching authors input-sm', 'placeholder': 'Person name(s)...', 'style': 'width: 100%;'}))
     authlist     = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=AuthorWidget(attrs={'data-placeholder': 'Select multiple persons...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=AuthorWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple persons...', 'style': 'width: 100%;', 'class': 'searching'}))
     typeaheads = ["authors"]
 
 
@@ -5494,7 +5614,7 @@ class CommentForm(BasicModelForm):
     # otype = forms.CharField(label=_("Object type"), required=False)
     objid = forms.CharField(label=_("Object id"), required=False)
     profilelist = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple users...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         ATTRS_FOR_FORMS = {'class': 'form-control'};
@@ -5531,7 +5651,7 @@ class CommentResponseForm(BasicModelForm):
         model = CommentResponse
         fields = ['content', 'profile', 'comment', 'visible']
         widgets={'content':     forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;', 'class': 'searching'}),
-                 'profile': ProfileOneWidget(attrs={'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+                 'profile': ProfileOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
                  }
 
     def __init__(self, *args, **kwargs):

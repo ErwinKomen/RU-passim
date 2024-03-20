@@ -244,7 +244,7 @@ class ManuscriptUploadExcel(ReaderImport):
                                         # Iterate over the rows
                                         for row in ws_sermo.iter_rows():
                                             row_values = [x.value for x in row]
-                                            v = row_values[0]
+                                            v = None if len(row_values) ==0 else row_values[0]
                                             if row_num > 1 and not v is None and v!= "":
                                                 # ==== DEBUG ====
                                                 oErr.Status("Upload excel row_num={}".format(row_num))
@@ -262,7 +262,7 @@ class ManuscriptUploadExcel(ReaderImport):
                                                 codico = dict_codico[codi_order]
                                                 # Process this sermon
                                                 order = oSermon['order']
-                                                sermon = SermonDescr.custom_add(oSermon, manu, codico, order)
+                                                sermon = SermonDescr.custom_add(oSermon, manu, codico, order, **kwargs)
 
                                                 oResult['sermons'] += 1
 

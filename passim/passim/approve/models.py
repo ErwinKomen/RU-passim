@@ -95,7 +95,7 @@ class EqualChange(models.Model):
                 bFound = False
                 for obj in EqualChange.objects.filter(super=super, profile=profile, field=field, atype="def"):
                     if obj.changeapprovals.exclude(atype="def").count() == 0:
-                        # We can use this one
+                        # We can use this one: reset it to hold the default values
                         bFound = True
                         obj.current = current
                         obj.change = change
@@ -175,6 +175,14 @@ class EqualChange(models.Model):
                 project_ids = {str(x.id): False for x in self.super.projects.all()}
                 # Then count the number of projects linked to it
                 iTotal = len(project_ids)
+
+                # Evaluate the projects that I am an official approver for
+                approve_project_ids = [x['project__id'] for x in self.profile.project_approver.all().values('project__id')]
+                for prj_id in approve_project_ids:
+                    sPrjId = str(prj_id)
+                    if sPrjId in project_ids:
+                        project_ids[sPrjId] = True
+
                 # Now go through all approvals and see which projects have already made an approval
                 for obj in self.changeapprovals.filter(atype="acc"):
                     # check out which projects this approver has rights for

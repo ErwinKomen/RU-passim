@@ -4,7 +4,7 @@ Definition of forms.
 
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
 from django.db.models import F
@@ -117,11 +117,11 @@ class SaveGroupOneWidget(ModelSelect2Widget):
 class ResearchSetForm(BasicModelForm):
     profileid = forms.CharField(required=False)
     manulist = ModelChoiceField(queryset=None, required=False,
-            widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
+            widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
     histlist = ModelChoiceField(queryset=None, required=False)
     ssgdlist = ModelChoiceField(queryset=None, required=False)
     ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
-                widget=ProfileWidget(attrs={'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
+                widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 'style': 'width: 100%;', 'class': 'searching'}))
     ssgdname = forms.CharField(label="Name", required=False, 
             widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
                                           'placeholder': 'User-defined name (optional)...',  'style': 'width: 100%;'}))
@@ -159,9 +159,9 @@ class ResearchSetForm(BasicModelForm):
 
             # Set the widgets correctly
             self.fields['histlist'].widget = CollOneHistWidget( attrs={'username': username, 'team_group': team_group, 'settype': 'hc',
-                        'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
             self.fields['ssgdlist'].widget = CollOneSuperWidget( attrs={'username': username, 'team_group': team_group,'settype': 'pd',
-                        'data-placeholder': 'Select a personal dataset of SSGs...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a personal dataset of SSGs...', 'style': 'width: 100%;', 'class': 'searching'})
 
             self.fields['ownlist'].queryset = Profile.objects.all()
 
@@ -195,7 +195,7 @@ class SetDefForm(BasicModelForm):
     """Used for listview and details view of SetDef"""
 
     manulist = ModelChoiceField(queryset=None, required=False,
-            widget=ManuidOneWidget(attrs={'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
+            widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select manuscript...', 'style': 'width: 100%;'}))
     histlist = ModelChoiceField(queryset=None, required=False)
 
     class Meta:
@@ -225,7 +225,7 @@ class SetDefForm(BasicModelForm):
 
             # Set the widgets correctly
             self.fields['histlist'].widget = CollOneHistWidget( attrs={'username': self.username, 'team_group': self.team_group, 'settype': 'hc',
-                        'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
+                        'data-minimum-input-length': 0, 'data-placeholder': 'Select a historical collection...', 'style': 'width: 100%;', 'class': 'searching'})
             # Note: the collection filters must use the SCOPE of the collection
             self.fields['histlist'].queryset = Collection.get_scoped_queryset('super', self.username, self.team_group, settype="hc")
 
@@ -260,7 +260,7 @@ class RsetSelForm(BasicSimpleForm):
                 profile = self.user.user_profiles.first()
                 # Set the widgets correctly
                 self.fields['rsetone'].widget = ResearchSetOneWidget(attrs={'profile': profile, 
-                            'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
+                            'data-minimum-input-length': 0, 'data-placeholder': 'Select a research set...', 'style': 'width: 100%;', 'class': 'searching'})
 
                 # The rsetone information is needed for "selection-to-DCT" processing
                 self.fields['rsetone'].queryset = ResearchSet.objects.filter(profile=profile)
@@ -294,7 +294,7 @@ class SgroupSelForm(BasicSimpleForm):
                 profile = self.user.user_profiles.first()
                 # Set the widgets correctly
                 self.fields['sgroupone'].widget = SaveGroupOneWidget(attrs={'profile': profile, 
-                            'data-placeholder': 'Select a save group...', 'style': 'width: 100%;', 'class': 'searching'})
+                            'data-minimum-input-length': 0, 'data-placeholder': 'Select a save group...', 'style': 'width: 100%;', 'class': 'searching'})
 
                 # The rsetone information is needed for "selection-to-DCT" processing
                 self.fields['sgroupone'].queryset = SaveGroup.objects.filter(profile=profile)

@@ -1112,6 +1112,7 @@ var ru = (function ($, ru) {
         var elSpan = null,
             copyText = null,
             textarea = null,
+            text_to_copy = "",
             range = null,
             selector = null,
             bgcol = null,
@@ -1123,27 +1124,56 @@ var ru = (function ($, ru) {
           elSpan = $(el).closest("div").find("textarea").first();
           if (elSpan.length === 0) {
             elSpan = $(el).closest("div").find("span.stable").first();
-            textarea = document.getElementById(tmp);
-            if (textarea === undefined || textarea === null) {
-              textarea = document.createElement("textarea");
-              textarea.id = tmp;
-              document.body.appendChild(textarea);
+            text_to_copy = $(elSpan).text().trim();
+
+            // Check if we can use navigator or not
+            if (!navigator.clipboard) {
+              // Use the old commandExec() way
+              textarea = document.getElementById(tmp);
+              if (textarea === undefined || textarea === null) {
+                textarea = document.createElement("textarea");
+                textarea.id = tmp;
+                document.body.appendChild(textarea);
+              }
+              textarea.style.height = 0;
+              textarea.value = text_to_copy;
+              $(textarea).removeClass("hidden");
+
+              selector = document.querySelector("#" + tmp);
+              selector.select();
+              document.execCommand("copy");
+              if (bg_color !== undefined) {
+                // Get current bg color
+                bgcol = $(el).css('background-color');
+                // Temporarily show the background color
+                $(el).css('background-color', bg_color);
+                window.setTimeout(function () {
+                  $(el).css('background-color', bgcol);
+                  $(textarea).addClass("hidden");
+                },
+                  1000);
+              }
+            } else {
+              navigator.clipboard.writeText(text_to_copy).then(function () {
+                  // Show success
+                  if (bg_color !== undefined) {
+                    // Get current bg color
+                    bgcol = $(el).css('background-color');
+                    // Temporarily show the background color
+                    $(el).css('background-color', bg_color);
+                    window.setTimeout(function () {
+                      $(el).css('background-color', bgcol);
+                      $(textarea).addClass("hidden");
+                    },
+                      3000);
+                  }
+                })
+                .catch( function () {
+                    alert("err"); // error
+                  });
             }
-            textarea.style.height = 0;
-            textarea.value = $(elSpan).text().trim();
-            selector = document.querySelector("#" + tmp);
-            selector.select();
-            document.execCommand("copy");
-            if (bg_color !== undefined) {
-              // Get current bg color
-              bgcol = $(el).css('background-color');
-              // Temporarily show the background color
-              $(el).css('background-color', bg_color);
-              window.setTimeout(function () {
-                $(el).css('background-color', bgcol);
-              },
-              1000);
-            }
+
+    
           } else {
             copyText = document.getElementById("search_copy");
             copyText.select();
@@ -1412,6 +1442,9 @@ var ru = (function ($, ru) {
   
                 $(target).find("input").each(function (idx, elThis) {
                   $(elThis).val("");
+                  if ($(elThis).attr("type") == "range") {
+                    $(elThis).closest("div").addClass("hidden");
+                  }
                 });
                 // Also reset all select 2 items
                 $(target).find("select").each(function (idx, elThis) {
@@ -1662,6 +1695,26 @@ var ru = (function ($, ru) {
         }
       },
 
+      slider_change: function () {
+        var el = $(this),
+          elvalueid = "",
+          elvalue = null;
+        // Do we have a valueid?
+        if ($(el)[0].hasAttribute("valueid")) {
+          // Get the value id
+          elvalueid = "#" + $(el).attr("valueid");
+          // Show the value
+          $(elvalueid).html(this.value);
+        } else {
+          // get the value element
+          elvalue = $(el).closest("td").find(".basic-range-input").first();
+          $(elvalue).html(this.value);
+          // Get the text element
+          elvalue = $(el).closest("td").find("input[type='text']").first();
+          $(elvalue)[0].value = this.value;
+        }
+      },
+
       /**
        *  init_events
        *      Bind main necessary events
@@ -1710,25 +1763,8 @@ var ru = (function ($, ru) {
           }
 
           // Make sure we catch changes
-          $("input[type='range']").on("change", function (evt) {
-            var el = $(this),
-                elvalueid = "",
-                elvalue = null;
-            // Do we have a valueid?
-            if ($(el)[0].hasAttribute("valueid")) {
-              // Get the value id
-              elvalueid = "#" + $(el).attr("valueid");
-              // Show the value
-              $(elvalueid).html(this.value);
-            } else {
-              // get the value element
-              elvalue = $(el).closest("td").find(".basic-range-input").first();
-              $(elvalue).html(this.value);
-              // Get the text element
-              elvalue = $(el).closest("td").find("input[type='text']").first();
-              $(elvalue)[0].value = this.value;
-            }
-          });
+          $("input[type='range']").on("change", ru.basic.slider_change);
+          $("input[type='range']").on("input", ru.basic.slider_change);
           // $(".basic-range-input")
 
           // Look for .blinded

@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block scripts %}
-    {% load staticfiles %}
+    {% load static %}
     <link rel="stylesheet" type="text/css" href="{% static 'basic/content/basic.css' %}" />
     <link rel="stylesheet" href="{% static 'basic/content/font-awesome.min.css' %}" />
     <script src="{% static 'basic/scripts/basic.js' %}"></script>
@@ -245,7 +245,7 @@
                         <!-- Sub filters from this section -->
                         <div>
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name  %}
+                            {% if filter.head_id == "filter_"|add:section.name and not filter.hide_button %}
                               <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " 
                                     targetid="{{filter.id}}" targetaddid="{{filter.include_id}}">{{filter.name}}</span>
                             {% endif %}
@@ -266,7 +266,7 @@
 
                           <!-- Show the different filters in the list -->
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name or filter.head_id == "hidden" %}
+                            {% if filter.head_id == "filter_"|add:section.name %}
                               <div id="{{filter.id}}" class="{% if filter.hasvalue %} {% else %}hidden {% endif %}"
                                addview="{% if filter.include_id %}{{filter.include_id}}{% endif %}">
                                 <table style="width: 100%;">

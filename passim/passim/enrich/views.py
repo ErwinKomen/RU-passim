@@ -34,7 +34,7 @@ from passim.enrich.models import Sentence, Speaker, Testunit, Participant, Tests
 from passim.enrich.forms import TestunitForm, TestsetForm, SpeakerForm, SentenceForm
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item, is_ajax
 from passim.seeker.views import BasicPart
 from passim.enrich.latin import *
 
@@ -699,7 +699,7 @@ def get_testsets(request):
     try:
         data = 'fail'
         qd = request.GET if request.method == "GET" else request.POST
-        if request.is_ajax():
+        if is_ajax(request):
             round = qd.get("round", "")
             lstQ = []
             lstQ.append(Q(testset__round=round))

@@ -1,4 +1,4 @@
-﻿              <ul class='pagination pagination-xsm'>
+              <ul class='pagination pagination-xsm'>
               {% if page_obj.has_previous %}
                   <li><a onclick="{{page_function}}({{ page_obj.previous_page_number }}, '{{formdiv}}');">&laquo;</a></li>
                   <li><a onclick="{{page_function}}(1, '{{formdiv}}');">1</a></li>
@@ -12,7 +12,7 @@
           
                   {% if not page_obj.has_previous or p != 1 %}
                     {% if p < page_obj.number|add:"6" and  p > page_obj.number|add:"-6" %}
-                    <li {% ifequal p page_obj.number %}class='active'{% endifequal %}>
+                    <li {% if p == page_obj.number %}class='active'{% endif %}>
                     <a onclick="{{page_function}}( {{ p }}, '{{formdiv}}');">{{p}}</a>
                     </li>
                     {% endif %}
