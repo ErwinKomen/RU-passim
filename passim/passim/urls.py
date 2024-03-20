@@ -45,6 +45,7 @@ admin.autodiscover()
 handler404 = 'passim.seeker.views.view_404'
 
 
+
 # Set admin stie information
 admin.site.site_header = "Patristic Sermons in the Middle Ages"
 admin.site.site_title = "passim Admin"
@@ -420,6 +421,11 @@ urlpatterns = [
     url(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     url(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
     url(r'^reader/import/trans/ssg/$', ReaderTransEqgImport.as_view(), name='import_trans_eqg'),
+
+    url(r'^reader/import/cppm_af/$', passim.reader.views.reader_CPPM_AF, name='import_cppm_af'), # change view
+
+    #url(r'^tools/update_currlocs$', ripdapp.views.update_cur_loc_coord_excel, name='tools_update_cur_loc_coord_excel'), 
+
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================

@@ -117,6 +117,7 @@ class AltPagesWidget(ModelSelect2MultipleWidget):
     def get_queryset(self):
         return AltPages.objects.all().order_by('altpage').distinct()
 
+
 class NoteAltPagesWidget(ModelSelect2MultipleWidget):
     model = AltPages
     search_fields = [ 'note__icontains']
@@ -1993,9 +1994,9 @@ class SermonForm(PassimModelForm):
     keyword = forms.CharField(label=_("Keyword"), required=False,
                 widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
     altpages = forms.CharField(label=_("Alternative page numbering"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Alternative pages...', 'style': 'width: 100%;'}))
     note  = forms.CharField(label=_("Alternative page numbering"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Keyword(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching keywords input-sm', 'placeholder': 'Note on alternative pages...', 'style': 'width: 100%;'}))
     kwlist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=KeywordWidget(attrs={'data-placeholder': 'Select multiple keywords...', 'style': 'width: 100%;', 'class': 'searching'}))
     ukwlist     = ModelMultipleChoiceField(queryset=None, required=False, 

@@ -4530,7 +4530,7 @@ class SermonEdit(BasicDetails):
             # some more items
             mainitems_add = [
                 {'type': 'plain', 'label': "Notes alt page numbering:",   'value': instance.get_notes_altpages(), 'field_list': "notes_altpageslist"},
-                                # Issue #23: delete bibliographic notes
+                # Issue #23: delete bibliographic notes
                 {'type': 'plain', 'label': "Bibliographic notes:",  'value': instance.bibnotes,         'field_key': 'bibnotes', 
                  'editonly': True, 'title': 'The bibliographic-notes field is legacy. It is edit-only, non-viewable'},
                 {'type': 'plain', 'label': "Feast:",                'value': instance.get_feast(),      'field_key': 'feast'}

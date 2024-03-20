@@ -8920,6 +8920,8 @@ class EqualGoldExternal(models.Model):
     equal = models.ForeignKey(EqualGold, related_name="equalexternals", on_delete=models.CASCADE)
     # [1] The identifier of the external project
     externalid = models.IntegerField("External identifier", default=0)
+    # [0-1] The identifier of the external project (text)
+    externaltextid = models.CharField("External identifier (text)", null=True, blank=True, max_length=LONG_STRING)
     # [1] The type of external project
     externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
                             max_length=5, default=EXTERNAL_HUWA_OPERA)
@@ -8976,6 +8978,8 @@ class SermonGoldExternal(models.Model):
     gold = models.ForeignKey(SermonGold, related_name="goldexternals", on_delete=models.CASCADE)
     # [1] The identifier of the external project
     externalid = models.IntegerField("External identifier", default=0)
+    # [0-1] The identifier of the external project (text)
+    externaltextid = models.CharField("External identifier (text)", null=True, blank=True, max_length=LONG_STRING)
     # [1] The type of external project
     externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
                             max_length=5, default=EXTERNAL_HUWA_OPERA)
