@@ -5,7 +5,7 @@ import re
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
-import plotly.graph_objects as go
+#import plotly.graph_objects as go
 
 from passim.plugin.forms import BoardForm
 from passim.utils import ErrHandle

@@ -6711,50 +6711,27 @@ class ReaderHuwaImport(ReaderEqualGold):
  
 def reader_CPPM_AF(request):
 
-    # This function is meant to add AF's retrieved from the CPPM data into the database
-    # by first adding GoldSermons and then creating new AF's based on the 
+    # This function adds AF's retrieved from the CPPM data into the database
+    # by first adding GoldSermons and then creating new AF's based on these GoldSermons.
     # Only the records that are coded as "False" need to be imported, the rest is already in the database. 
 
-    # More explaining?? Part 1 of 4, for now
+    # This is step 1, later steps will follow.    
 
     # Can only be done by a super-user
-    if request.user.is_superuser:
-        print("this works!")
+    if request.user.is_superuser:        
         pass
 
     # Read the JSON file from MEDIA_DIR   
     cppm_t_read = os.path.abspath(os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')) # cppm_texts_mapped_authors.json
 
-    cppm_t = open(cppm_t_read, encoding="utf8") # Nieuwe versie 
+    cppm_t = open(cppm_t_read, encoding="utf8")  
 
-    # Load the json files TH: lijkt te werken   
+    # Load the json files 
     cppm_texts = json.load(cppm_t)
-
     
+    # Getting the data ready. 
 
-    # What do we need from the CPPM json file and where should we store it??
-
-    # incipit --> GoldSermon, incipit
-    # explicit --> GoldSermon, explicit
-    # id author --> Author, id 
-    
-    # code --> GoldSermon, editype 
-    # editype -->  GoldSermon, editype 
-    # project_name --> Project 2, id (only after the AF's are created, author Anonymous, 2735)
-
-    # title --> ?? No?
-    # equality set --> ?? Later, opslaan alvast. 
-
-    # How to store the link between the new GS/AF and the manuscripts in the other json file? Using the number? Try get that number. 
-    # Where to store that number? Ask EK
-    # Maybe create a temporary table in the db that stores the numbers ("121"), equality set ("4130","474") and the link to the GoldSermon. 
-
-    # CppmGs model?
-
-    # How to create AF's from the new GoldSermons?
-
-    # Link AF to id 2735 (Anonymus) in model Authot 
-
+    # Create a count
     count = 0
 
     # Create lists
@@ -6770,6 +6747,7 @@ def reader_CPPM_AF(request):
     editype_lst = []
     project_lst = []
 
+    # Create an empty data frame
     gs_df = pd.DataFrame(columns=['Number', 'Code', 'Editype', 'Project', 'Incipit', 'Explicit', 'Title', 'Author_id', 'Equality'])
      
     # The project label that needs to be added
@@ -6785,12 +6763,7 @@ def reader_CPPM_AF(request):
             # Only the items that are not mapped should be 
             if key2 == 'mapped' and value2 == False:            
                 
-                count += 1
-                print(count) #947
-
-
-                # Get number and store in ???
-                #print(key1)
+                count += 1                               
                 work_lst.append(key1)
 
                 # This part is for the lower sections
@@ -6801,42 +6774,31 @@ def reader_CPPM_AF(request):
                         # zoals ms_items
                         for value4 in value3:
                         # Iterate over the items in the list, 
-                        # that can have multiple items
-                        # TH: hier moet iets aangepakt worden want hij gaat van boven naar beneden
-                        # en begint dus niet bij de code
+                        # that can have multiple items                        
 
-                            for key5, value5 in value4.items():
-                                #print(key5, value5)                          
+                            for key5, value5 in value4.items():                                
                                 # Get the CPPM code
                                 if key5 == 'code': #
-                                    code_imp = value5
-                                    #print(code_imp)
+                                    code_imp = value5                                    
                                     work_lst.append(code_imp)
                                 # Get the editype
                                 elif key5 == 'editype':
                                     editype_imp = value5
-                                    work_lst.append(editype_imp)
-                                    #print(editype_imp)
-
-                # Project name
-                #print(project_name)
+                                    work_lst.append(editype_imp)                                    
+                                                    
                 work_lst.append(project_name)      
                 
                 # Get the incipit
                 item = value1.get('incipit')                        
-                work_lst.append(item) # AF
-                #print(item)
+                work_lst.append(item) 
 
                 # Get the explicit
-                item = value1.get('excplicit')
-                work_lst.append(item) # AF
-                #print(item)
-
+                item = value1.get('explicit')
+                work_lst.append(item) 
+                
                 # Get the title ??
                 item = value1.get('title')            
-                work_lst.append(item)
-                #print(item)
-                               
+                work_lst.append(item)     
 
                 # This part is for the lower sections
                 for key3, value3 in value1.items():
@@ -6845,22 +6807,24 @@ def reader_CPPM_AF(request):
                     if key3 == 'name':
                         # Seeker id 
                         item3 = value3.get('seeker_author_id')
-                        # Add to list
-                        #print(item3)
+                        # Add to list                        
                         work_lst.append(item3)
                 
                 # Get the equality_set (list)
                 item_list = value1.get('equality_set')   
  
-                # using list comprehension
+                # Using list comprehension to get everything together
                 item_comb = ', '.join([str(item) for item in item_list])                  
                 work_lst.append(item_comb) 
                 
+                # Put everything in the empty dataframe
                 gs_df.loc[len(gs_df.index)] = work_lst
 
     for index, row in gs_df.iterrows():
-        print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
+        #print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
         
+        #print(row['Explicit'])
+
         # Check of dit allemaal werkt
         cppm = row['Number']
         code = row['Code']
@@ -6885,6 +6849,7 @@ def reader_CPPM_AF(request):
             if gs_obj == None:
                 # Create a new Gold Sermon
                 gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
+                gs_obj.save()   
         else: 
             # Moet hier niet ook gekeken worden naar de GS objects?
             # Als er een signature bestaat dan wordt een groot deel niet gechecked, en dus niet in de db gezet, 
@@ -6892,9 +6857,11 @@ def reader_CPPM_AF(request):
             gs_obj = SermonGold.objects.filter(incipit = incipit, explicit = explicit, author_id = author).first()
             if gs_obj == None:
                 # Create a new Gold Sermon
-                gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)  
+                gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
+                gs_obj.save()   
 
         # Check if the Signature that belongs to the GS is already in the db (probably not since we have checked this already)                     
+       
         sig_obj = Signature.objects.filter(code=code, gold=gs_obj).first()
         if sig_obj == None:
             # Create the new Signature record
@@ -6903,16 +6870,34 @@ def reader_CPPM_AF(request):
             sig_obj.editype = editype
             sig_obj.save()
 
-            # External 
+        # External 
             
-            # TH: de eerste drie records zitten hier niet in iih
-                        
-            # Add newly created SermonGold to the SermonGoldExternal table
-            # so that we can always link up other stuff from the CPPM data to the
-            # SermonGold
+        # TH: de eerste drie records zitten hier niet in iih
+                       
+        # Add newly created SermonGold to the SermonGoldExternal table
+        # so that we can always link up other stuff from the CPPM data to the
+        # SermonGold
+        # The new GS needs to be added to the SermonGoldExternal site
+        # Check if the GS External object already exists:
+        
+        # Make sure that in case of an additional letter added to the original numbers is properly processed
+        # and stored in externaltextid
+        cppm_textid = ""
 
-            # The new GS needs to be added to the SermonGoldExternal site
-            # Check if the GS External object already exists:
+        # Find out if the cppm id contains a letter!
+        if cppm.isdigit():
+                       
+            # The cppm number is stored in a new variable
+            cppm_id = cppm          
+            
+        else:
+           
+            # In this case, the cppm id does contain an "A"
+            # Store the cppm in a new variable 
+            cppm_textid = cppm
+            
+            # Get rid of the letter and store only the number in cppm_id:
+            cppm_id = re.sub("\D", "", cppm) # ok, igv 4324 + 4400 wordt het 43244400
 
         # Code for externaltype
         external = "cppm"
@@ -6920,11 +6905,8 @@ def reader_CPPM_AF(request):
         gsex_obj = SermonGoldExternal.objects.filter(gold=gs_obj, externaltype=external).first()             
         if gsex_obj == None:
             # Create the new GS External object, add type and original CPPM number
-            gsex_obj = SermonGoldExternal.objects.create(gold=gs_obj, externaltype=external, externalid = cppm)                
-        
-        # externaltextid aan class SermonGoldExternal toevoegen en aan EqualGoldExternal natuurlijk 
-       #                     
-        # The author of the EqualGold that will be created is "Anonymus", number 
+            gsex_obj = SermonGoldExternal.objects.create(gold=gs_obj, externaltype=external, externalid=cppm_id, externaltextid=cppm_textid)                
+            gsex_obj.save()          
            
         # Create string to safely find the correct author 
         name_anonym = "Anonymus"
@@ -6938,13 +6920,13 @@ def reader_CPPM_AF(request):
         if gs_obj.equal_id == None:
             # Find of the EqualGold record already exists
             # Create the new EqualGold record, add incipit, explicit, author
-            eqg_obj = EqualGold.objects.create(incipit=incipit, explicit=explicit, author=auth_obj) # hier gaat het iig mis, moet author instance zij
-                
-        # Now the new EqualGold needs to be linked to the SermonGold on which it is based.           
+            eqg_obj = EqualGold.objects.create(incipit=incipit, explicit=explicit, author=auth_obj, atype="acc") # hier gaat het iig mis, moet author instance zij
+            eqg_obj.save()   
+            # Now the new EqualGold needs to be linked to the SermonGold on which it is based.           
             
-            gs_obj.equal = eqg_obj # moet dit geen equal _id zijn?
+            gs_obj.equal = eqg_obj 
             gs_obj.save()
-            #print(gs_obj.equal)
+            
             
             # Add newly created EqualGold to the EqualGoldExternal table
             # so that we can always link up other stuff from the CPPM data to the
@@ -6958,8 +6940,8 @@ def reader_CPPM_AF(request):
             eqgex_obj = EqualGoldExternal.objects.filter(equal=eqg_obj, externaltype=external).first()             
             if eqgex_obj == None:
             # Create the new EG External object, add type and original CPPM number
-                eqgex_obj = EqualGoldExternal.objects.create(equal=eqg_obj, externaltype=external, externalid = cppm)  
-          
+                eqgex_obj = EqualGoldExternal.objects.create(equal=eqg_obj, externaltype=external, externalid=cppm_id, externaltextid=cppm_textid)  
+                eqgex_obj.save() 
 
             # Project
            
@@ -6982,10 +6964,6 @@ def reader_CPPM_AF(request):
                     # If the project name already exists, but not the link, than only a link should be 
                     # made between the EqualGold and the projectname
                     EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound) 
-                  
-        # Save the results 
-        #sig_obj.save()          # Moet dit hier staan?                          
-                                                 
                                     
     # What we return is simply the home page
     return redirect('home')
