@@ -10141,6 +10141,16 @@ class SermonDescr(models.Model):
                             fkfield = oField.get("fkfield")
                             model = oField.get("model")
                             if fkfield != None and model != None:
+                                # If an expected String is supplied as stringified JSON...
+                                if not value is None and value != "":
+                                    if value[0] == "[":
+                                        try:
+                                            xvalue = json.loads(value)
+                                            value = xvalue[0]
+                                        except:
+                                            # No bother
+                                            pass
+
                                 # Find an item with the name for the particular model
                                 cls = apps.app_configs['seeker'].get_model(model)
                                 instance = cls.objects.filter(**{"{}".format(fkfield): value}).first()
