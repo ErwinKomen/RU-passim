@@ -29,7 +29,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionProject, EqualGoldProject, OnlineSources, \
     ProjectApprover, ProjectEditor, ManuscriptExternal, SermonDescrExternal, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
-    EXTERNAL_HUWA_OPERA
+    EXTERNAL_HUWA_OPERA, excel_to_list
 from passim.reader.models import Edition, Literatur, OperaLit
 from passim.reader.views import read_kwcategories
 
@@ -39,7 +39,8 @@ adaptation_list = {
         'sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-        'supplyname', 'usersearch_params', 'huwamanudate'],
+        'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
+        'sermonesdates'],
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -113,6 +114,112 @@ def adapt_dateranges():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_baddateranges():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    lst_ranges = [ [100, 100], [9999, 9999], [1800, 2020] ]
+
+    try:
+        lst_delete = []
+        for oRange in lst_ranges:
+            yearstart = oRange[0]
+            yearfinish = oRange[1]
+            lst_ids = [x['id'] for x in Daterange.objects.filter(yearstart=yearstart, yearfinish=yearfinish).values('id')]
+            for id_this in lst_ids:
+                if not id_this in lst_delete:
+                    lst_delete.append(id_this)
+        # Do we have some ids?
+        if len(lst_delete) > 0:
+            # Remove them
+            Daterange.objects.filter(id__in=lst_delete).delete()
+            oErr.Status("adapt_baddaterange removed: {}".format(lst_delete))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_sermonesdates():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    FILE_NAME = "check_dates_passim_2.xlsx"
+
+    try:
+        # Expected column names
+        lExpected = ["first_line", "old_date", "new_dates", "shelfmark"]
+        # Names of the fields in which these need to be transformed
+        lField = ["first_line", "old_date", "new_dates", "shelfmark"]
+
+        # Expected filename
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, "passim", FILE_NAME))
+        oErr.Status("Reading file {}".format(filename))
+
+        if not os.path.exists(filename):
+            oErr.Status("Cannot find this file")
+            bResult = False
+            msg = "Cannot find file {}".format(filename)
+
+        else:
+            # Get the right dataset
+            dataset = Collection.objects.filter(name__icontains="SERMONES FILE").first()
+
+            # Convert the data into a list of objects
+            bResult, lst_sermones, msg = excel_to_list(None, filename, lExpected, lField)
+
+            if bResult and not dataset is None:
+
+                # Create a dictionary mapping the shelfmark to the manuscript ID
+                oManu = {x.manuscript.get_full_name() : x.manuscript.id for x in dataset.manuscript_col.all()}
+
+                # Read the objects
+                for oSermon in lst_sermones:
+                    # Treat this sermon
+                    old_date = oSermon.get("old_date")
+                    new_dates = oSermon.get("new_dates")
+                    shelfmark = oSermon.get("shelfmark")
+
+                    # Figure out the dates
+                    sDates = old_date if new_dates is None or new_dates == "" else new_dates
+                    if sDates != "" and sDates != "?":
+                        lDates = re.split(r'\,\s*', sDates)
+                        lst_date = []
+                        for sDate in lDates:
+                            ardate = sDate.split("-")
+                            if len(ardate) > 1:
+                                lst_date.append(dict(yearstart = ardate[0], yearfinish = ardate[1]))
+                            elif len(ardate) == 1:
+                                lst_date.append(dict(yearstart = ardate[0], yearfinish = ardate[0]))
+
+                        # Turn shelfmark into city/library/idno
+                        manu_id = oManu.get(shelfmark)
+                        if manu_id is None:
+                            # Cannot find this one
+                            oErr.Status("Cannot locate SERMONES shelfmark [{}]".format(shelfmark))
+                        else:
+                            # Get the right manuscript
+                            manuscript = Manuscript.objects.filter(id=manu_id).first()
+                            if not manuscript is None:
+                                # Get the codico - assuming there is only one
+                                codico = Codico.objects.filter(manuscript=manuscript).first()
+                                # Review the dates
+                                for oDate in lst_date:
+                                    yearstart = oDate.get('yearstart')
+                                    yearfinish = oDate.get('yearfinish')
+                                    dr = Daterange.objects.filter(codico=codico, yearstart=yearstart, yearfinish=yearfinish).first()
+                                    if dr is None:
+                                        oErr.Status("Manu [{}]: adding daterange [{},{}]".format(shelfmark, yearstart, yearfinish))
+                                        dr = Daterange.objects.create(codico=codico, yearstart=yearstart, yearfinish=yearfinish)
+                            
+
+                        # Check and adapt the dates
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 def adapt_msitemcleanup():
     method = "UseAdaptations"

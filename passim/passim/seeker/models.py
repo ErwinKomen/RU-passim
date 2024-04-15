@@ -4602,6 +4602,18 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/find_or_create")
             return None
 
+    def get_by_shelfmark(sShelfmark):
+        oErr =ErrHandle()
+        obj = None
+        try:
+            # Find the comma positions
+
+            pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_by_shelfmark")
+        return obj
+
     def get_city(self):
         city = "-"
         oErr = ErrHandle()
@@ -6679,10 +6691,11 @@ class Reconstruction(models.Model):
 class Daterange(models.Model):
     """Each manuscript can have a number of date ranges attached to it"""
 
+    # issue #713: change default daterange from [100-100] to [0000-0000]
     # [1] Date estimate: starting from this year
-    yearstart = models.IntegerField("Year from", null=False, default=100)
+    yearstart = models.IntegerField("Year from", null=False, default=0)
     # [1] Date estimate: finishing with this year
-    yearfinish = models.IntegerField("Year until", null=False, default=100)
+    yearfinish = models.IntegerField("Year until", null=False, default=0)
     # [0-1] An optional reference for this daterange
     reference = models.ForeignKey(Litref, null=True, related_name="reference_dateranges", on_delete=models.SET_NULL)
     # [0-1] The first and last page of the reference
