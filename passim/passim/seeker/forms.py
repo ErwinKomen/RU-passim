@@ -59,7 +59,7 @@ validate_safe_charinput = validators.RegexValidator(
 
 
 def order_search(qs, term):
-    """Given a query and a search term, provide better ordered results"""
+    """Given a query and a search term, provide better ordered results for SSG"""
 
     oErr = ErrHandle()
     try:
@@ -100,6 +100,66 @@ def order_search(qs, term):
                 ),
             )
             qs = qs.order_by("-full_string_order", "code", "id")
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("order_search")
+    return qs
+
+def order_search_manu(qs, term):
+    """Given a query and a search term, provide better ordered results for Manuscripts"""
+
+    oErr = ErrHandle()
+    bAdapt = True
+    try:
+        # Divide terms into list of words
+        term_list = term.split()
+        term_full = term
+
+        # New attempt
+        if len(term_list) > 1:
+            # There are multiple words in the search request - count the presence of each of them
+            term_keys = []
+            hitdict = {}
+            for idx, term in enumerate(term_list):
+                key = "hits{}".format(idx+1)
+                term_keys.append(key)
+                condition = Q(idno__icontains=term) | Q(lcity__name__icontains=term) | \
+                    Q(library__name__icontains=term)
+                hitdict[key] = Case( When(condition, then=Value(1)), default=Value(0), output_field=IntegerField())
+            # Annotate with the hitdict
+            qs = qs.annotate(**hitdict)
+            # Now annotate with the Sum of these hit-fields
+            sumdict = {}
+            sumdict['hitcount'] = F(term_keys[0])
+            for key in term_keys[1:]:
+                sumdict['hitcount'] += F(key)
+            qs = qs.annotate(**sumdict)
+            
+            # Also implement a full-string condition
+            condition = Q(idno__icontains=term_full ) | Q(lcity__name__icontains=term_full ) | \
+                    Q(library__name__icontains=term_full )
+            qs = qs.annotate(
+                full_string_order=Case(
+                    When(condition, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                ),
+            )
+
+            qs = qs.order_by("-full_string_order", "-hitcount", 'lcity__name', 'library__name', 'idno')
+        else:
+
+            # Adapt: behaviour from issue #292
+            condition = Q(idno__icontains=term) | Q(lcity__name__icontains=term) | \
+                    Q(library__name__icontains=term)
+            qs = qs.annotate(
+                full_string_order=Case(
+                    When(condition, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField()
+                ),
+            )
+            qs = qs.order_by("-full_string_order", 'lcity__name', 'library__name', 'idno')
     except:
         msg = oErr.get_error_message()
         oErr.DoError("order_search")
@@ -874,8 +934,15 @@ class ManuscriptWidget(ModelSelect2MultipleWidget):
             qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno')
         else:
             qs = qs.order_by('lcity__name', 'library__name', 'idno')
-        #if qs == None:
-        #    qs = Manuscript.objects.filter(mtype='man').order_by('lcity__name', 'library__name', 'idno').distinct()
+        return qs
+
+    def filter_queryset(self,request, term, queryset = None, **dependent_fields):
+        term_for_now = ""
+        qs = super(ManuscriptWidget, self).filter_queryset(request,term_for_now, queryset, **dependent_fields)
+
+        qs = order_search_manu(qs, term)
+
+        # Return result
         return qs
 
 
