@@ -8087,6 +8087,10 @@ class CollAnyEdit(BasicDetails):
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)    
 
+                # If this is not a HC, then no comments are needed
+                self.comment_button = False
+                context['comment_button'] = False
+
             # Possible add URI
             if instance.settype == "hc":
                 # Make stable URI available
@@ -8119,7 +8123,7 @@ class CollAnyEdit(BasicDetails):
             profile_owner = instance.owner
             profile_user = Profile.get_user_profile(self.request.user.username)
             # (2) Set default permission
-            permission = ""
+            permission = "readonly"
             if self.may_edit(context):
                 if profile_owner.id == profile_user.id:
                     # (3) Any creator of the collection may write it
@@ -8143,6 +8147,11 @@ class CollAnyEdit(BasicDetails):
                 permission = "readonly"
 
             context['permission'] = permission
+
+            # adapt visibility of revision history (issue #451)
+            if permission == "readonly":
+                self.history_button = False
+                context['history_button'] = False
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollAnyEdit/add_to_context")
@@ -8255,7 +8264,6 @@ class CollAnyEdit(BasicDetails):
                 errors.append(form.errors)
                 bResult = False
         return None
-
 
     def before_save(self, form, instance):
         oErr = ErrHandle()
@@ -11430,7 +11438,11 @@ class ManuscriptEdit(BasicDetails):
         passim_action_add(self, instance, details, actiontype)
 
     def get_history(self, instance):
-        return passim_get_history(instance)
+        lst_key_exclude = []
+        # Double check if this person is an editor or not
+        if not user_is_ingroup(self.request, app_editor):
+            lst_key_exclude.append("editornotes")
+        return passim_get_history(instance, lst_key_exclude)
 
 
 class ManuscriptDetails(ManuscriptEdit):

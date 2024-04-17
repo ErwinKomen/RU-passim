@@ -1860,7 +1860,7 @@ class BasicDetails(DetailView):
             # First step: authentication
             if user_is_authenticated(self.request):
                 # Second step: app_user
-                if context.get("is_app_user", False):
+                if context.get("is_app_user", False) or context.get("is_app_editor", False):
                     bEditor = context.get("is_app_editor", False)
                     bModerator = context.get("is_app_moderator", False)
                     bResult = (bEditor or bModerator)
