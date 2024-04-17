@@ -1431,7 +1431,7 @@ var ru = (function ($, ru) {
             radius = null,
             arcRadius = null,
             title = {
-              'pie_sermo': 'Sermon manifestations',
+              'pie_sermo': 'Manifestations',
               'pie_manu': 'Manuscripts',
               'pie_super': 'Authority files',
               'super_graph_attr': 'Attributed authors'

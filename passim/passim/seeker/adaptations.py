@@ -26,7 +26,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
-    CollectionProject, EqualGoldProject, OnlineSources, \
+    CollectionProject, EqualGoldProject, OnlineSources, CollectionType, \
     ProjectApprover, ProjectEditor, ManuscriptExternal, SermonDescrExternal, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
     EXTERNAL_HUWA_OPERA, excel_to_list
@@ -40,7 +40,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
-        'sermonesdates'],
+        'collectiontype'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -144,6 +144,8 @@ def adapt_sermonesdates():
     oErr = ErrHandle()
     bResult = True
     msg = ""
+    count_miss = 0
+    count_hit = 0
     FILE_NAME = "check_dates_passim_2.xlsx"
 
     try:
@@ -172,6 +174,7 @@ def adapt_sermonesdates():
 
                 # Create a dictionary mapping the shelfmark to the manuscript ID
                 oManu = {x.manuscript.get_full_name() : x.manuscript.id for x in dataset.manuscript_col.all()}
+                oManuFlat = {x.manuscript.get_full_name().replace(' ', '').lower() : x.manuscript.id for x in dataset.manuscript_col.all()}
 
                 # Read the objects
                 for oSermon in lst_sermones:
@@ -195,12 +198,20 @@ def adapt_sermonesdates():
                         # Turn shelfmark into city/library/idno
                         manu_id = oManu.get(shelfmark)
                         if manu_id is None:
+                            # Re-try using flat
+                            manu_id = oManuFlat.get(shelfmark.replace(' ', '').lower())
+                        if manu_id is None:
                             # Cannot find this one
                             oErr.Status("Cannot locate SERMONES shelfmark [{}]".format(shelfmark))
+                            count_miss += 1
                         else:
                             # Get the right manuscript
                             manuscript = Manuscript.objects.filter(id=manu_id).first()
-                            if not manuscript is None:
+                            if manuscript is None:
+                                oErr.Status("Cannot locate SERMONES manuscript [{}]".format(shelfmark))
+                                count_miss += 1
+                            else:
+                                count_hit += 1
                                 # Get the codico - assuming there is only one
                                 codico = Codico.objects.filter(manuscript=manuscript).first()
                                 # Review the dates
@@ -215,11 +226,43 @@ def adapt_sermonesdates():
 
                         # Check and adapt the dates
 
+        # Give a report
+        oErr.Status("sermonesdates: hit={} miss={}".format(count_hit, count_miss))
     except:
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_collectiontype():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    oCtype = dict(sermo="Manifestation", super="Authority File", manu="Manuscript", gold="Sermon Gold")
+    try:
+        # Possibly fill the CollectionType table
+        count = CollectionType.objects.count()
+        if count == 0:
+            for k,v in oCtype.items():
+                obj = CollectionType.objects.create(name=k, full=v)
+        # Get mapping from short name to id
+        oCtypeMap = {}
+        for obj in CollectionType.objects.all():
+            oCtypeMap[obj.name] = obj
+        # Make a link from every collection
+        for obj in Collection.objects.all():
+            # Get the type
+            ctype = obj.type
+            # Get the id of CollectionType
+            typename = oCtypeMap[ctype]
+            # Check if it is there
+            if obj.typename is None or obj.typename.id != typename.id:
+                obj.typename = typename
+                obj.save()
+
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
 
 def adapt_msitemcleanup():
     method = "UseAdaptations"

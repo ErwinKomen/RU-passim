@@ -9099,6 +9099,18 @@ class ManuscriptExt(models.Model):
 
     def short(self):
         return self.url
+
+
+class CollectionType(models.Model):
+    """Provide name and shortcut for each collection type"""
+
+    # [1] Each collection type has only 1 name 
+    name = models.CharField("Short name", null=True, blank=True, max_length=LONG_STRING)
+    # [1] A collectiontype should also have a full name
+    full = models.CharField("Full name", null=True, blank=True, max_length=LONG_STRING)
+
+    def __str__(self):
+        return self.name
        
 
 class Collection(models.Model):
@@ -9113,6 +9125,8 @@ class Collection(models.Model):
     # [1] Each "Collection" has only 1 type    
     type = models.CharField("Type of collection", choices=build_abbr_list(COLLECTION_TYPE), 
                             max_length=5)
+    # [0-1]  Each collection should receive a type name, once it has been determined
+    typename = models.ForeignKey(CollectionType, null=True, blank=True, related_name="typename_collections", on_delete=models.SET_NULL)
     # [1] Each "collection" has a settype: pd (personal dataset) versus hc (historical collection)
     settype = models.CharField("Set type", choices=build_abbr_list(SET_TYPE), max_length=5, default="pd")
     # [0-1] Each collection can have one description
@@ -9149,24 +9163,34 @@ class Collection(models.Model):
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         oErr = ErrHandle()
-        # Double check the number of authors, if this is settype HC
-        if self.settype == "hc":
-            ssg_id = self.super_col.all().values('super__id')
-            authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
-            self.ssgauthornum = authornum
+        response = None
+        try:
+            # Double check the number of authors, if this is settype HC
+            if self.settype == "hc":
+                ssg_id = self.super_col.all().values('super__id')
+                authornum = Author.objects.filter(Q(author_equalgolds__id__in=ssg_id)).order_by('id').distinct().count()
+                self.ssgauthornum = authornum
 
-            # Issue #599: if this is or becomes settype 'hc', then the scopy must be 'public'
-            self.scope = "publ"
+                # Issue #599: if this is or becomes settype 'hc', then the scopy must be 'public'
+                self.scope = "publ"
 
-        # Adapt the save date
-        self.saved = get_current_datetime()
+            # Adapt the save date
+            self.saved = get_current_datetime()
 
-        # Double checking for issue #484 ========================================================
-        if self.name == "" or self.owner_id == "" or self.owner == None:
-            oErr.Status("Collection/save issue484: name=[{}] type=[{}]".format(self.name, self.type))
-        # =======================================================================================
+            # Double checking for issue #484 ========================================================
+            if self.name == "" or self.owner_id == "" or self.owner == None:
+                oErr.Status("Collection/save issue484: name=[{}] type=[{}]".format(self.name, self.type))
+            # =======================================================================================
 
-        response = super(Collection, self).save(force_insert, force_update, using, update_fields)
+            # Make sure the [type] (datasettype) is reflected in the CollectionType
+            typename = CollectionType.objects.filter(name=self.type).first()
+            if self.typename is None or self.type != typename.name:
+                self.typename = typename
+
+            response = super(Collection, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Collection/save")
         return response
 
     def add_sitems(self, lst_item, coltype):
@@ -9514,6 +9538,18 @@ class Collection(models.Model):
             # Create a display for this topic
             lHtml.append("<span class='badge signature gr'><a href='{}'>{}</a></span>".format(url,size))
         sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_type_name(self):
+        sBack = "unknown"
+        if not self.typename is None:
+            sBack = self.typename.full
+        else:
+            oMapping = dict(manu="Manuscript",
+                sermo="Manifestation",
+                super="Authority File",
+                gold="Gold Sermon")
+            sBack = oMapping.get(self.type, "Unknown")
         return sBack
 
     def get_hctemplate_copy(self, username, mtype):
