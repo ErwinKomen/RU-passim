@@ -5,95 +5,148 @@
 
 <div class="container body-content">
   <div class="jumbotron" style="max-height: 180px;">
-      <h1>
-        <span>PASSIM</span>
-        <span class="pull-right">
-          {% if not user.is_authenticated %}
-            <a class="btn btn-default" href="{% url 'login' %}"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>Log in</a>
-            <a class="btn btn-default" href="{% url 'signup' %}">Sign up</a>
-          {% endif %}
-          <a href="{% url 'about' %}" class="btn btn-primary btn-large">Learn more &raquo;</a>
-        </span>
-      </h1>
-      <p class="lead">
-        <span>The passim web application provides search facilities for Medieval Latin sermons.</span>
-        <span style="font-weight: bold; font-size: larger;">&nbsp;&nbsp;Disclaimer: </span>
-        <span class="" style="color: red; font-weight: bold; font-size: large;">This is a beta version</span>
-      </p>
+    <h1>
+      <span>PASSIM</span>
+      <span class="pull-right">
+        {% if not user.is_authenticated %}
+        <a class="btn btn-default" href="{% url 'login' %}"><span class="glyphicon glyphicon-user" aria-hidden="true"></span>Log in</a>
+        <a class="btn btn-default" href="{% url 'signup' %}">Sign up</a>
+        {% endif %}
+        <a href="{% url 'about' %}" class="btn btn-primary btn-large">Learn more &raquo;</a>
+      </span>
+    </h1>
+    <p class="lead">
+      <span>The passim web application provides search facilities for Medieval Latin sermons.</span>
+      <span style="font-weight: bold; font-size: larger;">&nbsp;&nbsp;Disclaimer: </span>
+      <span class="" style="color: red; font-weight: bold; font-size: large;">This is a beta version</span>
+    </p>
   </div>
 
   {% if is_404 %}
-    <div class="sent-error">
-      Sorry, but the path that you attempted to use is not available for the Passim application.
+  <div class="sent-error">
+    Sorry, but the path that you attempted to use is not available for the Passim application.
+  </div>
+  {% endif %}
+
+  {% if profile_msg %}
+    <div style="color: red; background-color: lightcyan;">Please update your 
+      <a role="button" class="btn jumbo-3" href="{{profile_url}}">Profile</a>
     </div>
   {% endif %}
 
   <div class="row">
-      <div class="col-md-6 bgimg">
-        <h2>Summary</h2>
-        <p>Currently the web application hosts {{count_sermon}} sermons, that are part of {{count_manu}} manuscripts. 
-        We keep track of the information that is extracted from external <a href="{% url 'source_list' %}" target="_blank">sources</a> 
+    <div class="col-md-6 bgimg">
+      <h2>Summary</h2>
+      <p>
+        Currently the web application hosts {{count_sermon}} sermons, that are part of {{count_manu}} manuscripts.
+        We keep track of the information that is extracted from external <a href="{% url 'source_list' %}" target="_blank">sources</a>
         (<a href="{% url 'about' %}">statistics</a>).
-        More details can be found on the <a href="{% url 'literature_list' %}" target="_blank">bibliography page</a>.</p>
+        More details can be found on the <a href="{% url 'literature_list' %}" target="_blank">bibliography page</a>.
+      </p>
 
-        <div class="row" style="height: 200px;" targeturl="{% url 'guide' %}">
-          <div id="pie_sermo" class="col-md-4" >
-          </div>
-          <div id="pie_super" class="col-md-4" >
-          </div>
-          <div id="pie_manu"  class="col-md-4" >
-          </div>
+      <div class="row" style="height: 200px;" targeturl="{% url 'guide' %}">
+        <div id="pie_sermo" class="col-md-4">
         </div>
-        
-        <p>Not sure about the colours? See this <a href="{% url 'guide' %}">explanation</a>.</p>
+        <div id="pie_super" class="col-md-4">
+        </div>
+        <div id="pie_manu" class="col-md-4">
+        </div>
+      </div>
 
-        <h2>Latest news</h2>
-        {% if newsitem_list %}
-          {% for item in newsitem_list %}
-            <div class="panel-news panel-default">
-              <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
-                <span>{{item.title}}</span>
-                <span class="pull-right" style="font-size: smaller;">
-                  {% if item.saved|date:"j/b/o" == item.created|date:"j/b/o" %}
-                    <i>{{item.saved|date:"j/b/o"}}</i>
-                  {% else %}
-                    <i>{{item.created|date:"j/b/o"}} - {{item.saved|date:"j/b/o"}}</i>
-                  {% endif %}
-                </span>
-              </div>
-              <div class="collapse newsitem" id="news-item-{{item.id}}">
-                {{item.msg|safe}}
-              </div>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p><i>(There is no news yet)</i></p>
+      <p>Not sure about the colours? See this <a href="{% url 'guide' %}">explanation</a>.</p>
+
+      <h2>Latest news</h2>
+      {% if newsitem_list %}
+      {% for item in newsitem_list %}
+      <div class="panel-news panel-default">
+        <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
+          <span>{{item.title}}</span>
+          <span class="pull-right" style="font-size: smaller;">
+            {% if item.saved|date:"j/b/o" == item.created|date:"j/b/o" %}
+            <i>{{item.saved|date:"j/b/o"}}</i>
+            {% else %}
+            <i>{{item.created|date:"j/b/o"}} - {{item.saved|date:"j/b/o"}}</i>
+            {% endif %}
+          </span>
+        </div>
+        <div class="collapse newsitem" id="news-item-{{item.id}}">
+          {{item.msg|safe}}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p><i>(There is no news yet)</i></p>
+      {% endif %}
+    </div>
+    <div class="col-md-6">
+      <h2>Project</h2>
+      <p>See the PASSIM <a href="https://applejack.science.ru.nl/passimproject" target="_blank">project page</a> for more information.</p>
+
+      <h2>Getting started</h2>
+      <p>
+        The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
+        Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>).
+        Regular researchers are able to read and search through the information that is provided.
+      </p>
+      <p>
+        {% if user.is_authenticated %}
+        (See the <b>Extra</b> menu for logout and other options)
         {% endif %}
-      </div>
-      <div class="col-md-6">
-        <h2>Project</h2>
-        <p>See the PASSIM <a href="https://applejack.science.ru.nl/passimproject" target="_blank">project page</a> for more information.</p>
-
-        <h2>Getting started</h2>
-        <p>
-          The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
-          Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>).
-          Regular researchers are able to read and search through the information that is provided.
-        </p>
-        <p>
-          {% if user.is_authenticated %}
-          (See the <b>Extra</b> menu for logout and other options)
-          {% endif %}
-        </p>
+      </p>
 
 
-      </div>
+    </div>
   </div>
 </div>
+{% if profile_msg %}
+  <!-- Modal form for profile updating -->
+  <div id="modal-profile" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+      <!-- Modal content -->
+      <div class="modal-content" style='width: 70%;'>
+        <!-- introduction header -->
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h3 class="modal-title">Your profile</h3>
+        </div>
+
+        <!-- Body of the modal-->
+        <div class="modal-body modal-dragpoint" id="view-profile">
+          <!-- This is where the actual help shows up -->
+          <div style='height: 200px; overflow-y: scroll;'>
+            <h4>Your profile lacks some important information.</h4>
+            <div>&nbsp;</div>
+            {% for line in profile_msg %}
+              <div>{{line|safe}}</div>
+            {% endfor %}
+            <div style="color: red; background-color: lightcyan;">
+              Continue to update your <a role="button" class="btn jumbo-3" href="{{profile_url}}">Profile</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer with the save button -->
+        <div class="modal-footer">
+          <a class="btn jumbo-1" data-dismiss="modal">
+            <span class="glyphicon glyphicon-ok" title="Close reminder">&nbsp;Close</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
 <script type="text/javascript">
-  var g_pie_data = {{pie_data|safe}} ;
+  var g_pie_data = {{ pie_data| safe}};
 
 </script>
+{% if profile_msg %}
+  <script type="text/javascript">
+    $(window).on('load', function () {
+      $('#modal-profile').modal('show');
+    });
+  </script>
+{% endif %}
 
 
 {% endblock %}

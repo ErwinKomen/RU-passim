@@ -1940,6 +1940,41 @@ class Profile(models.Model):
             oErr.DoError("is_project_editor")
         return bResult
 
+    def needs_updating(self):
+        """Check if the user needs to update his profile
+        
+        see issue #725
+        """
+
+        oErr = ErrHandle()
+        bResult = False
+        fields_user = ['first_name', 'last_name']
+        fields_profile = ['affiliation']
+        lst_msg = []
+        msg = ""
+        try:
+            # Check [User] fields
+            user = self.user
+            for field in fields_user:
+                value = getattr(user,field).strip()
+                if len(value) < 2:
+                    lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
+            for field in fields_profile:
+                value = getattr(self,field).strip()
+                if len(value) < 2:
+                    lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
+            if len(lst_msg) > 0:
+                # Combine
+                # msg = "\n".join(lst_msg)
+                # msg = json.dumps(lst_msg)
+                msg = lst_msg
+                bResult = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("")
+        return bResult, msg
+
+
 
 class Visit(models.Model):
     """One visit to part of the application"""

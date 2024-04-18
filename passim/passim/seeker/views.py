@@ -788,6 +788,18 @@ def home(request, errortype=None):
             thread = Thread(target=scan_transcriptions)
             thread.start()
 
+        # Check if the user's / profile's information is up-to-date
+        user = request.user
+        if not request is None and not user is None and not user.id is None:
+            profile = user.user_profiles.first()
+            if not profile is None:
+                # Validate information from this user
+                bNeeds, msg = profile.needs_updating()
+                if bNeeds:
+                    # Provide popup for user
+                    context['profile_msg'] = msg
+                    context['profile_url'] = reverse('profile_details', kwargs={'pk': profile.id})
+
         # Calculate the response
         response = render(request, template_name, context)
     except:
