@@ -460,7 +460,8 @@ class SetList(models.Model):
         The title is stored in an object, to facilitate template rendering
         """
 
-        oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 3000, "matches": 0}
+        # issue #713: changed into 0-0
+        oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 0, "matches": 0}
         if self.setlisttype == "manu":          # SSGs via Manuscript > sermons > SSG links
             # This is a manuscript
             oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")

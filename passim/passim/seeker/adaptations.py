@@ -26,10 +26,10 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
     CollectionMan, CollectionSuper, CollectionGold, UserKeyword, Template, \
     ManuscriptCorpus, ManuscriptCorpusLock, EqualGoldCorpus, SermonGoldExternal, \
     Codico, OriginCod, CodicoKeyword, ProvenanceCod, Project2, ManuscriptProject, SermonDescrProject, \
-    CollectionProject, EqualGoldProject, OnlineSources, \
+    CollectionProject, EqualGoldProject, OnlineSources, CollectionType, \
     ProjectApprover, ProjectEditor, ManuscriptExternal, SermonDescrExternal, \
     get_reverse_spec, LINK_EQUAL, LINK_PRT, LINK_BIDIR, LINK_PARTIAL, STYPE_IMPORTED, STYPE_EDITED, LINK_UNSPECIFIED, \
-    EXTERNAL_HUWA_OPERA
+    EXTERNAL_HUWA_OPERA, excel_to_list
 from passim.reader.models import Edition, Literatur, OperaLit
 from passim.reader.views import read_kwcategories
 
@@ -39,7 +39,8 @@ adaptation_list = {
         'sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-        'supplyname', 'usersearch_params', 'huwamanudate'],
+        'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
+        'collectiontype'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -109,6 +110,155 @@ def adapt_dateranges():
                     bNeedSaving = True
                 if bNeedSaving:
                     manu.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_baddateranges():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    lst_ranges = [ [100, 100], [9999, 9999], [1800, 2020] ]
+
+    try:
+        lst_delete = []
+        for oRange in lst_ranges:
+            yearstart = oRange[0]
+            yearfinish = oRange[1]
+            lst_ids = [x['id'] for x in Daterange.objects.filter(yearstart=yearstart, yearfinish=yearfinish).values('id')]
+            for id_this in lst_ids:
+                if not id_this in lst_delete:
+                    lst_delete.append(id_this)
+        # Do we have some ids?
+        if len(lst_delete) > 0:
+            # Remove them
+            Daterange.objects.filter(id__in=lst_delete).delete()
+            oErr.Status("adapt_baddaterange removed: {}".format(lst_delete))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_sermonesdates():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    count_miss = 0
+    count_hit = 0
+    FILE_NAME = "check_dates_passim_2.xlsx"
+
+    try:
+        # Expected column names
+        lExpected = ["first_line", "old_date", "new_dates", "shelfmark"]
+        # Names of the fields in which these need to be transformed
+        lField = ["first_line", "old_date", "new_dates", "shelfmark"]
+
+        # Expected filename
+        filename = os.path.abspath(os.path.join(MEDIA_DIR, "passim", FILE_NAME))
+        oErr.Status("Reading file {}".format(filename))
+
+        if not os.path.exists(filename):
+            oErr.Status("Cannot find this file")
+            bResult = False
+            msg = "Cannot find file {}".format(filename)
+
+        else:
+            # Get the right dataset
+            dataset = Collection.objects.filter(name__icontains="SERMONES FILE").first()
+
+            # Convert the data into a list of objects
+            bResult, lst_sermones, msg = excel_to_list(None, filename, lExpected, lField)
+
+            if bResult and not dataset is None:
+
+                # Create a dictionary mapping the shelfmark to the manuscript ID
+                oManu = {x.manuscript.get_full_name() : x.manuscript.id for x in dataset.manuscript_col.all()}
+                oManuFlat = {x.manuscript.get_full_name().replace(' ', '').lower() : x.manuscript.id for x in dataset.manuscript_col.all()}
+
+                # Read the objects
+                for oSermon in lst_sermones:
+                    # Treat this sermon
+                    old_date = oSermon.get("old_date")
+                    new_dates = oSermon.get("new_dates")
+                    shelfmark = oSermon.get("shelfmark")
+
+                    # Figure out the dates
+                    sDates = old_date if new_dates is None or new_dates == "" else new_dates
+                    if sDates != "" and sDates != "?":
+                        lDates = re.split(r'\,\s*', sDates)
+                        lst_date = []
+                        for sDate in lDates:
+                            ardate = sDate.split("-")
+                            if len(ardate) > 1:
+                                lst_date.append(dict(yearstart = ardate[0], yearfinish = ardate[1]))
+                            elif len(ardate) == 1:
+                                lst_date.append(dict(yearstart = ardate[0], yearfinish = ardate[0]))
+
+                        # Turn shelfmark into city/library/idno
+                        manu_id = oManu.get(shelfmark)
+                        if manu_id is None:
+                            # Re-try using flat
+                            manu_id = oManuFlat.get(shelfmark.replace(' ', '').lower())
+                        if manu_id is None:
+                            # Cannot find this one
+                            oErr.Status("Cannot locate SERMONES shelfmark [{}]".format(shelfmark))
+                            count_miss += 1
+                        else:
+                            # Get the right manuscript
+                            manuscript = Manuscript.objects.filter(id=manu_id).first()
+                            if manuscript is None:
+                                oErr.Status("Cannot locate SERMONES manuscript [{}]".format(shelfmark))
+                                count_miss += 1
+                            else:
+                                count_hit += 1
+                                # Get the codico - assuming there is only one
+                                codico = Codico.objects.filter(manuscript=manuscript).first()
+                                # Review the dates
+                                for oDate in lst_date:
+                                    yearstart = oDate.get('yearstart')
+                                    yearfinish = oDate.get('yearfinish')
+                                    dr = Daterange.objects.filter(codico=codico, yearstart=yearstart, yearfinish=yearfinish).first()
+                                    if dr is None:
+                                        oErr.Status("Manu [{}]: adding daterange [{},{}]".format(shelfmark, yearstart, yearfinish))
+                                        dr = Daterange.objects.create(codico=codico, yearstart=yearstart, yearfinish=yearfinish)
+                            
+
+                        # Check and adapt the dates
+
+        # Give a report
+        oErr.Status("sermonesdates: hit={} miss={}".format(count_hit, count_miss))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_collectiontype():
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    oCtype = dict(sermo="Manifestation", super="Authority File", manu="Manuscript", gold="Sermon Gold")
+    try:
+        # Possibly fill the CollectionType table
+        count = CollectionType.objects.count()
+        if count == 0:
+            for k,v in oCtype.items():
+                obj = CollectionType.objects.create(name=k, full=v)
+        # Get mapping from short name to id
+        oCtypeMap = {}
+        for obj in CollectionType.objects.all():
+            oCtypeMap[obj.name] = obj
+        # Make a link from every collection
+        for obj in Collection.objects.all():
+            # Get the type
+            ctype = obj.type
+            # Get the id of CollectionType
+            typename = oCtypeMap[ctype]
+            # Check if it is there
+            if obj.typename is None or obj.typename.id != typename.id:
+                obj.typename = typename
+                obj.save()
+
     except:
         bResult = False
         msg = oErr.get_error_message()

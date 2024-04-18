@@ -10,7 +10,7 @@
       <div>
         <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#colladdinfo"
            title="Add {{pl_name}} to this personal dataset">
-          <span class="glyphicon glyphicon-plus"></span>Add {{pl_name}} info
+          <span class="glyphicon glyphicon-plus"></span>How to add {{pl_name}}?
         </a>
       </div>
 
@@ -24,13 +24,13 @@
           </ul>
           <p>Here is a shortcut to the listview that you need:
               {% if datasettype == "manu" %}
-                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'manuscript_list' %}">Goto manuscripts</a>
+                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'manuscript_list' %}">Go to Manuscripts listview</a>
               {% elif datasettype == "sermo" %}
-                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'sermon_list' %}">Goto sermons</a>
+                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'sermon_list' %}">Go to Manifestations listview</a>
               {% elif datasettype == "gold" %}
-                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'gold_list' %}">Goto gold sermons</a>
+                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'gold_list' %}">Go to Sermons Gold listview</a>
               {% elif datasettype == "super" %}
-                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'equalgold_list' %}">Goto super sermons gold</a>
+                <a class="btn btn-xs jumbo-3" style="color: white;" href="{% url 'equalgold_list' %}">Go to Authority Files listview</a>
               {% else %}
                 <i>Sorry, something went wrong. I'm not able to determine what kind of items this dataset holds.</i>
               {% endif %}

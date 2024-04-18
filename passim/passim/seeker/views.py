@@ -4594,7 +4594,7 @@ class SermonEdit(BasicDetails):
                     {'type': 'plain', 'label': "Project:",     'value': instance.get_project_markdown2(), 'field_list': 'projlist'},
                     # AltPageNumber HIER
                     #{'type': 'plain', 'label': "Alternative page numbering:", 'value': instance.get_altpage_markdown(), 'field_list': 'altpagelist'},
-                    {'type': 'line',  'label': "Related sermon manifestations:",  'value': instance.get_sermolinks_markdown(), 
+                    {'type': 'line',  'label': "Related Manifestations:",  'value': instance.get_sermolinks_markdown(), 
                         'multiple': True,  'field_list': 'slinklist',   'fso': self.formset_objects[5]},
 
                     ]
@@ -7973,8 +7973,8 @@ class CollAnyEdit(BasicDetails):
             # Define the main items to show and edit
             context['mainitems'] = [
                 # Some items must be passed on
-                {'type': 'plain', 'label': "Type:",        'value': instance.type,      'field_key': 'type',   'empty': 'hide'},
-                {'type': 'plain', 'label': "Owner id:",    'value': instance.owner.id,  'field_key': 'owner',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Type:",        'value': instance.get_type_name(),   'field_key': 'type',   'empty': 'hide'},
+                {'type': 'plain', 'label': "Owner id:",    'value': instance.owner.id,          'field_key': 'owner',   'empty': 'hide'},
 
                 # Regular visible fields
                 {'type': 'plain', 'label': "Name:",        'value': instance.name, 'field_key': 'name'},
@@ -7992,7 +7992,7 @@ class CollAnyEdit(BasicDetails):
 
             # Always add Type, but its value may not be changed
             context['mainitems'].append(
-                {'type': 'plain', 'label': "Type:",        'value': instance.get_type_display})
+                {'type': 'plain', 'label': "Type:",        'value': instance.get_type_name()})
 
             # Always add project label(s)
             #context['mainitems'].append(
@@ -8007,7 +8007,7 @@ class CollAnyEdit(BasicDetails):
             if self.prefix == "priv" and instance != None and instance.settype == "pd" and instance.id != None:
                 name_choice = dict(
                     manu=dict(sg_name="Manuscript", pl_name="Manuscripts"),
-                    sermo=dict(sg_name="Sermon manifestation", pl_name="Sermons"),
+                    sermo=dict(sg_name="Manifestation", pl_name="Manifestations"),
                     gold=dict(sg_name="Sermon Gold", pl_name="Sermons Gold"),
                     super=dict(sg_name="Authority file", pl_name="Authority files")
                     )
@@ -8087,6 +8087,10 @@ class CollAnyEdit(BasicDetails):
                 # Store the after_details in the context
                 context['after_details'] = "\n".join(lhtml)    
 
+                # If this is not a HC, then no comments are needed
+                self.comment_button = False
+                context['comment_button'] = False
+
             # Possible add URI
             if instance.settype == "hc":
                 # Make stable URI available
@@ -8119,7 +8123,7 @@ class CollAnyEdit(BasicDetails):
             profile_owner = instance.owner
             profile_user = Profile.get_user_profile(self.request.user.username)
             # (2) Set default permission
-            permission = ""
+            permission = "readonly"
             if self.may_edit(context):
                 if profile_owner.id == profile_user.id:
                     # (3) Any creator of the collection may write it
@@ -8143,6 +8147,11 @@ class CollAnyEdit(BasicDetails):
                 permission = "readonly"
 
             context['permission'] = permission
+
+            # adapt visibility of revision history (issue #451)
+            if permission == "readonly":
+                self.history_button = False
+                context['history_button'] = False
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollAnyEdit/add_to_context")
@@ -8255,7 +8264,6 @@ class CollAnyEdit(BasicDetails):
                 errors.append(form.errors)
                 bResult = False
         return None
-
 
     def before_save(self, form, instance):
         oErr = ErrHandle()
@@ -8632,7 +8640,7 @@ class CollPrivDetails(CollAnyEdit):
 
             elif instance.type == "sermo":
                 # Get all sermons that are part of this PD
-                sermons = dict(title="Sermon manifestations within this dataset", prefix="sermo")
+                sermons = dict(title="Manifestations within this dataset", prefix="sermo")
                 if resizable: sermons['gridclass'] = "resizable dragdrop"
                 sermons['savebuttons'] = True
                 sermons['saveasbutton'] = True
@@ -9591,7 +9599,7 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "All types Collections"
             self.sg_name = "Collection"  
-            self.order_cols = ['type', 'scope', 'name', 'created', 'owner__user__username', '']
+            self.order_cols = ['typename__full', 'scope', 'name', 'created', 'owner__user__username', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
@@ -9606,7 +9614,7 @@ class CollectionListView(BasicList):
             self.titlesg = "Personal Dataset"
             self.plural_name = "Datasets"
             self.sg_name = "Dataset"  
-            self.order_cols = ['type', 'name', 'scope', 'owner__user__username', '', 'created', '']
+            self.order_cols = ['typename__full', 'name', 'scope', 'owner__user__username', '', 'created', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
@@ -9637,7 +9645,7 @@ class CollectionListView(BasicList):
             self.new_button = False
             self.plural_name = "Public Datasets"
             self.sg_name = "Public Dataset"  
-            self.order_cols = ['type', 'name', 'created',  'owner__user__username', '', '']
+            self.order_cols = ['typename__full', 'name', 'created',  'owner__user__username', '', '']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Type',        'order': 'o=1', 'type': 'str', 'custom': 'type'},
@@ -9964,7 +9972,7 @@ class CollectionListView(BasicList):
             # Combine the HTML code
             sBack = "\n".join(html)
         elif custom == "type":
-            sBack = instance.get_type_display()
+            sBack = instance.get_type_name()
         elif custom == "scope":
             sBack = instance.get_scope_display()
         elif custom == "created":
@@ -10918,7 +10926,7 @@ class ManuscriptEdit(BasicDetails):
                     if instance.mtype != "rec":
                         # Add a button so that the user can import sermons + hierarchy from an existing template
                         if not has_sermons:
-                            lbuttons.append(dict(title="Import sermon manifestations from a template", 
+                            lbuttons.append(dict(title="Import Manifestations from a template", 
                                         id=template_import_button, open="import_from_template", label="Import from template..."))
 
                         # Add a button so that the user can turn this manuscript into a `Template`
@@ -11430,7 +11438,11 @@ class ManuscriptEdit(BasicDetails):
         passim_action_add(self, instance, details, actiontype)
 
     def get_history(self, instance):
-        return passim_get_history(instance)
+        lst_key_exclude = []
+        # Double check if this person is an editor or not
+        if not user_is_ingroup(self.request, app_editor):
+            lst_key_exclude.append("editornotes")
+        return passim_get_history(instance, lst_key_exclude)
 
 
 class ManuscriptDetails(ManuscriptEdit):
@@ -17139,12 +17151,16 @@ class BasketUpdate(BasicPart):
                         # Save the current basket as a collection that needs to receive a name
                         # Note: this assumes [scope='priv'] default
                         if self.colltype != "super":
+                            # Need to adapt the wording
+                            adapted_word = dict(sermo="Manifestation", manu="Manuscript", gold="GoldSermon")
+                            sWord = adapted_word.get(self.colltype, "Unknown")
                             coll = Collection.objects.create(path=history, settype="pd",
-                                    descrip="Created from a {} listview basket".format(self.colltype), 
+                                    descrip="Created from a {} listview basket".format(sWord), 
                                     owner=profile, type=self.colltype)
                         else:
+                            # So this is only super = ssg = authority file
                             coll = Collection.objects.create(path=history, settype="pd",
-                                    descrip="Created from a Authority file listview basket", 
+                                    descrip="Created from an Authority file listview basket", 
                                     owner=profile, type=self.colltype)
                         # Assign it a name based on its ID number and the owner
                         if self.colltype != "super":
@@ -17154,10 +17170,13 @@ class BasketUpdate(BasicPart):
                         coll.name = name
                         coll.save()
                     elif operation == "rsetcreate":
+                        # Need to adapt the wording
+                        adapted_word = dict(sermo="Manifestation", manu="Manuscript", gold="GoldSermon", super="Authority File")
+                        sWord = adapted_word.get(self.colltype, "Unknown")
                         # Save the current basket as a research-set that needs to receive a name
                         rset = ResearchSet.objects.create(
                             name="tijdelijk",
-                            notes="Created from a {} listview basket".format(self.colltype),
+                            notes="Created from a {} listview basket".format(sWord),
                             profile=profile)
                         # Assign it a name based on its ID number and the owner
                         name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)
@@ -17177,10 +17196,13 @@ class BasketUpdate(BasicPart):
                                 rsetname = rset.name
                                 context['data'] = dict(collurl=rseturl, collname=rsetname)
                     elif operation == "dctlaunch":
+                        # Need to adapt the wording
+                        adapted_word = dict(sermo="Manifestation", manu="Manuscript", gold="GoldSermon", super="Authority File")
+                        sWord = adapted_word.get(self.colltype, "Unknown")
                         # Save the current basket as a research-set that needs to receive a name
                         rset = ResearchSet.objects.create(
                             name="tijdelijk",
-                            notes="Created from a {} listview basket for direct DCT launching".format(self.colltype),
+                            notes="Created from a {} listview basket for direct DCT launching".format(sWord),
                             profile=profile)
                         # Assign it a name based on its ID number and the owner
                         name = "{}_{}_{}".format(profile.user.username, rset.id, self.colltype)

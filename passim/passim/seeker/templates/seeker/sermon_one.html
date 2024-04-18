@@ -86,7 +86,7 @@
                 {% endif %}
                 {% if msitem.sermon %}
                   <a href="{% url 'sermon_details' msitem.sermon.id %}" class="sermon">
-                    <span>{% include 'seeker/sermon_view.html' with sermon=msitem.sermon %}</span>
+                    <span style="width: 100%;">{% include 'seeker/sermon_view.html' with sermon=msitem.sermon %}</span>
                   </a>
                   <span class="sermon">
                     <span class="manusermo hc hidden">{{msitem.hclist|safe}}</span>

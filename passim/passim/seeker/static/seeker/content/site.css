@@ -1518,6 +1518,11 @@ td a.nostyle {
   display: inline-block;
 }
 
+a.sermon {
+    width: 100%;
+    display: block;
+}
+
 a.sermon:link, a.sermon:visited {
     text-decoration: inherit;
     color: inherit;

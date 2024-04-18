@@ -19,15 +19,20 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
     lData = []
     msg = ""
     try:
-        # Write data temporarily to the WRITABLE dir, but with a temporary filename
-        tmp_path = os.path.abspath(os.path.join( MEDIA_DIR, filename))
-        with io.open(tmp_path, "wb") as f:
-            sData = data.read()
-            f.write(sData)
+        # Check the first argument
+        if data is None:
+            wb = openpyxl.load_workbook(filename, read_only=True)
+            ws = wb.active
+        else:
+            # Write data temporarily to the WRITABLE dir, but with a temporary filename
+            tmp_path = os.path.abspath(os.path.join( MEDIA_DIR, filename))
+            with io.open(tmp_path, "wb") as f:
+                sData = data.read()
+                f.write(sData)
 
-        # Read string file
-        wb = openpyxl.load_workbook(tmp_path, read_only=True)
-        ws = wb.active
+            # Read string file
+            wb = openpyxl.load_workbook(tmp_path, read_only=True)
+            ws = wb.active
 
         # Iterate through rows
         bFirst = True
@@ -70,7 +75,8 @@ def excel_to_list(data, filename, lExpected = None, lField = None):
         wb.close()
 
         # Remove the file
-        os.remove(tmp_path)
+        if not data is None:
+            os.remove(tmp_path)
         # Return positively
         bResult = True
     except:

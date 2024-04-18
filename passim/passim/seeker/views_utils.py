@@ -55,7 +55,7 @@ def passim_action_add(view, instance, details, actiontype):
     # Now we are ready
     return None
 
-def passim_get_history(instance):
+def passim_get_history(instance, lst_key_exclude = []):
     lhtml= []
     lhtml.append("<table class='table'><thead><tr><td><b>User</b></td><td><b>Date</b></td><td><b>Description</b></td></tr></thead><tbody>")
     # Get the history for this item
@@ -75,7 +75,8 @@ def passim_get_history(instance):
         if 'changes' in obj:
             lchanges = []
             for key, value in obj['changes'].items():
-                lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
+                if not key in lst_key_exclude:
+                    lchanges.append("<b>{}</b>=<code>{}</code>".format(key, value))
             changes = ", ".join(lchanges)
             if 'model' in obj and obj['model'] != None and obj['model'] != "":
                 description = "{} {}".format(description, obj['model'])
