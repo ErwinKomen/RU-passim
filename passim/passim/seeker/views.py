@@ -8,6 +8,7 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F, Sum
 from django.db.models.functions import Lower
@@ -1296,6 +1297,8 @@ def signup(request):
             # Create the user
             username = form.cleaned_data.get('username')
             raw_password = form.cleaned_data.get('password1')
+            affiliation = form.cleaned_data.get('affiliation')
+
             # also make sure that the user gets into the STAFF,
             #      otherwise he/she may not see the admin pages
             user = authenticate(username=username, 
@@ -1308,6 +1311,13 @@ def signup(request):
             if gQs.count() > 0:
                 g = gQs[0]
                 g.user_set.add(user)
+
+            # Add a profile for this new user
+            profile = Profile.objects.filter(user=user).first()
+            if profile == None:
+                # There is no profile yet, so make it
+                profile = Profile.objects.create(user=user, affiliation=affiliation)
+
             # Log in as the user
             login(request, user)
             return redirect('home')
@@ -7403,6 +7413,8 @@ class ProfileEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        not_editable_by_user = ['username', 'status', 'project editing rights', 'project approval rights' ]
+
         # Define the main items to show and edit
         context['mainitems'] = [
             # The user.id must be passed on, but non-visibly
@@ -7437,6 +7449,13 @@ class ProfileEdit(BasicDetails):
             # Compare with instance
             if user.id == instance.user.id:
                 self.permission = "write"
+                # BUT: some fields may *NOT* be edited even by the user
+                for oItem in context['mainitems']:
+                    label_name = oItem.get("label").replace(":", "").lower()
+                    if label_name in not_editable_by_user:
+                        # Remove any field_key or field_list
+                        if 'field_key' in oItem: oItem.pop('field_key')
+                        if 'field_list' in oItem: oItem.pop('field_list')
             else:
                 # This is not the current user
                 self.permission = "readonly"
@@ -7455,27 +7474,49 @@ class ProfileEdit(BasicDetails):
 
             # (1) Process newusername
             newusername = form.cleaned_data['newusername']
-            if instance.user.username != newusername:
-                instance.user.username = newusername
-                bSaveUser = True
+            if newusername != "":
+                # Note: the [newusername] is empty, if the user is not allowed to work on this
+                if instance.user.username != newusername:
+                    instance.user.username = newusername
+                    bSaveUser = True
 
             # (2) Process newemail
             newemail = form.cleaned_data['newemail']
             if instance.user.email != newemail:
-                instance.user.email = newemail
-                bSaveUser = True
+                # Validate this
+                try:
+                    validate_email(newemail)
+                    instance.user.email = newemail
+                    bSaveUser = True
+                except ValidationError:
+                    oErr.Status("ProfileEdit/after_save: invalid email")
+                    form.add_error("newemail", "invalid email")
 
             # (3) Process newfirst_name
             newfirst_name = form.cleaned_data['newfirst_name']
             if instance.user.first_name != newfirst_name:
-                instance.user.first_name = newfirst_name
-                bSaveUser = True
+                newfirst_name = newfirst_name.strip()
+                if newfirst_name != "" and len(newfirst_name) > 1:
+                    instance.user.first_name = newfirst_name
+                    bSaveUser = True
+                else:
+                    form.add_error("newfirst_name", "Invalid first name")
 
             # (4) Process newlast_name
             newlast_name = form.cleaned_data['newlast_name']
             if instance.user.last_name != newlast_name:
-                instance.user.last_name = newlast_name
-                bSaveUser = True
+                newlast_name = newlast_name.strip()
+                if newlast_name != "" and len(newlast_name) > 1:
+                    instance.user.last_name = newlast_name
+                    bSaveUser = True
+                else:
+                    form.add_error("newlast_name", "Invalid last name")
+
+            # (5) Check affiliation
+            affiliation = form.cleaned_data['affiliation']
+            affiliation = affiliation.strip()
+            if len(affiliation) < 2:
+                form.add_error("affiliation", "Invalid affiliation")
 
             # Possibly save the user
             if bSaveUser:

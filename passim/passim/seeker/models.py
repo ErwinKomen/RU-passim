@@ -4044,6 +4044,44 @@ class Manuscript(models.Model):
             bResult = False
         return bResult, msg
 
+    def adapt_manudateranges(self):
+        oErr = ErrHandle()
+        bResult = True
+        msg = ""
+
+        try:
+            # Check dates for this manuscript
+            yearstart = 0
+            yearfinish = 3000
+            # Find the best fit for the yearstart
+            lst_dateranges = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart').values('yearstart')
+            if len(lst_dateranges) > 0:
+                yearstart = lst_dateranges[0]['yearstart']
+            # Find the best fit for the yearfinish
+            lst_dateranges = Daterange.objects.filter(codico__manuscript=self).order_by('-yearfinish').values('yearfinish')
+            if len(lst_dateranges) > 0:
+                yearfinish = lst_dateranges[0]['yearfinish']
+            bNeedSaving = False
+            if yearstart != self.yearstart:
+                self.yearstart = yearstart
+                bNeedSaving = True
+            if yearfinish != self.yearfinish:
+                self.yearfinish = yearfinish
+                bNeedSaving = True
+
+            # Do not accept 3000
+            if self.yearfinish == 3000:
+                self.yearfinish = yearstart
+                bNeedSaving = True
+                    
+            if bNeedSaving:
+                self.save()
+        except:
+            bResult = False
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/adapt_manudateranges")
+        return bResult
+
     def add_codico_to_manuscript(self):
         bResult, msg = add_codico_to_manuscript(self)
         return bResult, msg

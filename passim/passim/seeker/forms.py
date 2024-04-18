@@ -1725,20 +1725,28 @@ class BootstrapAuthenticationForm(AuthenticationForm):
 
 
 class SignUpForm(UserCreationForm):
-    first_name = forms.CharField(max_length=30, required=False, help_text='Optional.')
-    last_name = forms.CharField(max_length=30, required=False, help_text='Optional.')
+    first_name = forms.CharField(max_length=30, required=True, help_text='Required.')
+    last_name = forms.CharField(max_length=30, required=True, help_text='Required.')
+    affiliation = forms.CharField(max_length=254, required=True, help_text='Required. If private, fill in "not applicable"')
     email = forms.EmailField(max_length=254, help_text='Required. Inform a valid email address.')
 
     class Meta:
         model = User
-        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2', )
+        fields = ('username', 'first_name', 'last_name', 'affiliation', 'email', 'password1', 'password2', )
 
     def __init__(self, *args, **kwargs):
+        # First do what needs to be done
         super(SignUpForm, self).__init__(*args, **kwargs)
+
+        # Now process the parameters
         first_name = self.fields['first_name']
         last_name = self.fields['last_name']
+        affiliation = self.fields['affiliation']
+
+        # Make sure to validate
         first_name.validators.append(validate_safe_charinput)
         last_name.validators.append(validate_safe_charinput)
+        affiliation.validators.append(validate_safe_charinput)
 
     def is_valid(self):
         # Do default is valid
@@ -1757,20 +1765,16 @@ class SignUpForm(UserCreationForm):
                         valid = False
                         self.errors[k] = "Don't include JS in a text field"
                         # break
+
+            # Double check: the username may not occur already
+            username = cd['username']
+            obj = User.objects.filter(username=username).first()
+            if not obj is None:
+                # This username is already taken
+                self.errors['username'] = "This username is not available"
+                valid = False
         # Return what we have
         return valid
-
-
-#class SearchSermonForm(BasicSimpleForm):
-#    """Note: only for SEARCHING"""
-
-#    author = forms.CharField(label=_("Author"), required=False)
-#    incipit = forms.CharField(label=_("Incipit"), required=False)
-#    explicit = forms.CharField(label=_("Explicit"), required=False)
-#    title = forms.CharField(label=_("Title"), required=False)
-#    signature = forms.CharField(label=_("Signature"), required=False)
-#    feast = forms.CharField(label=_("Feast"), required=False)
-#    keyword = forms.CharField(label=_("Keyword"), required=False)
 
 
 class SelectGoldForm(BasicModelForm):
@@ -1834,24 +1838,6 @@ class ManuReconForm(BasicSimpleForm):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("manureconform")
-
-
-#class SearchManuscriptForm(BasicSimpleForm):
-#    """Note: only for SEARCHING"""
-
-#    country = forms.CharField(label=_("Country"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-#    city = forms.CharField(label=_("City"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-#    library = forms.CharField(label=_("Library"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-#    signature = forms.CharField(label=_("Signature"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
-#    name = forms.CharField(label=_("Title"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
-#    idno = forms.CharField(label=_("Idno"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
-#    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
 class SearchManuForm(PassimModelForm):

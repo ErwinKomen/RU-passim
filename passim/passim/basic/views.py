@@ -2342,6 +2342,11 @@ class BasicDetails(DetailView):
                     
                             # Any action(s) after saving
                             bResult, msg = self.after_save(frm, obj)
+                            
+                            if frm.errors:
+                                # We need to pass on to the user that there are errors
+                                context['errors'] = frm.errors
+                                oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
                         else:
 
                             # EK: working on this.
@@ -2384,7 +2389,7 @@ class BasicDetails(DetailView):
                         # Check if an 'afternewurl' is specified
                         if self.afternewurl != "":
                             context['afternewurl'] = self.afternewurl
-                
+
             else:
                 if mForm != None:
                     # Check if this is asking for a new form

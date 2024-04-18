@@ -108,6 +108,12 @@ def adapt_dateranges():
                 if yearfinish != manu.yearfinish:
                     manu.yearfinish = yearfinish
                     bNeedSaving = True
+
+                # Do not accept 3000
+                if manu.yearfinish == 3000:
+                    manu.yearfinish = yearstart
+                    bNeedSaving = True
+                    
                 if bNeedSaving:
                     manu.save()
     except:
