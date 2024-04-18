@@ -2193,7 +2193,7 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city        = forms.CharField(required=False)
     city_ta     = forms.CharField(label=_("City"), required=False, 
-                    widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     library     = forms.CharField(required=False)
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))

@@ -5524,7 +5524,7 @@ class SermonListView(BasicList):
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',        'fkfield': 'manu',  'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity|msitem__manu__library__location',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'msitem__codico__origin',          'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'msitem__codico__provenances|msitem__codico__provenances__location',     
@@ -11994,7 +11994,7 @@ class ManuscriptListView(BasicList):
     plural_name = "Manuscripts"
     basketview = False
     
-    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__location__name;library__lcity__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
         {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
@@ -12266,10 +12266,10 @@ class ManuscriptListView(BasicList):
         if custom == "city":
             if not instance.library is None:
                 city = None
-                if instance.library.lcity:
-                    city = instance.library.lcity.name
-                elif instance.library.location:
+                if instance.library.location:
                     city = instance.library.location.name
+                elif instance.library.lcity:
+                    city = instance.library.lcity.name
                 if city == None:
                     html.append("??")
                     sTitle = "City or location unclear"
