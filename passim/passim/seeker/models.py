@@ -1964,9 +1964,6 @@ class Profile(models.Model):
                 if len(value) < 2:
                     lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
             if len(lst_msg) > 0:
-                # Combine
-                # msg = "\n".join(lst_msg)
-                # msg = json.dumps(lst_msg)
                 msg = lst_msg
                 bResult = True
         except:
