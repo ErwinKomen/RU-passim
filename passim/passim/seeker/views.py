@@ -9967,7 +9967,7 @@ class CollectionListView(BasicList):
             number = instance.freqsuper()
             if number > 0:
                 url = reverse('equalgold_list')
-                html.append("<a href='{}?ssg-collist_hist={}'>".format(url, instance.id))
+                html.append("<a href='{}?ssg-collist_ssg={}'>".format(url, instance.id))
                 html.append("<span class='badge jumbo-3 clickable' title='Frequency in Authority files'>{}</span></a>".format(number))
             # Combine the HTML code
             sBack = "\n".join(html)
