@@ -12233,6 +12233,8 @@ class ManuscriptExternal(models.Model):
     # [1] The type of external project
     externaltype = models.CharField("External type", choices=build_abbr_list(EXTERNAL_TYPE), 
                             max_length=5, default=EXTERNAL_HUWA_OPERA)
+    # [0-1] The identifier of the external project (text)
+    externaltextid = models.CharField("External identifier (text)", null=True, blank=True, max_length=LONG_STRING)
 
     # [1] And a date: the date of saving this relation
     created = models.DateTimeField(default=get_current_datetime)

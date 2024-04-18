@@ -57,8 +57,8 @@ from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, Ma
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
     Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, Information, \
-    Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal,  \
-    Report, Keyword, ManuscriptKeyword, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
+    Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal, \
+    Report, Keyword, ManuscriptKeyword, ManuscriptExternal, City, Country, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
 
 # ======= from RU-Basic ========================
@@ -6706,9 +6706,7 @@ class ReaderHuwaImport(ReaderEqualGold):
             oImported['msg'] = msg
 
         return oImported
-
-
- 
+         
 def reader_CPPM_AF(request):
 
     # This function adds AF's retrieved from the CPPM data into the database
@@ -6746,13 +6744,12 @@ def reader_CPPM_AF(request):
     code_lst = []
     editype_lst = []
     project_lst = []
+    
+    project_name = "Brepols-CPPM"
 
     # Create an empty data frame
     gs_df = pd.DataFrame(columns=['Number', 'Code', 'Editype', 'Project', 'Incipit', 'Explicit', 'Title', 'Author_id', 'Equality'])
      
-    # The project label that needs to be added
-    project_name = "Brepols-CPPM"
-    
     # First at the highest level (the id's (numbers))
     for key1, value1 in cppm_texts.items(): 
 
@@ -6821,10 +6818,8 @@ def reader_CPPM_AF(request):
                 gs_df.loc[len(gs_df.index)] = work_lst
 
     for index, row in gs_df.iterrows():
-        #print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
+        print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
         
-        #print(row['Explicit'])
-
         # Check of dit allemaal werkt
         cppm = row['Number']
         code = row['Code']
@@ -6843,11 +6838,10 @@ def reader_CPPM_AF(request):
         # Check of de Signature bestaat
         sig_obj = Signature.objects.filter(code=code, editype = 'cl').first()
         if sig_obj is None:            
-            # GoldSermon aanmaken, check of die SG er niet al eerder door mij erin is gezet 
-            # TH klopt dit? wat als er al wel een sig is maar geen GS?            
+            # Find if the SG is already in the database                  
             gs_obj = SermonGold.objects.filter(incipit = incipit, explicit = explicit, author_id = author).first()
             if gs_obj == None:
-                # Create a new Gold Sermon
+                # Create a new Gold Sermon if this is not the case
                 gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
                 gs_obj.save()   
         else: 
@@ -6860,8 +6854,8 @@ def reader_CPPM_AF(request):
                 gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
                 gs_obj.save()   
 
-        # Check if the Signature that belongs to the GS is already in the db (probably not since we have checked this already)                     
-       
+        # Check if the Signature that belongs to the GS is already in the db 
+        # (probably not since we have checked this already)                            
         sig_obj = Signature.objects.filter(code=code, gold=gs_obj).first()
         if sig_obj == None:
             # Create the new Signature record
@@ -6926,8 +6920,8 @@ def reader_CPPM_AF(request):
             
             gs_obj.equal = eqg_obj 
             gs_obj.save()
-            
-            
+                        
+           
             # Add newly created EqualGold to the EqualGoldExternal table
             # so that we can always link up other stuff from the CPPM data to the
             # EqualGold
@@ -6947,23 +6941,310 @@ def reader_CPPM_AF(request):
            
             # The name of the project needs to linked to the EqualGold.             
             # The project label that needs to be added
-            project_name = "Brepols-CPPM"
+            project_name_1 = "Brepols-CPPM"
+            project_name_2 = "Passim"
 
-            # Check if the project label already exits in the Project2 table
-            projectfound = Project2.objects.filter(name__iexact=project_name).first()
-            if projectfound == None:
+            # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+            projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+            if projectfound_1 == None:
                 # If the projectname does not already exist, it needs to be added to the database
-                projectcppm = Project2.objects.create(name = project_name)
+                projectcppm_1 = Project2.objects.create(name = project_name_1)
                 # And a link should be made between this new material and corresponding Portrait table
-                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm)
+                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
             else:
                 # In case there is a projectfound, check for a link, if so, nothing should happen, 
                 # than there is already a link between the EqualGold and a the project name
-                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound).first()
+                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
                 if eqgprjlink == None:
                     # If the project name already exists, but not the link, than only a link should be 
                     # made between the EqualGold and the projectname
-                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound) 
-                                    
+                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1) 
+             
+            # Check if the project label "Passim" already exits in the Project2 table
+            projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
+            if projectfound_2 == None:
+                # If the projectname does not already exist, it needs to be added to the database
+                projectcppm_2 = Project2.objects.create(name = project_name_2)
+                # And a link should be made between this new material and corresponding Portrait table
+                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_2)
+            else:
+                # In case there is a projectfound, check for a link, if so, nothing should happen, 
+                # than there is already a link between the EqualGold and a the project name
+                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_2).first()
+                if eqgprjlink == None:
+                    # If the project name already exists, but not the link, than only a link should be 
+                    # made between the EqualGold and the projectname
+                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_2)
+             
     # What we return is simply the home page
     return redirect('home')
+
+def reader_CPPM_manu(request):
+    
+    # This function adds manuscrips retrieved from the CPPM data into the database.     
+    # Only the records that are coded as "False" need to be imported, the rest is already in the database. 
+    
+    # Can only be done by a super-user
+    if request.user.is_superuser:        
+        pass
+
+    # Read the JSON file from MEDIA_DIR   
+    man_u_read = os.path.abspath(os.path.join(MEDIA_DIR, 'manuscripts_uniform.json')) 
+
+    # Open the read
+    manu_u = open(man_u_read, encoding="utf8")  
+
+    # Load the json files 
+    manuscripts_uniform = json.load(manu_u)
+    
+    # Keep count
+    count = 0 
+
+    # Create an empty data frame for later use
+    manu_df = pd.DataFrame(columns=['Number','Shelfmark', 'DateB', 'DateA', 'Shelf', 'Manid', 'Libid', 'Libname', 'Idno', 'Type']) #10
+    
+    # Find the information wee need, first at the highest level (the id's (numbers))
+    for key1, value1 in manuscripts_uniform.items():  
+        
+        # Retrieve the id of the entry
+        numb_json = key1
+
+        # Then one level lower
+        for key2, value2 in value1.items():
+            
+            # See which AF's are not in PASSIM and need to be added to the database
+            # and get all the information part of those unmapped AF's
+            if key2 == 'mapped' and value2 == False:  
+                
+                # Get cppm_shelfmark_norm
+                shelfm_norm = value1.get('cppm_shelfmark_norm')               
+               
+                # Navigate to the date items
+                for key3, value3 in value1.items():
+                    # Get the items from "date":
+                    if key3 == 'date':
+
+                        # Before date
+                        datebef = value3.get('notBefore')
+                        
+                        # After date
+                        dateaft = value3.get('notAfter')                       
+
+                    # Navigate to the passim_mapping items where the other items are                   
+                    elif key3 == 'passim_mapping':
+                        for value4 in value3:                                            
+                            
+                            # Create work_lst to add all the items we need
+                            work_lst = [] 
+
+                            # Add the ID of the JSON file (for ManuscriptExternal) #1
+                            work_lst.append(numb_json) 
+                                                                        
+                            # Add the shelfmark #2
+                            work_lst.append(shelfm_norm)                                                                         
+                                                            
+                            # Add the date before #3
+                            work_lst.append(datebef)
+
+                            # Add the date after #4
+                            work_lst.append(dateaft) 
+
+                            # Iterate over the items in the list
+                            # Here all the items should be placed in the work_lst list     
+                            for key5, value5 in value4.items():  
+                                  
+                                # Get the passim shelfmark (if mapped!) #5
+                                if key5 == 'passim_ms_shelfmark':                                                        
+                                    shelf = value5
+                                    work_lst.append(shelf)                                 
+                                                        
+                                # Get the passim manuscript id (if mapped!) #6
+                                elif key5 == 'seeker_manuscript_id':                                                        
+                                    manu_id = value5
+                                    work_lst.append(manu_id) 
+                                                       
+                                # Get the passim library id #7 
+                                elif key5 == 'seeker_library_id':                                                        
+                                    lib_id = value5
+                                    work_lst.append(lib_id)
+                                                        
+                                # Get the passim library name #8
+                                elif key5 == 'passim_institution':                                                        
+                                    lib_name=value5
+                                    work_lst.append(lib_name)
+                                                        
+                                # Get the passim manuscript idno #9 
+                                elif key5 == 'seeker_manuscript_idno':
+                                    idno=value5
+                                    work_lst.append(idno)
+                                                        
+                                # Get the passim manuscript type #10
+                                elif key5 == 'seeker_manuscript_stype':                                                        
+                                    stype=value5
+                                    work_lst.append(stype)                                                     
+                                                    
+                            # Put everything in the empty dataframe created above
+                            manu_df.loc[len(manu_df.index)] = work_lst
+     
+    # Sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers belong to which id and thus manuscript
+    manu_df.sort_values(by=['Number'])
+    
+    # Iterate over de DF
+    for index, row in manu_df.iterrows():
+        print(row['Number'], row['DateB'], row['DateA'], row['Shelfmark'], row['Shelf'], row['Manid'], row['Libid'], row['Libname'], row['Idno'], row['Type'])
+                             
+        # Give the contents of each cell a name
+        id_json = row['Number']   
+        dateb = row['DateB']
+        datea = row['DateA']
+        shelfmark = row['Shelfmark']
+        shelf_passim = row['Shelf']
+        manu_id = row['Manid']
+        lib_id = row['Libid']
+        lib_name = row['Libname']
+        idno = row['Idno'] 
+        type = row['Type'] 
+
+        # Date 
+
+        # In case dateb and datea are empty they need to be filled with "0"
+        # In case only datea is empty, datea will get the date of dateb
+
+        if dateb == None: 
+            if datea == None:            
+                dateb = 0
+                datea = 0
+            elif datea != None:
+                dateb = datea
+                
+        # If only datea is empty
+        else: 
+            if datea == None:
+                datea = dateb
+        
+        # Now we can store the data in the database
+        
+        # Manuscript
+
+        # First we need to find the library
+        lib_obj=Library.objects.filter(id=lib_id).first()        
+        
+        # If there is a library...
+        if lib_obj !=None:           
+
+            # ... get the city and country objects
+            city = lib_obj.lcity
+            country = lib_obj.lcountry
+
+            # Get the id's of those objects
+            city_id = city.id
+            country_id = country.id
+
+            # Get the locations for the city and country of the library 
+            loc_objcity = Location.objects.filter(id=city_id).first()
+            loc_objcountry = Location.objects.filter(id=country_id).first()
+
+        
+        # Check if the manuscript already exists and if not create a new manuscript
+        manu_obj = Manuscript.objects.filter(library=lib_obj, idno=idno, stype=type).first()
+        if manu_obj == None:
+            
+            # Create a new Manuscript
+            manu_obj = Manuscript.objects.create(library=lib_obj, idno=idno, stype=type, lcity=loc_objcity, lcountry=loc_objcountry)
+            
+        # Dates
+
+        # The dates need to be added to the Daterange table but first we need to 
+        # find the Codico unit of the newly created manuscript
+        cod_obj = manu_obj.manuscriptcodicounits.first()
+
+        # Then see if the Daterange object already exitst
+        dater_obj = Daterange.objects.filter(codico=cod_obj).first()
+        
+        # If this is not the case..
+        if dater_obj == None:
+            # ...create a new Daterange object and add the dates
+            dater_obj = Daterange.objects.create(codico=cod_obj, yearstart=dateb, yearfinish=datea)
+
+        # ManuscriptExternal    
+                                                     
+        # Add each newly created Manuscript to the ManuscriptExternal table
+        # add the key that belongs to this manuscript so that we can always link up 
+        # the other stuff from the CPPM data to the Manuscript.        
+       
+        # Code for externaltype
+        external = "brepols"   
+
+        # Check if the ManuscriptExternal object already exists           
+        manuex_obj = ManuscriptExternal.objects.filter(externalid=id_json, externaltype=external, manu=manu_obj).first()             
+        # If this is not the case
+        if manuex_obj == None:
+            # Create the new ManuscriptExternal object, add type and JSON key
+            manuex_obj = ManuscriptExternal.objects.create(manu=manu_obj, externaltype=external, externalid=id_json)                
+             
+        # Project
+
+        # The names of the projects "Brepols-CPPM" and "Passim" need to linked to the Manuscripts.             
+        
+        # The project label that needs to be added
+        project_name_1 = "Brepols-CPPM"
+        project_name_2 = "Passim"
+
+        # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+        projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+        if projectfound_1 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_1 = Project2.objects.create(name = project_name_1)
+            # And a link should be made between this new material and corresponding Manuscript table
+            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_1)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the Manuscript and a the project name
+            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_1).first()
+            if manugprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_1)
+        
+        # Check if the project label "Passim" already exits in the Project2 table
+        projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
+        if projectfound_2 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_2 = Project2.objects.create(name = project_name_2)
+            # And a link should be made between this new material and corresponding Manuscript table
+            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_2)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the Manuscript and a the project name
+            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_2).first()
+            if manugprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_2)
+ 
+    # What we return is simply the home page
+    return redirect('home')
+
+
+#def reader_CPPM_editions(request):
+
+#    # What we return is simply the home page
+#    return redirect('home')
+
+#des reader_CPPM_eqset(request):
+
+#    # What we return is simply the home page
+#    return redirect('home')
+
+#def reader_CPPM_addPassim(request):
+
+#    # What we return is simply the home page
+#    return redirect('home')
+
+
+# Eqset, first check on them and mark one directional links
+
+# Add Project Passim to the cppm records
+
+
+
