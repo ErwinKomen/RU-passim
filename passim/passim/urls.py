@@ -4,11 +4,13 @@ Definition of urls for passim.
 
 from datetime import datetime
 from django.contrib.auth.decorators import login_required, permission_required
-from django.conf.urls import include #, url # , handler404, handler400, handler403, handler500
+# from django.conf.urls import include #, url # , handler404, handler400, handler403, handler500
 from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import HttpResponseNotFound
 from django.urls import path, re_path
+# from django.conf.urls import include
+from django.urls.conf import include
 import django.contrib.auth.views
 import django
 
@@ -458,7 +460,7 @@ urlpatterns = [
 
     # =============================================================================================
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
-    re_path(r'^select2/', include('django_select2.urls')),
+    re_path(r'^select2/', django.urls.conf.include('django_select2.urls')),
 
     # ========================= PLUGIN ============================================================
     re_path(r'^plugin/sermboard/$', passim.plugin.views.sermonboard, name='sermonboard'),

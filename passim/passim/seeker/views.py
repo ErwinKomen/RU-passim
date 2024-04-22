@@ -16025,6 +16025,58 @@ class EqualGoldLinkEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def after_save(self, form, instance):
+
+        # Initialisations
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+                
+        try:
+            if not instance is None:
+                if instance.linktype in LINK_BIDIR:
+                    # Find the reversal
+                    reverse = EqualGoldLink.objects.filter(src=instance.dst, dst=instance.src, linktype=instance.linktype).first()
+                    if reverse is None:
+                        # There is no reverse one: create the reversal 
+                        reverse = EqualGoldLink.objects.create(src=instance.dst, dst=instance.src, linktype=instance.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if instance.spectype != None and instance.spectype != "":
+                            reverse.spectype = get_reverse_spec(instance.spectype)
+                            bNeedSaving = True
+                        # Possibly copy note
+                        if instance.note != None and instance.note != "":
+                            reverse.note = instance.note
+                            bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                            reverse.save()
+                    else:
+                        # There is a reverse, but we need to make sure that the spec type is correct and the note, possibly
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if instance.spectype != None and instance.spectype != "":
+                            rev_spectype = get_reverse_spec(instance.spectype)
+                            if reverse.spectype != rev_spectype:
+                                reverse.spectype = rev_spectype
+                                bNeedSaving = True
+                        # Possibly copy note
+                        if instance.note != None and instance.note != "":
+                            if reverse.note != instance.note:
+                                reverse.note = instance.note
+                                bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                            reverse.save()
+
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
 
 class EqualGoldLinkDetails(EqualGoldLinkEdit):
     """The Details variant of Edit"""

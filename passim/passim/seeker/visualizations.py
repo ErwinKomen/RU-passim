@@ -2,6 +2,7 @@
 Definition of visualization views for the SEEKER app.
 """
 
+from xml.etree.ElementInclude import include
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F
 from django.template.loader import render_to_string
@@ -278,7 +279,7 @@ class EqualGoldOverlap(BasicPart):
 
         return context
 
-    def do_overlap(self, ssg_link, degree):
+    def do_overlap(self, ssg_link, degree, include_to_me=False):
         """Calculate the overlap network up until 'degree'"""
 
         def add_nodeset(ssg_id, group):

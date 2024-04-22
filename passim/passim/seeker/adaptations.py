@@ -1586,6 +1586,8 @@ def adapt_ssg_bidirectional():
     msg = ""
     
     try:
+        count_remove = 0
+        count_add = 0
         # Put all links in a list
         lst_link = []
         lst_remove = []
@@ -1597,6 +1599,9 @@ def adapt_ssg_bidirectional():
                 # Add them to the removal
                 for item in lst_src:
                     lst_remove.append(item)
+                    # debugging
+                    oErr.Status("Could be removed id={}".format(item.id))
+                    count_remove += 1
             else:
                 # Add the obj to the list
                 lst_link.append(obj)
@@ -1606,6 +1611,9 @@ def adapt_ssg_bidirectional():
             if reverse.count() == 0:
                 # Create the reversal
                 reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                count_add += 1
+
+        oErr.Status("SSG bidirectional report: removable={} added={}".format(count_remove, count_add))
     except:
         bResult = False
         msg = oErr.get_error_message()
