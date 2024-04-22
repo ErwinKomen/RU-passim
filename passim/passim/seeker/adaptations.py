@@ -1392,8 +1392,16 @@ def adapt_huwafolionumbers():
                     lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
                     von_bis = get_folio_number(lst_von_bis)
                     bNeedAdaptation = True
+                else:
+                    lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
+                    von_bis = get_folio_number(lst_von_bis)
+                    bNeedAdaptation = True
 
                 if len(bis_rv) > 1:
+                    lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
+                    bis_f = get_folio_number(lst_bis_f)
+                    bNeedAdaptation = True
+                else:
                     lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
                     bis_f = get_folio_number(lst_bis_f)
                     bNeedAdaptation = True
@@ -1421,17 +1429,6 @@ def adapt_huwafolionumbers():
                         else:
                             # No need to change this one
                             iNoNeed += 1
-        ## Do we have candidates to be processed?
-        #if len(lst_result) > 0:
-        #    # Change them all together
-        #    with transaction.atomic():
-        #        for oResult in lst_result:
-        #            sermon_id = oResult.get("sermon_id")
-        #            locus = oResult.get("locus")
-        #            sermon = SermonDescr.objects.filter(id=sermon_id).first()
-        #            if not sermon is None:
-        #                sermon.locus = locus
-        #                sermon.save()
 
 
         # Everything has been processed correctly now
