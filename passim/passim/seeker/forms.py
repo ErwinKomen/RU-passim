@@ -3562,12 +3562,12 @@ class SuperSermonGoldForm(PassimModelForm):
     newauthor = ModelChoiceField(queryset=None, required=False,
                 widget=AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}))
     newincipit = forms.CharField(label=_("Incipit"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching eqgincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
-    newfulltext = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching eqgexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
+    newfulltext = forms.CharField(label=_("Full text"), required=False,
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
-    srchfulltext = forms.CharField(label=_("Explicit"), required=False,
+    srchfulltext = forms.CharField(label=_("Full text"), required=False,
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 
                                              'placeholder': 'Full text transcription ...'}))
     signature = forms.CharField(label=_("Signature"), required=False,
@@ -3624,7 +3624,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSuperWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
-    typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
+    # typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
+    typeaheads = ["authors", "eqgincipits", "eqgexplicits", "signatures"]   # Add [signatures] because of select_gold
     initial_fields = ['author', 'incipit', 'explicit']
 
     class Meta:
@@ -3637,8 +3638,8 @@ class SuperSermonGoldForm(PassimModelForm):
             'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
                                 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
             'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Author number'}),
-            'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-            'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+            'incipit':     forms.TextInput(attrs={'class': 'typeahead searching eqgincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+            'explicit':    forms.TextInput(attrs={'class': 'typeahead searching eqgexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
             'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
             # ----------------- STEMMATOLOGY -----------------------------------

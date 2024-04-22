@@ -3680,6 +3680,32 @@ def get_nicknames(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_eqgincipits(request):
+    """Get a list of EqualGold-sermon incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if is_ajax(request):
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = EqualGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_gldincipits(request):
     """Get a list of Gold-sermon incipits for autocomplete"""
 
@@ -3691,8 +3717,6 @@ def get_gldincipits(request):
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
             items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
-            # items = SermonGold.objects.order_by("incipit").distinct()
-            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
             results = []
             for idx, co in enumerate(items):
                 val = co['srchincipit']
@@ -3722,6 +3746,32 @@ def get_srmincipits(request):
             results = []
             for idx, co in enumerate(items):
                 val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_eqgexplicits(request):
+    """Get a list of EqualGold-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if is_ajax(request):
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = EqualGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchexplicit']
                 co_json = {'name': val, 'id': idx }
                 results.append(co_json)
             data = json.dumps(results)
