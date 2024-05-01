@@ -40,7 +40,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
-        'collectiontype'], # 'sermonesdates',
+        'collectiontype', 'huwadoubles'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -1007,6 +1007,84 @@ def adapt_huwamanudate():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_huwadoubles():
+    """Try to combine HUWA-imported manuscripts that are the same (library/idno), but have different handschrift entries """
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    huwa_tables = ['handschrift']
+    try:
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+        # Get the table of handschrift
+        lHandschrift = tables['handschrift']
+
+        # Start a dictionary
+        oCombi = {}
+        # Walk the handschrifts
+        for oHandschrift in lHandschrift:
+            externalid = oHandschrift.get("id") 
+            # Get the library id and the signatur
+            library_id = oHandschrift.get("bibliothek")
+            signatur = oHandschrift.get("signatur")
+            # Combine into one key
+            key = "{}|{}".format(library_id, signatur)
+            if not key in oCombi:
+                oCombi[key] = []
+
+            # Add the externalid to the dictionary
+            oCombi[key].append(externalid)
+
+        # Get all manuscripts with more than one externalid
+        lDouble = []
+        iLongest = 0
+        for key, lst_ids in oCombi.items():
+            lLength = len(lst_ids)
+            if lLength > 1:
+                lDouble.append(dict(key=key, externalids=lst_ids))
+                if lLength > iLongest:
+                    ilongest = lLength
+        
+        iDoubles = len(lDouble)
+
+        # Now try to calculate via the Passim way
+        prj_huwa = Project2.objects.filter(name__icontains="huwa").first()
+        qs = Manuscript.objects.filter(manuscript_proj__project=prj_huwa, 
+                                       mtype="man", 
+                                       library__isnull=False).exclude(idno="").order_by("library__id", "idno")
+        q_len = qs.count()
+        key = ""
+        oManus = {}
+        for obj in qs:
+            key = "{}|{}".format(obj.library.id, obj.idno)
+            if not key in oManus:
+                oManus[key] = []
+            oManus[key].append(obj.id)
+            
+        # Get all the manuscripts with the same shelfmark, occurring more than once
+        lManuDouble = []
+        iManuLongest = 0
+        for key, lst_ids in oManus.items():
+            lLength = len(lst_ids)
+            if lLength > 1:
+                lManuDouble.append(dict(key=key, manuids=lst_ids))
+                if lLength > iManuLongest:
+                    iManuLongest = lLength
+        x = len(lManuDouble)
+
+        iStop = 1
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+        oErr.DoError("adaptations/adapt_huwadoubles")
+    # Return the table that we found
+    return bResult, msg
+
 
 
 # =========== Part of sermon_list ==================
