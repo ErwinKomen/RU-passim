@@ -2,6 +2,7 @@
 Adaptations of the database that are called up from the (list)views in the SEEKER app.
 """
 
+from tracemalloc import start
 from django.db import transaction
 import re
 import json
@@ -9,6 +10,7 @@ import os
 import csv
 import sqlite3
 import pandas as pd
+import copy
 from unidecode import unidecode
 from passim.settings import MEDIA_DIR
 
@@ -1017,40 +1019,6 @@ def adapt_huwadoubles():
     msg = ""
     huwa_tables = ['handschrift']
     try:
-        # Read the HUWA database
-        table_info = read_huwa()
-        # (5) Load the tables that we need
-        tables = get_huwa_tables(table_info, huwa_tables)
-        # Get the table of handschrift
-        lHandschrift = tables['handschrift']
-
-        # Start a dictionary
-        oCombi = {}
-        # Walk the handschrifts
-        for oHandschrift in lHandschrift:
-            externalid = oHandschrift.get("id") 
-            # Get the library id and the signatur
-            library_id = oHandschrift.get("bibliothek")
-            signatur = oHandschrift.get("signatur")
-            # Combine into one key
-            key = "{}|{}".format(library_id, signatur)
-            if not key in oCombi:
-                oCombi[key] = []
-
-            # Add the externalid to the dictionary
-            oCombi[key].append(externalid)
-
-        # Get all manuscripts with more than one externalid
-        lDouble = []
-        iLongest = 0
-        for key, lst_ids in oCombi.items():
-            lLength = len(lst_ids)
-            if lLength > 1:
-                lDouble.append(dict(key=key, externalids=lst_ids))
-                if lLength > iLongest:
-                    ilongest = lLength
-        
-        iDoubles = len(lDouble)
 
         # Now try to calculate via the Passim way
         prj_huwa = Project2.objects.filter(name__icontains="huwa").first()
@@ -1076,6 +1044,110 @@ def adapt_huwadoubles():
                 if lLength > iManuLongest:
                     iManuLongest = lLength
         x = len(lManuDouble)
+
+
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+        # Get the table of handschrift
+        lHandschrift = tables['handschrift']
+
+        # Start a dictionary
+        oCombi = {}
+        oFaszikel = {}
+        # Walk the handschrifts
+        for oHandschrift in lHandschrift:
+            externalid = oHandschrift.get("id") 
+            # Get the library id and the signatur
+            library_id = oHandschrift.get("bibliothek")
+            signatur = oHandschrift.get("signatur")
+            # Exclude empty signatur
+            if not signatur is None and len(signatur.strip()) > 0 and not signatur[0] == "?":
+                # Combine into one key
+                key = "{}|{}".format(library_id, signatur)
+                if not key in oCombi:
+                    oCombi[key] = []
+                    oFaszikel[key] = []
+
+                # Add the externalid to the dictionary
+                oCombi[key].append(externalid)
+
+                # Also get the faszikel (codices) information
+                faszikel_id = oHandschrift.get("faszikel")
+                oFaszikel[key].append(dict(faszikel=faszikel_id, handschrift=externalid))
+
+        # Get manuscripts with more than one differing faszikel
+        lst_joinmanu = []
+        for key, lst_faszikel in oFaszikel.items():
+            if len(lst_faszikel) > 1:
+                # There are multiple handschrift items: do they have different faszikels?
+                if lst_faszikel[0] != lst_faszikel[-1]:
+                    # Figure out what the starting one is (the first one having 100)
+                    start_id = -1
+                    lst_f = []
+                    for f in lst_faszikel:
+                        if start_id < 0 and f['faszikel'] == 100:
+                            start_id = f['handschrift']
+                        else:
+                            lst_f.append(copy.copy(f))
+                    # Sort the list of faszikel
+                    lst_f_sorted = sorted(lst_f, key=lambda x:x['faszikel'])
+                    # They potentiall differ: add to list
+                    oJoin = dict(key=key, faszikels=lst_f_sorted, start=start_id)
+                    lst_joinmanu.append(oJoin)
+        lJoining = len(lst_joinmanu)
+
+        # Walk the manuscripts that can be joined, potentially...
+        for oJoining in lst_joinmanu:
+            # Get the manuscript associated with the start_id
+            start_id = oJoining['start']
+            lst_faszikel = oJoining['faszikels']
+            key = oJoining['key']
+            oErr.Status("Joining key={}".format(key))
+            manuscript = Manuscript.objects.filter(manuexternals__externalid=start_id).first()
+            order = 1
+            if not manuscript is None:
+                # Walk all the faszikels
+                for oFaszikel in lst_faszikel:
+                    # Get the handschrift id
+                    externalid = oFaszikel['handschrift']
+                    # Find the codicological unit
+                    codico = Codico.objects.filter(manuscript__manuexternals__externalid=externalid).first()
+                    lst_delete = []
+                    if not codico is None:
+                        order += 1
+                        old_manu_id = codico.manuscript.id
+                        lst_delete.append(old_manu_id)
+                        # Change to the new manuscript
+                        codico.manuscript = manuscript
+                        codico.order = order
+                        codico.save()
+                        # Find the ManuscriptExternal item
+                        obj = ManuscriptExternal.objects.filter(externalid=externalid, manu_id=old_manu_id).first()
+                        if not obj is None:
+                            # Set to the correct manuscript
+                            obj.manuscript = manuscript
+                            # Add the codico information
+                            obj.externaltextid = "codico;{}".format(codico.id)
+                            obj.save()
+                    # Remove the manuscripts
+                    Manuscript.objects.filter(id__in=lst_delete).delete()
+
+
+        # Get all manuscripts with more than one externalid
+        lDouble = []
+        #iLongest = 0
+        #for key, lst_ids in oCombi.items():
+        #    lLength = len(lst_ids)
+        #    if lLength > 1:
+        #        lDouble.append(dict(key=key, externalids=lst_ids))
+        #        if lLength > iLongest:
+        #            ilongest = lLength
+        
+        #iDoubles = len(lDouble)
+
+
 
         iStop = 1
     except:
