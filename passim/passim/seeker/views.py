@@ -10927,17 +10927,29 @@ class ManuscriptEdit(BasicDetails):
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
-                ext = ManuscriptExternal.objects.filter(manu=instance).first()
-                if not ext is None:
+                qs_ext = ManuscriptExternal.objects.filter(manu=instance)
+                if qs_ext.count() > 0:
                     # Get the field values
-                    externaltype = ext.externaltype
-                    externalid = ext.externalid
+                    ext = None
+                    lst_ext_id = []
+                    for ext_obj in qs_ext:
+                        if ext is None:
+                            ext = ext_obj
+                            externaltype = ext.externaltype
+                            externalid = ext.externalid
+                        else:
+                            lst_ext_id.append(str(ext_obj.externalid))
+                    if qs_ext.count() == 1:
+                        ext_value = externalid
+                    else:
+                        ext_value = "{} (and: {})".format(externalid, ", ".join(lst_ext_id))
+
                     # Issue #730.3
                     # bEditHuwa = profile.is_project_approver("huwa")
                     bEditHuwa = profile.is_project_editor("huwa")
                     if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid, field_key="externalid")
+                        oItem = dict(type="plain", label="HUWA ids", value=ext_value, field_key="externalid")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items

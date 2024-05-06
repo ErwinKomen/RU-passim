@@ -1108,47 +1108,47 @@ def adapt_huwadoubles():
             manuscript = Manuscript.objects.filter(manuexternals__externalid=start_id).first()
             order = 1
             if not manuscript is None:
+                oErr.Status("Treating manuscript id={} - handschrift={}".format(manuscript.id, start_id))
+                lst_delete = []
                 # Walk all the faszikels
                 for oFaszikel in lst_faszikel:
                     # Get the handschrift id
                     externalid = oFaszikel['handschrift']
                     # Find the codicological unit
                     codico = Codico.objects.filter(manuscript__manuexternals__externalid=externalid).first()
-                    lst_delete = []
                     if not codico is None:
                         order += 1
                         old_manu_id = codico.manuscript.id
                         lst_delete.append(old_manu_id)
+                        # debug
+                        oErr.Status("Adding codico={} that was manuscript={}".format(codico.id, old_manu_id))
                         # Change to the new manuscript
                         codico.manuscript = manuscript
                         codico.order = order
                         codico.save()
+                        # Make sure to change the MsItems connected to this one
+                        for msitem in codico.codicoitems.all():
+                            msitem.manu = manuscript
+                            msitem.save()
+                            # Walk the SermonDescr items
+                            for serm in msitem.itemsermons.all():
+                                serm.manu = manuscript
+                                serm.save()
                         # Find the ManuscriptExternal item
                         obj = ManuscriptExternal.objects.filter(externalid=externalid, manu_id=old_manu_id).first()
                         if not obj is None:
                             # Set to the correct manuscript
-                            obj.manuscript = manuscript
+                            obj.manu = manuscript
                             # Add the codico information
                             obj.externaltextid = "codico;{}".format(codico.id)
                             obj.save()
+
+                # Is there anything to be deleted?
+                if len(lst_delete) > 0:
                     # Remove the manuscripts
                     Manuscript.objects.filter(id__in=lst_delete).delete()
 
-
-        # Get all manuscripts with more than one externalid
-        lDouble = []
-        #iLongest = 0
-        #for key, lst_ids in oCombi.items():
-        #    lLength = len(lst_ids)
-        #    if lLength > 1:
-        #        lDouble.append(dict(key=key, externalids=lst_ids))
-        #        if lLength > iLongest:
-        #            ilongest = lLength
-        
-        #iDoubles = len(lDouble)
-
-
-
+                    
         iStop = 1
     except:
         bResult = False
