@@ -1063,11 +1063,16 @@ def adapt_huwadoubles():
             library_id = oHandschrift.get("bibliothek")
             signatur = oHandschrift.get("signatur")
             # Exclude empty signatur
-            if not signatur is None and len(signatur.strip()) > 0 and not signatur[0] == "?":
+            if not signatur is None: # and len(signatur.strip()) > 0 and not signatur[0] == "?":
+
+                if "10440" in signatur:
+                    iStop = 1
+
                 # Combine into one key
                 key = "{}|{}".format(library_id, signatur)
                 if not key in oCombi:
                     oCombi[key] = []
+                if not key in oFaszikel:
                     oFaszikel[key] = []
 
                 # Add the externalid to the dictionary
@@ -1075,28 +1080,69 @@ def adapt_huwadoubles():
 
                 # Also get the faszikel (codices) information
                 faszikel_id = oHandschrift.get("faszikel")
-                oFaszikel[key].append(dict(faszikel=faszikel_id, handschrift=externalid))
+                # And get the manuscript id
+                manuscript = Manuscript.objects.filter(manuexternals__externalid=externalid).first()
+                if not manuscript is None:
+                    manuscriptid = manuscript.id
+                    oFaszikel[key].append(dict(faszikel=faszikel_id, handschrift=externalid, manuscript=manuscriptid))
+                else:
+                    oErr.Status("Could not find manuscript for handschrift={} [{}]".format(externalid, key))
 
         # Get manuscripts with more than one differing faszikel
         lst_joinmanu = []
+        lst_head = ["Key", "Handschr.Start", "Manuscript", "Handschrift", "Faszikel"]
+        print("\t".join(lst_head))
         for key, lst_faszikel in oFaszikel.items():
+            if "10440" in key:
+                iStop = 1
             if len(lst_faszikel) > 1:
                 # There are multiple handschrift items: do they have different faszikels?
-                if lst_faszikel[0] != lst_faszikel[-1]:
+                #if lst_faszikel[0] != lst_faszikel[-1]:
+                if True:
                     # Figure out what the starting one is (the first one having 100)
                     start_id = -1
+                    start_manu = -1
                     lst_f = []
                     for f in lst_faszikel:
                         if start_id < 0 and f['faszikel'] == 100:
                             start_id = f['handschrift']
+                            start_manu = f['manuscript']
                         else:
                             lst_f.append(copy.copy(f))
                     # Sort the list of faszikel
                     lst_f_sorted = sorted(lst_f, key=lambda x:x['faszikel'])
                     # They potentiall differ: add to list
-                    oJoin = dict(key=key, faszikels=lst_f_sorted, start=start_id)
+                    oJoin = dict(key=key, faszikels=lst_f_sorted, start=start_id, manu=start_manu)
+
+                    # Check if the manuscript differs over de faszikels
+                    manuid = start_manu
+                    bSame = False
+                    for oItem in lst_faszikel:
+                        if oItem['manuscript'] == manuid:
+                            bSame=True
+                            exit
+                    lst_cell = []
+                    lst_cell.append("{}".format(key))
+                    lst_cell.append("{}".format(start_id))
+                    lst_cell.append("{}".format(start_manu))
+                    lst_cell.append("{}".format(start_id))
+                    lst_cell.append("{}".format("100"))
+                    print("\t".join(lst_cell))
+                    # Also just provide lines for a CSV
+                    for oFaszikel in lst_f_sorted:
+                        lst_cell = []
+                        lst_cell.append("{}".format(key))
+                        lst_cell.append("{}".format(start_id))
+                        lst_cell.append("{}".format(oFaszikel['manuscript']))
+                        lst_cell.append("{}".format(oFaszikel['handschrift']))
+                        lst_cell.append("{}".format(oFaszikel['faszikel']))
+                        print("\t".join(lst_cell))
                     lst_joinmanu.append(oJoin)
+
         lJoining = len(lst_joinmanu)
+        print(lst_joinmanu)
+
+        iStop = 1
 
         # Walk the manuscripts that can be joined, potentially...
         for oJoining in lst_joinmanu:
