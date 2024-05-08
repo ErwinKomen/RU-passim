@@ -4140,6 +4140,7 @@ class Manuscript(models.Model):
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
+            bManuCreate = kwargs.get("manucreate", False)
 
             # Need to have external information
             externals = oManu.get("externals")
@@ -4219,7 +4220,7 @@ class Manuscript(models.Model):
                         obj_same = qs.filter(source=source).first()
 
                     # Check if it exists *anywhere*
-                    if obj is None:
+                    if obj is None or bManuCreate:
                         # Doesn't exist: create it
                         obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                         if not source is None:
