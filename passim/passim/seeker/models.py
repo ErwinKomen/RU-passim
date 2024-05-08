@@ -13123,11 +13123,13 @@ class NewsItem(models.Model):
                     lst_id.append(oItem.get("id"))
             # Need any changes??
             if len(lst_id) > 0:
-                with transaction.atomic():
-                    for obj in NewsItem.objects.filter(id__in=lst_id):
-                        # This should be set invalid
-                        obj.status = "ext"
-                        obj.save()
+                qs = NewsItem.objects.filter(id__in=lst_id).exclude(status="ext")
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        for obj in qs:
+                            # This should be set invalid
+                            obj.status = "ext"
+                            obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Newsitem/check_until")

@@ -15087,11 +15087,24 @@ class EqualGoldDetails(EqualGoldEdit):
                 # (see seeker/visualizations)
 
                 # Make sure to delete any previous corpora of mine
-                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+                qs = EqualGoldCorpus.objects.filter(profile=profile, ssg=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
 
                 # Old, extinct
-                ManuscriptCorpus.objects.filter(super=instance).delete()
-                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+                qs = ManuscriptCorpus.objects.filter(super=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: ManuscriptCorpus.objects.filter(super=instance).delete()
+
+                qs = ManuscriptCorpusLock.objects.filter(profile=profile, super=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
 
                 # THe graph also needs room in after details
                 if use_network_graph:

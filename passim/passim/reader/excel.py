@@ -322,7 +322,7 @@ class ManuscriptUploadExcel(ReaderImport):
                     code = "\n".join(lst_err)
                     bOkay = False
             if code == "":
-                code = "Imported using the [import_excel] function on this filew: {}".format(", ".join(file_list))
+                code = "Imported using the [import_excel] function on these files: {}".format(", ".join(file_list))
         except:
             bOkay = False
             code = oErr.get_error_message()
