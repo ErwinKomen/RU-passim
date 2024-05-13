@@ -3195,8 +3195,8 @@ class SermonDescrGoldForm(BasicModelForm):
         # Start by executing the standard handling
         super(SermonDescrGoldForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
-        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+        init_choices(self, 'linktype', LINK_TYPE_SRMGLD, bUseAbbr=True)
+        init_choices(self, 'newlinktype', LINK_TYPE_SRMGLD, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
         self.fields['newgold'].required = False
@@ -3250,8 +3250,8 @@ class SermonDescrSuperForm(BasicModelForm):
         # Start by executing the standard handling
         super(SermonDescrSuperForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
-        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+        init_choices(self, 'linktype', LINK_TYPE_SRMEQ, bUseAbbr=True)
+        init_choices(self, 'newlinktype', LINK_TYPE_SRMEQ, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
         self.fields['super'].required = False

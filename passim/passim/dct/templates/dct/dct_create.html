@@ -1,0 +1,23 @@
+{% load i18n %}
+
+<div id="setlist_dct" class="view-mode">
+
+  <div class="panel panel-none">
+    <a role="button" class="btn  jumbo-1 btn-xs " data-toggle="collapse" data-target="#setlist_dct_create">
+      Create...
+    </a>
+
+    <!-- The different (initially hidden) places to select an item for this particular setlist -->
+    <div id="setlist_dct_create" class="collapse">
+      <div>{{rsetForm.dctname}}</div>
+      <div class="card card-body">
+        <a class="btn btn-xs jumbo-1" onclick="ru.passim.seeker.postsubmit(this);">
+          <span class="glyphicon glyphicon-plus"></span>&nbsp;Create new DCT
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+

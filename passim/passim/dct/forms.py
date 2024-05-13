@@ -125,6 +125,9 @@ class ResearchSetForm(BasicModelForm):
     ssgdname = forms.CharField(label="Name", required=False, 
             widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
                                           'placeholder': 'User-defined name (optional)...',  'style': 'width: 100%;'}))
+    dctname = forms.CharField(label="Name", required=False, 
+            widget=forms.TextInput(attrs={'class': 'typeahead searching input-sm', 
+                                          'placeholder': 'Specify a name for the DCT...',  'style': 'width: 100%;'}))
 
     class Meta:
         model = ResearchSet

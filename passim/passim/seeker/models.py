@@ -56,6 +56,8 @@ COLLECTION_TYPE = "seeker.coltype"
 SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
+LINK_TYPE_SRMEQ = "seeker.linktype.srmeq"
+LINK_TYPE_SRMGLD = "seeker.linktype.srmgld"
 LINK_TYPE = "seeker.linktype"
 EXTERNAL_TYPE = "seeker.extype"
 SPEC_TYPE = "seeker.spectype"
@@ -12572,7 +12574,7 @@ class SermonDescrEqual(models.Model):
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="uns")
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE_SRMEQ), max_length=5, default="uns")
 
     def __str__(self):
         # Temporary fix: sermon.id
@@ -12656,7 +12658,7 @@ class SermonDescrGold(models.Model):
     # [1] The gold sermon
     gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE_SRMGLD), 
                             max_length=5, default="eq")
 
     def __str__(self):

@@ -2321,6 +2321,10 @@ class BasicDetails(DetailView):
                         if bResult:
                             # Now save it for real
                             obj.save()
+                            # Retrieve it
+                            cls = obj.__class__
+                            obj_retrieved = cls.objects.filter(id=obj.id).first()
+                            print("retrieved id={}".format(obj_retrieved.id))
 
                             # Make sure the form is actually saved completely
                             # Issue #426: put it up here

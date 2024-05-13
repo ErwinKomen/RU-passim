@@ -902,6 +902,9 @@ class MyPassimEdit(BasicDetails):
         hlist_objects = [
             {"prefix": "svitem",    "cls": SavedItem, "grp": SaveGroup},
             {"prefix": "svsearch",  "cls": SavedSearch},
+            {"prefix": "svdvis",    "cls": SavedVis},
+            {"prefix": "dctdef",    "cls": SetDef},
+            {"prefix": "stemma",    "cls": StemmaSet},
             ]
 
         try:
@@ -940,7 +943,10 @@ class MyPassimEdit(BasicDetails):
                             # Keep track of the actually used items, in the mean time
                             hlist.append(item_id)
 
-                            lstQ = [Q(profile=instance)]
+                            if prefix == "dctdef":
+                                lstQ = [Q(researchset__profile=instance)]
+                            else:
+                                lstQ = [Q(profile=instance)]
                             lstQ.append(Q(**{"id": item_id}))
                             obj = cls.objects.filter(*lstQ).first()
 
@@ -948,7 +954,10 @@ class MyPassimEdit(BasicDetails):
                             if groupid == 0:
                                 group = None
                             else:
-                                lstQ = [Q(profile=instance)]
+                                if prefix == "dctdef":
+                                    lstQ = [Q(researchset__profile=instance)]
+                                else:
+                                    lstQ = [Q(profile=instance)]
                                 lstQ.append(Q(**{"id": groupid}))
                                 group = grp.objects.filter(*lstQ).first()
 
@@ -967,13 +976,19 @@ class MyPassimEdit(BasicDetails):
                                     bChanges = True
 
                     # See if any need to be removed
-                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    if prefix == "dctdef":
+                        existing_item_id = [str(x.id) for x in cls.objects.filter(researchset__profile=instance)]
+                    else:
+                        existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
                     delete_id = []
                     for item_id in existing_item_id:
                         if not item_id in hlist:
                             delete_id.append(item_id)
                     if len(delete_id)>0:
-                        lstQ = [Q(profile=instance)]
+                        if prefix == "dctdef":
+                            lstQ = [Q(researchset__profile=instance)]
+                        else:
+                            lstQ = [Q(profile=instance)]
                         lstQ.append(Q(**{"id__in": delete_id}))
                         cls.objects.filter(*lstQ).delete()
                         bChanges = True
@@ -1002,7 +1017,10 @@ class MyPassimEdit(BasicDetails):
                         # Make sure the orders are correct
                         for idx, item_id in enumerate(hlist):
                             order = idx + 1
-                            lstQ = [Q(profile=instance)]
+                            if prefix == "dctdef":
+                                lstQ = [Q(researchset__profile=instance)]
+                            else:
+                                lstQ = [Q(profile=instance)]
                             lstQ.append(Q(**{"id": item_id}))
                             obj = cls.objects.filter(*lstQ).first()
                             if obj != None:
@@ -1011,13 +1029,19 @@ class MyPassimEdit(BasicDetails):
                                     obj.save()
                                     bChanges = True
                     # See if any need to be removed
-                    existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
+                    if prefix == "dctdef":
+                        existing_item_id = [str(x.id) for x in cls.objects.filter(researchset__profile=instance)]
+                    else:
+                        existing_item_id = [str(x.id) for x in cls.objects.filter(profile=instance)]
                     delete_id = []
                     for item_id in existing_item_id:
                         if not item_id in hlist:
                             delete_id.append(item_id)
                     if len(delete_id)>0:
-                        lstQ = [Q(profile=instance)]
+                        if prefix == "dctdef":
+                            lstQ = [Q(researchset__profile=instance)]
+                        else:
+                            lstQ = [Q(profile=instance)]
                         lstQ.append(Q(**{"id__in": delete_id}))
                         cls.objects.filter(*lstQ).delete()
                         bChanges = True
@@ -1791,8 +1815,13 @@ class ResearchSetEdit(BasicDetails):
 
         # Only if the user has permission
         if context['is_app_editor']:
+            # Create the html to add an item to the researchset
             add_html = render_to_string("dct/setlist_add.html", context, self.request)
             context['mainitems'].append( {'type': 'line',  'label': "Add:",        'value': add_html})
+
+            # Create the HTML to add a new DCT derived from this researchset
+            dct_html = render_to_string("dct/dct_create.html", context, self.request)
+            context['mainitems'].append({'type': 'line', 'label': "DCT:", 'value': dct_html})
 
 
         # Signal that we do have select2
@@ -1918,6 +1947,7 @@ class ResearchSetDetails(ResearchSetEdit):
             hist = cleaned.get("histlist")
             ssgd = cleaned.get("ssgdlist")
             ssgdname = cleaned.get("ssgdname")
+            dctname = cleaned.get("dctname")
 
             if manu != None or hist != None or ssgd != None:
                  # (1) Preliminary order
@@ -1973,6 +2003,23 @@ class ResearchSetDetails(ResearchSetEdit):
                 instance.adapt_order()
                 # (6) Re-calculate the set of setlists
                 instance.update_ssglists()
+            elif not dctname is None and dctname != "":
+                # Save as a new item and open that one
+                notes = "Default DCT created by request of the user"
+                setdef_new = SetDef.objects.create(
+                    researchset=instance,
+                    name=dctname,
+                    notes=notes)
+                # (6) Re-calculate the set of setlists
+                force = False
+                instance.update_ssglists(force)
+
+                # We do a new redirect
+                self.newRedirect = True
+                # Change the redirect URL
+                if self.redirectpage == "":
+                    self.redirectpage = reverse('researchset_details', kwargs={'pk': instance.id})
+
         # Return as usual
         return bStatus, msg
 
@@ -2162,49 +2209,50 @@ class ResearchSetDetails(ResearchSetEdit):
         sBack = ""
         collection_types = ['hist', 'ssgd' ]
 
-        if type == "manu":
-            if custom == "title":
-                url = reverse("manuscript_details", kwargs={'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
-                    url, instance.get_city(), instance.get_library(), instance.idno)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this manuscript
-                count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
-                sBack = "{}".format(count)
-        elif type in collection_types:
-            if custom == "title":
-                sTitle = "none"
-                if instance is None:
-                    sBack = sTitle
-                else:
-                    if type == "hist":
-                        url = reverse("collhist_details", kwargs={'pk': instance.id})
+        if not instance is None:
+            if type == "manu":
+                if custom == "title":
+                    url = reverse("manuscript_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
+                        url, instance.get_city(), instance.get_library(), instance.idno)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this manuscript
+                    count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
+                    sBack = "{}".format(count)
+            elif type in collection_types:
+                if custom == "title":
+                    sTitle = "none"
+                    if instance is None:
+                        sBack = sTitle
                     else:
-                        if instance.scope == "publ":
-                            url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                        if type == "hist":
+                            url = reverse("collhist_details", kwargs={'pk': instance.id})
                         else:
-                            url = reverse("collpriv_details", kwargs={'pk': instance.id})
-                    if kwargs != None and 'name' in kwargs:
-                        title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
-                    else:
-                        title = instance.name
-                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
-            elif custom == "size":
-                # Get the number of SSGs related to items in this collection
-                count = "-1" if instance is None else instance.super_col.count()
-                sBack = "{}".format(count)
-        elif type == "setdef":
-            if custom == "buttons":
-                # Create the launch button
-                url = reverse("setdef_details", kwargs={'pk': instance.id})
-                sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
-            elif custom == "name":
-                url = reverse("setdef_details", kwargs={'pk': instance.id})
-                sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
-        elif type == "setlist":
-            if custom == "buttons":
-                # Create the remove button
-                sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                            if instance.scope == "publ":
+                                url = reverse("collpubl_details", kwargs={'pk': instance.id})
+                            else:
+                                url = reverse("collpriv_details", kwargs={'pk': instance.id})
+                        if kwargs != None and 'name' in kwargs:
+                            title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
+                        else:
+                            title = instance.name
+                        sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
+                elif custom == "size":
+                    # Get the number of SSGs related to items in this collection
+                    count = "-1" if instance is None else instance.super_col.count()
+                    sBack = "{}".format(count)
+            elif type == "setdef":
+                if custom == "buttons":
+                    # Create the launch button
+                    url = reverse("setdef_details", kwargs={'pk': instance.id})
+                    sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
+                elif custom == "name":
+                    url = reverse("setdef_details", kwargs={'pk': instance.id})
+                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
+            elif type == "setlist":
+                if custom == "buttons":
+                    # Create the remove button
+                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
 
         return sBack
 
