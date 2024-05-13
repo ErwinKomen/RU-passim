@@ -53,6 +53,7 @@ def get_application_name():
 # Provide application-specific information
 PROJECT_NAME = get_application_name()
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
+app_user = "{}_user".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
 app_userplus = "{}_userplus".format(PROJECT_NAME.lower())
 app_developer = "{}_developer".format(PROJECT_NAME.lower())
@@ -395,6 +396,9 @@ class MyPassimEdit(BasicDetails):
 
         # Authorization: only app-editors may edit!
         bMayEdit = user_is_ingroup(self.request, team_group)
+        # FOr MyPassim the user may be in the group app_user
+        if not bMayEdit:
+            bMayEdit = user_is_ingroup(self.request, app_user)
             
         related_objects = []
         lstQ = []
@@ -785,6 +789,7 @@ class MyPassimEdit(BasicDetails):
     def get_field_value(self, type, instance, custom, kwargs=None):
         sBack = ""
         collection_types = ['hc', 'pd' ]
+        sRemove = "<a class='btn btn-xs jumbo-1'><span class='glyphicon glyphicon-remove related-remove' title='Delete this item'></span></a>"
 
         oErr = ErrHandle()
         try:
@@ -850,31 +855,36 @@ class MyPassimEdit(BasicDetails):
                 # A saved item should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    # sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    sBack = sRemove
 
             elif type == "savedsearch":
                 # A saved item should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    # sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    sBack = sRemove
 
             elif type == "savedvis":
                 # A saved item should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    # sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    sBack = sRemove
 
             elif type == "mydct":
                 # A DCT should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    # sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    sBack = sRemove
 
             elif type == "stemma":
                 # A Stemma research set should get the button 'Delete'
                 if custom == "buttons":
                     # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    # sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
+                    sBack = sRemove
 
 
         except:
