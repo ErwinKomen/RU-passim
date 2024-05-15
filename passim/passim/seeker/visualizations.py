@@ -604,8 +604,18 @@ class EqualGoldTrans(BasicPart):
                     # Take note of the nodes
                     src = oItem['source']
                     dst = oItem['target']
-                    if not src in node_dict: node_dict[src] = node_set[src]
-                    if not dst in node_dict: node_dict[dst] = node_set[dst]
+
+                    # Double check to see if both are in the node_set (they should be)
+                    if not src in node_set:
+                        # Issue a warning
+                        oErr.DoError("EqualGoldTrans/do_manu_method WARNING: cannot find src ssg {} in [node_set]".format(src))
+                    elif not dst in node_set:
+                        # Issue a warning
+                        oErr.DoError("EqualGoldTrans/do_manu_method WARNING: cannot find dst ssg {} in [node_set]".format(dst))
+                    else:
+                        # Now adapt the [node_dict]
+                        if not src in node_dict: node_dict[src] = node_set[src]
+                        if not dst in node_dict: node_dict[dst] = node_set[dst]
             # Walk the nodes
             node_list = []
             for ssg_id, oItem in node_dict.items():
@@ -616,7 +626,7 @@ class EqualGoldTrans(BasicPart):
  
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("do_manu_method")
+            oErr.DoError("EqualGoldTrans/do_manu_method")
 
         return node_list, link_list,  author_list, max_value
 
