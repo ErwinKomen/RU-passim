@@ -3924,6 +3924,8 @@ class Manuscript(models.Model):
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
     # [m] Many-to-many: all the manuscripts linked to me
     relations = models.ManyToManyField("self", through="ManuscriptLink", symmetrical=False, related_name="related_to")
+    # [m] Many-to-many: all manuscripts that have been calculated to be equal to me
+    similars = models.ManyToManyField("self", through="ManuscriptSimilar", symmetrical=False, related_name="similar_to")
     
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
@@ -5233,6 +5235,33 @@ class Manuscript(models.Model):
         
             # Return the result
         return sermon_list
+
+    def get_similars_markdown(self):
+        """Provide a list of manuscripts that are similar (i.e. occur in ManuscriptSimilar with the current one as src)"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html = []
+        try:
+            if self.similars.count() > 0:
+                # Walk all the similars
+                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno"):
+                    # Get the shelfmark
+                    shelfmark = obj.get_full_name(plain=False)
+                    # get the url
+                    url = reverse("manuscript_details", kwargs={'pk': obj.id})
+                    # Get the passim manuscript ID
+                    manu_id = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, obj.id)
+
+                    # Combine
+                    html.append("{} {}".format(shelfmark, manu_id))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_similars_markdown")
+
+        return sBack
 
     def get_stype_light(self, add="", usercomment=False): 
         count = 0
@@ -12366,6 +12395,24 @@ class ManuscriptLink(models.Model):
         if not self.note is None and self.note != "":
             sBack = self.note
         return sBack
+
+
+class ManuscriptSimilar(models.Model):
+    """One manuscript is similar to another one on the basis of a particular similarity value"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a Manuscript is deleted, then the ManuscriptSimilar instance that refers to it is removed too
+    src = models.ForeignKey(Manuscript, related_name="src_manuscriptsimilars", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(Manuscript, related_name="dst_manuscriptsimilars", on_delete=models.CASCADE)
+    # [1] The similarity value: 1.0 is identical
+    simval = models.FloatField("Similarity value", default=1.0)
+    
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is similar to {} with value {}".format(src_name, dst_name, self.simval)
+        return combi
 
 
 class CodicoKeyword(models.Model):

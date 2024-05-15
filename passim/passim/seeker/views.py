@@ -11008,6 +11008,7 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
                     {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
                         'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
+                    {'type': 'line',  'label': "Suspected doubles:",    'value': instance.get_similars_markdown()}
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -12077,7 +12078,8 @@ class ManuscriptListView(BasicList):
     plural_name = "Manuscripts"
     basketview = False
     
-    order_cols = ['library__location__name;library__lcity__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__location__name;library__lcity__name', 'library__name', 'idno;name', 
+                  '', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
         {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
@@ -12085,10 +12087,11 @@ class ManuscriptListView(BasicList):
         {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
         {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+        {'name': 'Doubles',  'order': '',    'type': 'int', 'custom': 'similars','align': 'right'},
         {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
-        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
-        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
+        {'name': 'From',     'order': 'o=7', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=8', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=9', 'type': 'str', 'custom': 'status'},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [         
         {"name": "Country",         "id": "filter_country",          "enabled": False}, 
@@ -12391,6 +12394,10 @@ class ManuscriptListView(BasicList):
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
+        elif custom == "similars":
+            bSimilars = (instance.similars.count() > 0)
+            if bSimilars:
+                html.append('<span class="glyphicon glyphicon-ok"></span>')
         elif custom == "from":
             # for item in instance.manuscript_dateranges.all():
             # Walk all codico's
