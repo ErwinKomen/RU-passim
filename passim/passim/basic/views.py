@@ -1148,12 +1148,14 @@ class BasicList(ListView):
         for section in self.searches:
             oFsection = {}
             bHasValue = False
+            section_label = section['section']
+
             if 'name' in section:
                 section_name = section['name']
             else:
-                section_name = section['section']
+                section_name = section_label # section['section']
             if section_name != "" and section_name not in fsections:          
-                oFsection = dict(name=section_name, has_value=False)
+                oFsection = dict(name=section_name, label=section_label, has_value=False)
                 # fsections.append(dict(name=section_name))
             # Copy the relevant search filter
             for item in section['filterlist']:

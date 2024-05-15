@@ -12082,6 +12082,8 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},        
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
+        {"name": "PD",              "id": "filter_colmanu",          "enabled": False,
+         "title": "Personal dataset"},
         
         # Issue #717: rename into "Comparative search..."
         # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
@@ -12100,15 +12102,17 @@ class ManuscriptListView(BasicList):
         {"name": "Bible reference",         "id": "filter_sermo_bibref",        "enabled": False, "head_id": "filter_sermon"},
         {"name": "Feast",                   "id": "filter_sermo_feast",         "enabled": False, "head_id": "filter_sermon"},
                
-        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
+        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
+        {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
+        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection", "hide_button": True},
         # issue #717: delete the PD:Manuscript and PD:Sermon options
         #{"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         #{"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
+
+        # Issue #
         
         {"name": "Author",                  "id": "filter_authority_file_author",       "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Incipit",                 "id": "filter_authority_file_incipit",      "enabled": False, "head_id": "filter_authority_file"},
@@ -12135,10 +12139,12 @@ class ManuscriptListView(BasicList):
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearstart__gte', 'keyS': 'date_from'},
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearfinish__lte', 'keyS': 'date_until'},            
             {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
-            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'}
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'},
+            {'filter': 'colmanu',       'fkfield': 'collections',                            
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             ]},
 
-        {'section': 'collection', 'filterlist': [
+        {'section': 'comparative', 'name': 'Comparative Search', 'filterlist': [
             # === Overlap with a specific manuscript ===
             {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id', 'help': 'overlap_manu'},            
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc', 
@@ -12151,8 +12157,8 @@ class ManuscriptListView(BasicList):
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },             
 
             # === Personal Dataset ===
-            {'filter': 'collection_manu',  'fkfield': 'collections',                            
-             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
+            #{'filter': 'collection_manu',  'fkfield': 'collections',                            
+            # 'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               
              'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
             # Issue #416: Delete the option to search for a GoldSermon dataset 

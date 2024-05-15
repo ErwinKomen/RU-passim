@@ -823,8 +823,20 @@ class LibraryOneWidget(ModelSelect2Widget):
         return Library.objects.all().order_by('name').distinct()
 
     def filter_queryset(self,request, term, queryset = None, **dependent_fields):
-        response = super(LibraryOneWidget, self).filter_queryset(request,term, queryset, **dependent_fields)
-        return response
+        # Make sure to initialize to something meaningfull
+        qs = Library.objects.all().order_by('name')
+
+        # Do we have dependent fields?
+        if len(dependent_fields) == 2:
+            lcountry_id = dependent_fields.get('lcountry')
+            lcity_id = dependent_fields.get('lcity')
+            location_id = lcity_id
+            qCombi = Q(lcountry_id=lcountry_id) & ( Q(lcity_id=lcity_id) | Q(location_id=location_id) )
+            qs = Library.objects.filter(qCombi).order_by('name')
+        else:
+            qs = super(LibraryOneWidget, self).filter_queryset(request,term, queryset, **dependent_fields)
+        # return the result
+        return qs
 
 
 class LitrefSgWidget(ModelSelect2MultipleWidget):
