@@ -9932,118 +9932,139 @@ class CollectionListView(BasicList):
             oErr.DoError("CollectionListView/get_own_list")
         return qs
 
+    def get_own_list_ids(self):
+        oErr = ErrHandle()
+        lst_back = []
+        try:
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Get to the profile of this user
+            if user is None:
+                oErr.Status("CollectionListView/get_own_list_ids: unknown user is [{}]".format(username))
+            else:
+                lst_back = [x['id'] for x in Profile.objects.filter(user=user).values('id')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/get_own_list_ids")
+        return lst_back
+
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        if self.prefix == "hist":
-            # The settype should be specified
-            fields['settype'] = "hc"
+        oErr = ErrHandle()
+        try:
+            if self.prefix == "hist":
+                # The settype should be specified
+                fields['settype'] = "hc"
 
-            # The collection type is 'super'
-            fields['type'] = "super"
+                # The collection type is 'super'
+                fields['type'] = "super"
 
-            # The scope of a historical collection to be shown should be 'public'
-            if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
-                profile = Profile.get_user_profile(self.request.user.username)
-                fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
-            else:
-                fields['scope'] = "publ"
+                # The scope of a historical collection to be shown should be 'public'
+                if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
+                    profile = Profile.get_user_profile(self.request.user.username)
+                    fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
+                else:
+                    fields['scope'] = "publ"
 
-            # Adapt the bible reference list
-            bibrefbk = fields.get("bibrefbk", "")
-            if bibrefbk != None and bibrefbk != "":
-                bibrefchvs = fields.get("bibrefchvs", "")
+                # Adapt the bible reference list
+                bibrefbk = fields.get("bibrefbk", "")
+                if bibrefbk != None and bibrefbk != "":
+                    bibrefchvs = fields.get("bibrefchvs", "")
 
-                # Get the start and end of this bibref
-                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+                    # Get the start and end of this bibref
+                    start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
 
-                # Find out which sermons have references in this range
-                lstQ = []
-                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-                collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
+                    # Find out which sermons have references in this range
+                    lstQ = []
+                    lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                    lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                    collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
 
-                fields['bibrefbk'] = Q(id__in=collectionlist)
+                    fields['bibrefbk'] = Q(id__in=collectionlist)
             
-            # Make sure we only use the Authority Files with accepted modifications
-            # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
-            # With this condition we make sure ALL historical collections are in de unfiltered listview
-            if fields['ssgcode'] != '':
-                fields['atype'] = 'acc'
-        elif self.prefix == "priv":
-            # Show private, team and public datasets, provided the person is in the team
-            # Bij navigeren naar Datasets is scope leeg                                 
-            fields['settype'] = "pd"          
-            ownlist = self.get_own_list()
-            if user_is_ingroup(self.request, app_editor):
-            # When filtering on scope:  
-                # When navigating to My Datasets, scope is empty and colscope is None:
-                if fields['scope'] == "":
-                    # For the complete overview (private datasets of the user, team and public):
-                    if fields['colscope'] == None:
-                        # issue #446: use [defscope] for default setting
-                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
-                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
-                    # Filtering on scope Public:
-                    elif fields['colscope'].abbr == 'publ':           
-                        fields['colscope'] = (Q(scope="publ") )
-                    # Filtering on scope Team:
-                    elif fields['colscope'].abbr == 'team':                        
-                        fields['colscope'] = (Q(scope="team") )
-                    # Filtering on scope Private: 
-                    elif fields['colscope'].abbr == 'priv':
-                        fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ))
-                # Somehow after the initial first view of all datasets and the first filtering, scope remains "priv" 
-                # whether you filter on any of the three options. Only colscope is changed when filtering on Private, Team or Public.        
-                elif fields['scope'] == "priv":                                      
-                    if fields['colscope'] != None:
-                        # Filtering on scope Private:
-                        if fields['colscope'].abbr == 'priv':
-                            fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  )) 
+                # Make sure we only use the Authority Files with accepted modifications
+                # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
+                # With this condition we make sure ALL historical collections are in de unfiltered listview
+                if fields['ssgcode'] != '':
+                    fields['atype'] = 'acc'
+            elif self.prefix == "priv":
+                # Show private, team and public datasets, provided the person is in the team
+                # Bij navigeren naar Datasets is scope leeg                                 
+                fields['settype'] = "pd"          
+                ownlist = self.get_own_list()
+                ownlist_ids = self.get_own_list_ids()
+                if user_is_ingroup(self.request, app_editor):
+                    # When filtering on scope:  
+                    # When navigating to My Datasets, scope is empty and colscope is None:
+                    if fields['scope'] == "":
+                        # For the complete overview (private datasets of the user, team and public):
+                        if fields['colscope'] == None:
+                            # issue #446: use [defscope] for default setting
+                            # fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                            fields['defscope'] = ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="team") | Q(scope="publ"))
                         # Filtering on scope Public:
-                        elif fields['colscope'].abbr == 'publ':
+                        elif fields['colscope'].abbr == 'publ':           
                             fields['colscope'] = (Q(scope="publ") )
                         # Filtering on scope Team:
-                        elif fields['colscope'].abbr == 'team':
+                        elif fields['colscope'].abbr == 'team':                        
                             fields['colscope'] = (Q(scope="team") )
-                    # For the complete overview (private datasets of the user, team and public):
-                    elif fields['colscope'] == None:
-                        # issue #446: use [defscope] for default setting
-                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
-                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                        # Filtering on scope Private: 
+                        elif fields['colscope'].abbr == 'priv':
+                            # fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ))
+                            fields['colscope'] = ( ( Q(scope="priv") & Q(owner__id__in=ownlist_ids)  ))
+                    # Somehow after the initial first view of all datasets and the first filtering, scope remains "priv" 
+                    # whether you filter on any of the three options. Only colscope is changed when filtering on Private, Team or Public.        
+                    elif fields['scope'] == "priv":                                      
+                        if fields['colscope'] != None:
+                            # Filtering on scope Private:
+                            if fields['colscope'].abbr == 'priv':
+                                fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  )) 
+                            # Filtering on scope Public:
+                            elif fields['colscope'].abbr == 'publ':
+                                fields['colscope'] = (Q(scope="publ") )
+                            # Filtering on scope Team:
+                            elif fields['colscope'].abbr == 'team':
+                                fields['colscope'] = (Q(scope="team") )
+                        # For the complete overview (private datasets of the user, team and public):
+                        elif fields['colscope'] == None:
+                            # issue #446: use [defscope] for default setting
+                            # fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                            fields['defscope'] = ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="team") | Q(scope="publ")) 
+                else:
+                    # This user is *NOT* an app_editor: only show publ ones
+                    fields['colscope'] =  (Q(scope="publ") )
              
         
-        elif self.prefix == "publ":
-            # Show only public datasets
-            fields['settype'] = "pd"
-            # qAlternative = Q(scope="publ")
-            fields['scope'] = "publ"
-        else:
-            # Check if the collist is identified
-            if fields['ownlist'] == None or len(fields['ownlist']) == 0:
-                # Get the user
-                #username = self.request.user.username
-                #user = User.objects.filter(username=username).first()
-                ## Get to the profile of this user
-                #qs = Profile.objects.filter(user=user)
-                #profile = qs[0]
-                #fields['ownlist'] = qs
-                fields['ownlist'] = self.get_own_list()
+            elif self.prefix == "publ":
+                # Show only public datasets
+                fields['settype'] = "pd"
+                # qAlternative = Q(scope="publ")
+                fields['scope'] = "publ"
+            else:
+                # Check if the collist is identified
+                if fields['ownlist'] == None or len(fields['ownlist']) == 0:
+                    # Get the user
+                    fields['ownlist'] = self.get_own_list()
 
-                # Check on what kind of user I am
-                if user_is_ingroup(self.request, app_editor):
-                    # This is an editor: may see collections in the team
-                    qAlternative = Q(scope="team") | Q(scope="publ")
-                else:
-                    # Common user: may only see those with public scope
-                    # fields['scope'] = "publ"
-                    qAlternative = Q(scope="publ")
+                    # Check on what kind of user I am
+                    if user_is_ingroup(self.request, app_editor):
+                        # This is an editor: may see collections in the team
+                        qAlternative = Q(scope="team") | Q(scope="publ")
+                    else:
+                        # Common user: may only see those with public scope
+                        # fields['scope'] = "publ"
+                        qAlternative = Q(scope="publ")
 
-            # Also make sure that we add the collection type, which is specified in "prefix"
-            if self.prefix != "any":
-                fields['type'] = self.prefix
-            # The settype should be specified
-            fields['settype'] = "pd"
+                # Also make sure that we add the collection type, which is specified in "prefix"
+                if self.prefix != "any":
+                    fields['type'] = self.prefix
+                # The settype should be specified
+                fields['settype'] = "pd"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/adapt_search")
         return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):
