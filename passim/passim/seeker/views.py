@@ -12107,12 +12107,11 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},        
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
-        {"name": "PD",              "id": "filter_colmanu",          "enabled": False,
-         "title": "Personal dataset"},
+        {"name": "PD",              "id": "filter_colmanu",          "enabled": False},
         
         # Issue #717: rename into "Comparative search..."
         # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
-        {"name": "Comparative search...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
+        {"name": "Comparative search...",  "id": "filter_comparative",    "enabled": False, "head_id": "none"},
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
@@ -12165,7 +12164,7 @@ class ManuscriptListView(BasicList):
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearfinish__lte', 'keyS': 'date_until'},            
             {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
             {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'},
-            {'filter': 'colmanu',       'fkfield': 'collections',                            
+            {'filter': 'colmanu',       'fkfield': 'collections', "title": "Personal dataset",                          
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             ]},
 
@@ -16514,6 +16513,27 @@ class LibraryListView(BasicList):
         #    # Combine the HTML code
         #    sBack = "\n".join(html)
         return sBack, sTitle
+
+    def adapt_search(self, fields):                      
+
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        oErr = ErrHandle()
+        try:
+            # If needed: adapt the search for city to include locations
+            citylist = fields.get('citylist')
+            if citylist != None and citylist != "" and len(citylist) > 0:
+                citylist_ids = [x['id']  for x in citylist.values('id')]
+                fields['citylist'] = Q(lcity__id__in=citylist_ids) | Q(location__id__in=citylist_ids)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("LibraryListview/adapt_search")
+
+        return fields, lstExclude, qAlternative
+
 
 
 class LibraryListDownload(BasicPart):

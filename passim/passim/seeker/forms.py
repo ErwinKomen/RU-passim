@@ -282,6 +282,21 @@ class CityMonasteryOneWidget(ModelSelect2Widget):
         return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
 
 
+class CityMonasteryWidget(ModelSelect2MultipleWidget):
+    model = Location
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        level = 8   # Level 8 is city, lower than that is village, library, monastery
+        #loc_id = LocationType.objects.filter(Q(name="city")|Q(name="village")|Q(name="monastery")).first()
+        #return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
+        return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+
+
 class CityWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains']
@@ -4781,7 +4796,7 @@ class LibrarySearchForm(BasicModelForm):
     countrylist = ModelMultipleChoiceField(queryset=None, required=False,
                  widget=CountryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
     citylist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=CityWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
+                 widget=CityMonasteryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select cities or monasteries...', 'style': 'width: 100%;'}))
     librarylist = ModelMultipleChoiceField(queryset=None, required=False,
                  widget=LibraryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
     library_ta = forms.CharField(label=_("Libraru"), required=False, 
@@ -4793,6 +4808,10 @@ class LibrarySearchForm(BasicModelForm):
 
         model = Library
         fields = ['lcity', 'lcountry']
+        #widgets = {
+        #    'library':     LibraryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
+        #    'lcity':       CityMonasteryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
+        #    }
 
     def __init__(self, *args, **kwargs):
         oErr = ErrHandle()
