@@ -8955,7 +8955,8 @@ class CollPrivDetails(CollAnyEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
+                # sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
+                sBack = instance.get_full_name(False)
             elif custom == "name":
                 sBack = instance.name
             elif custom == "origprov":
