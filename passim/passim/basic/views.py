@@ -1552,7 +1552,9 @@ class BasicList(ListView):
                     print('Form error WARNING: {}'.format(thisForm.errors))
 
                     # Just show everything
-                    qs = self.model.objects.all().distinct()
+                    #qs = self.model.objects.all().distinct()
+                    # DO NOT SHOW ANYTHING!!
+                    qs = self.model.objects.none()
 
                 # Do the ordering of the results
                 order = self.order_default

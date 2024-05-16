@@ -10034,8 +10034,20 @@ class CollectionListView(BasicList):
                             # fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
                             fields['defscope'] = ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="team") | Q(scope="publ")) 
                 else:
-                    # This user is *NOT* an app_editor: only show publ ones
-                    fields['colscope'] =  (Q(scope="publ") )
+                    # Situation: not an app_editor, but only an app_user
+                    scope = fields.get('scope')
+                    colscope = fields.get('colscope')
+                    colscope = "" if colscope is None else colscope.abbr
+                    colscope = scope if colscope == "" else colscope
+                    # Situation 1: no scope defined
+                    if colscope == "":
+                        # This user is *NOT* an app_editor: only show publ ones + those of the user
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="publ")) 
+                    elif colscope == "publ" or colscope == "team":
+                        fields['colscope'] =  Q(scope="publ")
+                    elif colscope == "priv":
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) )
+
              
         
             elif self.prefix == "publ":
@@ -10066,6 +10078,10 @@ class CollectionListView(BasicList):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollectionListView/adapt_search")
+            # make sure to define colscope and settype if it is not set
+            fields['type'] = self.prefix
+            fields['settype'] = "pd"
+            fields['colscope'] =  Q(scope="publ")
         return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):

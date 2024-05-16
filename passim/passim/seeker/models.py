@@ -1962,7 +1962,10 @@ class Profile(models.Model):
                 if len(value) < 2:
                     lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
             for field in fields_profile:
-                value = getattr(self,field).strip()
+                if getattr(self,field) == None:
+                    value = ""
+                else:
+                    value = getattr(self,field).strip()
                 if len(value) < 2:
                     lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
             if len(lst_msg) > 0:
