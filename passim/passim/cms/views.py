@@ -468,7 +468,7 @@ class CitemEdit(BasicDetails):
 
         oErr = ErrHandle()
         # field_keys = [None, None, 'clocation', None, 'contents', None, None]
-        field_keys = [None, None, None, None, 'contents', None, None]
+        field_keys = [None, None, None, None, None, 'contents', None, None]
         try:
             # Get the location id
             clocation_id = instance.clocation.id
@@ -490,9 +490,13 @@ class CitemEdit(BasicDetails):
             if user_is_ingroup(self.request, app_moderator) or user_is_ingroup(self.request, app_developer): 
                 # Allow editing
                 for idx, oItem in enumerate(context['mainitems']):
-                    fk = field_keys[idx]
-                    if not fk is None:
-                        oItem['field_key'] = fk
+                    # Double check if the idx is okay
+                    if idx >= 0 and idx < len(field_keys):
+                        fk = field_keys[idx]
+                        if not fk is None:
+                            oItem['field_key'] = fk
+                    else:
+                        oErr.Status("CitemEdit: index for field_key is out of range: {}".format(idx))
 
                 # Signal that we have select2
                 context['has_select2'] = True
