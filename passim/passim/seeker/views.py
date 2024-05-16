@@ -15344,7 +15344,8 @@ class EqualGoldListView(BasicList):
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
+        # issue #727: remove SermonGold filter
+        # {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Authority file",  "id": "filter_collsuper",         "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical",      "id": "filter_collhist",          "enabled": False, "head_id": "filter_collection"},
                ]
@@ -15382,8 +15383,9 @@ class EqualGoldListView(BasicList):
             # issue #466: fkfield was 'equal_goldsermons__sermondescr__collections'
             #             changed into 'equalgold_sermons__sermondescr_col__collection'
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
-             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            # issue #727: remove SermonGold filter
+            #{'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
+            # 'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
             {'filter': 'collsuper', 'fkfield': 'collections',                                        
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
             {'filter': 'collhist', 'fkfield': 'collections',                                        
@@ -16533,7 +16535,6 @@ class LibraryListView(BasicList):
             oErr.DoError("LibraryListview/adapt_search")
 
         return fields, lstExclude, qAlternative
-
 
 
 class LibraryListDownload(BasicPart):
