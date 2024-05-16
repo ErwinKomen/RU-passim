@@ -1291,7 +1291,7 @@ def login_as_user(request, user_id):
     # Make sure that I am superuser
     if super.is_staff and super.is_superuser:
         user = User.objects.filter(username__iexact=user_id).first()
-        if user != None:
+        if not user is None:
             # Perform the login
             login(request, user)
             return HttpResponseRedirect(reverse("home"))
@@ -9789,7 +9789,9 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
+            # self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
+            # See issue #756
+            self.order_cols = ['name', '', '', 'ssgauthornum']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},

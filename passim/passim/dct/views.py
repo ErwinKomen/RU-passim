@@ -2546,6 +2546,9 @@ class SetDefDetails(SetDefEdit):
                 get_token(self.request))
             context['mayedit'] = bMayEdit
 
+            ## Calculate the size of the research set
+            #x = instance.researchset.researchset_setlists.count()
+
             # Create the DCT with a template
             dct_view = render_to_string(template_name, context)
 
