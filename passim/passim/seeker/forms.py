@@ -165,6 +165,12 @@ def order_search_manu(qs, term):
         oErr.DoError("order_search")
     return qs
 
+def get_stype_qs():
+    """Get a queryset for stype"""
+
+    qs = FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr="-").order_by("english_name")
+    return qs
+
 # ================= WIDGETS =====================================
 
 class AltPagesWidget(ModelSelect2MultipleWidget):
@@ -1581,7 +1587,8 @@ class StypeWidget(ModelSelect2MultipleWidget):
         return obj.english_name
 
     def get_queryset(self):
-        return FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+        #return FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr='-').order_by("english_name")
+        return get_stype_qs()
 
 
 class SuperDistWidget(ModelSelect2Widget):
@@ -2033,7 +2040,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
             self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
@@ -2300,7 +2307,7 @@ class SermonForm(PassimModelForm):
             # Choice field initialization
             self.fields['authortype'].choices = AUTHOR_TYPE
 
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() #  FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr='-').order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['manuone'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -3010,7 +3017,7 @@ class CollectionForm(PassimModelForm):
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # SSG section
-            self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['ssgstypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
             self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
@@ -3018,7 +3025,7 @@ class CollectionForm(PassimModelForm):
 
             # S section
             self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['sermostypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
@@ -3026,7 +3033,7 @@ class CollectionForm(PassimModelForm):
             # M section
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['manustypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             if prefix == "priv" or prefix == "publ":
                 self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
@@ -3434,7 +3441,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['codetype'].choices = CODE_TYPE
 
             # Determine the querysets
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['passimlist'].queryset = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
@@ -3694,7 +3701,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['ssgcount'].initial = -1
 
             # Initialize querysets
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['newauthor'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
@@ -4960,7 +4967,7 @@ class CodicoForm(PassimModelForm):
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True

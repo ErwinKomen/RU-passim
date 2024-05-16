@@ -5511,7 +5511,8 @@ class SermonListView(BasicList):
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
-                {"name": "Note",             "id": "filter_note",           "enabled": False},
+                # issue #727: redundancies
+                # {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
                 {"name": "Free",             "id": "filter_freetext",       "enabled": False},
@@ -5542,7 +5543,8 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'srchtitle',         'keyS': 'srch_title'},
             {'filter': 'sectiontitle',  'dbfield': 'srchsectiontitle',  'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
-            {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
+            # issue #727: redundancies
+            # {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
             {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_term'},
@@ -8247,7 +8249,20 @@ class CollAnyEdit(BasicDetails):
                             # All users may read collections with 'public' scope
                             permission = "read"
             else:
+                # Default permission:
                 permission = "readonly"
+                # But what if this is a passim_user trying to see a non-private database?
+                if self.prefix == "priv":
+                    # User trying to see a private collection
+                    # (1) What is the collection's scope?
+                    if instance.scope == "team":
+                        # May not be visible
+                        permission = ""
+                    elif instance.scope == "priv":
+                        # Who is the user of this item?
+                        if profile_owner.id != profile_user.id:
+                            # User X trying to look at stuff from user Y
+                            permission = ""
 
             context['permission'] = permission
 
