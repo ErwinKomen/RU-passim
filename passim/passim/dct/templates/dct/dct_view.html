@@ -2,7 +2,6 @@
 
 <div class="row">
 
-  {% if is_app_editor %}
   <div class="col-md-12 dct-root">
     <!-- Hidden away show which DCT we are showing -->
     <div class="hidden">
@@ -162,11 +161,7 @@
       <!-- THis is where a copy of the dct-view is kept -->
     </div>
   </div>
-  {% else %}
-  <div>
-    <code>Sorry, non-editors are not able to use the DCT tool.</code>
-  </div>
-  {% endif %}
+
 </div>
 
 {% block script %}
