@@ -13934,9 +13934,10 @@ class EqualGoldEdit(BasicDetails):
                 'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2], 'order': 8},                
                 {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
                  'field_key': 'newfulltext', 'order':9},
-                {'type': 'bold',  'label': "Moved to:",   'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url(),'order': 12},
-                {'type': 'bold',  'label': "Previous:",   'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url(),'order': 13},
-                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2(), 'order':11},                
+                {'type': 'plain',  'label': "Notes:",     'value': instance.raw, 'order':10},
+                {'type': 'bold',  'label': "Moved to:",   'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url(),'order': 13},
+                {'type': 'bold',  'label': "Previous:",   'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url(),'order': 14},
+                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2(), 'order':12},                
                  ]},            
             
             {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
@@ -14018,7 +14019,7 @@ class EqualGoldEdit(BasicDetails):
                                             title="Add a transcription file to this Authority file",
                                             value=instance.get_trans_file(),
                                             field_key='transcription',
-                                            order=10)                             
+                                            order=11)                             
                             oMainSection['fields'].append(oItem)
 
                             # Make sure the spectypes are checked
@@ -14037,7 +14038,7 @@ class EqualGoldEdit(BasicDetails):
                                             label="Add to project:",
                                             title="Submit a request to add this SSG to the following project(s)",
                                             value=self.get_prj_submitted(instance, "other", profile), 
-                                            order=12)
+                                            order=13)
                             oItem['field_list']="addprojlist"                                
                             oMainSection['fields'].append(oItem)
 
@@ -14046,9 +14047,14 @@ class EqualGoldEdit(BasicDetails):
                                             label="Remove from project:",
                                             title="Submit a request to remove this SSG from the following project(s)",
                                             value=self.get_prj_submitted(instance, 'current'),
-                                            order=13)
+                                            order=14)
                             oItem['field_list']="delprojlist"                             
-                            oMainSection['fields'].append(oItem)                                 
+                            oMainSection['fields'].append(oItem)
+                            
+                            
+
+
+
                         else:
                             pass
                 

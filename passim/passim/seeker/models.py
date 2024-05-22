@@ -7111,6 +7111,11 @@ class EqualGold(models.Model):
     # [0-1] The sermon to which this one has moved
     moved = models.ForeignKey('self', on_delete=models.SET_NULL, related_name="moved_ssg", blank=True, null=True)
 
+    # RAW data of an Authority File, when imported from an external source
+    
+    # [0-1] Raw: imported data (string) when imported from an external source
+    raw = models.TextField("Raw", null=True, blank=True)
+
     # [0-1] A SermonGold may optionally have a JSON field with *edition* (literature) information
     edinote = models.TextField("Edition note", null=True, blank=True)
 
@@ -7120,7 +7125,7 @@ class EqualGold(models.Model):
     atype = models.CharField("Approval", choices=build_abbr_list(APPROVAL_TYPE), max_length=5, default="def")
     # [0-1] Status note
     snote = models.TextField("Status note(s)", default="[]")
-
+        
     # ============= Bible referencing =============
     # [0-1] Any number of bible references (as stringified JSON list)
     bibleref = models.TextField("Bible reference(s)", null=True, blank=True)

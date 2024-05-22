@@ -6706,6 +6706,126 @@ class ReaderHuwaImport(ReaderEqualGold):
             oImported['msg'] = msg
 
         return oImported
+
+
+
+def reader_CPPM_AF_raw(request):
+
+    # This function adds the raw CPPM data from the cppm_texts_mapped_authors.json file (cppm_entry_str) to
+    # the EqualGold table (field: raw)
+    
+    # Can only be done by a super-user
+    if request.user.is_superuser:        
+        pass
+    
+    # Read the JSON file from MEDIA_DIR   
+    cppm_t_read = os.path.abspath(os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')) # cppm_texts_mapped_authors.json
+
+    cppm_t = open(cppm_t_read, encoding="utf8")  
+
+    # Load the json files 
+    cppm_texts = json.load(cppm_t)
+    
+    # Getting the data ready. 
+    
+    # Create a count
+    count = 0
+
+    # Create lists
+    numbers_lst = []
+    cppm_raw_lst=[]
+
+    # Create an empty data frame
+    gs_df = pd.DataFrame(columns=['Number', 'Code', 'Raw'])
+
+    # First at the highest level (the id's (numbers))
+    for key1, value1 in cppm_texts.items(): 
+
+        work_lst = []
+
+        # Then one level lower (cppm number)
+        for key2, value2 in value1.items():
+            # Only the items that are not mapped should be 
+            if key2 == 'mapped' and value2 == False:            
+                
+                count += 1                               
+                work_lst.append(key1)
+
+                # This part is for the lower sections
+                for key3, value3 in value1.items():
+                   
+                    # seeker_equalgold_link needs to be added
+                    if key3 == 'seeker_signature':
+                        # zoals ms_items
+                        for value4 in value3:
+                        # Iterate over the items in the list, 
+                        # that can have multiple items                        
+
+                            for key5, value5 in value4.items():                                
+                                # Get the CPPM code
+                                if key5 == 'code': #
+                                    code_imp = value5                                    
+                                    work_lst.append(code_imp)
+                                    #print(code_imp)
+                                                     
+                # Get the equality_set (list)
+                raw_cppm = value1.get('cppm_entry_str')    
+                work_lst.append(raw_cppm) 
+                #print(raw_cppm)
+                
+                # Put everything in the empty dataframe
+                gs_df.loc[len(gs_df.index)] = work_lst
+
+    for index, row in gs_df.iterrows():
+       #print(row['Number'], row['Raw'])
+        
+       # Check of dit allemaal werkt
+       cppm = row['Number']
+       code = row['Code']
+       raw = row['Raw']
+
+       # Store the data in the database
+
+       # Find the EqualGold object using the EqualGold External table 
+       # Check if the EG External object already exists: TH: onzeker of dit werkt
+
+       # Code for externaltype
+       external = "cppm"
+       
+       # Find out if the cppm number is not a regular id:
+
+       # Find the EquaGold using the EqualGoldExternal table, use the externalid OR externaltype
+       # Find out if the cppm id contains a letter!
+       
+       if cppm.isdigit():
+           eqgex_obj = EqualGoldExternal.objects.filter(externalid=cppm, externaltype=external).first()        
+       else:
+           eqgex_obj = EqualGoldExternal.objects.filter(externaltextid=cppm, externaltype=external).first()        
+       
+       #print(cppm)
+       
+       if eqgex_obj == None:
+           print (cppm)
+       else:      
+           equal = eqgex_obj.equal_id
+       
+       
+       #print(equal)
+
+       # Find the correct EqualGold
+       #eqg_obj = EqualGold.objects.filter(id=equal).first()
+
+       # Add the raw data to the table
+       #eqg_obj.raw = raw
+       #eqg_obj.save()
+
+
+
+
+
+
+    # What we return is simply the home page
+    return redirect('home')
          
 def reader_CPPM_AF(request):
 
@@ -6762,6 +6882,9 @@ def reader_CPPM_AF(request):
                 
                 count += 1                               
                 work_lst.append(key1)
+                print(key1)
+                numbers_lst.append(key1)
+
 
                 # This part is for the lower sections
                 for key3, value3 in value1.items():
@@ -6778,6 +6901,7 @@ def reader_CPPM_AF(request):
                                 if key5 == 'code': #
                                     code_imp = value5                                    
                                     work_lst.append(code_imp)
+                                    code_lst.append(code_imp)
                                 # Get the editype
                                 elif key5 == 'editype':
                                     editype_imp = value5
@@ -6816,11 +6940,20 @@ def reader_CPPM_AF(request):
                 
                 # Put everything in the empty dataframe
                 gs_df.loc[len(gs_df.index)] = work_lst
+    
+    print(len(numbers_lst))
+    print(len(code_lst))
 
     for index, row in gs_df.iterrows():
-        print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
+
+        cppm = row['Number']
+
+        if cppm == 1215:
+            print("there we are")
+        #print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
         
         # Check of dit allemaal werkt
+        
         cppm = row['Number']
         code = row['Code']
         editype = row['Editype']
@@ -6830,12 +6963,12 @@ def reader_CPPM_AF(request):
         project = row['Project']
         equality = row['Equality'] # Die kan ik via External GS en EG altijd opnieuw ophalen
 
-        # Store the data in the database: dit staat niet goed
+        # Store the data in the database
            
         # Create a new Signature (if there is a new one!) Ok dit werkt niet want hij gaat eerst alles af en dan slaat hij het pas op, dat moet eerder gebeuren.
         # Iterate over df and add to Signature
 
-        # Check of de Signature bestaat
+        # Check if the Signature exists
         sig_obj = Signature.objects.filter(code=code, editype = 'cl').first()
         if sig_obj is None:            
             # Find if the SG is already in the database                  
