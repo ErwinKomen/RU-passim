@@ -8,6 +8,7 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Q, Prefetch, Count, F, Sum
 from django.db.models.functions import Lower
@@ -787,6 +788,18 @@ def home(request, errortype=None):
             thread = Thread(target=scan_transcriptions)
             thread.start()
 
+        # Check if the user's / profile's information is up-to-date
+        user = request.user
+        if not request is None and not user is None and not user.id is None:
+            profile = user.user_profiles.first()
+            if not profile is None:
+                # Validate information from this user
+                bNeeds, msg = profile.needs_updating()
+                if bNeeds:
+                    # Provide popup for user
+                    context['profile_msg'] = msg
+                    context['profile_url'] = reverse('profile_details', kwargs={'pk': profile.id})
+
         # Calculate the response
         response = render(request, template_name, context)
     except:
@@ -1278,7 +1291,7 @@ def login_as_user(request, user_id):
     # Make sure that I am superuser
     if super.is_staff and super.is_superuser:
         user = User.objects.filter(username__iexact=user_id).first()
-        if user != None:
+        if not user is None:
             # Perform the login
             login(request, user)
             return HttpResponseRedirect(reverse("home"))
@@ -1296,6 +1309,8 @@ def signup(request):
             # Create the user
             username = form.cleaned_data.get('username')
             raw_password = form.cleaned_data.get('password1')
+            affiliation = form.cleaned_data.get('affiliation')
+
             # also make sure that the user gets into the STAFF,
             #      otherwise he/she may not see the admin pages
             user = authenticate(username=username, 
@@ -1308,6 +1323,13 @@ def signup(request):
             if gQs.count() > 0:
                 g = gQs[0]
                 g.user_set.add(user)
+
+            # Add a profile for this new user
+            profile = Profile.objects.filter(user=user).first()
+            if profile == None:
+                # There is no profile yet, so make it
+                profile = Profile.objects.create(user=user, affiliation=affiliation)
+
             # Log in as the user
             login(request, user)
             return redirect('home')
@@ -3658,6 +3680,32 @@ def get_nicknames(request):
     return HttpResponse(data, mimetype)
 
 @csrf_exempt
+def get_eqgincipits(request):
+    """Get a list of EqualGold-sermon incipits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if is_ajax(request):
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchincipit__icontains=author))
+            items = EqualGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
 def get_gldincipits(request):
     """Get a list of Gold-sermon incipits for autocomplete"""
 
@@ -3669,8 +3717,6 @@ def get_gldincipits(request):
             lstQ = []
             lstQ.append(Q(srchincipit__icontains=author))
             items = SermonGold.objects.filter(*lstQ).values("srchincipit").distinct().all().order_by('srchincipit')
-            # items = SermonGold.objects.order_by("incipit").distinct()
-            # items = SermonGold.objects.filter(*lstQ).order_by('incipit').distinct()
             results = []
             for idx, co in enumerate(items):
                 val = co['srchincipit']
@@ -3700,6 +3746,32 @@ def get_srmincipits(request):
             results = []
             for idx, co in enumerate(items):
                 val = co['srchincipit']
+                co_json = {'name': val, 'id': idx }
+                results.append(co_json)
+            data = json.dumps(results)
+        else:
+            data = "Request is not ajax"
+    except:
+        msg = oErr.get_error_message()
+        data = "error: {}".format(msg)
+    mimetype = "application/json"
+    return HttpResponse(data, mimetype)
+
+@csrf_exempt
+def get_eqgexplicits(request):
+    """Get a list of EqualGold-sermon explicits for autocomplete"""
+
+    oErr = ErrHandle()
+    try:
+        data = 'fail'
+        if is_ajax(request):
+            author = request.GET.get("name", "")
+            lstQ = []
+            lstQ.append(Q(srchexplicit__icontains=author))
+            items = EqualGold.objects.filter(*lstQ).values("srchexplicit").distinct().all().order_by('srchexplicit')
+            results = []
+            for idx, co in enumerate(items):
+                val = co['srchexplicit']
                 co_json = {'name': val, 'id': idx }
                 results.append(co_json)
             data = json.dumps(results)
@@ -5439,7 +5511,8 @@ class SermonListView(BasicList):
                 {"name": "Keyword",          "id": "filter_keyword",        "enabled": False}, 
                 {"name": "Feast",            "id": "filter_feast",          "enabled": False},
                 {"name": "Bible reference",  "id": "filter_bibref",         "enabled": False},
-                {"name": "Note",             "id": "filter_note",           "enabled": False},
+                # issue #727: redundancies
+                # {"name": "Note",             "id": "filter_note",           "enabled": False},
                 {"name": "Status",           "id": "filter_stype",          "enabled": False},
                 {"name": "Passim code",      "id": "filter_code",           "enabled": False},
                 {"name": "Free",             "id": "filter_freetext",       "enabled": False},
@@ -5470,7 +5543,8 @@ class SermonListView(BasicList):
             {'filter': 'title',         'dbfield': 'srchtitle',         'keyS': 'srch_title'},
             {'filter': 'sectiontitle',  'dbfield': 'srchsectiontitle',  'keyS': 'srch_sectiontitle'},
             {'filter': 'feast',         'fkfield': 'feast',             'keyFk': 'feast', 'keyList': 'feastlist', 'infield': 'id'},
-            {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
+            # issue #727: redundancies
+            # {'filter': 'note',          'dbfield': 'note',              'keyS': 'note'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefbk'},
             {'filter': 'bibref',        'dbfield': '$dummy',            'keyS': 'bibrefchvs'},
             {'filter': 'freetext',      'dbfield': '$dummy',            'keyS': 'free_term'},
@@ -5502,7 +5576,7 @@ class SermonListView(BasicList):
         {'section': 'manuscript', 'filterlist': [
             {'filter': 'manuid',        'fkfield': 'manu',  'keyS': 'manuidno',     'keyList': 'manuidlist', 'keyFk': 'idno', 'infield': 'id'},
             {'filter': 'country',       'fkfield': 'msitem__manu__library__lcountry', 'keyS': 'country_ta',   'keyId': 'country',     'keyFk': "name"},
-            {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
+            {'filter': 'city',          'fkfield': 'msitem__manu__library__lcity|msitem__manu__library__location',    'keyS': 'city_ta',      'keyId': 'city',        'keyFk': "name"},
             {'filter': 'library',       'fkfield': 'msitem__manu__library',           'keyS': 'libname_ta',   'keyId': 'library',     'keyFk': "name"},
             {'filter': 'origin',        'fkfield': 'msitem__codico__origin',          'keyS': 'origin_ta',    'keyId': 'origin',      'keyFk': "name"},
             {'filter': 'provenance',    'fkfield': 'msitem__codico__provenances|msitem__codico__provenances__location',     
@@ -7403,6 +7477,8 @@ class ProfileEdit(BasicDetails):
     def add_to_context(self, context, instance):
         """Add to the existing context"""
 
+        not_editable_by_user = ['username', 'status', 'project editing rights', 'project approval rights' ]
+
         # Define the main items to show and edit
         context['mainitems'] = [
             # The user.id must be passed on, but non-visibly
@@ -7437,6 +7513,13 @@ class ProfileEdit(BasicDetails):
             # Compare with instance
             if user.id == instance.user.id:
                 self.permission = "write"
+                # BUT: some fields may *NOT* be edited even by the user
+                for oItem in context['mainitems']:
+                    label_name = oItem.get("label").replace(":", "").lower()
+                    if label_name in not_editable_by_user:
+                        # Remove any field_key or field_list
+                        if 'field_key' in oItem: oItem.pop('field_key')
+                        if 'field_list' in oItem: oItem.pop('field_list')
             else:
                 # This is not the current user
                 self.permission = "readonly"
@@ -7455,27 +7538,49 @@ class ProfileEdit(BasicDetails):
 
             # (1) Process newusername
             newusername = form.cleaned_data['newusername']
-            if instance.user.username != newusername:
-                instance.user.username = newusername
-                bSaveUser = True
+            if newusername != "":
+                # Note: the [newusername] is empty, if the user is not allowed to work on this
+                if instance.user.username != newusername:
+                    instance.user.username = newusername
+                    bSaveUser = True
 
             # (2) Process newemail
             newemail = form.cleaned_data['newemail']
             if instance.user.email != newemail:
-                instance.user.email = newemail
-                bSaveUser = True
+                # Validate this
+                try:
+                    validate_email(newemail)
+                    instance.user.email = newemail
+                    bSaveUser = True
+                except ValidationError:
+                    oErr.Status("ProfileEdit/after_save: invalid email")
+                    form.add_error("newemail", "invalid email")
 
             # (3) Process newfirst_name
             newfirst_name = form.cleaned_data['newfirst_name']
             if instance.user.first_name != newfirst_name:
-                instance.user.first_name = newfirst_name
-                bSaveUser = True
+                newfirst_name = newfirst_name.strip()
+                if newfirst_name != "" and len(newfirst_name) > 1:
+                    instance.user.first_name = newfirst_name
+                    bSaveUser = True
+                else:
+                    form.add_error("newfirst_name", "Invalid first name")
 
             # (4) Process newlast_name
             newlast_name = form.cleaned_data['newlast_name']
             if instance.user.last_name != newlast_name:
-                instance.user.last_name = newlast_name
-                bSaveUser = True
+                newlast_name = newlast_name.strip()
+                if newlast_name != "" and len(newlast_name) > 1:
+                    instance.user.last_name = newlast_name
+                    bSaveUser = True
+                else:
+                    form.add_error("newlast_name", "Invalid last name")
+
+            # (5) Check affiliation
+            affiliation = form.cleaned_data['affiliation']
+            affiliation = affiliation.strip()
+            if len(affiliation) < 2:
+                form.add_error("affiliation", "Invalid affiliation")
 
             # Possibly save the user
             if bSaveUser:
@@ -8144,7 +8249,20 @@ class CollAnyEdit(BasicDetails):
                             # All users may read collections with 'public' scope
                             permission = "read"
             else:
+                # Default permission:
                 permission = "readonly"
+                # But what if this is a passim_user trying to see a non-private database?
+                if self.prefix == "priv":
+                    # User trying to see a private collection
+                    # (1) What is the collection's scope?
+                    if instance.scope == "team":
+                        # May not be visible
+                        permission = ""
+                    elif instance.scope == "priv":
+                        # Who is the user of this item?
+                        if profile_owner.id != profile_user.id:
+                            # User X trying to look at stuff from user Y
+                            permission = ""
 
             context['permission'] = permission
 
@@ -8852,7 +8970,8 @@ class CollPrivDetails(CollAnyEdit):
         sBack = ""
         if type == "manu":
             if custom == "shelfmark":
-                sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
+                # sBack = "{}, {}, <span class='signature'>{}</span>".format(instance.get_full_name())
+                sBack = instance.get_full_name(False)
             elif custom == "name":
                 sBack = instance.name
             elif custom == "origprov":
@@ -9670,11 +9789,13 @@ class CollectionListView(BasicList):
             self.settype = "hc"
             self.plural_name = "Historical Collections"
             self.sg_name = "Historical Collection"  
-            self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
+            # self.order_cols = ['name', '', '', 'ssgauthornum', 'created']
+            # See issue #756
+            self.order_cols = ['name', '', '', 'ssgauthornum']
             self.order_default = self.order_cols
             self.order_heads  = [
                 {'name': 'Historical Collection',   'order': 'o=1', 'type': 'str', 'field': 'name', 'linkdetails': True},
-                {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'allowwrap': True, 'main': True},
+                {'name': 'Authors',                 'order': '',    'type': 'str', 'custom': 'authors', 'linkdetails': True, 'allowwrap': True, 'main': True},
                 {'name': '',                        'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
                 {'name': 'Author count',            'order': 'o=4', 'type': 'int', 'custom': 'authcount'},
                 #{'name': 'Added',                   'order': 'o=5', 'type': 'str', 'custom': 'created'}
@@ -9829,118 +9950,155 @@ class CollectionListView(BasicList):
             oErr.DoError("CollectionListView/get_own_list")
         return qs
 
+    def get_own_list_ids(self):
+        oErr = ErrHandle()
+        lst_back = []
+        try:
+            # Get the user
+            username = self.request.user.username
+            user = User.objects.filter(username=username).first()
+            # Get to the profile of this user
+            if user is None:
+                oErr.Status("CollectionListView/get_own_list_ids: unknown user is [{}]".format(username))
+            else:
+                lst_back = [x['id'] for x in Profile.objects.filter(user=user).values('id')]
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/get_own_list_ids")
+        return lst_back
+
     def adapt_search(self, fields):
         lstExclude=None
         qAlternative = None
-        if self.prefix == "hist":
-            # The settype should be specified
-            fields['settype'] = "hc"
+        oErr = ErrHandle()
+        try:
+            if self.prefix == "hist":
+                # The settype should be specified
+                fields['settype'] = "hc"
 
-            # The collection type is 'super'
-            fields['type'] = "super"
+                # The collection type is 'super'
+                fields['type'] = "super"
 
-            # The scope of a historical collection to be shown should be 'public'
-            if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
-                profile = Profile.get_user_profile(self.request.user.username)
-                fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
-            else:
-                fields['scope'] = "publ"
+                # The scope of a historical collection to be shown should be 'public'
+                if user_is_authenticated(self.request) and user_is_ingroup(self.request, app_editor):
+                    profile = Profile.get_user_profile(self.request.user.username)
+                    fields['scope'] = ( ( Q(scope="priv") & Q(owner=profile) ) | Q(scope="team") | Q(scope="publ") )
+                else:
+                    fields['scope'] = "publ"
 
-            # Adapt the bible reference list
-            bibrefbk = fields.get("bibrefbk", "")
-            if bibrefbk != None and bibrefbk != "":
-                bibrefchvs = fields.get("bibrefchvs", "")
+                # Adapt the bible reference list
+                bibrefbk = fields.get("bibrefbk", "")
+                if bibrefbk != None and bibrefbk != "":
+                    bibrefchvs = fields.get("bibrefchvs", "")
 
-                # Get the start and end of this bibref
-                start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
+                    # Get the start and end of this bibref
+                    start, einde = Reference.get_startend(bibrefchvs, book=bibrefbk)
 
-                # Find out which sermons have references in this range
-                lstQ = []
-                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
-                lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
-                collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
+                    # Find out which sermons have references in this range
+                    lstQ = []
+                    lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__gte=start))
+                    lstQ.append(Q(super_col__super__equalgold_sermons__sermonbibranges__bibrangeverses__bkchvs__lte=einde))
+                    collectionlist = [x.id for x in Collection.objects.filter(*lstQ).order_by('id').distinct()]
 
-                fields['bibrefbk'] = Q(id__in=collectionlist)
+                    fields['bibrefbk'] = Q(id__in=collectionlist)
             
-            # Make sure we only use the Authority Files with accepted modifications
-            # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
-            # With this condition we make sure ALL historical collections are in de unfiltered listview
-            if fields['ssgcode'] != '':
-                fields['atype'] = 'acc'
-        elif self.prefix == "priv":
-            # Show private, team and public datasets, provided the person is in the team
-            # Bij navigeren naar Datasets is scope leeg                                 
-            fields['settype'] = "pd"          
-            ownlist = self.get_own_list()
-            if user_is_ingroup(self.request, app_editor):
-            # When filtering on scope:  
-                # When navigating to My Datasets, scope is empty and colscope is None:
-                if fields['scope'] == "":
-                    # For the complete overview (private datasets of the user, team and public):
-                    if fields['colscope'] == None:
-                        # issue #446: use [defscope] for default setting
-                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
-                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
-                    # Filtering on scope Public:
-                    elif fields['colscope'].abbr == 'publ':           
-                        fields['colscope'] = (Q(scope="publ") )
-                    # Filtering on scope Team:
-                    elif fields['colscope'].abbr == 'team':                        
-                        fields['colscope'] = (Q(scope="team") )
-                    # Filtering on scope Private: 
-                    elif fields['colscope'].abbr == 'priv':
-                        fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ))
-                # Somehow after the initial first view of all datasets and the first filtering, scope remains "priv" 
-                # whether you filter on any of the three options. Only colscope is changed when filtering on Private, Team or Public.        
-                elif fields['scope'] == "priv":                                      
-                    if fields['colscope'] != None:
-                        # Filtering on scope Private:
-                        if fields['colscope'].abbr == 'priv':
-                            fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  )) 
+                # Make sure we only use the Authority Files with accepted modifications
+                # This means that atype should be 'acc' (and not: 'mod', 'rej' or 'def') 
+                # With this condition we make sure ALL historical collections are in de unfiltered listview
+                if fields['ssgcode'] != '':
+                    fields['atype'] = 'acc'
+            elif self.prefix == "priv":
+                # Show private, team and public datasets, provided the person is in the team
+                # Bij navigeren naar Datasets is scope leeg                                 
+                fields['settype'] = "pd"          
+                ownlist = self.get_own_list()
+                ownlist_ids = self.get_own_list_ids()
+                if user_is_ingroup(self.request, app_editor):
+                    # When filtering on scope:  
+                    # When navigating to My Datasets, scope is empty and colscope is None:
+                    if fields['scope'] == "":
+                        # For the complete overview (private datasets of the user, team and public):
+                        if fields['colscope'] == None:
+                            # issue #446: use [defscope] for default setting
+                            # fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ"))
+                            fields['defscope'] = ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="team") | Q(scope="publ"))
                         # Filtering on scope Public:
-                        elif fields['colscope'].abbr == 'publ':
+                        elif fields['colscope'].abbr == 'publ':           
                             fields['colscope'] = (Q(scope="publ") )
                         # Filtering on scope Team:
-                        elif fields['colscope'].abbr == 'team':
+                        elif fields['colscope'].abbr == 'team':                        
                             fields['colscope'] = (Q(scope="team") )
-                    # For the complete overview (private datasets of the user, team and public):
-                    elif fields['colscope'] == None:
-                        # issue #446: use [defscope] for default setting
-                        # fields['colscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
-                        fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                        # Filtering on scope Private: 
+                        elif fields['colscope'].abbr == 'priv':
+                            # fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  ))
+                            fields['colscope'] = ( ( Q(scope="priv") & Q(owner__id__in=ownlist_ids)  ))
+                    # Somehow after the initial first view of all datasets and the first filtering, scope remains "priv" 
+                    # whether you filter on any of the three options. Only colscope is changed when filtering on Private, Team or Public.        
+                    elif fields['scope'] == "priv":                                      
+                        if fields['colscope'] != None:
+                            # Filtering on scope Private:
+                            if fields['colscope'].abbr == 'priv':
+                                fields['colscope'] = ( ( Q(scope="priv") & Q(owner__in=ownlist)  )) 
+                            # Filtering on scope Public:
+                            elif fields['colscope'].abbr == 'publ':
+                                fields['colscope'] = (Q(scope="publ") )
+                            # Filtering on scope Team:
+                            elif fields['colscope'].abbr == 'team':
+                                fields['colscope'] = (Q(scope="team") )
+                        # For the complete overview (private datasets of the user, team and public):
+                        elif fields['colscope'] == None:
+                            # issue #446: use [defscope] for default setting
+                            # fields['defscope'] = ( Q(scope="priv") & Q(owner__in=ownlist) | Q(scope="team") | Q(scope="publ")) 
+                            fields['defscope'] = ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="team") | Q(scope="publ")) 
+                else:
+                    # Situation: not an app_editor, but only an app_user
+                    scope = fields.get('scope')
+                    colscope = fields.get('colscope')
+                    colscope = "" if colscope is None else colscope.abbr
+                    colscope = scope if colscope == "" else colscope
+                    # Situation 1: no scope defined
+                    if colscope == "":
+                        # This user is *NOT* an app_editor: only show publ ones + those of the user
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="publ")) 
+                    elif colscope == "publ" or colscope == "team":
+                        fields['colscope'] =  Q(scope="publ")
+                    elif colscope == "priv":
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) )
+
              
         
-        elif self.prefix == "publ":
-            # Show only public datasets
-            fields['settype'] = "pd"
-            # qAlternative = Q(scope="publ")
-            fields['scope'] = "publ"
-        else:
-            # Check if the collist is identified
-            if fields['ownlist'] == None or len(fields['ownlist']) == 0:
-                # Get the user
-                #username = self.request.user.username
-                #user = User.objects.filter(username=username).first()
-                ## Get to the profile of this user
-                #qs = Profile.objects.filter(user=user)
-                #profile = qs[0]
-                #fields['ownlist'] = qs
-                fields['ownlist'] = self.get_own_list()
+            elif self.prefix == "publ":
+                # Show only public datasets
+                fields['settype'] = "pd"
+                # qAlternative = Q(scope="publ")
+                fields['scope'] = "publ"
+            else:
+                # Check if the collist is identified
+                if fields['ownlist'] == None or len(fields['ownlist']) == 0:
+                    # Get the user
+                    fields['ownlist'] = self.get_own_list()
 
-                # Check on what kind of user I am
-                if user_is_ingroup(self.request, app_editor):
-                    # This is an editor: may see collections in the team
-                    qAlternative = Q(scope="team") | Q(scope="publ")
-                else:
-                    # Common user: may only see those with public scope
-                    # fields['scope'] = "publ"
-                    qAlternative = Q(scope="publ")
+                    # Check on what kind of user I am
+                    if user_is_ingroup(self.request, app_editor):
+                        # This is an editor: may see collections in the team
+                        qAlternative = Q(scope="team") | Q(scope="publ")
+                    else:
+                        # Common user: may only see those with public scope
+                        # fields['scope'] = "publ"
+                        qAlternative = Q(scope="publ")
 
-            # Also make sure that we add the collection type, which is specified in "prefix"
-            if self.prefix != "any":
-                fields['type'] = self.prefix
-            # The settype should be specified
+                # Also make sure that we add the collection type, which is specified in "prefix"
+                if self.prefix != "any":
+                    fields['type'] = self.prefix
+                # The settype should be specified
+                fields['settype'] = "pd"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionListView/adapt_search")
+            # make sure to define colscope and settype if it is not set
+            fields['type'] = self.prefix
             fields['settype'] = "pd"
+            fields['colscope'] =  Q(scope="publ")
         return fields, lstExclude, qAlternative
 
     def get_field_value(self, instance, custom):
@@ -10824,17 +10982,29 @@ class ManuscriptEdit(BasicDetails):
             # If this user belongs to the ProjectApprover of HUWA, show him the HUWA ID if it is there
             if not istemplate and not instance is None:
                 # NOTE: this code should be extended to include other external projects, when the time is right
-                ext = ManuscriptExternal.objects.filter(manu=instance).first()
-                if not ext is None:
+                qs_ext = ManuscriptExternal.objects.filter(manu=instance)
+                if qs_ext.count() > 0:
                     # Get the field values
-                    externaltype = ext.externaltype
-                    externalid = ext.externalid
+                    ext = None
+                    lst_ext_id = []
+                    for ext_obj in qs_ext:
+                        if ext is None:
+                            ext = ext_obj
+                            externaltype = ext.externaltype
+                            externalid = ext.externalid
+                        else:
+                            lst_ext_id.append(str(ext_obj.externalid))
+                    if qs_ext.count() == 1:
+                        ext_value = externalid
+                    else:
+                        ext_value = "{} (and: {})".format(externalid, ", ".join(lst_ext_id))
+
                     # Issue #730.3
                     # bEditHuwa = profile.is_project_approver("huwa")
                     bEditHuwa = profile.is_project_editor("huwa")
                     if externaltype == "huwop" and externalid > 0 and bEditHuwa:
                         # Okay, the user has the right to see the externalid
-                        oItem = dict(type="plain", label="HUWA id", value=externalid, field_key="externalid")
+                        oItem = dict(type="plain", label="HUWA ids", value=ext_value, field_key="externalid")
                         context['mainitems'].insert(0, oItem)
 
             # Get the main items
@@ -10872,6 +11042,7 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
                     {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
                         'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
+                    {'type': 'line',  'label': "Suspected doubles:",    'value': instance.get_similars_markdown()}
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -11941,7 +12112,8 @@ class ManuscriptListView(BasicList):
     plural_name = "Manuscripts"
     basketview = False
     
-    order_cols = ['library__lcity__name;library__location__name', 'library__name', 'idno;name', '', '', 'yearstart','yearfinish', 'stype','']
+    order_cols = ['library__location__name;library__lcity__name', 'library__name', 'idno;name', 
+                  '', '', '', 'yearstart','yearfinish', 'stype','']
     order_default = order_cols
     order_heads = [
         {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
@@ -11949,10 +12121,11 @@ class ManuscriptListView(BasicList):
         {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
         {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
+        {'name': 'Doubles',  'order': '',    'type': 'int', 'custom': 'similars','align': 'right'},
         {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
-        {'name': 'From',     'order': 'o=6', 'type': 'int', 'custom': 'from',    'align': 'right'},
-        {'name': 'Until',    'order': 'o=7', 'type': 'int', 'custom': 'until',   'align': 'right'},
-        {'name': 'Status',   'order': 'o=8', 'type': 'str', 'custom': 'status'},
+        {'name': 'From',     'order': 'o=7', 'type': 'int', 'custom': 'from',    'align': 'right'},
+        {'name': 'Until',    'order': 'o=8', 'type': 'int', 'custom': 'until',   'align': 'right'},
+        {'name': 'Status',   'order': 'o=9', 'type': 'str', 'custom': 'status'},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'links'}]
     filters = [         
         {"name": "Country",         "id": "filter_country",          "enabled": False}, 
@@ -11967,10 +12140,11 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},        
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
+        {"name": "PD",              "id": "filter_colmanu",          "enabled": False},
         
         # Issue #717: rename into "Comparative search..."
         # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
-        {"name": "Comparative search...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},
+        {"name": "Comparative search...",  "id": "filter_comparative",    "enabled": False, "head_id": "none"},
         {"name": "Manifestation...",       "id": "filter_sermon",         "enabled": False, "head_id": "none"},       
         {"name": "Authority file...",      "id": "filter_authority_file", "enabled": False, "head_id": "none"},        
 
@@ -11985,15 +12159,17 @@ class ManuscriptListView(BasicList):
         {"name": "Bible reference",         "id": "filter_sermo_bibref",        "enabled": False, "head_id": "filter_sermon"},
         {"name": "Feast",                   "id": "filter_sermo_feast",         "enabled": False, "head_id": "filter_sermon"},
                
-        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
-        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_collection"},
+        {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
+        {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
+        {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
         {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection", "hide_button": True},
         # issue #717: delete the PD:Manuscript and PD:Sermon options
         #{"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         #{"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},
         # Issue #416: Delete the option to search for a GoldSermon dataset 
         # {"name": "PD: Sermon Gold",         "idco": "filter_collection_gold", "enabled": False, "head_id": "filter_collection"},
+
+        # Issue #
         
         {"name": "Author",                  "id": "filter_authority_file_author",       "enabled": False, "head_id": "filter_authority_file"},
         {"name": "Incipit",                 "id": "filter_authority_file_incipit",      "enabled": False, "head_id": "filter_authority_file"},
@@ -12020,10 +12196,12 @@ class ManuscriptListView(BasicList):
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearstart__gte', 'keyS': 'date_from'},
             {'filter': 'daterange',     'dbfield': 'manuscriptcodicounits__codico_dateranges__yearfinish__lte', 'keyS': 'date_until'},            
             {'filter': 'manutype',      'dbfield': 'mtype',                  'keyS': 'manutype', 'keyType': 'fieldchoice', 'infield': 'abbr'},
-            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'}
+            {'filter': 'stype',         'dbfield': 'stype',                  'keyList': 'stypelist', 'keyType': 'fieldchoice', 'infield': 'abbr'},
+            {'filter': 'colmanu',       'fkfield': 'collections', "title": "Personal dataset",                          
+             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             ]},
 
-        {'section': 'collection', 'filterlist': [
+        {'section': 'comparative', 'name': 'Comparative Search', 'filterlist': [
             # === Overlap with a specific manuscript ===
             {'filter': 'collection_manuidno',  'keyS': 'cmpmanu', 'dbfield': 'dbcmpmanu', 'keyList': 'cmpmanuidlist', 'infield': 'id', 'help': 'overlap_manu'},            
             {'filter': 'collection_hcptc', 'keyS': 'overlap', 'dbfield': 'hcptc', 
@@ -12036,8 +12214,8 @@ class ManuscriptListView(BasicList):
              'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_hist', 'infield': 'name' },             
 
             # === Personal Dataset ===
-            {'filter': 'collection_manu',  'fkfield': 'collections',                            
-             'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
+            #{'filter': 'collection_manu',  'fkfield': 'collections',                            
+            # 'keyS': 'collection',    'keyFk': 'name', 'keyList': 'collist_m', 'infield': 'name' },
             {'filter': 'collection_sermo', 'fkfield': 'manuitems__itemsermons__collections',               
              'keyS': 'collection_s',  'keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' },
             # Issue #416: Delete the option to search for a GoldSermon dataset 
@@ -12213,10 +12391,10 @@ class ManuscriptListView(BasicList):
         if custom == "city":
             if not instance.library is None:
                 city = None
-                if instance.library.lcity:
-                    city = instance.library.lcity.name
-                elif instance.library.location:
+                if instance.library.location:
                     city = instance.library.location.name
+                elif instance.library.lcity:
+                    city = instance.library.lcity.name
                 if city == None:
                     html.append("??")
                     sTitle = "City or location unclear"
@@ -12249,6 +12427,10 @@ class ManuscriptListView(BasicList):
         elif custom == "count":
             # html.append("{}".format(instance.manusermons.count()))
             html.append("{}".format(instance.get_sermon_count()))
+        elif custom == "similars":
+            bSimilars = (instance.similars.count() > 0)
+            if bSimilars:
+                html.append('<span class="glyphicon glyphicon-ok"></span>')
         elif custom == "from":
             # for item in instance.manuscript_dateranges.all():
             # Walk all codico's
@@ -14978,11 +15160,24 @@ class EqualGoldDetails(EqualGoldEdit):
                 # (see seeker/visualizations)
 
                 # Make sure to delete any previous corpora of mine
-                EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
+                qs = EqualGoldCorpus.objects.filter(profile=profile, ssg=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: EqualGoldCorpus.objects.filter(profile=profile, ssg=instance).delete()
 
                 # Old, extinct
-                ManuscriptCorpus.objects.filter(super=instance).delete()
-                ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
+                qs = ManuscriptCorpus.objects.filter(super=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: ManuscriptCorpus.objects.filter(super=instance).delete()
+
+                qs = ManuscriptCorpusLock.objects.filter(profile=profile, super=instance)
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        qs.delete()
+                # OLD: ManuscriptCorpusLock.objects.filter(profile=profile, super=instance).delete()
 
                 # THe graph also needs room in after details
                 if use_network_graph:
@@ -15188,7 +15383,8 @@ class EqualGoldListView(BasicList):
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
+        # issue #727: remove SermonGold filter
+        # {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Authority file",  "id": "filter_collsuper",         "enabled": False, "head_id": "filter_collection"},
         {"name": "Historical",      "id": "filter_collhist",          "enabled": False, "head_id": "filter_collection"},
                ]
@@ -15226,8 +15422,9 @@ class EqualGoldListView(BasicList):
             # issue #466: fkfield was 'equal_goldsermons__sermondescr__collections'
             #             changed into 'equalgold_sermons__sermondescr_col__collection'
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_s', 'infield': 'name' }, 
-            {'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
-             'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
+            # issue #727: remove SermonGold filter
+            #{'filter': 'collgold',  'fkfield': 'equal_goldsermons__collections',                     
+            # 'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_sg', 'infield': 'name' }, 
             {'filter': 'collsuper', 'fkfield': 'collections',                                        
              'keyS': 'collection','keyFk': 'name', 'keyList': 'collist_ssg', 'infield': 'name' }, 
             {'filter': 'collhist', 'fkfield': 'collections',                                        
@@ -15978,6 +16175,58 @@ class EqualGoldLinkEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def after_save(self, form, instance):
+
+        # Initialisations
+        msg = ""
+        bResult = True
+        oErr = ErrHandle()
+                
+        try:
+            if not instance is None:
+                if instance.linktype in LINK_BIDIR:
+                    # Find the reversal
+                    reverse = EqualGoldLink.objects.filter(src=instance.dst, dst=instance.src, linktype=instance.linktype).first()
+                    if reverse is None:
+                        # There is no reverse one: create the reversal 
+                        reverse = EqualGoldLink.objects.create(src=instance.dst, dst=instance.src, linktype=instance.linktype)
+                        # Other adaptations
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if instance.spectype != None and instance.spectype != "":
+                            reverse.spectype = get_reverse_spec(instance.spectype)
+                            bNeedSaving = True
+                        # Possibly copy note
+                        if instance.note != None and instance.note != "":
+                            reverse.note = instance.note
+                            bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                            reverse.save()
+                    else:
+                        # There is a reverse, but we need to make sure that the spec type is correct and the note, possibly
+                        bNeedSaving = False
+                        # Set the correct 'reverse' spec type
+                        if instance.spectype != None and instance.spectype != "":
+                            rev_spectype = get_reverse_spec(instance.spectype)
+                            if reverse.spectype != rev_spectype:
+                                reverse.spectype = rev_spectype
+                                bNeedSaving = True
+                        # Possibly copy note
+                        if instance.note != None and instance.note != "":
+                            if reverse.note != instance.note:
+                                reverse.note = instance.note
+                                bNeedSaving = True
+                        # Need saving? Then save
+                        if bNeedSaving:
+                            reverse.save()
+
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+        return bResult, msg
+
 
 class EqualGoldLinkDetails(EqualGoldLinkEdit):
     """The Details variant of Edit"""
@@ -16305,6 +16554,26 @@ class LibraryListView(BasicList):
         #    # Combine the HTML code
         #    sBack = "\n".join(html)
         return sBack, sTitle
+
+    def adapt_search(self, fields):                      
+
+        # Adapt the search to the keywords that *may* be shown
+        lstExclude=None
+        qAlternative = None
+
+        oErr = ErrHandle()
+        try:
+            # If needed: adapt the search for city to include locations
+            citylist = fields.get('citylist')
+            if citylist != None and citylist != "" and len(citylist) > 0:
+                citylist_ids = [x['id']  for x in citylist.values('id')]
+                fields['citylist'] = Q(lcity__id__in=citylist_ids) | Q(location__id__in=citylist_ids)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("LibraryListview/adapt_search")
+
+        return fields, lstExclude, qAlternative
 
 
 class LibraryListDownload(BasicPart):

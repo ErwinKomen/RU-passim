@@ -4,11 +4,13 @@ Definition of urls for passim.
 
 from datetime import datetime
 from django.contrib.auth.decorators import login_required, permission_required
-from django.conf.urls import include #, url # , handler404, handler400, handler403, handler500
+# from django.conf.urls import include #, url # , handler404, handler400, handler403, handler500
 from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import HttpResponseNotFound
 from django.urls import path, re_path
+# from django.conf.urls import include
+from django.urls.conf import include
 import django.contrib.auth.views
 import django
 
@@ -390,6 +392,8 @@ urlpatterns = [
     re_path(r'^api/manuscripts/$', passim.seeker.views.get_manuscripts, name='api_manuscripts'),
     re_path(r'^api/authors/list/$', passim.seeker.views.get_authors, name='api_authors'),
     re_path(r'^api/nicknames/$', passim.seeker.views.get_nicknames, name='api_nicknames'),
+    re_path(r'^api/eqgincipits/$', passim.seeker.views.get_eqgincipits, name='api_eqgincipits'),
+    re_path(r'^api/eqgexplicits/$', passim.seeker.views.get_eqgexplicits, name='api_eqgexplicits'),
     re_path(r'^api/gldincipits/$', passim.seeker.views.get_gldincipits, name='api_gldincipits'),
     re_path(r'^api/gldexplicits/$', passim.seeker.views.get_gldexplicits, name='api_gldexplicits'),
     re_path(r'^api/srmincipits/$', passim.seeker.views.get_srmincipits, name='api_srmincipits'),
@@ -459,7 +463,7 @@ urlpatterns = [
 
     # =============================================================================================
     # For working with ModelWidgets from the select2 package https://django-select2.readthedocs.io
-    re_path(r'^select2/', include('django_select2.urls')),
+    re_path(r'^select2/', django.urls.conf.include('django_select2.urls')),
 
     # ========================= PLUGIN ============================================================
     re_path(r'^plugin/sermboard/$', passim.plugin.views.sermonboard, name='sermonboard'),
@@ -474,7 +478,7 @@ urlpatterns = [
     re_path(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     re_path(r'^signup/$', passim.seeker.views.signup, name='signup'),
 
-    re_path(r'^login/user/(?P<user_id>\w[\w\d_]+)$', passim.seeker.views.login_as_user, name='login_as'),
+    re_path(r'^login/user/(?P<user_id>\w[\w\d\-_]+)$', passim.seeker.views.login_as_user, name='login_as'),
 
     re_path(r'^login/$', LoginView.as_view
         (

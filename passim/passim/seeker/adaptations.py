@@ -2,6 +2,7 @@
 Adaptations of the database that are called up from the (list)views in the SEEKER app.
 """
 
+from tracemalloc import start
 from django.db import transaction
 import re
 import json
@@ -9,6 +10,7 @@ import os
 import csv
 import sqlite3
 import pandas as pd
+import copy
 from unidecode import unidecode
 from passim.settings import MEDIA_DIR
 
@@ -40,7 +42,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
-        'collectiontype'], # 'sermonesdates',
+        'collectiontype', 'huwadoubles'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -108,6 +110,12 @@ def adapt_dateranges():
                 if yearfinish != manu.yearfinish:
                     manu.yearfinish = yearfinish
                     bNeedSaving = True
+
+                # Do not accept 3000
+                if manu.yearfinish == 3000:
+                    manu.yearfinish = yearstart
+                    bNeedSaving = True
+                    
                 if bNeedSaving:
                     manu.save()
     except:
@@ -1002,6 +1010,200 @@ def adapt_huwamanudate():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_huwadoubles():
+    """Try to combine HUWA-imported manuscripts that are the same (library/idno), but have different handschrift entries """
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    huwa_tables = ['handschrift']
+    try:
+
+        # Now try to calculate via the Passim way
+        prj_huwa = Project2.objects.filter(name__icontains="huwa").first()
+        qs = Manuscript.objects.filter(manuscript_proj__project=prj_huwa, 
+                                       mtype="man", 
+                                       library__isnull=False).exclude(idno="").order_by("library__id", "idno")
+        q_len = qs.count()
+        key = ""
+        oManus = {}
+        for obj in qs:
+            key = "{}|{}".format(obj.library.id, obj.idno)
+            if not key in oManus:
+                oManus[key] = []
+            oManus[key].append(obj.id)
+            
+        # Get all the manuscripts with the same shelfmark, occurring more than once
+        lManuDouble = []
+        iManuLongest = 0
+        for key, lst_ids in oManus.items():
+            lLength = len(lst_ids)
+            if lLength > 1:
+                lManuDouble.append(dict(key=key, manuids=lst_ids))
+                if lLength > iManuLongest:
+                    iManuLongest = lLength
+        x = len(lManuDouble)
+
+
+        # Read the HUWA database
+        table_info = read_huwa()
+        # (5) Load the tables that we need
+        tables = get_huwa_tables(table_info, huwa_tables)
+        # Get the table of handschrift
+        lHandschrift = tables['handschrift']
+
+        # Start a dictionary
+        oCombi = {}
+        oFaszikel = {}
+        # Walk the handschrifts
+        for oHandschrift in lHandschrift:
+            externalid = oHandschrift.get("id") 
+            # Get the library id and the signatur
+            library_id = oHandschrift.get("bibliothek")
+            signatur = oHandschrift.get("signatur")
+            # Exclude empty signatur
+            if not signatur is None: # and len(signatur.strip()) > 0 and not signatur[0] == "?":
+
+                if "10440" in signatur:
+                    iStop = 1
+
+                # Combine into one key
+                key = "{}|{}".format(library_id, signatur)
+                if not key in oCombi:
+                    oCombi[key] = []
+                if not key in oFaszikel:
+                    oFaszikel[key] = []
+
+                # Add the externalid to the dictionary
+                oCombi[key].append(externalid)
+
+                # Also get the faszikel (codices) information
+                faszikel_id = oHandschrift.get("faszikel")
+                # And get the manuscript id
+                manuscript = Manuscript.objects.filter(manuexternals__externalid=externalid).first()
+                if not manuscript is None:
+                    manuscriptid = manuscript.id
+                    oFaszikel[key].append(dict(faszikel=faszikel_id, handschrift=externalid, manuscript=manuscriptid))
+                else:
+                    oErr.Status("Could not find manuscript for handschrift={} [{}]".format(externalid, key))
+
+        # Get manuscripts with more than one differing faszikel
+        lst_joinmanu = []
+        lst_head = ["Key", "Handschr.Start", "Manuscript", "Handschrift", "Faszikel"]
+        print("\t".join(lst_head))
+        for key, lst_faszikel in oFaszikel.items():
+            if "10440" in key:
+                iStop = 1
+            if len(lst_faszikel) > 1:
+                # There are multiple handschrift items: do they have different faszikels?
+                #if lst_faszikel[0] != lst_faszikel[-1]:
+                if True:
+                    # Figure out what the starting one is (the first one having 100)
+                    start_id = -1
+                    start_manu = -1
+                    lst_f = []
+                    for f in lst_faszikel:
+                        if start_id < 0 and f['faszikel'] == 100:
+                            start_id = f['handschrift']
+                            start_manu = f['manuscript']
+                        else:
+                            lst_f.append(copy.copy(f))
+                    # Sort the list of faszikel
+                    lst_f_sorted = sorted(lst_f, key=lambda x:x['faszikel'])
+                    # They potentiall differ: add to list
+                    oJoin = dict(key=key, faszikels=lst_f_sorted, start=start_id, manu=start_manu)
+
+                    # Check if the manuscript differs over de faszikels
+                    manuid = start_manu
+                    bSame = False
+                    for oItem in lst_faszikel:
+                        if oItem['manuscript'] == manuid:
+                            bSame=True
+                            exit
+                    lst_cell = []
+                    lst_cell.append("{}".format(key))
+                    lst_cell.append("{}".format(start_id))
+                    lst_cell.append("{}".format(start_manu))
+                    lst_cell.append("{}".format(start_id))
+                    lst_cell.append("{}".format("100"))
+                    print("\t".join(lst_cell))
+                    # Also just provide lines for a CSV
+                    for oFaszikel in lst_f_sorted:
+                        lst_cell = []
+                        lst_cell.append("{}".format(key))
+                        lst_cell.append("{}".format(start_id))
+                        lst_cell.append("{}".format(oFaszikel['manuscript']))
+                        lst_cell.append("{}".format(oFaszikel['handschrift']))
+                        lst_cell.append("{}".format(oFaszikel['faszikel']))
+                        print("\t".join(lst_cell))
+                    lst_joinmanu.append(oJoin)
+
+        lJoining = len(lst_joinmanu)
+        print(lst_joinmanu)
+
+        iStop = 1
+
+        # Walk the manuscripts that can be joined, potentially...
+        for oJoining in lst_joinmanu:
+            # Get the manuscript associated with the start_id
+            start_id = oJoining['start']
+            lst_faszikel = oJoining['faszikels']
+            key = oJoining['key']
+            oErr.Status("Joining key={}".format(key))
+            manuscript = Manuscript.objects.filter(manuexternals__externalid=start_id).first()
+            order = 1
+            if not manuscript is None:
+                oErr.Status("Treating manuscript id={} - handschrift={}".format(manuscript.id, start_id))
+                lst_delete = []
+                # Walk all the faszikels
+                for oFaszikel in lst_faszikel:
+                    # Get the handschrift id
+                    externalid = oFaszikel['handschrift']
+                    # Find the codicological unit
+                    codico = Codico.objects.filter(manuscript__manuexternals__externalid=externalid).first()
+                    if not codico is None:
+                        order += 1
+                        old_manu_id = codico.manuscript.id
+                        lst_delete.append(old_manu_id)
+                        # debug
+                        oErr.Status("Adding codico={} that was manuscript={}".format(codico.id, old_manu_id))
+                        # Change to the new manuscript
+                        codico.manuscript = manuscript
+                        codico.order = order
+                        codico.save()
+                        # Make sure to change the MsItems connected to this one
+                        for msitem in codico.codicoitems.all():
+                            msitem.manu = manuscript
+                            msitem.save()
+                            # Walk the SermonDescr items
+                            for serm in msitem.itemsermons.all():
+                                serm.manu = manuscript
+                                serm.save()
+                        # Find the ManuscriptExternal item
+                        obj = ManuscriptExternal.objects.filter(externalid=externalid, manu_id=old_manu_id).first()
+                        if not obj is None:
+                            # Set to the correct manuscript
+                            obj.manu = manuscript
+                            # Add the codico information
+                            obj.externaltextid = "codico;{}".format(codico.id)
+                            obj.save()
+
+                # Is there anything to be deleted?
+                if len(lst_delete) > 0:
+                    # Remove the manuscripts
+                    Manuscript.objects.filter(id__in=lst_delete).delete()
+
+                    
+        iStop = 1
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+        oErr.DoError("adaptations/adapt_huwadoubles")
+    # Return the table that we found
+    return bResult, msg
+
+
 
 # =========== Part of sermon_list ==================
 def adapt_nicknames():
@@ -1386,8 +1588,16 @@ def adapt_huwafolionumbers():
                     lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
                     von_bis = get_folio_number(lst_von_bis)
                     bNeedAdaptation = True
+                else:
+                    lst_von_bis = str(oInhalt.get("von_bis", "")).split(".")
+                    von_bis = get_folio_number(lst_von_bis)
+                    bNeedAdaptation = True
 
                 if len(bis_rv) > 1:
+                    lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
+                    bis_f = get_folio_number(lst_bis_f)
+                    bNeedAdaptation = True
+                else:
                     lst_bis_f = str(oInhalt.get("bis_f", "")).split(".")
                     bis_f = get_folio_number(lst_bis_f)
                     bNeedAdaptation = True
@@ -1415,17 +1625,6 @@ def adapt_huwafolionumbers():
                         else:
                             # No need to change this one
                             iNoNeed += 1
-        ## Do we have candidates to be processed?
-        #if len(lst_result) > 0:
-        #    # Change them all together
-        #    with transaction.atomic():
-        #        for oResult in lst_result:
-        #            sermon_id = oResult.get("sermon_id")
-        #            locus = oResult.get("locus")
-        #            sermon = SermonDescr.objects.filter(id=sermon_id).first()
-        #            if not sermon is None:
-        #                sermon.locus = locus
-        #                sermon.save()
 
 
         # Everything has been processed correctly now
@@ -1580,6 +1779,8 @@ def adapt_ssg_bidirectional():
     msg = ""
     
     try:
+        count_remove = 0
+        count_add = 0
         # Put all links in a list
         lst_link = []
         lst_remove = []
@@ -1591,6 +1792,9 @@ def adapt_ssg_bidirectional():
                 # Add them to the removal
                 for item in lst_src:
                     lst_remove.append(item)
+                    # debugging
+                    oErr.Status("Could be removed id={}".format(item.id))
+                    count_remove += 1
             else:
                 # Add the obj to the list
                 lst_link.append(obj)
@@ -1600,6 +1804,9 @@ def adapt_ssg_bidirectional():
             if reverse.count() == 0:
                 # Create the reversal
                 reverse = EqualGoldLink.objects.create(src=obj.dst, dst=obj.src, linktype=obj.linktype)
+                count_add += 1
+
+        oErr.Status("SSG bidirectional report: removable={} added={}".format(count_remove, count_add))
     except:
         bResult = False
         msg = oErr.get_error_message()

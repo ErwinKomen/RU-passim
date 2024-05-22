@@ -1,25 +1,29 @@
 <div class="row">
   <div class="md-col-12">
-    <span class="pull-right" style="margin-bottom: 10px;">
-      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network" 
+    <span class="pull-right" style="margin-bottom: 10px; margin-right: 10px;">
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Textual overlap network"
          data-target="#ssg_network_overlap"
          onclick="ru.passim.seeker.network_overlap(this);">Overlap</a>
-      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Manuscript Transmission" 
+      {% if is_app_editor %}
+      <a class="btn btn-xs jumbo-1 sticky-visualization" title="Manuscript Transmission"
          data-target="#ssg_network_trans"
          onclick="ru.passim.seeker.network_transmission(this);">Transmission</a>
-      <a class="hidden btn btn-xs jumbo-1 sticky-visualization" title="Network graph" 
+      <a class="hidden btn btn-xs jumbo-1 sticky-visualization" title="Network graph"
          data-target="#ssg_network_graph"
          onclick="ru.passim.seeker.network_graph(this);">Graph</a>
+      {% endif %}
+      <span>&nbsp;</span>
     </span>
   </div>
 </div>
 
 
+{% if is_app_editor %}
 <div id="ssg_network_trans" class="hidden container-small">
-  <form action="{{equalgold_trans}}" method="post" >
+  <form action="{{equalgold_trans}}" method="post">
     {% csrf_token %}
     <div id="downloadcenter" class="hidden">
-      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name='downloadtype' id='downloadtype' class='form-control' value=''>
       <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
 
@@ -30,20 +34,20 @@
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="network_trans_slider" id="id_network_trans_slider" valueid="network_trans_slider_value"
-                type="range" min="1" max="{{manuscripts}}" value="2" class="slider" />
+               type="range" min="1" max="{{manuscripts}}" value="2" class="slider" />
       </div>
 
       <!-- Button to stop -->
       <div class="col-md-1 align-right tdnowrap">
 
         <a role="button" class="btn btn-xs jumbo-2" data-target="#transmission-saveas" data-toggle="collapse"
-            title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim." >
+           title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim.">
           <span class="glyphicon glyphicon-floppy-disk"></span>
         </a>
         <a role="button" class="btn btn-xs jumbo-2"
-            title="Update/refresh the visualization with the current setting"
-            targeturl={{equalgold_trans}}
-            onclick="ru.passim.seeker.network_transmission(this);">
+           title="Update/refresh the visualization with the current setting"
+           targeturl={{equalgold_trans}}
+           onclick="ru.passim.seeker.network_transmission(this);">
           <span class="glyphicon glyphicon-repeat"></span>
         </a>
 
@@ -57,7 +61,7 @@
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="gravity_trans_slider" id="id_gravity_trans_slider" valueid="gravity_trans_value"
-                type="range" min="-100" max="300" value="100" class="slider" />
+               type="range" min="-100" max="300" value="100" class="slider" />
       </div>
 
       <!-- Download button -->
@@ -75,10 +79,10 @@
           </span>
           &nbsp;
           <span class="pull-right">
-            <a role="button" class="btn btn-xs jumbo-2" 
-                saveurl="{{equalgold_trans}}" targeturl="{% url 'savedvis_apply' user.id %}" 
-                onclick="ru.passim.seeker.do_savedvis(this, 'transmission');">Save</a>
-          </span>            
+            <a role="button" class="btn btn-xs jumbo-2"
+               saveurl="{{equalgold_trans}}" targeturl="{% url 'savedvis_apply' user.id %}"
+               onclick="ru.passim.seeker.do_savedvis(this, 'transmission');">Save</a>
+          </span>
         </div>
         <!-- Any responses -->
         <div id="transmission-saveas-result" class="hidden">
@@ -114,10 +118,10 @@
 </div>
 
 <div id="ssg_network_graph" class="hidden container-small">
-  <form action="{{equalgold_graph}}" method="post" >
+  <form action="{{equalgold_graph}}" method="post">
     {% csrf_token %}
     <div id="downloadcenter" class="hidden">
-      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name='downloadtype' id='downloadtype' class='form-control' value=''>
       <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
     <div class="row">
@@ -127,14 +131,14 @@
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="networkslider" id="id_networkslider" valueid="network_graph_slider_value"
-                type="range" min="1" max="{{manuscripts}}" value="2" class="slider" />
+               type="range" min="1" max="{{manuscripts}}" value="2" class="slider" />
       </div>
 
       <!-- Button to stop -->
       <div class="col-md-1 align-right">
         <a role="button" class="btn btn-xs jumbo-2"
-            targeturl={{equalgold_graph}}
-            onclick="ru.passim.seeker.network_graph(this);">Update</a>
+           targeturl={{equalgold_graph}}
+           onclick="ru.passim.seeker.network_graph(this);">Update</a>
       </div>
 
     </div>
@@ -145,7 +149,7 @@
       </div>
       <div class="col-md-3 slidecontainer">
         <input name="gravityslider" id="id_gravityslider" valueid="gravity_graph_value"
-                type="range" min="1" max="100" value="10" class="slider" />
+               type="range" min="1" max="100" value="10" class="slider" />
       </div>
 
       <!-- Download button -->
@@ -163,20 +167,21 @@
   <div class="row" style="height: 500px;">
     <!-- The overlap network -->
     <div class="col-md-10">
-      <div id="super_network_graph" style="width: 100%;" class="visborder" >
+      <div id="super_network_graph" style="width: 100%;" class="visborder">
         <svg viewBox="0,0,800,500"></svg>
       </div>
     </div>
   </div>
 
 </div>
+{% endif %}
 
 <div id="ssg_network_overlap" class="hidden container-small">
 
-  <form action="{{equalgold_overlap}}" method="post" >
+  <form action="{{equalgold_overlap}}" method="post">
     {% csrf_token %}
     <div id="downloadcenter" class="hidden">
-      <input name='downloadtype' id='downloadtype' class='form-control' value='' >
+      <input name='downloadtype' id='downloadtype' class='form-control' value=''>
       <input name="downloaddata" id="downloaddata" class="hidden form-control" value="" />
     </div>
 
@@ -192,7 +197,7 @@
               </label>
             </td>
 
-            <td class="tdnowrap" ><span>Alternative options&nbsp;</span></td>
+            <td class="tdnowrap"><span>Alternative options&nbsp;</span></td>
             <td>
               <label class="switch" title="Highlight alternative options">
                 <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_alternatives');" />
@@ -200,7 +205,7 @@
               </label>
             </td>
 
-            <td class="tdnowrap" ><span>Historical collections&nbsp;</span></td>
+            <td class="tdnowrap"><span>Historical collections&nbsp;</span></td>
             <td>
               <label class="switch" title="Show historical collections">
                 <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_histcoll');" />
@@ -215,12 +220,12 @@
             </td>
             <td class="slidecontainer" style="width: 100%;">
               <input name="network_overlap_slider" id="id_network_overlap_slider" valueid="network_overlap_slider_value"
-                      type="range" min="1" max="10" value="1" class="slider" />
+                     type="range" min="1" max="10" value="1" class="slider" />
             </td>
 
             <td align="right">
               <a role="button" class="btn btn-xs jumbo-2" data-target="#overlap-saveas" data-toggle="collapse"
-                 title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim." >
+                 title="Open/close the [Save visualization] dialogue. Saved visualizations are kept in MyPassim.">
                 <span class="glyphicon glyphicon-floppy-disk"></span>
               </a>
               <a role="button" class="btn btn-xs jumbo-2"
@@ -236,7 +241,7 @@
             <td class="tdnowrap"><span>Link types&nbsp;</span></td>
             <td>
               <label class="switch" title="Show link types">
-                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktypes');"  />
+                <input type="checkbox" onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktypes');" />
                 <span class="switchslider round"></span>
               </label>
             </td>
@@ -257,7 +262,6 @@
             </td>
             <!-- Update button -->
             <td align="right">
-
             </td>
 
             <td class="tdnowrap" align="right">
@@ -267,7 +271,7 @@
             </td>
             <td class="slidecontainer" style="width: 100%;">
               <input name="gravity_overlap_slider" id="id_gravity_overlap_slider" valueid="gravity_overlap_value"
-                      type="range" min="-100" max="300" value="100" class="slider" />
+                     type="range" min="-100" max="300" value="100" class="slider" />
             </td>
 
             <td align="right">
@@ -281,38 +285,38 @@
               <div class="hidden linktypes">
                 <label class="checkbox-inline">
                   <input type="checkbox" value="linktype_neq" checked
-                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                         onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
                   <span>Nearly Equals</span>
                 </label>
                 <label class="checkbox-inline">
                   <input type="checkbox" value="linktype_prt" checked
-                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                         onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
                   <span>Partially Equals</span>
                 </label>
                 <label class="checkbox-inline">
                   <input type="checkbox" value="linktype_ech" checked
-                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
+                         onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
                   <span>Echoes</span>
                 </label>
                 <label class="checkbox-inline">
-                  <input type="checkbox" value="linktype_uns" checked 
-                          onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');"/>
+                  <input type="checkbox" value="linktype_uns" checked
+                         onclick="ru.passim.seeker.network_overlap_option(this, 'overlap_linktype_change');" />
                   <span>Unspecified</span>
                 </label>
               </div>
 
             </td>
-            <td colspan="4"  align="right">
+            <td colspan="4" align="right">
               <div id="overlap-saveas" class="saveas collapse">
                 <span>
                   <input type="text" name="overlap-visname" style="width: 80%" placeholder="Name for this visualization" />
                 </span>
                 &nbsp;
                 <span>
-                  <a role="button" class="btn btn-xs jumbo-2" 
-                     saveurl="{{equalgold_overlap}}" targeturl="{% url 'savedvis_apply' user.id %}" 
+                  <a role="button" class="btn btn-xs jumbo-2"
+                     saveurl="{{equalgold_overlap}}" targeturl="{% url 'savedvis_apply' user.id %}"
                      onclick="ru.passim.seeker.do_savedvis(this, 'overlap');">Save</a>
-                </span>            
+                </span>
               </div>
               <!-- Any responses -->
               <div id="overlap-saveas-result" class="hidden">
@@ -343,7 +347,7 @@
   <div class="row" style="height: 500px;">
     <!-- The overlap network -->
     <div class="col-md-12">
-      <div id="super_network_overlap" style="width: 100%; " class="visborder" >
+      <div id="super_network_overlap" style="width: 100%; " class="visborder">
         <svg viewBox="0,0,800,500"></svg>
       </div>
     </div>
@@ -352,7 +356,7 @@
 </div>
 
 <div id="ssg_pca" class="hidden">
-  <form action="{{equalgold_pca}}" method="post" >
+  <form action="{{equalgold_pca}}" method="post">
     {% csrf_token %}
   </form>
 
@@ -399,8 +403,8 @@
 
       <!-- Footer with the save button -->
       <div class="modal-footer">
-        <a class="btn jumbo-1" data-dismiss="modal" >
-          <span class="glyphicon glyphicon-ok" 
+        <a class="btn jumbo-1" data-dismiss="modal">
+          <span class="glyphicon glyphicon-ok"
                 onclick="ru.passim.seeker.network_overlap_setcolor(this);"
                 title="Back to the original and apply the selected color">&nbsp;Ok</span>
         </a>

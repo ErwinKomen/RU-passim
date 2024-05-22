@@ -38,6 +38,8 @@ class StemmaSet(models.Model):
     name = models.CharField("Name", max_length=STANDARD_LENGTH)
     # [1] a research set belongs to a particular user's profilee
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_stemmasets")
+    # [1] The saved items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
 
     # [0-1] Optional notes for this set
     notes = models.TextField("Notes", blank=True, null=True)
@@ -60,6 +62,10 @@ class StemmaSet(models.Model):
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         # Adapt the save date
         self.saved = get_current_datetime()
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = StemmaSet.objects.filter(profile=self.profile).count() + 1
         response = super(StemmaSet, self).save(force_insert, force_update, using, update_fields)
 
         # If there is no DCT definition yet, create a default one
@@ -69,7 +75,7 @@ class StemmaSet(models.Model):
         return response
 
     def adapt_order(self):
-        """Re-calculate the order and adapt where needed"""
+        """Re-calculate the order *WITHIN* the stemmaset and adapt where needed"""
 
         qs = self.stemmaset_stemmaitems.all().order_by("order")
         order = 1
@@ -288,6 +294,27 @@ class StemmaSet(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("StemmaSet/get_ssglists")
         return lBack
+
+    def update_order(profile):
+        """Update the order of one user's stemmaset items (within MyPassim)"""
+
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = StemmaSet.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("StemmaSet/update_order")
+            bOkay = False
+        return bOkay
 
 
 class StemmaCalc(models.Model):

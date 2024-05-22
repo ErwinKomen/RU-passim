@@ -42,16 +42,58 @@ class SermonsDistanceOneWidget(ModelSelect2Widget):
         qs = SermonsDistance.objects.all().order_by('name')
         return qs
 
+    def filter_queryset(self, request, term, queryset = None, **dependent_fields):
+        """The sermons distance depends on the chosen dataset"""
+
+        dataset_sermon = {
+            "Omeliari": ['Uniform'],
+            "Passim Core": ['LDA Cosine', 'LDA euclidean', 'Uniform'],
+            "Passim Core Custom": ['Freq', 'LDA Cosine', 'LDA euclidean', 'Uniform'],
+            "Passim Extended": ['Freq', 'LDA Cosine', 'LDA euclidean', 'Uniform'],
+            "Passim Sample": ['Uniform'],
+            }
+
+        # Initially: everything is allowed
+        qs = SermonsDistance.objects.all().order_by('name')
+
+        dataset_id = dependent_fields.get("dataset")
+        dataset = BoardDataset.objects.filter(id=dataset_id).first()
+
+        # Get the list of possible sermons
+        serm_list = dataset_sermon.get(dataset.name)
+
+        if not serm_list is None:
+            qs = SermonsDistance.objects.filter(name__in=serm_list).order_by('name')
+
+        # Return result
+        return qs
+
 
 class SeriesDistanceOneWidget(ModelSelect2Widget):
     model = SeriesDistance
     search_fields = [ 'name__icontains' ]
+    serm_widget = None
 
     def label_from_instance(self, obj):
         return obj.name
 
     def get_queryset(self):
         qs = SeriesDistance.objects.all().order_by('name')
+        return qs
+
+    def filter_queryset(self, request, term, queryset = None, **dependent_fields):
+        """The series distance depends on the chosen sermons distance"""
+
+        sermdist_id = dependent_fields.get("sermdist")
+        sermdist = SermonsDistance.objects.filter(id=sermdist_id).first()
+        if sermdist.name.lower() == "uniform":
+            # No problem - everything is allowed
+            qs = SeriesDistance.objects.all().order_by('name')
+        else:
+            # Need to filter, because only "Edit" and "Edit_normalized" are allowed
+            qs = SeriesDistance.objects.filter(name__istartswith="edit").order_by('name')
+        
+        # Return result
         return qs
 
 
@@ -178,6 +220,16 @@ class BoardForm(BasicSimpleForm):
             dimension = Dimension.objects.filter(name__iexact="2d").first()
             if not dimension is None:
                 self.fields['umap_dim'].initial = dimension
+
+            # Allow the series distance widget to know about the sermon distance widget
+            self.fields['serdist'].widget.serm_widget = self.fields['sermdist'].widget
+
+            # Set the dependent fields for [lcity]
+            if self.prefix != "":
+                self.fields['serdist'].widget.dependent_fields = {
+                    '{}-sermdist'.format(self.prefix): 'sermdist'}
+                self.fields['sermdist'].widget.dependent_fields = {
+                    '{}-dataset'.format(self.prefix): 'dataset'}
 
             # Initial clustering method
             cl_method = ClMethod.objects.filter(abbr="ward").first()

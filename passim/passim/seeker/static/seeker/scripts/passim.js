@@ -1,4 +1,4 @@
-﻿var django = {
+var django = {
   "jQuery": jQuery.noConflict(true)
 };
 var jQuery = django.jQuery;
@@ -51,6 +51,10 @@ var ru = (function ($, ru) {
         loc_locationsL = [],
         loc_litrefs = [],           // Literatur references for manuscripts
         loc_litrefsL = [],
+        loc_eqgincipits = [],       // Use in equalgold_select.html
+        loc_eqgincipitsL = [],  
+        loc_eqgexplicits = [],      // Use in equalgold_select.html
+        loc_eqgexplicitsL = [],
         loc_gldincipits = [],       // Use in sermongold_select.html
         loc_gldincipitsL = [],  
         loc_gldexplicits = [],      // Use in sermongold_select.html
@@ -154,7 +158,7 @@ var ru = (function ($, ru) {
             div_ta = "#__typeaheads__",
             i = 0,
             lst_options = ["countries", "cities", "libraries", "origins", "locations", "litrefs", "authors",
-                           "nicknames", "gldincipits", "srmincipits", "gldexplicits", "srmexplicits",
+              "nicknames", "gldincipits", "srmincipits", "gldexplicits", "srmexplicits", "eqgincipits", "eqgexplicits",
                            "signatures", "gldsiggrysons", "gldsigclavises", "srmsignatures", "siggrysons", "sigclavises",
                            "manuidnos", "editions", "keywords", "collections"],
             item = "";
@@ -312,6 +316,27 @@ var ru = (function ($, ru) {
                     }
                   });
                   break;
+                case "eqgincipits":
+                  // Bloodhound: eqgincipit
+                  loc_eqgincipits = new Bloodhound({
+                    datumTokenizer: function (myObj) {
+                      return myObj;
+                    },
+                    queryTokenizer: function (myObj) {
+                      return myObj;
+                    },
+                    // loc_countries will be an array of countries
+                    local: loc_eqgincipitsL,
+                    prefetch: { url: base_url + 'api/eqgincipits/', cache: true },
+                    remote: {
+                      url: base_url + 'api/eqgincipits/?name=',
+                      replace: function (url, uriEncodedQuery) {
+                        url += encodeURIComponent(uriEncodedQuery);
+                        return url;
+                      }
+                    }
+                  });
+                  break;
                 case "gldincipits":
                   // Bloodhound: gldincipit
                   loc_gldincipits = new Bloodhound({
@@ -354,6 +379,26 @@ var ru = (function ($, ru) {
                     }
                   });
                   break;
+                case "eqgexplicits":
+                  // Bloodhound: eqgexplicit
+                  loc_eqgexplicits = new Bloodhound({
+                    datumTokenizer: function (myObj) {
+                      return myObj;
+                    },
+                    queryTokenizer: function (myObj) {
+                      return myObj;
+                    },
+                    // loc_countries will be an array of countries
+                    local: loc_eqgexplicitsL,
+                    prefetch: { url: base_url + 'api/eqgexplicits/', cache: true },
+                    remote: {
+                      url: base_url + 'api/eqgexplicits/?name=',
+                      replace: function (url, uriEncodedQuery) {
+                        url += encodeURIComponent(uriEncodedQuery);
+                        return url;
+                      }
+                    }
+                  });
                 case "gldexplicits":
                   // Bloodhound: gldexplicit
                   loc_gldexplicits = new Bloodhound({
@@ -610,6 +655,8 @@ var ru = (function ($, ru) {
           $(".typeahead.litrefs").typeahead('destroy');
           $(".typeahead.authors").typeahead('destroy');
           $(".typeahead.nicknames").typeahead('destroy');
+          $(".typeahead.eqgincipits").typeahead('destroy');
+          $(".typeahead.eqgexplicits").typeahead('destroy');
           $(".typeahead.gldincipits").typeahead('destroy');
           $(".typeahead.gldexplicits").typeahead('destroy');
           $(".typeahead.srmincipits").typeahead('destroy');
@@ -749,6 +796,24 @@ var ru = (function ($, ru) {
             $(this).closest("td").find(".author-key input").last().val("");
           });
 
+          // Type-ahead: eqgincipit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.eqgincipits, tr .typeahead.eqgincipits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'eqgincipits', source: loc_eqgincipits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".eqgincipit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".eqgincipit-key input").last().val("");
+          });
+
           // Type-ahead: gldincipit -- NOTE: not in a form-row, but in a normal 'row'
           $(".row .typeahead.gldincipits, tr .typeahead.gldincipits").typeahead(
             { hint: true, highlight: true, minLength: 1 },
@@ -783,6 +848,24 @@ var ru = (function ($, ru) {
             $(this).closest("td").find(".srmincipit-key input").last().val(suggestion.id);
           }).on('typeahead:open', function (e) {
             $(this).closest("td").find(".srmincipit-key input").last().val("");
+          });
+
+          // Type-ahead: eqgexplicit -- NOTE: not in a form-row, but in a normal 'row'
+          $(".row .typeahead.eqgexplicits, tr:not(.empty-form) .typeahead.eqgexplicits").typeahead(
+            { hint: true, highlight: true, minLength: 1 },
+            {
+              name: 'eqgexplicits', source: loc_eqgexplicits, limit: 25, displayKey: "name",
+              templates: {
+                empty: '<p>Use the wildcard * to mark inexact wording or # for whole words</p>',
+                suggestion: function (item) {
+                  return '<div>' + item.name + '</div>';
+                }
+              }
+            }
+          ).on('typeahead:selected typeahead:autocompleted', function (e, suggestion, name) {
+            $(this).closest("td").find(".eqgexplicit-key input").last().val(suggestion.id);
+          }).on('typeahead:open', function (e) {
+            $(this).closest("td").find(".eqgexplicit-key input").last().val("");
           });
 
           // Type-ahead: gldexplicit -- NOTE: not in a form-row, but in a normal 'row'

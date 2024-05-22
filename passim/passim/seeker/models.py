@@ -56,6 +56,8 @@ COLLECTION_TYPE = "seeker.coltype"
 SET_TYPE = "seeker.settype"
 EDI_TYPE = "seeker.editype"
 LIBRARY_TYPE = "seeker.libtype"
+LINK_TYPE_SRMEQ = "seeker.linktype.srmeq"
+LINK_TYPE_SRMGLD = "seeker.linktype.srmgld"
 LINK_TYPE = "seeker.linktype"
 EXTERNAL_TYPE = "seeker.extype"
 SPEC_TYPE = "seeker.spectype"
@@ -1939,6 +1941,41 @@ class Profile(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("is_project_editor")
         return bResult
+
+    def needs_updating(self):
+        """Check if the user needs to update his profile
+        
+        see issue #725
+        """
+
+        oErr = ErrHandle()
+        bResult = False
+        fields_user = ['first_name', 'last_name']
+        fields_profile = ['affiliation']
+        lst_msg = []
+        msg = ""
+        try:
+            # Check [User] fields
+            user = self.user
+            for field in fields_user:
+                value = getattr(user,field).strip()
+                if len(value) < 2:
+                    lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
+            for field in fields_profile:
+                if getattr(self,field) == None:
+                    value = ""
+                else:
+                    value = getattr(self,field).strip()
+                if len(value) < 2:
+                    lst_msg.append("Please provide a value for your profile field: <code>{}</code>".format(field))
+            if len(lst_msg) > 0:
+                msg = lst_msg
+                bResult = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("")
+        return bResult, msg
+
 
 
 class Visit(models.Model):
@@ -3890,6 +3927,8 @@ class Manuscript(models.Model):
     collections = models.ManyToManyField("Collection", through="CollectionMan", related_name="collections_manuscript")
     # [m] Many-to-many: all the manuscripts linked to me
     relations = models.ManyToManyField("self", through="ManuscriptLink", symmetrical=False, related_name="related_to")
+    # [m] Many-to-many: all manuscripts that have been calculated to be equal to me
+    similars = models.ManyToManyField("self", through="ManuscriptSimilar", symmetrical=False, related_name="similar_to")
     
     # [m] Many-to-many: one manuscript can have a series of user-supplied comments
     comments = models.ManyToManyField(Comment, related_name="comments_manuscript")
@@ -4044,6 +4083,44 @@ class Manuscript(models.Model):
             bResult = False
         return bResult, msg
 
+    def adapt_manudateranges(self):
+        oErr = ErrHandle()
+        bResult = True
+        msg = ""
+
+        try:
+            # Check dates for this manuscript
+            yearstart = 0
+            yearfinish = 3000
+            # Find the best fit for the yearstart
+            lst_dateranges = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart').values('yearstart')
+            if len(lst_dateranges) > 0:
+                yearstart = lst_dateranges[0]['yearstart']
+            # Find the best fit for the yearfinish
+            lst_dateranges = Daterange.objects.filter(codico__manuscript=self).order_by('-yearfinish').values('yearfinish')
+            if len(lst_dateranges) > 0:
+                yearfinish = lst_dateranges[0]['yearfinish']
+            bNeedSaving = False
+            if yearstart != self.yearstart:
+                self.yearstart = yearstart
+                bNeedSaving = True
+            if yearfinish != self.yearfinish:
+                self.yearfinish = yearfinish
+                bNeedSaving = True
+
+            # Do not accept 3000
+            if self.yearfinish == 3000:
+                self.yearfinish = yearstart
+                bNeedSaving = True
+                    
+            if bNeedSaving:
+                self.save()
+        except:
+            bResult = False
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/adapt_manudateranges")
+        return bResult
+
     def add_codico_to_manuscript(self):
         bResult, msg = add_codico_to_manuscript(self)
         return bResult, msg
@@ -4070,6 +4147,7 @@ class Manuscript(models.Model):
             source = kwargs.get("source")
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
+            bManuCreate = kwargs.get("manucreate", False)
 
             # Need to have external information
             externals = oManu.get("externals")
@@ -4149,7 +4227,7 @@ class Manuscript(models.Model):
                         obj_same = qs.filter(source=source).first()
 
                     # Check if it exists *anywhere*
-                    if obj is None:
+                    if obj is None or bManuCreate:
                         # Doesn't exist: create it
                         obj = Manuscript.objects.create(idno=idno, stype="imp", mtype="man")
                         if not source is None:
@@ -5160,6 +5238,33 @@ class Manuscript(models.Model):
         
             # Return the result
         return sermon_list
+
+    def get_similars_markdown(self):
+        """Provide a list of manuscripts that are similar (i.e. occur in ManuscriptSimilar with the current one as src)"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html = []
+        try:
+            if self.similars.count() > 0:
+                # Walk all the similars
+                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno"):
+                    # Get the shelfmark
+                    shelfmark = obj.get_full_name(plain=False)
+                    # get the url
+                    url = reverse("manuscript_details", kwargs={'pk': obj.id})
+                    # Get the passim manuscript ID
+                    manu_id = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, obj.id)
+
+                    # Combine
+                    html.append("{} {}".format(shelfmark, manu_id))
+                # Combine
+                sBack = "\n".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_similars_markdown")
+
+        return sBack
 
     def get_stype_light(self, add="", usercomment=False): 
         count = 0
@@ -12300,6 +12405,24 @@ class ManuscriptLink(models.Model):
         return sBack
 
 
+class ManuscriptSimilar(models.Model):
+    """One manuscript is similar to another one on the basis of a particular similarity value"""
+
+    # [1] Starting from manuscript [src]
+    #     Note: when a Manuscript is deleted, then the ManuscriptSimilar instance that refers to it is removed too
+    src = models.ForeignKey(Manuscript, related_name="src_manuscriptsimilars", on_delete=models.CASCADE)
+    # [1] It relates to manuscript [dst]
+    dst = models.ForeignKey(Manuscript, related_name="dst_manuscriptsimilars", on_delete=models.CASCADE)
+    # [1] The similarity value: 1.0 is identical
+    simval = models.FloatField("Similarity value", default=1.0)
+    
+    def __str__(self):
+        src_name = self.src.get_full_name()
+        dst_name = self.dst.get_full_name()
+        combi = "{} is similar to {} with value {}".format(src_name, dst_name, self.simval)
+        return combi
+
+
 class CodicoKeyword(models.Model):
     """Relation between a Codico and a Keyword"""
 
@@ -12506,7 +12629,7 @@ class SermonDescrEqual(models.Model):
     # [1] The gold sermon
     super = models.ForeignKey(EqualGold, related_name="sermondescr_super", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), max_length=5, default="uns")
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE_SRMEQ), max_length=5, default="uns")
 
     def __str__(self):
         # Temporary fix: sermon.id
@@ -12590,7 +12713,7 @@ class SermonDescrGold(models.Model):
     # [1] The gold sermon
     gold = models.ForeignKey(SermonGold, related_name="sermondescr_gold", on_delete=models.CASCADE)
     # [1] Each sermon-to-gold link must have a linktype, with default "equal"
-    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE), 
+    linktype = models.CharField("Link type", choices=build_abbr_list(LINK_TYPE_SRMGLD), 
                             max_length=5, default="eq")
 
     def __str__(self):
@@ -13058,11 +13181,13 @@ class NewsItem(models.Model):
                     lst_id.append(oItem.get("id"))
             # Need any changes??
             if len(lst_id) > 0:
-                with transaction.atomic():
-                    for obj in NewsItem.objects.filter(id__in=lst_id):
-                        # This should be set invalid
-                        obj.status = "ext"
-                        obj.save()
+                qs = NewsItem.objects.filter(id__in=lst_id).exclude(status="ext")
+                if qs.count() > 0:
+                    with transaction.atomic():
+                        for obj in qs:
+                            # This should be set invalid
+                            obj.status = "ext"
+                            obj.save()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Newsitem/check_until")

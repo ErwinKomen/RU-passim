@@ -48,6 +48,9 @@ class ManuscriptUploadExcel(ReaderImport):
 
     import_type = "excel"
     sourceinfo_url = "https://www.ru.nl/english/people/boodts-s/"
+    # Note: set manucreate to [True], if a new manuscript must be created
+    #       instead of adding to the existing manuscript
+    manucreate = False # True
 
     def process_files(self, request, source, lResults, lHeader):
         file_list = []
@@ -170,7 +173,9 @@ class ManuscriptUploadExcel(ReaderImport):
                                             oManu[k] = v
 
                                     params = {}
+
                                     # We have an object with key/value pairs: process it
+                                    kwargs['manucreate'] = self.manucreate
                                     manu = Manuscript.custom_add(oManu, params, **kwargs)
 
                                     # Process codicological unit - if it has been provided in the Excel
@@ -322,7 +327,7 @@ class ManuscriptUploadExcel(ReaderImport):
                     code = "\n".join(lst_err)
                     bOkay = False
             if code == "":
-                code = "Imported using the [import_excel] function on this filew: {}".format(", ".join(file_list))
+                code = "Imported using the [import_excel] function on these files: {}".format(", ".join(file_list))
         except:
             bOkay = False
             code = oErr.get_error_message()

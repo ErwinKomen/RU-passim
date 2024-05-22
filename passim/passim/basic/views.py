@@ -1148,12 +1148,14 @@ class BasicList(ListView):
         for section in self.searches:
             oFsection = {}
             bHasValue = False
+            section_label = section['section']
+
             if 'name' in section:
                 section_name = section['name']
             else:
-                section_name = section['section']
+                section_name = section_label # section['section']
             if section_name != "" and section_name not in fsections:          
-                oFsection = dict(name=section_name, has_value=False)
+                oFsection = dict(name=section_name, label=section_label, has_value=False)
                 # fsections.append(dict(name=section_name))
             # Copy the relevant search filter
             for item in section['filterlist']:
@@ -1550,7 +1552,9 @@ class BasicList(ListView):
                     print('Form error WARNING: {}'.format(thisForm.errors))
 
                     # Just show everything
-                    qs = self.model.objects.all().distinct()
+                    #qs = self.model.objects.all().distinct()
+                    # DO NOT SHOW ANYTHING!!
+                    qs = self.model.objects.none()
 
                 # Do the ordering of the results
                 order = self.order_default
@@ -2321,6 +2325,10 @@ class BasicDetails(DetailView):
                         if bResult:
                             # Now save it for real
                             obj.save()
+                            # Retrieve it
+                            cls = obj.__class__
+                            obj_retrieved = cls.objects.filter(id=obj.id).first()
+                            print("retrieved id={}".format(obj_retrieved.id))
 
                             # Make sure the form is actually saved completely
                             # Issue #426: put it up here
@@ -2342,6 +2350,11 @@ class BasicDetails(DetailView):
                     
                             # Any action(s) after saving
                             bResult, msg = self.after_save(frm, obj)
+                            
+                            if frm.errors:
+                                # We need to pass on to the user that there are errors
+                                context['errors'] = frm.errors
+                                oErr.Status("BasicDetails/prepare_form form is not valid: {}".format(frm.errors))
                         else:
 
                             # EK: working on this.
@@ -2384,7 +2397,7 @@ class BasicDetails(DetailView):
                         # Check if an 'afternewurl' is specified
                         if self.afternewurl != "":
                             context['afternewurl'] = self.afternewurl
-                
+
             else:
                 if mForm != None:
                     # Check if this is asking for a new form

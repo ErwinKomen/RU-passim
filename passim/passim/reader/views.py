@@ -2236,18 +2236,34 @@ def scan_transcriptions(oStatus=None, oMsg=None):
             iTotal = EqualGold.objects.count()
             idx = 0
             print("Checking SG count for AF...")
+            # (3) Check which ones need adaptation
+            oAdaptCount = {}
+            for ssg in EqualGold.objects.all():
+                sgcount = ssg.sgcount
+                iSize = ssg.equal_goldsermons.all().count()
+                if iSize != sgcount:
+                    # Add to the dict of changes
+                    oAdaptCount[ssg.id] = iSize
+            # (4) implement the changes
+            bDoStatus = False
             with transaction.atomic():
                 for ssg in EqualGold.objects.all():
                     idx += 1
-                    # If necessary, provide Status information
-                    if not oStatus is None:
-                        oCount = dict(total=iTotal, current=idx)
-                        oStatus.set("SG-count", oCount=oCount)
+                    if ssg.id in oAdaptCount:
+                        iSize = oAdaptCount[ssg.id]
+                        ssg.sgcount = iSize
+                        ssg.save()
+                        iCount += 1
 
-                    iChanges = ssg.set_sgcount()
-                    if iChanges > 0:
-                        iCount += iChanges
-                        print("# {} - sgcount: {}".format(idx, iCount))
+                    ## If necessary, provide Status information
+                    #if bDoStatus and not oStatus is None:
+                    #    oCount = dict(total=iTotal, current=idx)
+                    #    oStatus.set("SG-count", oCount=oCount)
+
+                    #iChanges = ssg.set_sgcount()
+                    #if iChanges > 0:
+                    #    iCount += iChanges
+                    #    print("# {} - sgcount: {}".format(idx, iCount))
 
             # If necessary, provide Status information
             if not oStatus is None:

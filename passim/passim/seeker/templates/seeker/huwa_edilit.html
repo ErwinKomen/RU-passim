@@ -1,10 +1,16 @@
-﻿<div>
+<div>
   {% if edilits|length > 0 %}
     <table class="func-view" style="width: 100%;">
       <thead>
         <tr>
-          <th>edition</th><th>Author</th><th>Year</th><th>Short</th><th>pp</th>
-          <th>Title (series/literature)</th><th>Vol</th><th>Location</th>
+          <th>edition</th>
+          <th>Author</th>
+          <th>Year</th>
+          <th>Title (series/literature)</th>
+          <th>Short</th>
+          <th>Vol</th>
+          <th>pp</th>
+          <th>Location</th>
           <th title="sigle (if existing, only for an edition)">S</th>
         </tr>
       </thead>
@@ -14,8 +20,6 @@
             <td valign="top" class="tdnowrap">{{edilit.edition}}</td>
             <td valign="top" class="tdnowrap">{{edilit.author.full}}</td>
             <td valign="top" class="tdnowrap">{{edilit.year}}</td>
-            <td valign="top">{{edilit.reihekurz}}</td>
-            <td valign="top" class="tdnowrap">{{edilit.pp}}</td>
             <td valign="top">
               {% if edilit.reihetitel %}
                 {{edilit.reihetitel}}
@@ -27,7 +31,9 @@
                 -
               {% endif %}
             </td>
+            <td valign="top">{{edilit.reihekurz}}</td>
             <td valign="top" class="tdnowrap">{{edilit.band}}</td>
+            <td valign="top" class="tdnowrap">{{edilit.pp}}</td>
             <td valign="top">
               {{edilit.location.city}}
               {% if edilit.location.country %}, {{edilit.location.country}}{% endif %}

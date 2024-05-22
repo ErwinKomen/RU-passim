@@ -714,6 +714,12 @@ class SetDef(models.Model):
             default_name = "{}_DCT_{:06}".format(self.researchset.profile.user.username, order)
             self.name = default_name
             self.notes = "Automatically created"
+
+        # Check if the order is specified
+        if self.order is None or self.order <= 0:
+            # Specify the order
+            self.order = SetDef.objects.filter(researchset__profile=self.researchset.profile).count() + 1
+
         # Initial saving
         response = super(SetDef, self).save(force_insert, force_update, using, update_fields)
 
@@ -868,6 +874,25 @@ class SetDef(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("SetDef/get_view_link")
         return sBack
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = SetDef.objects.filter(researchset__profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Setdef/update_order")
+            bOkay = False
+        return bOkay
 
 
 # ====================== Personal Research Environment models ========================================
@@ -1043,7 +1068,7 @@ class SavedItem(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedItem/update_saveditems")
-            bOkay = Falses
+            bOkay = False
         return bOkay
     
 
@@ -1115,7 +1140,7 @@ class SavedSearch(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedSearch/update_order")
-            bOkay = Falses
+            bOkay = False
         return bOkay
 
 
@@ -1215,7 +1240,7 @@ class SavedVis(models.Model):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SavedVis/update_order")
-            bOkay = Falses
+            bOkay = False
         return bOkay
 
 

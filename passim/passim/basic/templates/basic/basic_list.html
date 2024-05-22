@@ -237,7 +237,7 @@
                 {% for section in fsections  %}
                   {% if section.name and section.name != "other"  %}
                     <!-- Row with buttons and stuff for this filtersection -->
-                    <div id="filter_{{section.name}}" class="row {% if not section.has_value %}hidden{% endif %}" targetid="filter_{{section.name}}_specs">
+                    <div id="filter_{{section.label}}" class="row {% if not section.has_value %}hidden{% endif %}" targetid="filter_{{section.label}}_specs">
 
                       <!-- Sub filters for this section -->
                       <div class="col-md-10 col-sm-offset-2">
@@ -245,7 +245,7 @@
                         <!-- Sub filters from this section -->
                         <div>
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name and not filter.hide_button %}
+                            {% if filter.head_id == "filter_"|add:section.label and not filter.hide_button %}
                               <span class="badge filter {% if filter.enabled %} jumbo-2 on {% else %} jumbo-1 {% endif %} " 
                                     targetid="{{filter.id}}" targetaddid="{{filter.include_id}}">{{filter.name}}</span>
                             {% endif %}
@@ -257,7 +257,7 @@
                     </div>
 
                     <!-- Row with the fields for this section -->
-                    <div id="filter_{{section.name}}_specs" class="row">
+                    <div id="filter_{{section.label}}_specs" class="row">
                       <div class="col-md-10">
                         <div class="panel panel-default ">
 
@@ -266,7 +266,7 @@
 
                           <!-- Show the different filters in the list -->
                           {% for filter in filters %}
-                            {% if filter.head_id == "filter_"|add:section.name %}
+                            {% if filter.head_id == "filter_"|add:section.label %}
                               <div id="{{filter.id}}" class="{% if filter.hasvalue %} {% else %}hidden {% endif %}"
                                addview="{% if filter.include_id %}{{filter.include_id}}{% endif %}">
                                 <table style="width: 100%;">

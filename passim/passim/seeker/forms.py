@@ -165,6 +165,12 @@ def order_search_manu(qs, term):
         oErr.DoError("order_search")
     return qs
 
+def get_stype_qs():
+    """Get a queryset for stype"""
+
+    qs = FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr="-").order_by("english_name")
+    return qs
+
 # ================= WIDGETS =====================================
 
 class AltPagesWidget(ModelSelect2MultipleWidget):
@@ -268,6 +274,21 @@ class CityOneWidget(ModelSelect2Widget):
 
 
 class CityMonasteryOneWidget(ModelSelect2Widget):
+    model = Location
+    search_fields = [ 'name__icontains' ]
+    dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        level = 8   # Level 8 is city, lower than that is village, library, monastery
+        #loc_id = LocationType.objects.filter(Q(name="city")|Q(name="village")|Q(name="monastery")).first()
+        #return Location.objects.filter(loctype=loc_city).order_by('name').distinct()
+        return Location.objects.filter(loctype__level__lte=level).order_by('name').distinct()
+
+
+class CityMonasteryWidget(ModelSelect2MultipleWidget):
     model = Location
     search_fields = [ 'name__icontains' ]
     dependent_fields = {}   # E.G: {'lcity': 'lcity', 'lcountry': 'lcountry'}
@@ -823,8 +844,20 @@ class LibraryOneWidget(ModelSelect2Widget):
         return Library.objects.all().order_by('name').distinct()
 
     def filter_queryset(self,request, term, queryset = None, **dependent_fields):
-        response = super(LibraryOneWidget, self).filter_queryset(request,term, queryset, **dependent_fields)
-        return response
+        # Make sure to initialize to something meaningfull
+        qs = Library.objects.all().order_by('name')
+
+        # Do we have dependent fields?
+        if len(dependent_fields) == 2:
+            lcountry_id = dependent_fields.get('lcountry')
+            lcity_id = dependent_fields.get('lcity')
+            location_id = lcity_id
+            qCombi = Q(lcountry_id=lcountry_id) & ( Q(lcity_id=lcity_id) | Q(location_id=location_id) )
+            qs = Library.objects.filter(qCombi).order_by('name')
+        else:
+            qs = super(LibraryOneWidget, self).filter_queryset(request,term, queryset, **dependent_fields)
+        # return the result
+        return qs
 
 
 class LitrefSgWidget(ModelSelect2MultipleWidget):
@@ -1554,7 +1587,8 @@ class StypeWidget(ModelSelect2MultipleWidget):
         return obj.english_name
 
     def get_queryset(self):
-        return FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+        #return FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr='-').order_by("english_name")
+        return get_stype_qs()
 
 
 class SuperDistWidget(ModelSelect2Widget):
@@ -1725,20 +1759,28 @@ class BootstrapAuthenticationForm(AuthenticationForm):
 
 
 class SignUpForm(UserCreationForm):
-    first_name = forms.CharField(max_length=30, required=False, help_text='Optional.')
-    last_name = forms.CharField(max_length=30, required=False, help_text='Optional.')
+    first_name = forms.CharField(max_length=30, required=True, help_text='Required.')
+    last_name = forms.CharField(max_length=30, required=True, help_text='Required.')
+    affiliation = forms.CharField(max_length=254, required=True, help_text='Required. If private, fill in "not applicable"')
     email = forms.EmailField(max_length=254, help_text='Required. Inform a valid email address.')
 
     class Meta:
         model = User
-        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2', )
+        fields = ('username', 'first_name', 'last_name', 'affiliation', 'email', 'password1', 'password2', )
 
     def __init__(self, *args, **kwargs):
+        # First do what needs to be done
         super(SignUpForm, self).__init__(*args, **kwargs)
+
+        # Now process the parameters
         first_name = self.fields['first_name']
         last_name = self.fields['last_name']
+        affiliation = self.fields['affiliation']
+
+        # Make sure to validate
         first_name.validators.append(validate_safe_charinput)
         last_name.validators.append(validate_safe_charinput)
+        affiliation.validators.append(validate_safe_charinput)
 
     def is_valid(self):
         # Do default is valid
@@ -1757,20 +1799,16 @@ class SignUpForm(UserCreationForm):
                         valid = False
                         self.errors[k] = "Don't include JS in a text field"
                         # break
+
+            # Double check: the username may not occur already
+            username = cd['username']
+            obj = User.objects.filter(username=username).first()
+            if not obj is None:
+                # This username is already taken
+                self.errors['username'] = "This username is not available"
+                valid = False
         # Return what we have
         return valid
-
-
-#class SearchSermonForm(BasicSimpleForm):
-#    """Note: only for SEARCHING"""
-
-#    author = forms.CharField(label=_("Author"), required=False)
-#    incipit = forms.CharField(label=_("Incipit"), required=False)
-#    explicit = forms.CharField(label=_("Explicit"), required=False)
-#    title = forms.CharField(label=_("Title"), required=False)
-#    signature = forms.CharField(label=_("Signature"), required=False)
-#    feast = forms.CharField(label=_("Feast"), required=False)
-#    keyword = forms.CharField(label=_("Keyword"), required=False)
 
 
 class SelectGoldForm(BasicModelForm):
@@ -1834,24 +1872,6 @@ class ManuReconForm(BasicSimpleForm):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("manureconform")
-
-
-#class SearchManuscriptForm(BasicSimpleForm):
-#    """Note: only for SEARCHING"""
-
-#    country = forms.CharField(label=_("Country"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
-#    city = forms.CharField(label=_("City"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
-#    library = forms.CharField(label=_("Library"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
-#    signature = forms.CharField(label=_("Signature"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching signatures input-sm', 'placeholder': 'Signature...',  'style': 'width: 100%;'}))
-#    name = forms.CharField(label=_("Title"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'input-sm searching', 'placeholder': 'Name or title...',  'style': 'width: 100%;'}))
-#    idno = forms.CharField(label=_("Idno"), required=False, 
-#                           widget=forms.TextInput(attrs={'class': 'typeahead searching manuidnos input-sm', 'placeholder': 'Shelfmark...',  'style': 'width: 100%;'}))
-#    typeaheads = ["countries", "cities", "libraries", "signatures", "manuidnos", "gldsiggrysons", "gldsigclavises"]
 
 
 class SearchManuForm(PassimModelForm):
@@ -2020,7 +2040,7 @@ class SearchManuForm(PassimModelForm):
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             self.fields['projlist'].queryset = Project2.objects.all().order_by('name')
             self.fields['srclist'].queryset = SourceInfo.objects.all()
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['passimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code')
             self.fields['bibrefbk'].queryset = Book.objects.all().order_by('idno')
             self.fields['manutype'].queryset = FieldChoice.objects.filter(field=MANUSCRIPT_TYPE).exclude(abbr='tem').order_by("english_name")
@@ -2207,7 +2227,7 @@ class SermonForm(PassimModelForm):
                     widget=forms.TextInput(attrs={'class': 'typeahead searching countries input-sm', 'placeholder': 'Country...', 'style': 'width: 100%;'}))
     city        = forms.CharField(required=False)
     city_ta     = forms.CharField(label=_("City"), required=False, 
-                    widget=forms.TextInput(attrs={'class': 'typeahead searching cities input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
+                    widget=forms.TextInput(attrs={'class': 'typeahead searching locations input-sm', 'placeholder': 'City...',  'style': 'width: 100%;'}))
     library     = forms.CharField(required=False)
     libname_ta  = forms.CharField(label=_("Library"), required=False, 
                     widget=forms.TextInput(attrs={'class': 'typeahead searching libraries input-sm', 'placeholder': 'Name of library...',  'style': 'width: 100%;'}))
@@ -2287,7 +2307,7 @@ class SermonForm(PassimModelForm):
             # Choice field initialization
             self.fields['authortype'].choices = AUTHOR_TYPE
 
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() #  FieldChoice.objects.filter(field=STATUS_TYPE).exclude(abbr='-').order_by("english_name")
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['manuone'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
@@ -2997,7 +3017,7 @@ class CollectionForm(PassimModelForm):
             self.fields['projlist'].widget.queryset = self.fields['projlist'].queryset
 
             # SSG section
-            self.fields['ssgstypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['ssgstypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['ssgauthorlist'].queryset = Author.objects.all().order_by('name') 
             self.fields['ssgsiglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['ssgpassimlist'].queryset = EqualGold.objects.filter(code__isnull=False, moved__isnull=True, atype='acc').order_by('code') 
@@ -3005,7 +3025,7 @@ class CollectionForm(PassimModelForm):
 
             # S section
             self.fields['sermokwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['sermostypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['sermostypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['sermosiglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['sermoauthorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['sermofeastlist'].queryset = Feast.objects.all().order_by('name')
@@ -3013,7 +3033,7 @@ class CollectionForm(PassimModelForm):
             # M section
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['manukwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
-            self.fields['manustypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['manustypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             if prefix == "priv" or prefix == "publ":
                 self.fields['collist'].widget = CollectionWidget( attrs={'username': username, 'team_group': team_group, 'settype': "pd", "scope": prefix,
@@ -3209,8 +3229,8 @@ class SermonDescrGoldForm(BasicModelForm):
         # Start by executing the standard handling
         super(SermonDescrGoldForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
-        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+        init_choices(self, 'linktype', LINK_TYPE_SRMGLD, bUseAbbr=True)
+        init_choices(self, 'newlinktype', LINK_TYPE_SRMGLD, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
         self.fields['newgold'].required = False
@@ -3264,8 +3284,8 @@ class SermonDescrSuperForm(BasicModelForm):
         # Start by executing the standard handling
         super(SermonDescrSuperForm, self).__init__(*args, **kwargs)
         # Initialize choices for linktype
-        init_choices(self, 'linktype', LINK_TYPE, bUseAbbr=True)
-        init_choices(self, 'newlinktype', LINK_TYPE, bUseAbbr=True, use_helptext=False)
+        init_choices(self, 'linktype', LINK_TYPE_SRMEQ, bUseAbbr=True)
+        init_choices(self, 'newlinktype', LINK_TYPE_SRMEQ, bUseAbbr=True, use_helptext=False)
         # Set the keyword to optional for best processing
         self.fields['newlinktype'].required = False
         self.fields['super'].required = False
@@ -3421,7 +3441,7 @@ class SermonGoldForm(PassimModelForm):
             self.fields['codetype'].choices = CODE_TYPE
 
             # Determine the querysets
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
             self.fields['passimlist'].queryset = EqualGold.objects.filter(moved__isnull=True, atype='acc').order_by('code').distinct()
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group, userplus)
@@ -3576,12 +3596,12 @@ class SuperSermonGoldForm(PassimModelForm):
     newauthor = ModelChoiceField(queryset=None, required=False,
                 widget=AuthorOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one author...', 'style': 'width: 100%;', 'class': 'searching'}))
     newincipit = forms.CharField(label=_("Incipit"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching eqgincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}))
     newexplicit = forms.CharField(label=_("Explicit"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
-    newfulltext = forms.CharField(label=_("Explicit"), required=False,
+                widget=forms.TextInput(attrs={'class': 'typeahead searching eqgexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}))
+    newfulltext = forms.CharField(label=_("Full text"), required=False,
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 'placeholder': 'Full text (markdown)...'}))
-    srchfulltext = forms.CharField(label=_("Explicit"), required=False,
+    srchfulltext = forms.CharField(label=_("Full text"), required=False,
                 widget=forms.Textarea(attrs={'rows': 1, 'style': 'height: 40px; width: 100%;', 'class': 'searching', 
                                              'placeholder': 'Full text transcription ...'}))
     signature = forms.CharField(label=_("Signature"), required=False,
@@ -3638,7 +3658,8 @@ class SuperSermonGoldForm(PassimModelForm):
                 widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
     collone     = ModelChoiceField(queryset=None, required=False) #, 
                 # widget=CollOneSuperWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one collection...', 'style': 'width: 100%;', 'class': 'searching'}))
-    typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
+    # typeaheads = ["authors", "gldincipits", "gldexplicits", "signatures"]   # Add [signatures] because of select_gold
+    typeaheads = ["authors", "eqgincipits", "eqgexplicits", "signatures"]   # Add [signatures] because of select_gold
     initial_fields = ['author', 'incipit', 'explicit']
 
     class Meta:
@@ -3651,8 +3672,8 @@ class SuperSermonGoldForm(PassimModelForm):
             'code':        forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 
                                 'placeholder': 'Passim code. Use wildcards, e.g: *002.*, *003'}),
             'number':      forms.TextInput(attrs={'class': 'searching', 'style': 'width: 100%;', 'data-minimum-input-length': 0, 'data-placeholder': 'Author number'}),
-            'incipit':     forms.TextInput(attrs={'class': 'typeahead searching gldincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
-            'explicit':    forms.TextInput(attrs={'class': 'typeahead searching gldexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
+            'incipit':     forms.TextInput(attrs={'class': 'typeahead searching eqgincipits input-sm', 'placeholder': 'Incipit...', 'style': 'width: 100%;'}),
+            'explicit':    forms.TextInput(attrs={'class': 'typeahead searching eqgexplicits input-sm', 'placeholder': 'Explicit...', 'style': 'width: 100%;'}),
             'stype':       forms.Select(attrs={'style': 'width: 100%;'}),
 
             # ----------------- STEMMATOLOGY -----------------------------------
@@ -3680,7 +3701,7 @@ class SuperSermonGoldForm(PassimModelForm):
             self.fields['ssgcount'].initial = -1
 
             # Initialize querysets
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
             self.fields['authorlist'].queryset = Author.objects.all().order_by('name')
             self.fields['newauthor'].queryset = Author.objects.all().order_by('name')
             self.fields['siglist'].queryset = Signature.objects.all().order_by('code')
@@ -4782,7 +4803,7 @@ class LibrarySearchForm(BasicModelForm):
     countrylist = ModelMultipleChoiceField(queryset=None, required=False,
                  widget=CountryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select countries...', 'style': 'width: 100%;'}))
     citylist = ModelMultipleChoiceField(queryset=None, required=False,
-                 widget=CityWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select cities...', 'style': 'width: 100%;'}))
+                 widget=CityMonasteryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select cities or monasteries...', 'style': 'width: 100%;'}))
     librarylist = ModelMultipleChoiceField(queryset=None, required=False,
                  widget=LibraryWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select libraries...', 'style': 'width: 100%;'}))
     library_ta = forms.CharField(label=_("Libraru"), required=False, 
@@ -4794,6 +4815,10 @@ class LibrarySearchForm(BasicModelForm):
 
         model = Library
         fields = ['lcity', 'lcountry']
+        #widgets = {
+        #    'library':     LibraryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a library...', 'style': 'width: 100%;', 'class': 'searching'}),
+        #    'lcity':       CityMonasteryOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a city, village or abbey...', 'style': 'width: 100%;', 'class': 'searching'}),
+        #    }
 
     def __init__(self, *args, **kwargs):
         oErr = ErrHandle()
@@ -4942,7 +4967,7 @@ class CodicoForm(PassimModelForm):
             self.fields['manuidlist'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
             self.fields['kwlist'].queryset = Keyword.get_scoped_queryset(username, team_group)
             # self.fields['prjlist'].queryset = Project.objects.all().order_by('name')
-            self.fields['stypelist'].queryset = FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
+            self.fields['stypelist'].queryset = get_stype_qs() # FieldChoice.objects.filter(field=STATUS_TYPE).order_by("english_name")
 
             if user_is_in_team(username, team_group):
                 self.fields['kwlist'].widget.is_team = True

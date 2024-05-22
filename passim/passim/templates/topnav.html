@@ -42,7 +42,6 @@
                           <!-- Used to be 'search_sermon' -->
                           <li><a href="{% url 'literature_list' %}" title="Bibliography">Bibliography</a></li>
                           <li><a href="{% url 'literature_list' %}" title="Visualizations">Visualizations</a></li>
-                          <li><a href="{% url 'collpriv_list' %}" title="List of datasets">Datasets</a></li>
                           <li><a href="{% url 'researchset_list' %}" title="Research Sets for Dynamic comparative tables">DCT tool</a></li>
                           <li><a href="{% url 'sermonboard' %}" title="Gleb's plugin'">Plugin</a></li>
                           {% if is_stemma_user %}
@@ -65,14 +64,7 @@
                            aria-haspopup="true" aria-expanded="false">Import tools<span class="caret"></span></a>
                         
                        <ul class="dropdown-menu">                                                                              
-                         <!--
-                          <li><a href="{% url 'collsermo_list' %}" title="Collections of Sermons">Collections of Sermons</a></li>
-                          <li><a href="{% url 'collmanu_list' %}" title="Collections of Manuscripts">Collections of Manuscripts</a></li>
-                          <li><a href="{% url 'collgold_list' %}" title="Collections of Sermon Gold">Collections of Sermon Gold</a></li>
-                          <li><a href="{% url 'collsuper_list' %}" title="Collections of Super Sermon Gold">Collections of Super Sermon Gold</a></li>
-                           -->                                                                                                        
                            <li><a href="{% url 'author_search' %}" title="List of people">People</a></li>
-                           <li><a href="{% url 'search_gold' %}" title="List and search Gold Sermons">Gold Sermon</a></li>
                            <li><a href="{% url 'library_search' %}" title="List of libraries">Repository</a></li> 
                           {% if is_app_editor %}
                            <li role="separator" class="divider"></li> 
@@ -178,8 +170,10 @@
                         <li><a href="{% url 'guide' %}" title="The user manual of the PASSIM application">User manual</a></li>
                         <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual</a></li>                        
                         <li><a href="{% url 'contact' %}" title="How to contact the PASSIM team" >Contact</a></li>
+                        {% if is_app_editor %}
                         <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                         <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>             
+                        {% endif %}
                       </ul>
                     </li>
                     <li class="dropdown">
