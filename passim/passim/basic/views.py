@@ -2735,10 +2735,11 @@ class BasicPart(View):
                             # Convert string to bytestring
                             sData = sData.encode()
                             # Decode base64 into binary
-                            sData = base64.decodestring(sData)
+                            # Deprecated: sData = base64.decodestring(sData)
+                            sData = base64.decodebytes(sData)
                             # Set the filename correctly
                             sDbName = "passim_{}_{}.png".format(downloadname, obj_id)
-
+                            
                     # Excel needs additional conversion
                     if self.dtype in ["excel"]:
                         # Convert 'compressed_content' to an Excel worksheet
@@ -2967,7 +2968,11 @@ class BasicPart(View):
                 if is_app_user or is_app_editor:
                     # Any more checking needed?
                     if sType == "w":
-                        bResult = is_app_editor
+                        # Allow downloading as user = non-editor
+                        if self.action == "download":
+                            bResult = True
+                        else:
+                            bResult = is_app_editor
                     else:
                         bResult = True
             # Otherwise: no permissions!

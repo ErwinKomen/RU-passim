@@ -2579,10 +2579,11 @@ class SetDefData(BasicPart):
 
         oErr = ErrHandle()
         try:
-            # Check validity
-            if not self.userpermissions("w"):
-                # Don't do anything
-                return context
+            # issue #756: THIS SHOULD NOT BE USED - any user may work on DCTs
+            ## Check validity
+            #if not self.userpermissions("w"):
+            #    # Don't do anything
+            #    return context
 
             # Get the SetDef object
             setdef = self.obj
@@ -2636,7 +2637,8 @@ class SetDefDownload(BasicPart):
     """Downloading for DCTs"""
 
     MainModel = SetDef
-    template_name = "seeker/download_status.html"
+    # template_name = "seeker/download_status.html"
+    template_name = None
     action = "download"
     dtype = ""
 
@@ -2646,6 +2648,20 @@ class SetDefDownload(BasicPart):
         dt = self.qd.get('downloadtype', "")
         if dt != None and dt != '':
             self.dtype = dt
+
+    def userpermissions(self, sType = "w"):
+        """Basic check for valid user permissions"""
+
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            # First step: authentication
+            if user_is_authenticated(self.request):
+                bResult = True
+            # Otherwise: no permissions!
+        except:
+            oErr.DoError("SetDefDownload/userpermissions")
+        return bResult
 
     def get_data(self, prefix, dtype, response=None):
         """Gather the data as CSV, including a header line and comma-separated"""
