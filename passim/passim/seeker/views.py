@@ -11042,7 +11042,8 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
                     {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
                         'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
-                    {'type': 'line',  'label': "Suspected doubles:",    'value': instance.get_similars_markdown()}
+                    {'type': 'line',  'label': "Potential doubles:",    'value': instance.get_similars_markdown(),
+                     'title': 'Potential doubles for this record in the dataset'}
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 

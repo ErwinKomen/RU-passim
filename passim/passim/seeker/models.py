@@ -5246,6 +5246,18 @@ class Manuscript(models.Model):
         oErr = ErrHandle()
         html = []
         try:
+            # Always: add contextual help
+            html.append('<a role="button" data-toggle="collapse" data-target="#basic_h_similars">')
+            html.append('<span class="glyphicon glyphicon-question-sign" style="color: blue;"></span>')
+            html.append('</a>')
+            html.append('<span id="basic_h_similars" class="collapse">')
+            html.append('Because data was important from different sources,\
+                it is possible there are multiple records in PASSIM for the same manuscript.\
+                This field shows an AI-generated, unverified list of 3 most likely doubles for this record,\
+                based on similarity of the shelfmark.')
+            html.append('</span>')
+
+            # Now look at the similars
             if self.similars.count() > 0:
                 # Walk all the similars
                 for obj in self.similars.all().order_by("lcity__name", "library__name", "idno"):
@@ -5258,8 +5270,8 @@ class Manuscript(models.Model):
 
                     # Combine
                     html.append("{} {}".format(shelfmark, manu_id))
-                # Combine
-                sBack = "\n".join(html)
+            # Combine
+            sBack = "\n".join(html)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("get_similars_markdown")
