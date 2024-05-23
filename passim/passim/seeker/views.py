@@ -8414,6 +8414,7 @@ class CollAnyEdit(BasicDetails):
                         # The name is already in use, so refuse it.
                         msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
                         return False, msg
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollAnyEdit/before_save")
@@ -8426,6 +8427,17 @@ class CollAnyEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            profile = self.request.user.user_profiles.first()
+            # Check it has a name
+            if not profile is None and instance.name is None:
+                # If this is a new one, just make sure it gets the right name
+                if instance.type != "super":
+                    name = "{}_{}_{}".format(profile.user.username, instance.id, instance.type)                         
+                else:
+                    name = "{}_{}_{}".format(profile.user.username, instance.id, "af")
+                instance.name = name
+                instance.save()
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'literature'
             litlist = form.cleaned_data['litlist']

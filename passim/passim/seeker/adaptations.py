@@ -54,7 +54,8 @@ adaptation_list = {
     'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
-    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc'],
+    "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc',
+                      'name_datasets'],
     'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
     }
 
@@ -2255,6 +2256,36 @@ def adapt_passim_project_name_hc():
                     if coll.settype == "hc":
                         CollectionProject.objects.create(project = projectfound, collection = coll)
                         print(coll.name, projectfound)    
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_name_datasets():
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Remove everything that has no owner
+        qs = Collection.objects.filter(owner__isnull=True)
+        if qs.count() > 0:
+            # Signal
+            oErr.Status("adapt_name_datasets: removing {} datasets without owner".format(qs.count()))
+            qs.delete()
+        # Walk through the remainder
+        for coll in Collection.objects.filter(name__isnull=True):
+            if coll.name is None:
+                profile = coll.owner
+                username = "Anonymous" if profile is None else profile.user.username
+                # If this is a new one, just make sure it gets the right name
+                if coll.type != "super":
+                    name = "{}_{}_{}".format(username, coll.id, coll.type)                         
+                else:
+                    name = "{}_{}_{}".format(username, coll.id, "af")
+                coll.name = name
+                coll.save()
+
     except:
         bResult = False
         msg = oErr.get_error_message()
