@@ -2389,6 +2389,10 @@ var ru = (function ($, ru) {
                     window.location = targeturl;
                   } else if (action !== undefined && action !== "") {
                     switch (action) {
+                      case "del_items":
+                        // This just calls for re-loading the page
+                        window.location = window.location;
+                        break;
                       case "update_sav":
                         // Adapt all relevant material
                         $(".selitem-button-selected").each(function (idx, el) {

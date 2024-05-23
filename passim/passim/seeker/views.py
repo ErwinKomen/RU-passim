@@ -9710,6 +9710,7 @@ class CollectionListView(BasicList):
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
         {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        {'title': 'Delete selection',   'mode': 'del_items',    'button': 'jumbo-5', 'glyphicon': 'glyphicon-remove'},
         ]
 
     def initializations(self):
@@ -10074,11 +10075,11 @@ class CollectionListView(BasicList):
                     # Situation 1: no scope defined
                     if colscope == "":
                         # This user is *NOT* an app_editor: only show publ ones + those of the user
-                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="publ")) 
+                        fields['defscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) ) #  | Q(scope="publ")) 
                     elif colscope == "publ" or colscope == "team":
                         fields['colscope'] =  Q(scope="publ")
                     elif colscope == "priv":
-                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) )
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) ) #  | Q(scope="publ")) 
 
              
         

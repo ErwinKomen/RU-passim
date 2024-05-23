@@ -1350,6 +1350,38 @@ class SelectItemApply(BasicPart):
                 # Indicate that the JS also needs to do some clearing
                 data['action'] = "clear_sel"
 
+            elif selitemaction == "del_items":
+                # The associated items should be removed + selection removed
+                # (1) First remove the associated items
+                for obj in SelectItem.objects.filter(profile=profile, selitemtype=selitemtype):
+                    # For the moment restrict this to PD only
+                    if selitemtype == "pd":
+                        # Remove collection, provided this is the owner
+                        if obj.collection.owner.id == profile.id:
+                            obj.collection.delete()
+                    #if selitemtype == "manu":
+                    #    # Remove manuscript
+                    #    obj.manuscript.delete()
+                    #elif selitemtype == "serm":
+                    #    # Remove manuscript
+                    #    obj.sermon.delete()
+                    #elif selitemtype == "ssg":
+                    #    # Remove manuscript
+                    #    obj.equal.delete()
+                    #elif selitemtype in ["hist", "pd"]:
+                    #    # Remove manuscript
+                    #    obj.collection.delete()
+                    #elif selitemtype == "svdi":
+                    #    # Remove manuscript
+                    #    obj.saveditem.delete()
+
+                # (2) In all situations: clear the selection
+                delete_id = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).values("id")
+                if len(delete_id) > 0:
+                    SelectItem.objects.filter(id__in=delete_id).delete()
+                # Indicate that the JS also needs to do some clearing
+                data['action'] = "del_items"
+
             elif selitemaction == "add_saveitem":
                 # Add all selected items to the Saved Items
                 qs = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype)

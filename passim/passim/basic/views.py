@@ -1093,7 +1093,7 @@ class BasicList(ListView):
 
         # Make sure to transform the 'object_list'  into a 'result_list'
         context['result_list'] = self.get_result_list(context['object_list'], context)
-
+        
         context['sortOrder'] = self.sort_order
         context['colWrap'] = self.col_wrap
         context['selMode'] = self.sel_mode
@@ -1638,7 +1638,7 @@ class BasicList(ListView):
                 get = UserSearch.load_parameters(usersearch_id, get)
             self.qd = get
             self.param_list = []
-
+            
             # Then check if we have a redirect or not
             if self.redirectpage == "":
                 # We can continue with the normal 'get()'
