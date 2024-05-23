@@ -2063,22 +2063,36 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
 .sitem-button-selected > .glyphicon {
     color: blue; /* #355e3b;  */
     cursor: pointer;
+    display: block;
+    width: 100%;
 }
 
 .sitem-button {
     color: gray; 
     cursor: pointer;
+    display: block;
+    width: 100%;
+}
+.sitem-button::before {
+    content: "";
 }
 
 
 .selitem-button-selected > .glyphicon {
     color: darkgreen; /* #355e3b;  */
     cursor: pointer;
+    display: block;
+    width: 100%;
+}
+.sitem-button-selected::before {
+    content: "";
 }
 
 .selitem-button {
-    color: gray; 
+    color: gray;
     cursor: pointer;
+    display: block;
+    width: 100%;
 }
 
 .savegroup {

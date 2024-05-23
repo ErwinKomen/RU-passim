@@ -2163,7 +2163,7 @@ var ru = (function ($, ru) {
                         $(elStart).html('<span class="glyphicon glyphicon-star-empty"></span>');
                         $(elStart).attr("title", "Add to your saved items");
                         // Change the sitem action to be taken
-                        $("#id_sitemaction").val("add");
+                        $(frm).find("#id_sitemaction").val("add");
                         break;
                       case "added":
                         // $(elStart).css("color", "red");
@@ -2172,7 +2172,7 @@ var ru = (function ($, ru) {
                         $(elStart).html('<span class="glyphicon glyphicon-star"></span>');
                         $(elStart).attr("title", "Remove from your saved items");
                         // Change the sitem action to be taken
-                        $("#id_sitemaction").val("remove");
+                        $(frm).find("#id_sitemaction").val("remove");
                         break;
                     }
                   }
