@@ -8091,7 +8091,7 @@ class CollAnyEdit(BasicDetails):
             # Optionally add Scope: but only for the actual *owner* of this one
             # Issue #599: don't offer scope for HC
             if instance.settype != "hc" and self.prefix in prefix_scope and not instance.owner is None \
-                and instance.owner.user == self.request.user:
+                and ( instance.owner.user == self.request.user or context['is_app_moderator']):
                 context['mainitems'].append(
                 {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
@@ -8263,6 +8263,16 @@ class CollAnyEdit(BasicDetails):
                         if profile_owner.id != profile_user.id:
                             # User X trying to look at stuff from user Y
                             permission = ""
+                        else:
+                            # Any user may edit his/her own sets
+                            permission = "write"
+                            self.permission = permission
+                            # Just make sure a simple user can *NOT* change the scope of his dataset
+                            for oItem in context['mainitems']:
+                                field_key = oItem.get("field_key")
+                                if not field_key is None and field_key == "scope":
+                                    # Remove this field_key
+                                    oItem.pop("field_key")
 
             context['permission'] = permission
 
@@ -8640,13 +8650,6 @@ class CollPrivDetails(CollAnyEdit):
     def custom_init(self, instance):
         if instance != None:
             # Check if someone acts as if this is a public dataset, while it is not
-            #if instance.settype == "pd":
-            #    # Determine what kind of dataset/collection this is          
-            #    if instance.scope == "publ":
-            #        self.title = "Public Dataset"
-            #        if instance.owner != Profile.get_user_profile(self.request.user.username):
-            #           # It is a public dataset after all! er is geen owner
-            #           self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id}) # priv ipv publ
             if instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
