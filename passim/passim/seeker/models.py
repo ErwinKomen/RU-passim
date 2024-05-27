@@ -1977,7 +1977,6 @@ class Profile(models.Model):
         return bResult, msg
 
 
-
 class Visit(models.Model):
     """One visit to part of the application"""
 
@@ -10631,11 +10630,17 @@ class SermonDescr(models.Model):
     def delete(self, using = None, keep_parents = False):
         # Keep track of the msitem, if I have one
         msitem = self.msitem
+        # Possibly update manuscript matters
+        manuscript = self.get_manuscript()
         # Regular delete operation
         response = super(SermonDescr, self).delete(using, keep_parents)
         # Now delete the msitem, if it is there
         if msitem != None:
             msitem.delete()
+        # Now update the manuscript matters if any
+        if not manuscript is None:
+            for setlist in manuscript.manuscript_setlists.all():
+                setlist.adapt_rset()
         return response
 
     def do_distance(self, bForceUpdate = False):
@@ -11591,21 +11596,6 @@ class SermonDescr(models.Model):
                 value_intended = get_searchable(getattr(self, field))
                 if value_current != value_intended:
                     setattr(self, srchfield, value_intended)
-            ## Brush up incipit
-            #if self.incipit: 
-            #    srchincipit = get_searchable(self.incipit)
-            #    if self.srchincipit != srchincipit:
-            #        self.srchincipit = srchincipit
-            ## Brush up explicit
-            #if self.explicit: 
-            #    srchexplicit = get_searchable(self.explicit)
-            #    if self.srchexplicit != srchexplicit:
-            #        self.srchexplicit = srchexplicit
-            ## Brush up fulltext
-            #if self.fulltext: 
-            #    srchfulltext = get_searchable(self.fulltext)
-            #    if self.srchfulltext != srchfulltext:
-            #        self.srchfulltext = srchfulltext
 
             # Preliminary saving, before accessing m2m fields
             response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
@@ -13251,6 +13241,42 @@ class CollectionSuper(models.Model):
     # [0-1] The order number for this S within the collection
     order = models.IntegerField("Order", default = -1)
 
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        oErr = ErrHandle()
+        try:
+            is_new = self._state.adding
+            # Perform the saving
+            response = super(CollectionSuper, self).save(force_insert, force_update, using, update_fields)
+            # What if this is a new one?
+            if is_new:
+                collection = self.collection
+                if not collection is None:
+                    for setlist in collection.collection_setlists.all():
+                        setlist.adapt_rset()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionSuper/save")
+
+        # Return the result of the saving
+        return response
+
+    def delete(self, using=None, keep_parents=False):
+        oErr = ErrHandle()
+        try:
+            collection = self.collection
+            # Post deleting stuff:
+            # - update 
+            if not collection is None:
+                for setlist in collection.collection_setlists.all():
+                    setlist.adapt_rset()
+
+            # We are allowed to delete: continue
+            response = super(CollectionSuper, self).delete(using, keep_parents)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionSuper/delete")
+        return None
+
 
 class CollectionProject(models.Model):
     """Relation between a Collection and a Project"""
@@ -13266,6 +13292,7 @@ class CollectionProject(models.Model):
         # Deletion is only allowed, if the project doesn't become 'orphaned'
         count = self.collection.projects.count()
         if count > 1:
+            # We are allowed to delete: continue
             response = super(CollectionProject, self).delete(using, keep_parents)
         else:
             response = None

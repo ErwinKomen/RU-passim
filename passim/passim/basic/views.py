@@ -1839,6 +1839,10 @@ class BasicDetails(DetailView):
         """Anything that needs doing before deleting [instance] """
         return True, "" 
 
+    def after_delete(self, oInfo):
+        """Action after deleting an item"""
+        return None
+
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
         return True, "" 

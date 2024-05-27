@@ -5,6 +5,7 @@ DCT = Dynamic Comparative Table
 """
 
 # View imports
+from re import X
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import login, authenticate
@@ -2392,6 +2393,11 @@ class SetDefEdit(BasicDetails):
             {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
             {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
             ]
+        sHiddenWarning = instance.hidden_warning()
+        if len(sHiddenWarning) > 0:
+            context['mainitems'].append(
+                {'type': 'safe',  'label': "", 'value': sHiddenWarning },
+            )
 
         # Signal that we do have select2
         context['has_select2'] = True

@@ -4842,38 +4842,50 @@ class SermonEdit(BasicDetails):
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
 
-        ## Set the 'afternew' URL
-        manu = instance.get_manuscript()
-        if manu and instance.order < 0:
-            # Calculate how many sermons there are
-            sermon_count = manu.get_sermon_count()
-            # Make sure the new sermon gets changed
-            form.instance.order = sermon_count
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            ## Set the 'afternew' URL
+            manu = instance.get_manuscript()
+            if manu and instance.order < 0:
+                # Calculate how many sermons there are
+                sermon_count = manu.get_sermon_count()
+                # Make sure the new sermon gets changed
+                form.instance.order = sermon_count
 
-        if manu:
-            # Need to know who is 'talking'...
-            username = self.request.user.username
-            profile = Profile.get_user_profile(username)
-            profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
+            if manu:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+                profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
-            project_count = instance.projects.count()
+                project_count = instance.projects.count()
 
-            if project_count == 0:
-                # How many projects are attached to this manuscript
-                manu_project_count = manu.projects.count()
-                if manu_project_count == 1:
-                    # Issue #546: if the manuscript is for one project, continue checking
-                    # Assign this sermon to the project of the manuscript
-                    project = manu.projects.first()
-                    instance.projects.add(project)
-                elif profile_projects.count() == 1:
-                    # This editor is only editor for one project
-                    # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
-                    project = profile_projects.first().project
-                    instance.projects.add(project)
+                if project_count == 0:
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count == 1:
+                        # Issue #546: if the manuscript is for one project, continue checking
+                        # Assign this sermon to the project of the manuscript
+                        project = manu.projects.first()
+                        instance.projects.add(project)
+                    elif profile_projects.count() == 1:
+                        # This editor is only editor for one project
+                        # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
+                        project = profile_projects.first().project
+                        instance.projects.add(project)
+
+                # This belongs to a manuscript: possibly update manuscript-connected setlist
+                ResearchSet.adapt_contents(manu=instance)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+            oErr.DoError("SermonEdit/after_new")
 
         # Return positively
-        return True, "" 
+        return bResult, msg 
 
     def process_formset(self, prefix, request, formset):
         """This is for processing *NEWLY* added items (using the '+' sign)"""
@@ -5425,6 +5437,7 @@ class SermonUserKeyword(SermonDetails):
             msg = oErr.get_error_message()
             oErr.DoError("SermonUserKeyword/custom_init")
     
+
 
 class SermonMove(SermonDetails):
     # newRedirect = True

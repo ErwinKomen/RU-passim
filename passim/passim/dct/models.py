@@ -117,6 +117,53 @@ class ResearchSet(models.Model):
         # Return the response when saving
         return response
 
+    def adapt_contents(manu=None, coll=None):
+        """Update research set and setlist that involve manuscript [manu] or collection [coll]"""
+
+        oErr = ErrHandle()
+        try:
+            rset_list = []
+            qs = None
+            # Decide which one to take
+            if not manu is None:
+                qs = SetList.objects.filter(manuscript_id=manu.id)
+            elif not coll is None:
+                qs = SetList.objects.filter(collection_id=coll.id)
+            if not qs is None:
+                # Look for any setlist having this one
+                for setlist in qs:
+                    # Add the researchset to the list
+                    rset = setlist.researchset
+                    if not rset.id in rset_list:
+                        rset_list.append(rset.id)
+                    # Update this setlist
+                    setlist.calculate_contents()
+                # Update research sets
+                for rset in ResearchSet.objects.filter(id__in=rset_list):
+                    # Update with force
+                    rset.update_ssglists(True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/adapt_contents")
+        return None
+
+    def adapt_from_setlist(self, setlist):
+        """Adapt, starting from this setlist"""
+
+        oErr = ErrHandle()
+        try:
+            # Double check argument
+            if not setlist is None:
+                # Update this setlist
+                setlist.calculate_contents()
+
+                # Update all items in the current researchset
+                self.update_ssglists()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/adapt_from_setlist")
+        return None
+
     def adapt_order(self):
         """Re-calculate the order and adapt where needed"""
 
@@ -354,6 +401,14 @@ class ResearchSet(models.Model):
         lst_ssglists = []
         try:
             oPMlist = None
+            # Double check and remove setlists of collection or manuscript that has been removed
+            delete_setlist = []
+            for oItem in self.researchset_setlists.all().values("manuscript__id", "collection__id", "id"):
+                if oItem['manuscript__id'] is None and oItem['collection__id'] is None:
+                    delete_setlist.append(oItem['id'])
+            if len(delete_setlist) > 0:
+                SetList.objects.filter(id__in=delete_setlist).delete()
+
             # Get the lists of SSGs for each list in the set
             for idx, setlist in enumerate(self.researchset_setlists.all().order_by('order')):
                 # Check for the contents
@@ -426,16 +481,31 @@ class SetList(models.Model):
         sBack = "{}: {}".format(self.researchset.name, self.order)
         return sBack
 
+    def adapt_rset(self):
+        # Adapt the research set which I am part of
+        rset = self.researchset
+        if not rset is None:
+            rset.adapt_from_setlist(self)
+        return None
+
     def calculate_contents(self):
-        oSsgList = {}
-        # Add the name object for this list
-        oSsgList['title'] = self.get_title_object()
-        # Get the list of SSGs for this list
-        oSsgList['ssglist'] = self.get_ssg_list()
-        # Add this contents and save myself
-        self.contents = json.dumps(oSsgList)
-        self.save()
-        return True
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            oSsgList = {}
+            # Only calculate contents, if there is any
+            if not self.collection is None or not self.manuscript is None:
+                # Add the name object for this list
+                oSsgList['title'] = self.get_title_object()
+                # Get the list of SSGs for this list
+                oSsgList['ssglist'] = self.get_ssg_list()
+            # Add this contents and save myself
+            self.contents = json.dumps(oSsgList)
+            self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetList/calculate_contents")
+        return bResult
 
     def get_ssg_list(self):
         """Create a list of SSGs,depending on the type I am"""
@@ -462,31 +532,36 @@ class SetList(models.Model):
 
         # issue #713: changed into 0-0
         oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 0, "matches": 0}
-        if self.setlisttype == "manu":          # SSGs via Manuscript > sermons > SSG links
-            # This is a manuscript
-            oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
-            oBack['size'] = self.manuscript.get_sermon_count()
-            oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
-            oBack['yearstart'] = self.manuscript.yearstart
-            oBack['yearfinish'] = self.manuscript.yearfinish
-        elif self.setlisttype == "hist":        # Historical collection (of SSGs)
-            oBack['top'] = "hc"
-            oBack['main'] = self.collection.name
-            oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
-        elif self.setlisttype == "ssgd":        # Personal/public dataset (of SSGs!!!)
-            # Personal collection
-            oBack['top'] = "pd"
-            if self.name == None or self.name == "":
+        oErr = ErrHandle()
+        try:
+            if self.setlisttype == "manu" and not self.manuscript is None:          # SSGs via Manuscript > sermons > SSG links
+                # This is a manuscript
+                oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
+                oBack['size'] = self.manuscript.get_sermon_count()
+                oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
+                oBack['yearstart'] = self.manuscript.yearstart
+                oBack['yearfinish'] = self.manuscript.yearfinish
+            elif self.setlisttype == "hist" and not self.collection is None:        # Historical collection (of SSGs)
+                oBack['top'] = "hc"
                 oBack['main'] = self.collection.name
+                oBack['size'] = self.collection.freqsuper()
+                oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
+            elif self.setlisttype == "ssgd" and not self.collection is None:        # Personal/public dataset (of SSGs!!!)
+                # Personal collection
+                oBack['top'] = "pd"
+                if self.name == None or self.name == "":
+                    oBack['main'] = self.collection.name
+                else:
+                    oBack['main'] = self.name
+                oBack['size'] = self.collection.freqsuper()
+                oBack['url'] = reverse('collpriv_details', kwargs={'pk': self.collection.id})
             else:
-                oBack['main'] = self.name
-            oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collpriv_details', kwargs={'pk': self.collection.id})
-        else:
-            # No idea what this is
-            oBack['top'] = "UNKNOWN"
-            oBack['main'] = self.setlisttype
+                # No idea what this is
+                oBack['top'] = "UNKNOWN"
+                oBack['main'] = self.setlisttype
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetList/get_title_object")
         # Return the result
         return oBack
 
@@ -874,6 +949,24 @@ class SetDef(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("SetDef/get_view_link")
         return sBack
+
+    def hidden_warning(self):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the hidden contents
+            if self.contents != "" and self.contents[0] == "{":
+                params = json.loads(self.contents)
+                # Find hidden rows
+                hidden_rows = params.get("hidden_rows", [])
+                size = len(hidden_rows)
+                if size > 0:
+                    sTitle = "Remove hidden rows: (a) Expand, (b) Save"
+                    sBack = '<span title="{}"><b>Warning</b>: this DCT has <code>{}</code> hidden rows.</span>'.format(sTitle, size)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDef/hidden_warning")
+        return sBack        
 
     def update_order(profile):
         oErr = ErrHandle()
