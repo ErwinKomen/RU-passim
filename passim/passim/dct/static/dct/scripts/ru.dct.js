@@ -751,7 +751,7 @@ var ru = (function ($, ru) {
                 oSsgPivot = remainder[row];
 
                 // Walk through all the other lists, finding this SSG
-                oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, false);
+                oCombi = private_methods.dct_row_combine(ssglists, pivot_idx, oSsgPivot, rowcolor, false, lst_exclude);
 
                 if (!oCombi.error) {
                   // Always show the row
