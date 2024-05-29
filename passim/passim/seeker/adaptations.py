@@ -1232,8 +1232,6 @@ def adapt_manu_setlists():
         msg = oErr.get_error_message()
     return bResult, msg
 
-
-
 # =========== Part of sermon_list ==================
 def adapt_nicknames():
     oErr = ErrHandle()
