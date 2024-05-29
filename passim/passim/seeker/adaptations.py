@@ -42,7 +42,7 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
-        'collectiontype', 'huwadoubles'], # 'sermonesdates',
+        'collectiontype', 'huwadoubles', 'manu_setlists'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
@@ -55,7 +55,7 @@ adaptation_list = {
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc',
-                      'name_datasets'],
+                      'name_datasets', 'coll_setlists'],
     'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
     }
 
@@ -1204,6 +1204,34 @@ def adapt_huwadoubles():
     # Return the table that we found
     return bResult, msg
 
+def adapt_manu_setlists():
+    """Adapt the setlists from the point of view of manuscripts"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    try:
+        lst_setlist = []
+        lst_setlistid = []
+        for manu in Manuscript.objects.filter(mtype='man'):
+            for setlist in manu.manuscript_setlists.all():
+                if not setlist.id in lst_setlistid:
+                    lst_setlistid.append(setlist.id)
+                    lst_setlist.append(setlist)
+
+        # Now address all the setlists
+        for setlist in lst_setlist:
+            setlist.adapt_rset(rset_type = "adaptations manu")
+
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
 # =========== Part of sermon_list ==================
@@ -2341,7 +2369,6 @@ def adapt_litref_check():
         msg = oErr.get_error_message()
     return bResult, msg
 
-
 def adapt_scope_hc():
     """One-time change scope of HCs to public"""
 
@@ -2356,6 +2383,34 @@ def adapt_scope_hc():
                 if obj_coll.scope != "publ":
                     obj_coll.scope = "publ"
                     obj_coll.save()
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_coll_setlists():
+    """Adapt the setlists from the point of view of collections"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    try:
+        lst_setlist = []
+        lst_setlistid = []
+        for coll in Collection.objects.filter(type='super'):
+            for setlist in coll.collection_setlists.all():
+                if not setlist.id in lst_setlistid:
+                    lst_setlistid.append(setlist.id)
+                    lst_setlist.append(setlist)
+
+        # Now address all the setlists
+        for setlist in lst_setlist:
+            setlist.adapt_rset(rset_type = "adaptations coll")
+
+
+        # Everything has been processed correctly now
+        msg = "ok"
     except:
         bResult = False
         msg = oErr.get_error_message()

@@ -4876,8 +4876,8 @@ class SermonEdit(BasicDetails):
                         project = profile_projects.first().project
                         instance.projects.add(project)
 
-                # This belongs to a manuscript: possibly update manuscript-connected setlist
-                ResearchSet.adapt_contents(manu=instance)
+                ## This belongs to a manuscript: possibly update manuscript-connected setlist
+                #ResearchSet.adapt_contents(manu=instance)
 
         except:
             msg = oErr.get_error_message()

@@ -481,11 +481,20 @@ class SetList(models.Model):
         sBack = "{}: {}".format(self.researchset.name, self.order)
         return sBack
 
-    def adapt_rset(self):
-        # Adapt the research set which I am part of
-        rset = self.researchset
-        if not rset is None:
-            rset.adapt_from_setlist(self)
+    def adapt_rset(self, rset_type = None):
+        oErr = ErrHandle()
+        try:
+            # Adapt the research set which I am part of
+            rset = self.researchset
+            if not rset is None:
+                rset_type = "-" if rset_type is None else rset_type
+                # Show what happens
+                oErr.Status("adapt_rset on setlist id={} rset_type={}".format(self.id, rset_type))
+                # Adapt from the setlist
+                rset.adapt_from_setlist(self)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_rset")
         return None
 
     def calculate_contents(self):
