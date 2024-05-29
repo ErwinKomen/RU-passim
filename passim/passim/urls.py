@@ -354,6 +354,10 @@ urlpatterns = [
     re_path(r'^sgroup/details(?:/(?P<pk>\d+))?/$', SaveGroupDetails.as_view(), name='savegroup_details'),
     re_path(r'^sgroup/edit(?:/(?P<pk>\d+))?/$', SaveGroupEdit.as_view(), name='savegroup_edit'),
 
+    re_path(r'^importset/list', ImportSetListView.as_view(), name='importset_list'),
+    re_path(r'^importset/details(?:/(?P<pk>\d+))?/$', ImportSetDetails.as_view(), name='importset_details'),
+    re_path(r'^importset/edit(?:/(?P<pk>\d+))?/$', ImportSetEdit.as_view(), name='importset_edit'),
+
     # ------------ Stemmatology tool ---------------------------------------------------------------------
     re_path(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),
     re_path(r'^stemmaset/details(?:/(?P<pk>\d+))?/$', StemmaSetDetails.as_view(), name='stemmaset_details'),

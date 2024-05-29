@@ -9,14 +9,14 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.urls import reverse
-
+import os
 
 from markdown import markdown
 import json, copy
 
 # Take from my own app
 from passim.utils import ErrHandle
-from passim.settings import TIME_ZONE
+from passim.settings import TIME_ZONE, MEDIA_ROOT
 from passim.basic.models import UserSearch
 from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
@@ -29,6 +29,7 @@ ABBR_LENGTH = 5
 SETLIST_TYPE = "dct.setlisttype"
 SAVEDITEM_TYPE = "dct.saveditemtype"
 SELITEM_TYPE = "dct.selitemtype"
+IMPORT_STATUS = "dct.importstatus"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -74,6 +75,47 @@ def get_list_matches(oPMlist, oSsgList):
             if ssg == oSsg['super']:
                 matches += 1
     return matches
+
+def import_path(sType, instance, filename):
+    """Upload Excel file to the right place, and remove old file if existing
+    
+    This function is used within the model ImportSet
+    NOTE: this must be the relative path w.r.t. MEDIA_ROOT
+    """
+
+    oErr = ErrHandle()
+    sBack = ""
+    sSubdir = "import"
+    try:
+        # Adapt the filename for storage
+        sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+
+        # The stuff that we return
+        sBack = os.path.join(sSubdir, sAdapted)
+
+        # Add the subdir (defined above)
+        fullsubdir = os.path.abspath(os.path.join(MEDIA_ROOT, sSubdir))
+        if not os.path.exists(fullsubdir):
+            os.makedirs(fullsubdir)
+
+        # Add the actual filename to form an absolute path
+        sAbsPath = os.path.abspath(os.path.join(fullsubdir, sAdapted))
+
+        if os.path.exists(sAbsPath):
+            # Remove it
+            os.remove(sAbsPath)
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("import_path")
+    return sBack
+
+def excel_import_path(instance, filename):
+    return import_path("manu", instance, filename)
+
+
+# ====================== Models needed to work on DCTs ===============================================
+
 
 
 class ResearchSet(models.Model):
@@ -1433,5 +1475,169 @@ class SelectItem(models.Model):
         return iCount
 
 
+# ====================== Models to work with excel imports and curation ========================================
+
+
+class ImportSet(models.Model):
+    """The user's desire to import a particular Excel
+    
+    The Excel may be a definition of Manuscript or of an Authority File (EqualGold)
+    """
+
+    # [1] An import-set item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_importsetitems")
+    # [1] The import-set items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each import-set item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SELITEM_TYPE), max_length=5)
+
+    # [0-1] Optional notes for this set
+    notes = models.TextField("Notes", blank=True, null=True)
+
+    # [0-1] Report on errors etc for this ImportSet
+    report = models.TextField("Report", blank=True, null=True)
+
+    # [0-1] Each importSet item contains a FileField that allows uploading an Excel file
+    excel = models.FileField("Excel file", null=True, blank=True, upload_to=excel_import_path)
+
+    # Depending on the type of SelectItem, there is a pointer to the actual item
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_importsetitems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_importsetitems")
+
+    # [1] Each importset item has a status, defining where it is on the acceptance scale
+    #     Scale: cre[ated], ch[an]g[ed], sub[mitted], rej[ected], acc[epted]
+    status = models.CharField("Import status", choices=build_abbr_list(IMPORT_STATUS), max_length=5, default="cre")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        return sBack
+
+    def adapt_order(self):
+        """Re-calculate the order and adapt where needed"""
+
+        qs = self.profile.profile_importsetitems.all().order_by("order")
+        order = 1
+        with transaction.atomic():
+            # Walk all the SetList objects
+            for obj in qs:
+                # Check if the order is as it should be
+                if obj.order != order:
+                    #No: adapt the order
+                    obj.order = order
+                    # And save it
+                    obj.save()
+                # Keep track of how the order should be
+                order += 1
+        return None
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_filename(self):
+        sBack = str(self.excel)
+        return sBack
+
+    def get_notes_html(self):
+        """Convert the markdown notes"""
+
+        sNotes = "-"
+        if self.notes != None:
+            sNotes = markdown(self.notes)
+        return sNotes    
+
+    def get_report_html(self):
+        """Convert the markdown report"""
+
+        sReport = "-"
+        if self.report != None:
+            sReport = markdown(self.report)
+        return sReport    
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_type(self):
+        return self.get_selitemtype_display()
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Check if the order is specified
+            if self.order is None or self.order <= 0:
+                # Specify the order
+                self.order = ImportSet.objects.filter(profile=self.profile).count() + 1
+            # Adapt the save date
+            self.saved = get_current_datetime()
+            response = super(ImportSet, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/save")
+        # Return the response when saving
+        return response
+
+
+class ImportReview(models.Model):
+    """Review of one importset by a moderator"""
+
+    # [1] Link to the importset
+    importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_reviews")
+    # [1] Link to the moderator
+    moderator = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="moderator_reviews")
+
+    # [0-1] Optional notes for this review
+    notes = models.TextField("Notes", blank=True, null=True)
+
+    # [1] Each review item has a status, defining what the suggestion is
+    #     Scale: cre[ated], ch[an]g[ed], sub[mitted], rej[ected], acc[epted]
+    status = models.CharField("Review status", choices=build_abbr_list(IMPORT_STATUS), max_length=5, default="cre")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        return sBack
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Adapt the save date
+            self.saved = get_current_datetime()
+            response = super(ImportReview, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/save")
+        # Return the response when saving
+        return response
 
 

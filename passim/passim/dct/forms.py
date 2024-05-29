@@ -14,7 +14,7 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 from passim.utils import ErrHandle
 from passim.basic.forms import BasicModelForm, BasicSimpleForm
 from passim.dct.models import *
-from passim.seeker.models import Profile
+from passim.seeker.models import Profile, FieldChoice
 
 
 # =============== WIDGETS ===============================================
@@ -61,6 +61,17 @@ class CollOneHistWidget(CollOneWidget):
     """Like CollOne, but then for: EqualGold = super sermon gold"""
     type = "super"
     settype = "hc"
+
+
+class ProfileOneWidget(ModelSelect2Widget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
 
 
 class ProfileWidget(ModelSelect2MultipleWidget):
@@ -110,6 +121,17 @@ class SaveGroupOneWidget(ModelSelect2Widget):
         else:
             qs = self.qs
         return qs
+
+
+class SelItemTypeWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        return FieldChoice.objects.filter(field=SELITEM_TYPE).order_by("english_name")
 
 
 # ================ FORMS ================================================
@@ -345,4 +367,66 @@ class SaveGroupForm(BasicModelForm):
             msg = oErr.get_error_message()
             oErr.DoError("SaveGroupForm")
         return None
+
+
+class ImportSetForm(BasicModelForm):
+    profileid = forms.CharField(required=False)
+    ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+        widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 
+                                    'style': 'width: 100%;', 'class': 'searching'}))
+    selitemtypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=SelItemTypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 
+                                    'Select multiple types...', 'style': 'width: 100%;'}))
+
+    class Meta:
+        model = ImportSet
+        fields = ['excel', 'notes', 'selitemtype']  # 'profile', 
+        widgets={
+            #'profile': ProfileOneWidget(attrs={'data-minimum-input-length': 0, 
+            #                        'data-placeholder': 'Select one user profile...', 'style': 'width: 100%;'}),
+            'excel':   forms.FileInput(attrs={'style': 'width: 100%;', 'placeholder': 'Excel file'}),
+            'notes':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;',
+                                    'placeholder': 'Optionally add your own notes...'}),
+            'selitemtype':  forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Obligatory for this type of form!!!
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(ImportSetForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = self.team_group
+
+            # Some fields are not required
+            self.fields['excel'].required = False
+            # self.fields['profile'].required = False
+            self.fields['notes'].required = False
+            self.fields['selitemtype'].required = False
+
+            # Make sure the profile is set correctly
+            # self.fields['profileid'].initial = profile.id
+
+            # Set queryset(s) - for details view
+            self.fields['ownlist'].queryset = Profile.objects.all()
+            self.fields['selitemtypelist'].queryset = FieldChoice.objects.filter(field=SELITEM_TYPE).order_by("english_name")
+            
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                # self.fields['profileid'].initial = instance.profile.id
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetForm")
+        return None
+
+
 
