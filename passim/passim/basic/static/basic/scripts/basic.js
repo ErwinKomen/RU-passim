@@ -2796,7 +2796,8 @@ var ru = (function ($, ru) {
                     if (waitclass !== null) {
                       // Start waiting
                       $(frm).find(waitclass).removeClass("hidden");
-                      $(frm).find(".dropdown-menu").addClass("hidden");
+                      // Previous: $(frm).find(".dropdown-menu").addClass("hidden");
+                      $(frm).find(".dropdown-menu").toggleClass('open');
                     }
 
                     // Check if this is SVG to PNG or strict HTML:

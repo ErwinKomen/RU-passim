@@ -1,0 +1,9 @@
+{% if is_app_editor %}
+  <form id="import_form_{{instance.id}}" targeturl="{% url 'importset_process' instance.id %}">
+    {% csrf_token %}
+    <div class="hidden">
+      <input type="text" id="id_importmode" name="importmode" value="{{importmode}}" />
+    </div>
+  </form>
+  <div id="import_err"></div>
+{% endif %}

@@ -9,14 +9,19 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.db.models.query import QuerySet 
 from django.urls import reverse
-
+import os
 
 from markdown import markdown
 import json, copy
 
+import openpyxl
+from openpyxl.utils.cell import get_column_letter
+from openpyxl.cell import Cell
+from openpyxl import Workbook
+
 # Take from my own app
 from passim.utils import ErrHandle
-from passim.settings import TIME_ZONE
+from passim.settings import TIME_ZONE, MEDIA_ROOT
 from passim.basic.models import UserSearch
 from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
@@ -29,6 +34,8 @@ ABBR_LENGTH = 5
 SETLIST_TYPE = "dct.setlisttype"
 SAVEDITEM_TYPE = "dct.saveditemtype"
 SELITEM_TYPE = "dct.selitemtype"
+IMPORT_TYPE = "dct.importtype"
+IMPORT_STATUS = "dct.importstatus"
 
 def get_passimcode(super_id, super_code):
     code = super_code if super_code and super_code != "" else "(nocode_{})".format(super_id)
@@ -75,6 +82,54 @@ def get_list_matches(oPMlist, oSsgList):
                 matches += 1
     return matches
 
+def import_path(instance, filename):
+    # def import_path(sType, instance, filename):
+    """Upload Excel file to the right place, and remove old file if existing
+    
+    This function is used within the model ImportSet
+    NOTE: this must be the relative path w.r.t. MEDIA_ROOT
+    """
+
+    oErr = ErrHandle()
+    sBack = ""
+    sSubdir = "import"
+    try:
+        # Adapt the filename for storage
+        # sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+        sAdapted = "{:08d}_{}".format(instance.id, filename.replace(" ", "_"))
+
+        # The stuff that we return
+        sBack = os.path.join(sSubdir, sAdapted)
+
+        # Add the subdir (defined above)
+        fullsubdir = os.path.abspath(os.path.join(MEDIA_ROOT, sSubdir))
+        if not os.path.exists(fullsubdir):
+            os.makedirs(fullsubdir)
+
+        # Add the actual filename to form an absolute path
+        sAbsPath = os.path.abspath(os.path.join(fullsubdir, sAdapted))
+
+        # Also get the bare file name
+        sBare = os.path.basename(filename)
+        # Store it in the item
+        instance.name = sBare
+
+        if os.path.exists(sAbsPath):
+            # Remove it
+            os.remove(sAbsPath)
+
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("import_path")
+    return sBack
+
+def excel_import_path(instance, filename):
+    return import_path(instance, filename)
+
+
+# ====================== Models needed to work on DCTs ===============================================
+
+
 
 class ResearchSet(models.Model):
     """One research set
@@ -116,6 +171,53 @@ class ResearchSet(models.Model):
 
         # Return the response when saving
         return response
+
+    def adapt_contents(manu=None, coll=None):
+        """Update research set and setlist that involve manuscript [manu] or collection [coll]"""
+
+        oErr = ErrHandle()
+        try:
+            rset_list = []
+            qs = None
+            # Decide which one to take
+            if not manu is None:
+                qs = SetList.objects.filter(manuscript_id=manu.id)
+            elif not coll is None:
+                qs = SetList.objects.filter(collection_id=coll.id)
+            if not qs is None:
+                # Look for any setlist having this one
+                for setlist in qs:
+                    # Add the researchset to the list
+                    rset = setlist.researchset
+                    if not rset.id in rset_list:
+                        rset_list.append(rset.id)
+                    # Update this setlist
+                    setlist.calculate_contents()
+                # Update research sets
+                for rset in ResearchSet.objects.filter(id__in=rset_list):
+                    # Update with force
+                    rset.update_ssglists(True)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/adapt_contents")
+        return None
+
+    def adapt_from_setlist(self, setlist):
+        """Adapt, starting from this setlist"""
+
+        oErr = ErrHandle()
+        try:
+            # Double check argument
+            if not setlist is None:
+                # Update this setlist
+                setlist.calculate_contents()
+
+                # Update all items in the current researchset
+                self.update_ssglists()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ResearchSet/adapt_from_setlist")
+        return None
 
     def adapt_order(self):
         """Re-calculate the order and adapt where needed"""
@@ -354,6 +456,14 @@ class ResearchSet(models.Model):
         lst_ssglists = []
         try:
             oPMlist = None
+            # Double check and remove setlists of collection or manuscript that has been removed
+            delete_setlist = []
+            for oItem in self.researchset_setlists.all().values("manuscript__id", "collection__id", "id"):
+                if oItem['manuscript__id'] is None and oItem['collection__id'] is None:
+                    delete_setlist.append(oItem['id'])
+            if len(delete_setlist) > 0:
+                SetList.objects.filter(id__in=delete_setlist).delete()
+
             # Get the lists of SSGs for each list in the set
             for idx, setlist in enumerate(self.researchset_setlists.all().order_by('order')):
                 # Check for the contents
@@ -426,16 +536,40 @@ class SetList(models.Model):
         sBack = "{}: {}".format(self.researchset.name, self.order)
         return sBack
 
+    def adapt_rset(self, rset_type = None):
+        oErr = ErrHandle()
+        try:
+            # Adapt the research set which I am part of
+            rset = self.researchset
+            if not rset is None:
+                rset_type = "-" if rset_type is None else rset_type
+                # Show what happens
+                oErr.Status("adapt_rset on setlist id={} rset_type={}".format(self.id, rset_type))
+                # Adapt from the setlist
+                rset.adapt_from_setlist(self)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("adapt_rset")
+        return None
+
     def calculate_contents(self):
-        oSsgList = {}
-        # Add the name object for this list
-        oSsgList['title'] = self.get_title_object()
-        # Get the list of SSGs for this list
-        oSsgList['ssglist'] = self.get_ssg_list()
-        # Add this contents and save myself
-        self.contents = json.dumps(oSsgList)
-        self.save()
-        return True
+        oErr = ErrHandle()
+        bResult = True
+        try:
+            oSsgList = {}
+            # Only calculate contents, if there is any
+            if not self.collection is None or not self.manuscript is None:
+                # Add the name object for this list
+                oSsgList['title'] = self.get_title_object()
+                # Get the list of SSGs for this list
+                oSsgList['ssglist'] = self.get_ssg_list()
+            # Add this contents and save myself
+            self.contents = json.dumps(oSsgList)
+            self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetList/calculate_contents")
+        return bResult
 
     def get_ssg_list(self):
         """Create a list of SSGs,depending on the type I am"""
@@ -462,31 +596,36 @@ class SetList(models.Model):
 
         # issue #713: changed into 0-0
         oBack = {"main": "", "size": 0, "yearstart": 0, "yearfinish": 0, "matches": 0}
-        if self.setlisttype == "manu":          # SSGs via Manuscript > sermons > SSG links
-            # This is a manuscript
-            oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
-            oBack['size'] = self.manuscript.get_sermon_count()
-            oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
-            oBack['yearstart'] = self.manuscript.yearstart
-            oBack['yearfinish'] = self.manuscript.yearfinish
-        elif self.setlisttype == "hist":        # Historical collection (of SSGs)
-            oBack['top'] = "hc"
-            oBack['main'] = self.collection.name
-            oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
-        elif self.setlisttype == "ssgd":        # Personal/public dataset (of SSGs!!!)
-            # Personal collection
-            oBack['top'] = "pd"
-            if self.name == None or self.name == "":
+        oErr = ErrHandle()
+        try:
+            if self.setlisttype == "manu" and not self.manuscript is None:          # SSGs via Manuscript > sermons > SSG links
+                # This is a manuscript
+                oBack = self.manuscript.get_full_name_html(field1="top", field2="middle", field3="main")
+                oBack['size'] = self.manuscript.get_sermon_count()
+                oBack['url'] = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
+                oBack['yearstart'] = self.manuscript.yearstart
+                oBack['yearfinish'] = self.manuscript.yearfinish
+            elif self.setlisttype == "hist" and not self.collection is None:        # Historical collection (of SSGs)
+                oBack['top'] = "hc"
                 oBack['main'] = self.collection.name
+                oBack['size'] = self.collection.freqsuper()
+                oBack['url'] = reverse('collhist_details', kwargs={'pk': self.collection.id})   # Historical collection
+            elif self.setlisttype == "ssgd" and not self.collection is None:        # Personal/public dataset (of SSGs!!!)
+                # Personal collection
+                oBack['top'] = "pd"
+                if self.name == None or self.name == "":
+                    oBack['main'] = self.collection.name
+                else:
+                    oBack['main'] = self.name
+                oBack['size'] = self.collection.freqsuper()
+                oBack['url'] = reverse('collpriv_details', kwargs={'pk': self.collection.id})
             else:
-                oBack['main'] = self.name
-            oBack['size'] = self.collection.freqsuper()
-            oBack['url'] = reverse('collpriv_details', kwargs={'pk': self.collection.id})
-        else:
-            # No idea what this is
-            oBack['top'] = "UNKNOWN"
-            oBack['main'] = self.setlisttype
+                # No idea what this is
+                oBack['top'] = "UNKNOWN"
+                oBack['main'] = self.setlisttype
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetList/get_title_object")
         # Return the result
         return oBack
 
@@ -874,6 +1013,24 @@ class SetDef(models.Model):
             msg = oErr.get_error_message()
             oErr.DoError("SetDef/get_view_link")
         return sBack
+
+    def hidden_warning(self):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get the hidden contents
+            if self.contents != "" and self.contents[0] == "{":
+                params = json.loads(self.contents)
+                # Find hidden rows
+                hidden_rows = params.get("hidden_rows", [])
+                size = len(hidden_rows)
+                if size > 0:
+                    sTitle = "Remove hidden rows: (a) Expand, (b) Save"
+                    sBack = '<span title="{}"><b>Warning</b>: this DCT has <code>{}</code> hidden rows.</span>'.format(sTitle, size)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SetDef/hidden_warning")
+        return sBack        
 
     def update_order(profile):
         oErr = ErrHandle()
@@ -1331,5 +1488,312 @@ class SelectItem(models.Model):
         return iCount
 
 
+# ====================== Models to work with excel imports and curation ========================================
+
+
+class ImportSet(models.Model):
+    """The user's desire to import a particular Excel
+    
+    The Excel may be a definition of Manuscript or of an Authority File (EqualGold)
+    """
+
+    # [1] An import-set item belongs to a particular user's profile
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="profile_importsetitems")
+    # [1] The import-set items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
+    # [1] Each import-set item must be of a particular type
+    #     Possibilities: manu, serm, ssg, hist, pd
+    importtype = models.CharField("Import type", choices=build_abbr_list(IMPORT_TYPE), max_length=5)
+
+    # [0-1] Optional notes for this set
+    notes = models.TextField("Notes", blank=True, null=True)
+
+    # [0-1] Report on errors etc for this ImportSet
+    report = models.TextField("Report", blank=True, null=True)
+
+    # [0-1] Each importSet item contains a FileField that allows uploading an Excel file
+    excel = models.FileField("Excel file", null=True, blank=True, upload_to=import_path)
+    # [0-1] Name of the file as the user uploaded it
+    name = models.CharField("Name", blank=True, null=True, max_length=STANDARD_LENGTH)
+
+    # Depending on the type of SelectItem, there is a pointer to the actual item
+    # [0-1] Manuscript pointer
+    manuscript = models.ForeignKey(Manuscript, blank=True, null=True, on_delete=models.SET_NULL, related_name="manuscript_importsetitems")
+    # [0-1] SSG pointer
+    equal = models.ForeignKey(EqualGold, blank=True, null=True, on_delete=models.SET_NULL, related_name="equal_importsetitems")
+
+    # [1] Each importset item has a status, defining where it is on the acceptance scale
+    #     Scale: cre[ated], ch[an]g[ed], sub[mitted], rej[ected], acc[epted]
+    status = models.CharField("Import status", choices=build_abbr_list(IMPORT_STATUS), max_length=5, default="cre")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        return sBack
+
+    def adapt_order(self):
+        """Re-calculate the order and adapt where needed"""
+
+        qs = self.profile.profile_importsetitems.all().order_by("order")
+        order = 1
+        with transaction.atomic():
+            # Walk all the SetList objects
+            for obj in qs:
+                # Check if the order is as it should be
+                if obj.order != order:
+                    #No: adapt the order
+                    obj.order = order
+                    # And save it
+                    obj.save()
+                # Keep track of how the order should be
+                order += 1
+        return None
+
+    def do_submit(self):
+        """Submit the ImportSet"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            self.status = "sub"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_verify")
+        # Return the results of verification
+        return sBack
+
+    def do_verify(self):
+        """Verify the Excel"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html_err = []
+        html_wrn = []
+        try:
+            # Get the path to this Excel
+            excel_path = os.path.abspath(os.path.join(MEDIA_ROOT, self.excel.name))
+            # Load the Excel file
+            wb = openpyxl.load_workbook(excel_path, read_only=True)
+            sheetnames = wb.sheetnames
+            ws_manu = None
+            ws_sermo = None
+            lst_ws = []
+            for sname in sheetnames:
+                if "manuscript" in sname.lower():
+                    ws_manu = wb[sname]
+                    lst_ws.append(ws_manu)
+                elif "sermons" in sname.lower():
+                    ws_sermo = wb[sname]
+                    lst_ws.append(ws_sermo)
+            # Check if we have the correct number of worksheets
+            if len(lst_ws) != 2:
+                # Are there more sheets?
+                if len(lst_ws) > 2:
+                    html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
+                else:
+                    # It is less than 2
+                    if ws_manu is None:
+                        # There is no manuscript sheet
+                        html_err.append( "The Excel doesn't contain a sheet called 'Manuscript'")
+                    elif ws_sermo is None:
+                        # There is no manuscript sheet
+                        html_err.append( "The Excel doesn't contain a sheet called 'Sermons'")
+                    else:
+                        html_err.append( "The Excel sheet's names are unintelligable. They should be: 'Manuscript', 'Sermons'")
+
+            # Combine into reports
+            sWarning = "\n".join(html_wrn)
+            sError = "\n".join(html_err)
+            # Do we have a warning/error report?
+            if sError == "":
+                # There are no errors - maybe only warnings?
+                if sWarning == "":
+                    sReport = "Excel file has been verified"
+                else:
+                    sReport = "### WARNINGS\n{}".format(sWarning)
+                self.report = sReport
+                self.status = "ver"
+                self.save()
+            else:
+                # There are errors: collect and show them
+                sReport = "### ERRORS\n{}".format(sError)
+                if sWarning != "":
+                    sReport = "{}\n### WARNINGS\n{}".format(sReport, sWarning)
+
+                # set the status to REJECTED
+                self.report = sReport
+                self.status = "rej"
+                self.save()
+                sBack = sReport
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_verify")
+        # Return the results of verification
+        return sBack
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_filename(self):
+        sBack = str(self.excel)
+        return sBack
+
+    def get_importmode(self):
+        sBack = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            mode = ""
+            if self.status in ['chg', 'rej']: # 'cre', 
+                mode = "verify"
+            elif self.status in ['ver']:
+                mode = "submit"
+            sBack = mode
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/get_importmode")
+            bResult = False
+        return sBack
+
+    def get_name(self):
+        sBack = ""
+        if not self.name is None:
+            sBack = self.name
+        return sBack
+
+    def get_notes_html(self):
+        """Convert the markdown notes"""
+
+        sNotes = "-"
+        if self.notes != None:
+            sNotes = markdown(self.notes)
+        return sNotes    
+
+    def get_report_html(self):
+        """Convert the markdown report"""
+
+        sReport = "-"
+        if self.report != None:
+            sReport = markdown(self.report)
+        return sReport    
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def get_status(self, html=False):
+        sStatus = self.get_status_display()
+        if html:
+            sStatus = '<span class="badge signature ot">{}</span>'.format(sStatus)
+        return sStatus
+
+    def get_type(self):
+        return self.get_importtype_display()
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Check if the order is specified
+            if self.order is None or self.order <= 0:
+                # Specify the order
+                self.order = ImportSet.objects.filter(profile=self.profile).count() + 1
+            # Adapt the save date
+            self.saved = get_current_datetime()
+
+            # If the status is 'cre'..
+            if self.status == "cre":
+                # Check if an excel file has been specified
+                if self.importtype in ['manu', 'ssg'] and not self.excel is None and not self.excel.file is None:
+                    # Move on to the status 'chg'
+                    self.status = "chg"
+
+            response = super(ImportSet, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/save")
+        # Return the response when saving
+        return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = ImportSet.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/update_order")
+            bOkay = False
+        return bOkay
+
+
+class ImportReview(models.Model):
+    """Review of one importset by a moderator"""
+
+    # [1] Link to the importset
+    importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_reviews")
+    # [1] Link to the moderator
+    moderator = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="moderator_reviews")
+
+    # [0-1] Optional notes for this review
+    notes = models.TextField("Notes", blank=True, null=True)
+
+    # [1] Each review item has a status, defining what the suggestion is
+    #     Scale: cre[ated], ch[an]g[ed], sub[mitted], rej[ected], acc[epted]
+    status = models.CharField("Review status", choices=build_abbr_list(IMPORT_STATUS), max_length=5, default="cre")
+
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+    saved = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        return sBack
+
+    def get_created(self):
+        """REturn the created date in a readable form"""
+
+        sDate = get_crpp_date(self.created, True)
+        return sDate
+
+    def get_saved(self):
+        """REturn the saved date in a readable form"""
+
+        # sDate = self.saved.strftime("%d/%b/%Y %H:%M")
+        sDate = get_crpp_date(self.saved, True)
+        return sDate
+
+    def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        response = None
+        oErr = ErrHandle()
+        try:
+            # Adapt the save date
+            self.saved = get_current_datetime()
+            response = super(ImportReview, self).save(force_insert, force_update, using, update_fields)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/save")
+        # Return the response when saving
+        return response
 
 

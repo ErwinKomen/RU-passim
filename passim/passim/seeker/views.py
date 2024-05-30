@@ -4842,38 +4842,50 @@ class SermonEdit(BasicDetails):
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
 
-        ## Set the 'afternew' URL
-        manu = instance.get_manuscript()
-        if manu and instance.order < 0:
-            # Calculate how many sermons there are
-            sermon_count = manu.get_sermon_count()
-            # Make sure the new sermon gets changed
-            form.instance.order = sermon_count
+        bResult = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            ## Set the 'afternew' URL
+            manu = instance.get_manuscript()
+            if manu and instance.order < 0:
+                # Calculate how many sermons there are
+                sermon_count = manu.get_sermon_count()
+                # Make sure the new sermon gets changed
+                form.instance.order = sermon_count
 
-        if manu:
-            # Need to know who is 'talking'...
-            username = self.request.user.username
-            profile = Profile.get_user_profile(username)
-            profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
+            if manu:
+                # Need to know who is 'talking'...
+                username = self.request.user.username
+                profile = Profile.get_user_profile(username)
+                profile_projects = ProjectApprover.objects.filter(profile=profile, status="incl")
 
-            project_count = instance.projects.count()
+                project_count = instance.projects.count()
 
-            if project_count == 0:
-                # How many projects are attached to this manuscript
-                manu_project_count = manu.projects.count()
-                if manu_project_count == 1:
-                    # Issue #546: if the manuscript is for one project, continue checking
-                    # Assign this sermon to the project of the manuscript
-                    project = manu.projects.first()
-                    instance.projects.add(project)
-                elif profile_projects.count() == 1:
-                    # This editor is only editor for one project
-                    # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
-                    project = profile_projects.first().project
-                    instance.projects.add(project)
+                if project_count == 0:
+                    # How many projects are attached to this manuscript
+                    manu_project_count = manu.projects.count()
+                    if manu_project_count == 1:
+                        # Issue #546: if the manuscript is for one project, continue checking
+                        # Assign this sermon to the project of the manuscript
+                        project = manu.projects.first()
+                        instance.projects.add(project)
+                    elif profile_projects.count() == 1:
+                        # This editor is only editor for one project
+                        # Issue #546: if editor is only ProjectApprover for one project, then assign the sermon to that project
+                        project = profile_projects.first().project
+                        instance.projects.add(project)
+
+                ## This belongs to a manuscript: possibly update manuscript-connected setlist
+                #ResearchSet.adapt_contents(manu=instance)
+
+        except:
+            msg = oErr.get_error_message()
+            bResult = False
+            oErr.DoError("SermonEdit/after_new")
 
         # Return positively
-        return True, "" 
+        return bResult, msg 
 
     def process_formset(self, prefix, request, formset):
         """This is for processing *NEWLY* added items (using the '+' sign)"""
@@ -5425,6 +5437,7 @@ class SermonUserKeyword(SermonDetails):
             msg = oErr.get_error_message()
             oErr.DoError("SermonUserKeyword/custom_init")
     
+
 
 class SermonMove(SermonDetails):
     # newRedirect = True
@@ -8091,7 +8104,7 @@ class CollAnyEdit(BasicDetails):
             # Optionally add Scope: but only for the actual *owner* of this one
             # Issue #599: don't offer scope for HC
             if instance.settype != "hc" and self.prefix in prefix_scope and not instance.owner is None \
-                and instance.owner.user == self.request.user:
+                and ( instance.owner.user == self.request.user or context['is_app_moderator']):
                 context['mainitems'].append(
                 {'type': 'plain', 'label': "Scope:",       'value': instance.get_scope_display, 'field_key': 'scope'})
 
@@ -8263,6 +8276,16 @@ class CollAnyEdit(BasicDetails):
                         if profile_owner.id != profile_user.id:
                             # User X trying to look at stuff from user Y
                             permission = ""
+                        else:
+                            # Any user may edit his/her own sets
+                            permission = "write"
+                            self.permission = permission
+                            # Just make sure a simple user can *NOT* change the scope of his dataset
+                            for oItem in context['mainitems']:
+                                field_key = oItem.get("field_key")
+                                if not field_key is None and field_key == "scope":
+                                    # Remove this field_key
+                                    oItem.pop("field_key")
 
             context['permission'] = permission
 
@@ -8414,6 +8437,7 @@ class CollAnyEdit(BasicDetails):
                         # The name is already in use, so refuse it.
                         msg = "The name '{}' is already in use for a dataset. Please chose a different one".format(name)
                         return False, msg
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollAnyEdit/before_save")
@@ -8426,6 +8450,17 @@ class CollAnyEdit(BasicDetails):
         oErr = ErrHandle()
         
         try:
+            profile = self.request.user.user_profiles.first()
+            # Check it has a name
+            if not profile is None and instance.name is None:
+                # If this is a new one, just make sure it gets the right name
+                if instance.type != "super":
+                    name = "{}_{}_{}".format(profile.user.username, instance.id, instance.type)                         
+                else:
+                    name = "{}_{}_{}".format(profile.user.username, instance.id, "af")
+                instance.name = name
+                instance.save()
+
             # Process many-to-many changes: Add and remove relations in accordance with the new set passed on by the user
             # (1) 'literature'
             litlist = form.cleaned_data['litlist']
@@ -8628,13 +8663,6 @@ class CollPrivDetails(CollAnyEdit):
     def custom_init(self, instance):
         if instance != None:
             # Check if someone acts as if this is a public dataset, while it is not
-            #if instance.settype == "pd":
-            #    # Determine what kind of dataset/collection this is          
-            #    if instance.scope == "publ":
-            #        self.title = "Public Dataset"
-            #        if instance.owner != Profile.get_user_profile(self.request.user.username):
-            #           # It is a public dataset after all! er is geen owner
-            #           self.redirectpage = reverse("collpubl_details", kwargs={'pk': instance.id}) # priv ipv publ
             if instance.settype == "hc":
                 # This is a historical collection
                 self.redirectpage = reverse("collhist_details", kwargs={'pk': instance.id})
@@ -9695,6 +9723,7 @@ class CollectionListView(BasicList):
     selectbuttons = [
         {'title': 'Add to saved items', 'mode': 'add_saveitem', 'button': 'jumbo-1', 'glyphicon': 'glyphicon-star-empty'},
         {'title': 'Add to DCT',         'mode': 'show_dct',     'button': 'jumbo-1', 'glyphicon': 'glyphicon-wrench'},
+        {'title': 'Delete selection',   'mode': 'del_items',    'button': 'jumbo-5', 'glyphicon': 'glyphicon-remove'},
         ]
 
     def initializations(self):
@@ -10059,11 +10088,11 @@ class CollectionListView(BasicList):
                     # Situation 1: no scope defined
                     if colscope == "":
                         # This user is *NOT* an app_editor: only show publ ones + those of the user
-                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) | Q(scope="publ")) 
+                        fields['defscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) ) #  | Q(scope="publ")) 
                     elif colscope == "publ" or colscope == "team":
                         fields['colscope'] =  Q(scope="publ")
                     elif colscope == "priv":
-                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) )
+                        fields['colscope'] =  ( Q(scope="priv") & Q(owner__id__in=ownlist_ids) ) #  | Q(scope="publ")) 
 
              
         
@@ -11042,7 +11071,8 @@ class ManuscriptEdit(BasicDetails):
                         'multiple': True, 'field_list': 'mprovlist',    'fso': self.formset_objects[2] },
                     {'type': 'line',  'label': "Related manuscripts:",  'value': instance.get_manulinks_markdown(), 
                         'multiple': True,  'field_list': 'mlinklist',   'fso': self.formset_objects[4]},
-                    {'type': 'line',  'label': "Suspected doubles:",    'value': instance.get_similars_markdown()}
+                    {'type': 'line',  'label': "Potential doubles:",    'value': instance.get_similars_markdown(),
+                     'title': 'Potential doubles for this record in the dataset'}
                     ]
                 for item in mainitems_m2m: context['mainitems'].append(item)
 
@@ -12162,7 +12192,7 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript comparison",   "id": "filter_collection_manuidno", "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
         {"name": "Historical Collection",   "id": "filter_collection_hc",       "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
         {"name": "PD: Authority file",      "id": "filter_collection_super",    "enabled": False, "include_id": "filter_collection_hcptc", "head_id": "filter_comparative"},
-        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_collection", "hide_button": True},
+        {"name": "HC/Manu overlap",         "id": "filter_collection_hcptc",    "enabled": False, "head_id": "filter_comparative", "hide_button": True},
         # issue #717: delete the PD:Manuscript and PD:Sermon options
         #{"name": "PD: Manuscript",          "id": "filter_collection_manu",     "enabled": False, "head_id": "filter_collection"},
         #{"name": "PD: Sermon",              "id": "filter_collection_sermo",    "enabled": False, "head_id": "filter_collection"},

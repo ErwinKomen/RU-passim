@@ -14,7 +14,7 @@ from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidg
 from passim.utils import ErrHandle
 from passim.basic.forms import BasicModelForm, BasicSimpleForm
 from passim.dct.models import *
-from passim.seeker.models import Profile
+from passim.seeker.models import Profile, FieldChoice
 
 
 # =============== WIDGETS ===============================================
@@ -63,6 +63,32 @@ class CollOneHistWidget(CollOneWidget):
     settype = "hc"
 
 
+class ImportSetWidget(ModelSelect2MultipleWidget):
+    model = ImportSet
+    search_fields = [ 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.queryset == None:
+            qs = ImportSet.objects.all().order_by('name').distinct()
+        else:
+            qs = self.queryset
+        return qs
+
+
+class ProfileOneWidget(ModelSelect2Widget):
+    model = Profile
+    search_fields = [ 'user__username__icontains' ]
+
+    def label_from_instance(self, obj):
+        return obj.user.username
+
+    def get_queryset(self):
+        return Profile.objects.all().order_by('user__username').distinct()
+
+
 class ProfileWidget(ModelSelect2MultipleWidget):
     model = Profile
     search_fields = [ 'user__username__icontains' ]
@@ -109,6 +135,36 @@ class SaveGroupOneWidget(ModelSelect2Widget):
             self.qs = qs
         else:
             qs = self.qs
+        return qs
+
+
+class SelItemTypeWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+    allowed = []
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        if len(self.allowed) == 0:
+            qs = FieldChoice.objects.filter(field=SELITEM_TYPE).order_by("english_name")
+        else:
+            qs = FieldChoice.objects.filter(field=SELITEM_TYPE, abbr__in = self.allowed).order_by("english_name")
+
+        return qs
+
+
+class ImportTypeWidget(ModelSelect2MultipleWidget):
+    model = FieldChoice
+    search_fields = [ 'english_name__icontains']
+
+    def label_from_instance(self, obj):
+        return obj.english_name
+
+    def get_queryset(self):
+        qs = FieldChoice.objects.filter(field=IMPORT_TYPE).order_by("english_name")
+
         return qs
 
 
@@ -345,4 +401,75 @@ class SaveGroupForm(BasicModelForm):
             msg = oErr.get_error_message()
             oErr.DoError("SaveGroupForm")
         return None
+
+
+class ImportSetForm(BasicModelForm):
+    profileid = forms.CharField(required=False)
+    ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 
+                                    'style': 'width: 100%;', 'class': 'searching'}))
+    importtypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ImportTypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 
+                                    'Select multiple types...', 'style': 'width: 100%;'}))
+    fname = forms.CharField(label=_("Project"), required=False,
+            widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 
+                                              'placeholder': 'Name of the file...', 'style': 'width: 100%;'}))
+    namelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ImportSetWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple file names...', 
+                                              'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        model = ImportSet
+        fields = ['excel', 'notes', 'importtype'] 
+        widgets={
+            'excel':   forms.FileInput(attrs={'style': 'width: 100%;', 'placeholder': 'Excel file'}),
+            'notes':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;',
+                                    'placeholder': 'Optionally add your own notes...'}),
+            'importtype':  forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Obligatory for this type of form!!!
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(ImportSetForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = self.team_group
+
+            # Some fields are not required
+            self.fields['excel'].required = False
+            # self.fields['profile'].required = False
+            self.fields['notes'].required = False
+            self.fields['importtype'].required = False
+
+            # Make sure the profile is set correctly
+            # self.fields['profileid'].initial = profile.id
+
+            # Set queryset(s) - for details view
+            self.fields['ownlist'].queryset = Profile.objects.all()
+            self.fields['importtypelist'].queryset = FieldChoice.objects.filter(field=SELITEM_TYPE).order_by("english_name")
+
+            self.fields['namelist'].queryset = ImportSet.objects.filter(profile=profile)
+            
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                # self.fields['profileid'].initial = instance.profile.id
+
+                if instance.importtype == "":
+                    self.fields['importtype'].initial = "manu"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetForm")
+        return None
+
+
 

@@ -1093,7 +1093,7 @@ class BasicList(ListView):
 
         # Make sure to transform the 'object_list'  into a 'result_list'
         context['result_list'] = self.get_result_list(context['object_list'], context)
-
+        
         context['sortOrder'] = self.sort_order
         context['colWrap'] = self.col_wrap
         context['selMode'] = self.sel_mode
@@ -1638,7 +1638,7 @@ class BasicList(ListView):
                 get = UserSearch.load_parameters(usersearch_id, get)
             self.qd = get
             self.param_list = []
-
+            
             # Then check if we have a redirect or not
             if self.redirectpage == "":
                 # We can continue with the normal 'get()'
@@ -1838,6 +1838,10 @@ class BasicDetails(DetailView):
     def before_delete(self, instance):
         """Anything that needs doing before deleting [instance] """
         return True, "" 
+
+    def after_delete(self, oInfo):
+        """Action after deleting an item"""
+        return None
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
@@ -2735,10 +2739,11 @@ class BasicPart(View):
                             # Convert string to bytestring
                             sData = sData.encode()
                             # Decode base64 into binary
-                            sData = base64.decodestring(sData)
+                            # Deprecated: sData = base64.decodestring(sData)
+                            sData = base64.decodebytes(sData)
                             # Set the filename correctly
                             sDbName = "passim_{}_{}.png".format(downloadname, obj_id)
-
+                            
                     # Excel needs additional conversion
                     if self.dtype in ["excel"]:
                         # Convert 'compressed_content' to an Excel worksheet
@@ -2967,7 +2972,11 @@ class BasicPart(View):
                 if is_app_user or is_app_editor:
                     # Any more checking needed?
                     if sType == "w":
-                        bResult = is_app_editor
+                        # Allow downloading as user = non-editor
+                        if self.action == "download":
+                            bResult = True
+                        else:
+                            bResult = is_app_editor
                     else:
                         bResult = True
             # Otherwise: no permissions!
