@@ -14,6 +14,11 @@ import os
 from markdown import markdown
 import json, copy
 
+import openpyxl
+from openpyxl.utils.cell import get_column_letter
+from openpyxl.cell import Cell
+from openpyxl import Workbook
+
 # Take from my own app
 from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE, MEDIA_ROOT
@@ -29,6 +34,7 @@ ABBR_LENGTH = 5
 SETLIST_TYPE = "dct.setlisttype"
 SAVEDITEM_TYPE = "dct.saveditemtype"
 SELITEM_TYPE = "dct.selitemtype"
+IMPORT_TYPE = "dct.importtype"
 IMPORT_STATUS = "dct.importstatus"
 
 def get_passimcode(super_id, super_code):
@@ -76,7 +82,8 @@ def get_list_matches(oPMlist, oSsgList):
                 matches += 1
     return matches
 
-def import_path(sType, instance, filename):
+def import_path(instance, filename):
+    # def import_path(sType, instance, filename):
     """Upload Excel file to the right place, and remove old file if existing
     
     This function is used within the model ImportSet
@@ -88,7 +95,8 @@ def import_path(sType, instance, filename):
     sSubdir = "import"
     try:
         # Adapt the filename for storage
-        sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+        # sAdapted = "{}_{:08d}_{}".format(sType, instance.id, filename.replace(" ", "_"))
+        sAdapted = "{:08d}_{}".format(instance.id, filename.replace(" ", "_"))
 
         # The stuff that we return
         sBack = os.path.join(sSubdir, sAdapted)
@@ -101,6 +109,11 @@ def import_path(sType, instance, filename):
         # Add the actual filename to form an absolute path
         sAbsPath = os.path.abspath(os.path.join(fullsubdir, sAdapted))
 
+        # Also get the bare file name
+        sBare = os.path.basename(filename)
+        # Store it in the item
+        instance.name = sBare
+
         if os.path.exists(sAbsPath):
             # Remove it
             os.remove(sAbsPath)
@@ -111,7 +124,7 @@ def import_path(sType, instance, filename):
     return sBack
 
 def excel_import_path(instance, filename):
-    return import_path("manu", instance, filename)
+    return import_path(instance, filename)
 
 
 # ====================== Models needed to work on DCTs ===============================================
@@ -1490,7 +1503,7 @@ class ImportSet(models.Model):
     order = models.IntegerField("Order", default=0)
     # [1] Each import-set item must be of a particular type
     #     Possibilities: manu, serm, ssg, hist, pd
-    selitemtype = models.CharField("Select item type", choices=build_abbr_list(SELITEM_TYPE), max_length=5)
+    importtype = models.CharField("Import type", choices=build_abbr_list(IMPORT_TYPE), max_length=5)
 
     # [0-1] Optional notes for this set
     notes = models.TextField("Notes", blank=True, null=True)
@@ -1499,7 +1512,9 @@ class ImportSet(models.Model):
     report = models.TextField("Report", blank=True, null=True)
 
     # [0-1] Each importSet item contains a FileField that allows uploading an Excel file
-    excel = models.FileField("Excel file", null=True, blank=True, upload_to=excel_import_path)
+    excel = models.FileField("Excel file", null=True, blank=True, upload_to=import_path)
+    # [0-1] Name of the file as the user uploaded it
+    name = models.CharField("Name", blank=True, null=True, max_length=STANDARD_LENGTH)
 
     # Depending on the type of SelectItem, there is a pointer to the actual item
     # [0-1] Manuscript pointer
@@ -1537,6 +1552,90 @@ class ImportSet(models.Model):
                 order += 1
         return None
 
+    def do_submit(self):
+        """Submit the ImportSet"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            self.status = "sub"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_verify")
+        # Return the results of verification
+        return sBack
+
+    def do_verify(self):
+        """Verify the Excel"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html_err = []
+        html_wrn = []
+        try:
+            # Get the path to this Excel
+            excel_path = os.path.abspath(os.path.join(MEDIA_ROOT, self.excel.name))
+            # Load the Excel file
+            wb = openpyxl.load_workbook(excel_path, read_only=True)
+            sheetnames = wb.sheetnames
+            ws_manu = None
+            ws_sermo = None
+            lst_ws = []
+            for sname in sheetnames:
+                if "manuscript" in sname.lower():
+                    ws_manu = wb[sname]
+                    lst_ws.append(ws_manu)
+                elif "sermons" in sname.lower():
+                    ws_sermo = wb[sname]
+                    lst_ws.append(ws_sermo)
+            # Check if we have the correct number of worksheets
+            if len(lst_ws) != 2:
+                # Are there more sheets?
+                if len(lst_ws) > 2:
+                    html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
+                else:
+                    # It is less than 2
+                    if ws_manu is None:
+                        # There is no manuscript sheet
+                        html_err.append( "The Excel doesn't contain a sheet called 'Manuscript'")
+                    elif ws_sermo is None:
+                        # There is no manuscript sheet
+                        html_err.append( "The Excel doesn't contain a sheet called 'Sermons'")
+                    else:
+                        html_err.append( "The Excel sheet's names are unintelligable. They should be: 'Manuscript', 'Sermons'")
+
+            # Combine into reports
+            sWarning = "\n".join(html_wrn)
+            sError = "\n".join(html_err)
+            # Do we have a warning/error report?
+            if sError == "":
+                # There are no errors - maybe only warnings?
+                if sWarning == "":
+                    sReport = "Excel file has been verified"
+                else:
+                    sReport = "### WARNINGS\n{}".format(sWarning)
+                self.report = sReport
+                self.status = "ver"
+                self.save()
+            else:
+                # There are errors: collect and show them
+                sReport = "### ERRORS\n{}".format(sError)
+                if sWarning != "":
+                    sReport = "{}\n### WARNINGS\n{}".format(sReport, sWarning)
+
+                # set the status to REJECTED
+                self.report = sReport
+                self.status = "rej"
+                self.save()
+                sBack = sReport
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_verify")
+        # Return the results of verification
+        return sBack
+
     def get_created(self):
         """REturn the created date in a readable form"""
 
@@ -1545,6 +1644,30 @@ class ImportSet(models.Model):
 
     def get_filename(self):
         sBack = str(self.excel)
+        return sBack
+
+    def get_importmode(self):
+        sBack = ""
+        bResult = True
+        oErr = ErrHandle()
+        
+        try:
+            mode = ""
+            if self.status in ['chg', 'rej']: # 'cre', 
+                mode = "verify"
+            elif self.status in ['ver']:
+                mode = "submit"
+            sBack = mode
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/get_importmode")
+            bResult = False
+        return sBack
+
+    def get_name(self):
+        sBack = ""
+        if not self.name is None:
+            sBack = self.name
         return sBack
 
     def get_notes_html(self):
@@ -1570,8 +1693,14 @@ class ImportSet(models.Model):
         sDate = get_crpp_date(self.saved, True)
         return sDate
 
+    def get_status(self, html=False):
+        sStatus = self.get_status_display()
+        if html:
+            sStatus = '<span class="badge signature ot">{}</span>'.format(sStatus)
+        return sStatus
+
     def get_type(self):
-        return self.get_selitemtype_display()
+        return self.get_importtype_display()
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None
@@ -1583,12 +1712,39 @@ class ImportSet(models.Model):
                 self.order = ImportSet.objects.filter(profile=self.profile).count() + 1
             # Adapt the save date
             self.saved = get_current_datetime()
+
+            # If the status is 'cre'..
+            if self.status == "cre":
+                # Check if an excel file has been specified
+                if self.importtype in ['manu', 'ssg'] and not self.excel is None and not self.excel.file is None:
+                    # Move on to the status 'chg'
+                    self.status = "chg"
+
             response = super(ImportSet, self).save(force_insert, force_update, using, update_fields)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ImportSet/save")
         # Return the response when saving
         return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = ImportSet.objects.filter(profile=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/update_order")
+            bOkay = False
+        return bOkay
 
 
 class ImportReview(models.Model):

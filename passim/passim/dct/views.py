@@ -791,7 +791,7 @@ class MyPassimEdit(BasicDetails):
             importset['saveasbutton'] = False
             rel_list =[]
 
-            qs_imports = ImportSet.objects.filter(profile=instance).order_by('name')
+            qs_imports = ImportSet.objects.filter(profile=instance).order_by('excel')
             # Also store the count
             importset['count'] = qs_imports.count()
             importset['instance'] = instance
@@ -800,7 +800,7 @@ class MyPassimEdit(BasicDetails):
             # And store an introduction
             lIntro = []
             lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
-            lIntro.append('href="{}">Excel import sets</a> page.'.format(reverse('importset_list')))
+            lIntro.append('href="{}">Excel import submissions</a> page.'.format(reverse('importset_list')))
             sIntro = " ".join(lIntro)
             importset['introduction'] = sIntro
 
@@ -818,26 +818,30 @@ class MyPassimEdit(BasicDetails):
 
                 # TODO:
                 # Relevant columns for the Your visualisations are:
-                # 1 - name of the ImportSet
-                # 2 - scope of the Stemma research set (priv/team/publ)
-                # 3 - size in terms of number of SSGs part of this set
-                # 4 - analyze button
+                # 1 - filename of the ImportSet submission
+                # 2 - type (manuscript or authority file)
+                # 3 - status
+                # 4 - date
 
                 # SetDef: Order within the set of Your visualizations
                 add_one_item(rel_item, order, False, align="right", draggable=True)
 
-                # Name: the name of this Stemmaset
-                add_one_item(rel_item, obj.get_name_markdown(), False, main=True)
+                # Name: the filename of the import submission
+                sName = obj.get_name()
+                url = reverse('importset_details', kwargs={'pk': obj.id})
+                add_one_item(rel_item, sName, False, main=True, link=url)
 
-                # Analyze: button to analyze this one
-                add_one_item(rel_item, obj.get_analyze_markdown(), False, main=True)
+                # Type: what the import submission describes (M/SSG)
+                sType = obj.get_type()
+                add_one_item(rel_item, sType, False, main=False)
 
-                # Scope: private, team or global
-                add_one_item(rel_item, obj.get_scope_display(), False)
+                # Status: status of the submission
+                sStatus = obj.get_status()
+                add_one_item(rel_item, sStatus, False)
 
-                # Size: number of StemmaItems part of this ImportSet
-                size = "{}".format(obj.importset_stemmaitems.count())
-                add_one_item(rel_item, size, False, align="right")
+                # Date: last save date of submission
+                sDate = obj.get_saved()
+                add_one_item(rel_item, sDate, False) # , align="right")
 
                 if bMayEdit:
                     # Actions that can be performed on this item
@@ -849,10 +853,10 @@ class MyPassimEdit(BasicDetails):
             importset['rel_list'] = rel_list
             importset['columns'] = [
                 '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Name of the stemmatizer research set">Name</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Analyze the stemmatological research set">Analyze</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Scope">Scope</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Number of items in this research set">Size</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Name of the Excel file submitted">Name</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Type of submission">Type</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Status of the submission">Status</span>{}'.format(sort_start, sort_end), 
+                '{}<span title="Date last saved">Date</span>{}'.format(sort_start, sort_end), 
                 ]
             if bMayEdit:
                 importset['columns'].append("")
@@ -984,6 +988,7 @@ class MyPassimEdit(BasicDetails):
             {"prefix": "svdvis",    "cls": SavedVis},
             {"prefix": "dctdef",    "cls": SetDef},
             {"prefix": "stemma",    "cls": StemmaSet},
+            {"prefix": "xlsimp",    "cls": ImportSet},
             ]
 
         try:
@@ -2871,18 +2876,20 @@ class ImportSetListView(BasicList):
     has_select2 = True
     bUseFilter = True
     prefix = "impset"
-    sg_name = "Excel import set"
-    plural_name = "Excel import sets"
+    sg_name = "Excel import submission"
+    plural_name = "Excel import submissions"
     new_button = True
     use_team_group = True
-    order_cols = ['excel', 'selitemtype', 'profile__user__username', 'saved', '']
+    order_cols = ['order', 'excel', 'importtype', 'status', 'profile__user__username', 'saved', 'created']
     order_default = order_cols
     order_heads = [
         {'name': 'Order',   'order': 'o=1','type': 'int', 'field': 'order',     'linkdetails': True},
         {'name': 'File',    'order': 'o=2','type': 'str', 'custom': 'filename', 'linkdetails': True, 'main': True},
         {'name': 'Type',    'order': 'o=3','type': 'str', 'custom': 'type',     'linkdetails': True},
-        {'name': 'Owner',   'order': 'o=4','type': 'str', 'custom': 'owner',    'linkdetails': True},
-        {'name': 'Date',    'order': 'o=5','type': 'str', 'custom': 'date',     'linkdetails': True, 'align': 'right'},
+        {'name': 'Status',  'order': 'o=4','type': 'str', 'custom': 'status',   'linkdetails': True},
+        {'name': 'Owner',   'order': 'o=5','type': 'str', 'custom': 'owner',    'linkdetails': True},
+        {'name': 'Saved',   'order': 'o=6','type': 'str', 'custom': 'date',     'linkdetails': True, 'align': 'right'},
+        {'name': 'Created', 'order': 'o=7','type': 'str', 'custom': 'created',  'linkdetails': True, 'align': 'right'},
                 ]
     filters = [ 
         {"name": "Name",    "id": "filter_name",      "enabled": False},
@@ -2891,9 +2898,10 @@ class ImportSetListView(BasicList):
         ]
     searches = [
         {'section': '', 'filterlist': [
-            {'filter': 'name',  'dbfield': 'excel',     'keyS': 'excel'},
+            {'filter': 'name',  'dbfield': 'name',      'keyS': 'fname',  
+             'keyList': 'namelist', 'infield': 'name' },
             {'filter': 'owner', 'fkfield': 'profile',   'keyList': 'ownlist', 'infield': 'id' },
-            {'filter': 'type',  'dbfield': 'selitemtype',     'keyList': 'selitemtypelist',
+            {'filter': 'type',  'dbfield': 'importtype',     'keyList': 'importtypelist',
              'keyType': 'fieldchoice',  'infield': 'abbr' }
             ]},
         {'section': 'other', 'filterlist': [] }
@@ -2908,12 +2916,17 @@ class ImportSetListView(BasicList):
         sTitle = ""
 
         if custom == "date":
-            sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+            # sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+            sBack = instance.get_saved()
+        elif custom == "created":
+            # sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+            sBack = instance.get_created()
         elif custom == "filename":
-            html = []
-            sBack = str(instance.excel)
+            sBack = instance.get_name()
         elif custom == "type":
-            sBack = instance.get_selitemtype_display()
+            sBack = instance.get_type()
+        elif custom == "type":
+            sBack = instance.get_status()
         elif custom == "owner":
             sBack = instance.profile.user.username
 
@@ -2937,7 +2950,7 @@ class ImportSetEdit(BasicDetails):
     mForm = ImportSetForm
     prefix = 'impset'
     prefix_type = "simple"
-    title = "ImportSet"
+    title = "Import submission"
     use_team_group = True
     mainitems = []
 
@@ -2946,15 +2959,18 @@ class ImportSetEdit(BasicDetails):
 
         oErr = ErrHandle()
         try:
+            is_app_editor = context['is_app_editor']
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'line',  'label': "Excel file:",   'value': instance.get_filename(),    'field_key': 'excel'  },
+                {'type': 'line',  'label': "Excel file:",   'value': instance.get_name(),        'field_key': 'excel'  },
                 {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
-                {'type': 'plain', 'label': "Type:",         'value': instance.get_type(),        'field_key': 'selitemtype'},
+                {'type': 'plain', 'label': "Type:",         'value': instance.get_type(),        'field_key': 'importtype'},
+                {'type': 'safe',  'label': "Status:",       'value': instance.get_status(True),     },
                 {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
                 {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
                 {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
-                {'type': 'plain', 'label': "Report:",       'value': instance.get_report_html()           },
+                {'type': 'plain', 'label': "Report:",       'value': instance.get_report_html()     },
+                {'type': 'safe',  'label': "",              'value': self.get_button(instance, is_app_editor)     },
                 ]
             
             # Signal that we do have select2
@@ -2985,6 +3001,25 @@ class ImportSetEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    def get_button(self, instance, is_app_editor):
+        """Create and show the buttons that are appropriate at this stage"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html = []
+        try:
+            if not instance is None:
+                context = dict(instance=instance)
+                context['importmode'] = instance.get_importmode()
+                context['is_app_editor'] = is_app_editor
+                sBack = render_to_string("dct/xlsimp_button.html", context, self.request)
+ 
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetEdit/get_button")
+
+        return sBack
 
     def check_hlist(self, instance):
         """Check if a hlist parameter is given, and hlist saving is called for"""
@@ -3047,6 +3082,24 @@ class ImportSetEdit(BasicDetails):
             msg = oErr.get_error_message()
             oErr.DoError("ImportSetEdit/check_hlist")
             return False
+
+    #def get_importmode(self, instance):
+    #    sBack = ""
+    #    bResult = True
+    #    oErr = ErrHandle()
+        
+    #    try:
+    #        mode = ""
+    #        if instance.status in ['chg', 'rej']: # 'cre', 
+    #            mode = "verify"
+    #        elif instance.status in ['ver']:
+    #            mode = "submit"
+    #        sBack = mode
+    #    except:
+    #        msg = oErr.get_error_message()
+    #        oErr.DoError("ImportSetEdit/after_save")
+    #        bResult = False
+    #    return sBack
     
 
 class ImportSetDetails(ImportSetEdit):
@@ -3084,201 +3137,74 @@ class ImportSetDetails(ImportSetEdit):
         # Return as usual
         return bStatus, msg
 
-    #def add_to_context(self, context, instance):
-    #    # Perform the standard initializations:
-    #    context = super(ImportSetDetails, self).add_to_context(context, instance)
+    def add_to_context(self, context, instance):
+        # First process what needs to be done anyway
+        context = super(ImportSetDetails, self).add_to_context(context, instance)
 
-    #    def add_one_item(rel_item, value, resizable=False, title=None, align=None, link=None, main=None, draggable=None):
-    #        oAdd = dict(value=value)
-    #        if resizable: oAdd['initial'] = 'small'
-    #        if title != None: oAdd['title'] = title
-    #        if align != None: oAdd['align'] = align
-    #        if link != None: oAdd['link'] = link
-    #        if main != None: oAdd['main'] = main
-    #        if draggable != None: oAdd['draggable'] = draggable
-    #        rel_item.append(oAdd)
-    #        return True
-
-    #    def check_order(qs):
-    #        with transaction.atomic():
-    #            for idx, obj in enumerate(qs):
-    #                if obj.order < 0:
-    #                    obj.order = idx + 1
-    #                    obj.save()
-
-    #    username = self.request.user.username
-    #    team_group = app_editor
-
-    #    # Authorization: only app-editors may edit!
-    #    bMayEdit = user_is_ingroup(self.request, team_group)
-            
-    #    # All PDs: show the content
-    #    related_objects = []
-    #    lstQ = []
-    #    rel_list =[]
-    #    resizable = True
-    #    index = 1
-    #    sort_start = ""
-    #    sort_start_int = ""
-    #    sort_end = ""
-    #    if bMayEdit:
-    #        sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
-    #        sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
-    #        sort_end = '</span>'
-
-    #    oErr = ErrHandle()
-
-    #    try:
-
-    #        # [1] =============================================================
-    #        # Get all 'StemmaItem' objects that are part of this 'ImportSet'
-    #        supers = dict(title="Authority files within this Stemmatology research set", prefix="super")
-    #        if resizable: supers['gridclass'] = "resizable dragdrop"
-    #        supers['savebuttons'] = bMayEdit
-    #        supers['saveasbutton'] = True
-    #        supers['classes'] = ''
-
-    #        qs_stemmaitem = instance.stemmaset_stemmaitems.all().order_by(
-    #                'order', 'equal__author__name', 'equal__firstsig', 'equal__srchincipit', 'equal__srchexplicit')
-    #        check_order(qs_stemmaitem)
-
-    #        # Walk these collection sermons
-    #        for idx, obj in enumerate(qs_stemmaitem):
-    #            rel_item = []
-    #            item = obj.equal
-
-    #            # SSG: Order in Manuscript
-    #            #add_one_item(rel_item, index, False, align="right")
-    #            #index += 1
-    #            add_one_item(rel_item, obj.order, False, align="right", draggable=True)
-
-    #            # SSG: Author
-    #            add_one_item(rel_item, self.get_field_value("super", item, "author"), resizable)
-
-    #            # SSG: Passim code
-    #            add_one_item(rel_item, self.get_field_value("super", item, "code"), resizable) #, False) # , main=True)
-
-    #            # SSG: Gryson/Clavis = signature
-    #            add_one_item(rel_item, self.get_field_value("super", item, "sig"), resizable) #, False)
-
-    #            # SSG: Inc/Expl
-    #            add_one_item(rel_item, self.get_field_value("super", item, "incexpl"), resizable, main=True) #, False)
-
-    #            # SSG: Size (number of SG in equality set)
-    #            add_one_item(rel_item, self.get_field_value("super", item, "size"), resizable) #, False)
-
-    #            # Actions that can be performed on this item
-    #            if bMayEdit:
-    #                add_one_item(rel_item, self.get_actions())
-
-    #            # Add this line to the list
-    #            rel_list.append(dict(id=obj.id, cols=rel_item))
-            
-    #        supers['rel_list'] = rel_list
-    #        supers['columns'] = [
-    #            '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-    #            '{}<span title="Author">Author</span>{}'.format(sort_start, sort_end), 
-    #            '{}<span title="PASSIM code">Passim</span>{}'.format(sort_start, sort_end), 
-    #            '{}<span title="Gryson or Clavis codes of sermons gold in this set">Gryson/Clavis</span>{}'.format(sort_start, sort_end), 
-    #            '{}<span title="Incipit and explicit">inc...expl</span>{}'.format(sort_start, sort_end), 
-    #            '{}<span title="Number of Sermons Gold part of this set">Size</span>{}'.format(sort_start_int, sort_end)
-    #            ]
-    #        if bMayEdit:
-    #            supers['columns'].append("")
-    #        related_objects.append(supers)
-
-    #        # [3] =============================================================
-    #        # Make sure the resulting list ends up in the viewable part
-    #        context['related_objects'] = related_objects
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("ImportSetDetails/add_to_context")
-
-    #    # REturn the total context
-    #    return context
-
-    def get_actions(self):
-        html = []
-        buttons = ['remove']    # This contains all the button names that need to be added
-
-        # Start the whole div
-        html.append("<div class='blinded'>")
-        
-        # Add components
-        if 'up' in buttons: 
-            html.append("<a class='related-up' ><span class='glyphicon glyphicon-arrow-up'></span></a>")
-        if 'down' in buttons: 
-            html.append("<a class='related-down'><span class='glyphicon glyphicon-arrow-down'></span></a>")
-        if 'remove' in buttons: 
-            html.append("<a class='related-remove'><span class='glyphicon glyphicon-remove'></span></a>")
-
-        # Finish up the div
-        html.append("&nbsp;</div>")
-
-        # COmbine the list into a string
-        sHtml = "\n".join(html)
-        # Return out HTML string
-        return sHtml
-
-    def get_field_value(self, type, instance, custom, kwargs=None):
         sBack = ""
-        collection_types = ['hist', 'ssgd' ]
+        oErr = ErrHandle()
+        html = []
+        try:
+            # Do we have an instance defined?
+            if not instance is None:
+                context['importmode'] = instance.get_importmode()
+                sButtons = render_to_string("dct/xlsimp_form.html", context, self.request)
+                context['after_details'] = sButtons
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetDetails/add_to_context")
+        return context
+
+
+class ImportSetProcess(BasicPart):
+    """Process an imported Excel defined in an ImportSet"""
+
+    MainModel = ImportSet
+
+    def add_to_context(self, context):
+
+        # Gather all necessary data
+        data = {}
 
         oErr = ErrHandle()
         try:
-            if type == "manu":
-                if custom == "title":
-                    url = reverse("manuscript_details", kwargs={'pk': instance.id})
-                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}, {}, <span class='signature'>{}</span></a><span>".format(
-                        url, instance.get_city(), instance.get_library(), instance.idno)
-                elif custom == "size":
-                    # Get the number of SSGs related to items in this manuscript
-                    count = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu=instance).order_by('id').distinct().count()
-                    sBack = "{}".format(count)
-            elif type in collection_types:
-                if custom == "title":
-                    sTitle = "none"
-                    if instance is None:
-                        sBack = sTitle
-                    else:
-                        if type == "hist":
-                            url = reverse("collhist_details", kwargs={'pk': instance.id})
-                        else:
-                            if instance.scope == "publ":
-                                url = reverse("collpubl_details", kwargs={'pk': instance.id})
-                            else:
-                                url = reverse("collpriv_details", kwargs={'pk': instance.id})
-                        if kwargs != None and 'name' in kwargs:
-                            title = "{} (dataset name: {})".format( kwargs['name'], instance.name)
-                        else:
-                            title = instance.name
-                        sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, title)
-                elif custom == "size":
-                    # Get the number of SSGs related to items in this collection
-                    count = "-1" if instance is None else instance.super_col.count()
-                    sBack = "{}".format(count)
-            elif type == "setdef":
-                if custom == "buttons":
-                    # Create the launch button
-                    url = reverse("setdef_details", kwargs={'pk': instance.id})
-                    sBack = "<a href='{}' class='btn btn-xs jumbo-1'>Show</a>".format(url)
-                elif custom == "name":
-                    url = reverse("setdef_details", kwargs={'pk': instance.id})
-                    sBack = "<span class='clickable'><a href='{}' class='nostyle'>{}</a></span>".format(url, instance.name)
-            elif type == "setlist":
-                if custom == "buttons":
-                    # Create the remove button
-                    sBack = "<a class='btn btn-xs jumbo-2'><span class='related-remove'>Delete</span></a>"
-            elif type == "super":
-                sBack, sTitle = EqualGoldListView.get_field_value(None, instance, custom)
-                if custom == "code":
-                    url = reverse('equalgold_details', kwargs={'pk': instance.id})
-                    sBack = "<span class='badge signature ot'><a class='nostyle' href='{}'>{}</a></span>".format(
-                        url, sBack)
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
+
+            # Get the SetDef object
+            importset = self.obj
+
+            # Find out what we are doing here
+            importmode = self.qd.get("importmode", "")
+            # What if we have no importmode?
+            if importmode == "":
+                # Then try to look at the instance itself
+                importmode = importset.get_importmode()
+
+            # Action depends on the import mode
+            if importmode == "verify":
+                # We need to verify the Excel
+                result = importset.do_verify()
+                data['result'] = result
+
+                data['targeturl'] = reverse('importset_details', kwargs={'pk': importset.id})
+            elif importmode == "submit":
+                # Double check that the status is okay, and then submit it
+                status = importset.status
+                if status == "ver":
+                    # Yes, it has been verified: now submit it
+                    result = importset.do_submit()
+                    data['result'] = result
+
+                    data['targeturl'] = reverse('importset_details', kwargs={'pk': importset.id})
+ 
+            context['data'] = data
         except:
             msg = oErr.get_error_message()
-            oErr.DoError("ImportSetDetails/get_field_value")
+            oErr.DoError("ImportSetProcess")
+        return context
 
-        return sBack
 
 

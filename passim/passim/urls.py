@@ -357,6 +357,7 @@ urlpatterns = [
     re_path(r'^importset/list', ImportSetListView.as_view(), name='importset_list'),
     re_path(r'^importset/details(?:/(?P<pk>\d+))?/$', ImportSetDetails.as_view(), name='importset_details'),
     re_path(r'^importset/edit(?:/(?P<pk>\d+))?/$', ImportSetEdit.as_view(), name='importset_edit'),
+    re_path(r'^importset/process(?:/(?P<pk>\d+))?/$', ImportSetProcess.as_view(), name='importset_process'),
 
     # ------------ Stemmatology tool ---------------------------------------------------------------------
     re_path(r'^stemmaset/list', StemmaSetListView.as_view(), name='stemmaset_list'),

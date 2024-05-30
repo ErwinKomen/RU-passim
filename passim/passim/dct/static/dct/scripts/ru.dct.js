@@ -2810,6 +2810,85 @@ var ru = (function ($, ru) {
       },
 
       /**
+       * do_importset
+       *    Request to process an ImportSet definition
+       *
+       */
+      do_importset: function (el) {
+        var targetid = "",
+            targeturl = "",
+            data = null,
+            err = "#import_err",
+            frm = null;
+
+        try {
+          // Get the targeturl
+          targetid = $(el).closest("span").attr("targetid");
+          targeturl = $(targetid).attr("targeturl");
+          err = targetid;
+          // Get the form information
+          frm = $(targetid).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Perform a POST request with this
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else {
+                    // Tell user can't go anywhere
+                    $(err).html("Sorry, I am missing the targeturl");
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_importset", ex);
+        }
+      },
+
+      /**
        * postsubmit
        *    Submit nearest form as POST
        *
