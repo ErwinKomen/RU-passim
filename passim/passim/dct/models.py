@@ -1590,7 +1590,9 @@ class ImportSet(models.Model):
                     ws_sermo = wb[sname]
                     lst_ws.append(ws_sermo)
             # Check if we have the correct number of worksheets
-            if len(lst_ws) != 2:
+            if len(wb.sheetnames) >2:
+                html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
+            elif len(lst_ws) != 2:
                 # Are there more sheets?
                 if len(lst_ws) > 2:
                     html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
@@ -1604,6 +1606,50 @@ class ImportSet(models.Model):
                         html_err.append( "The Excel doesn't contain a sheet called 'Sermons'")
                     else:
                         html_err.append( "The Excel sheet's names are unintelligable. They should be: 'Manuscript', 'Sermons'")
+
+            # Verify the information on the manuscript sheet
+            if len(html_err) == 0 and not ws_manu is None:
+                # Read in the first two columns
+                row_no = 1
+                oValues = {}
+                while ws_manu.cell(row=row_no, column=1).value:
+                    # First row gets special treatment
+                    k = ws_manu.cell(row=row_no, column=1).value
+                    v = ws_manu.cell(row=row_no, column=2).value
+                    if row_no == 1:
+                        if k != "Field" or v != "Value":
+                            html_err.append("Manuscript columns should be [Field], [Value]")
+                            break
+                    else:
+                        # Make sure we use case insensitivity
+                        k = k.lower()
+                        # Check that key is not there yet
+                        if k in oValues:
+                            html_err.append("Manuscript field is used multiple times: [{}]".format(k))
+                            break
+                        else:
+                            oValues[k] = v
+
+                    row_no += 1
+
+                # Check at least for shelf mark, country, city, library
+                shelfmark = oValues.get("shelf mark")
+                country = oValues.get("country")
+                city = oValues.get("city")
+                library = oValues.get("library")
+                if shelfmark is None:
+                    html_wrn.append("Manuscript has no shelf mark specified")
+                if country is None:
+                    html_wrn.append("Manuscript has no country specified")
+                if city is None:
+                    html_wrn.append("Manuscript has no city specified")
+                if library is None:
+                    html_wrn.append("Manuscript has no library specified")
+
+            # Verify the information on the sermons sheet
+            if len(html_err) == 0 and not ws_sermo is None:
+                # Look for
+                pass
 
             # Combine into reports
             sWarning = "\n".join(html_wrn)
