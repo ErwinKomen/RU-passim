@@ -6723,125 +6723,6 @@ class ReaderHuwaImport(ReaderEqualGold):
 
         return oImported
 
-
-
-def reader_CPPM_AF_raw(request):
-
-    # This function adds the raw CPPM data from the cppm_texts_mapped_authors.json file (cppm_entry_str) to
-    # the EqualGold table (field: raw)
-    
-    # Can only be done by a super-user
-    if request.user.is_superuser:        
-        pass
-    
-    # Read the JSON file from MEDIA_DIR   
-    cppm_t_read = os.path.abspath(os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')) # cppm_texts_mapped_authors.json
-
-    cppm_t = open(cppm_t_read, encoding="utf8")  
-
-    # Load the json files 
-    cppm_texts = json.load(cppm_t)
-    
-    # Getting the data ready. 
-    
-    # Create a count
-    count = 0
-
-    # Create lists
-    numbers_lst = []
-    cppm_raw_lst=[]
-
-    # Create an empty data frame
-    gs_df = pd.DataFrame(columns=['Number', 'Code', 'Raw'])
-
-    # First at the highest level (the id's (numbers))
-    for key1, value1 in cppm_texts.items(): 
-
-        work_lst = []
-
-        # Then one level lower (cppm number)
-        for key2, value2 in value1.items():
-            # Only the items that are not mapped should be 
-            if key2 == 'mapped' and value2 == False:            
-                
-                count += 1                               
-                work_lst.append(key1)
-
-                # This part is for the lower sections
-                for key3, value3 in value1.items():
-                   
-                    # seeker_equalgold_link needs to be added
-                    if key3 == 'seeker_signature':
-                        # zoals ms_items
-                        for value4 in value3:
-                        # Iterate over the items in the list, 
-                        # that can have multiple items                        
-
-                            for key5, value5 in value4.items():                                
-                                # Get the CPPM code
-                                if key5 == 'code': #
-                                    code_imp = value5                                    
-                                    work_lst.append(code_imp)
-                                    #print(code_imp)
-                                                     
-                # Get the equality_set (list)
-                raw_cppm = value1.get('cppm_entry_str')    
-                work_lst.append(raw_cppm) 
-                #print(raw_cppm)
-                
-                # Put everything in the empty dataframe
-                gs_df.loc[len(gs_df.index)] = work_lst
-
-    for index, row in gs_df.iterrows():
-       #print(row['Number'], row['Raw'])
-        
-       # Check of dit allemaal werkt
-       cppm = row['Number']
-       code = row['Code']
-       raw = row['Raw']
-
-       # Store the data in the database
-
-       # Find the EqualGold object using the EqualGold External table 
-       # Check if the EG External object already exists: TH: onzeker of dit werkt
-
-       # Code for externaltype
-       external = "cppm"
-       
-       # Find out if the cppm number is not a regular id:
-
-       # Find the EquaGold using the EqualGoldExternal table, use the externalid OR externaltype
-       # Find out if the cppm id contains a letter!
-       
-       if cppm.isdigit():
-           eqgex_obj = EqualGoldExternal.objects.filter(externalid=cppm, externaltype=external).first()        
-       else:
-           eqgex_obj = EqualGoldExternal.objects.filter(externaltextid=cppm, externaltype=external).first()        
-       
-       #print(cppm)
-       
-       if eqgex_obj == None:
-           print (cppm)
-       else:      
-           equal = eqgex_obj.equal_id
-       
-       
-       #print(equal)
-
-       # Find the correct EqualGold
-       #eqg_obj = EqualGold.objects.filter(id=equal).first()
-
-       # Add the raw data to the table
-       #eqg_obj.raw = raw
-       #eqg_obj.save()
-
-
-
-
-
-
-    # What we return is simply the home page
-    return redirect('home')
          
 def reader_CPPM_AF(request):
 
@@ -6884,7 +6765,7 @@ def reader_CPPM_AF(request):
     project_name = "Brepols-CPPM"
 
     # Create an empty data frame
-    gs_df = pd.DataFrame(columns=['Number', 'Code', 'Editype', 'Project', 'Incipit', 'Explicit', 'Title', 'Author_id', 'Equality'])
+    gs_df = pd.DataFrame(columns=['Number', 'Code', 'Editype', 'Project', 'Incipit', 'Explicit', 'Title', 'Author_id', 'Equality', 'Raw'])
      
     # First at the highest level (the id's (numbers))
     for key1, value1 in cppm_texts.items(): 
@@ -6898,9 +6779,8 @@ def reader_CPPM_AF(request):
                 
                 count += 1                               
                 work_lst.append(key1)
-                print(key1)
+                #print(key1)
                 numbers_lst.append(key1)
-
 
                 # This part is for the lower sections
                 for key3, value3 in value1.items():
@@ -6954,21 +6834,26 @@ def reader_CPPM_AF(request):
                 item_comb = ', '.join([str(item) for item in item_list])                  
                 work_lst.append(item_comb) 
                 
+                # Get the equality_set (list)
+                raw_cppm = value1.get('cppm_entry_str')    
+                work_lst.append(raw_cppm) 
+
                 # Put everything in the empty dataframe
                 gs_df.loc[len(gs_df.index)] = work_lst
     
-    print(len(numbers_lst))
-    print(len(code_lst))
+    #print(len(numbers_lst))
+    #print(len(code_lst))
+
+    #print(len(gs_df))
+
+    count = 0
+    
+    testprojectlst=[]
+    testprojectlst2=[]
+    testcodelst=[]
 
     for index, row in gs_df.iterrows():
-
-        cppm = row['Number']
-
-        if cppm == 1215:
-            print("there we are")
-        #print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'])
-        
-        # Check of dit allemaal werkt
+        # print(row['Number'], row['Code'], row['Editype'], row['Project'], row['Incipit'], row['Explicit'], row['Title'], row['Author_id'], row['Equality'], row['Raw'])
         
         cppm = row['Number']
         code = row['Code']
@@ -6977,54 +6862,18 @@ def reader_CPPM_AF(request):
         explicit = row['Explicit']
         author = row['Author_id']
         project = row['Project']
-        equality = row['Equality'] # Die kan ik via External GS en EG altijd opnieuw ophalen
+        equality = row['Equality'] 
+        raw = row['Raw']
 
+        testcodelst.append(code)
+                
         # Store the data in the database
-           
-        # Create a new Signature (if there is a new one!) Ok dit werkt niet want hij gaat eerst alles af en dan slaat hij het pas op, dat moet eerder gebeuren.
-        # Iterate over df and add to Signature
-
-        # Check if the Signature exists
-        sig_obj = Signature.objects.filter(code=code, editype = 'cl').first()
-        if sig_obj is None:            
-            # Find if the SG is already in the database                  
-            gs_obj = SermonGold.objects.filter(incipit = incipit, explicit = explicit, author_id = author).first()
-            if gs_obj == None:
-                # Create a new Gold Sermon if this is not the case
-                gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
-                gs_obj.save()   
-        else: 
-            # Moet hier niet ook gekeken worden naar de GS objects?
-            # Als er een signature bestaat dan wordt een groot deel niet gechecked, en dus niet in de db gezet, 
-            # bijv de EG en de External objects
-            gs_obj = SermonGold.objects.filter(incipit = incipit, explicit = explicit, author_id = author).first()
-            if gs_obj == None:
-                # Create a new Gold Sermon
-                gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
-                gs_obj.save()   
-
-        # Check if the Signature that belongs to the GS is already in the db 
-        # (probably not since we have checked this already)                            
-        sig_obj = Signature.objects.filter(code=code, gold=gs_obj).first()
-        if sig_obj == None:
-            # Create the new Signature record
-            sig_obj = Signature.objects.create(gold=gs_obj)
-            sig_obj.code = code # dit kan evt ook hierboven in een keer worden afgehandeld?
-            sig_obj.editype = editype
-            sig_obj.save()
-
-        # External 
-            
-        # TH: de eerste drie records zitten hier niet in iih
-                       
-        # Add newly created SermonGold to the SermonGoldExternal table
-        # so that we can always link up other stuff from the CPPM data to the
-        # SermonGold
-        # The new GS needs to be added to the SermonGoldExternal site
-        # Check if the GS External object already exists:
         
+        # Modify cppm number (when it contains more than digits alone)
+
         # Make sure that in case of an additional letter added to the original numbers is properly processed
         # and stored in externaltextid
+
         cppm_textid = ""
 
         # Find out if the cppm id contains a letter!
@@ -7033,19 +6882,82 @@ def reader_CPPM_AF(request):
             # The cppm number is stored in a new variable
             cppm_id = cppm          
             
-        else:
-           
+        else:           
             # In this case, the cppm id does contain an "A"
             # Store the cppm in a new variable 
             cppm_textid = cppm
             
-            # Get rid of the letter and store only the number in cppm_id:
-            cppm_id = re.sub("\D", "", cppm) # ok, igv 4324 + 4400 wordt het 43244400
+            # Hier moet die "null" worden omgezet, if statement
 
-        # Code for externaltype
-        external = "cppm"
-           
-        gsex_obj = SermonGoldExternal.objects.filter(gold=gs_obj, externaltype=external).first()             
+            if cppm == "null":
+                cppm_id = 0
+            else:
+                # Get rid of the letter and store only the number in cppm_id:
+                cppm_id = re.sub("\D", "", cppm) # ok, igv 4324 + 4400 wordt het 43244400
+                           
+        # Signature
+
+        # Create a new Signature (if there is a new one!) 
+        
+        # First check if the Signature exists
+        sig_obj = Signature.objects.filter(code=code, editype = 'cl').first()        
+        if sig_obj is None:    
+
+            # If not create new Signature
+            sig_obj = Signature.objects.create(code=code, editype=editype)
+            sig_obj.save()
+            
+            # In this case a new GS also needs to be created using the data from the json file
+            gs_obj = SermonGold.objects.create(incipit = incipit, explicit = explicit, author_id = author)
+            gs_obj.save()
+
+            # And the new GS needs to be linked to the Signature
+            sig_obj.gold = gs_obj
+            sig_obj.save()
+
+            # Code for externaltype imported GS:
+            external = "cppm"
+         
+        else:
+            # In case there is already a Signature, we let the log file know what CPPM numbers
+            # are not imported
+            print ("This CPPM signature is NOT imported:", sig_obj.code)
+                        
+            # We still keep the Signature and the GS that is linked to that Signature           
+            gs_obj = sig_obj.gold
+            
+            # Code for externaltype NOT imported GS / EG External tables
+            external = "cppm_x"
+
+            # To make sure that the External table is not polluted with double objects when the import is executed twice
+            # we need to make sure that the external type is not cppm_x but cppm! Otherwise all records with externaltype == "cppm" will 
+            # be doubled with externaltype == "cppm_x"   
+            
+            external_test = "cppm"
+            
+            # Find out if the GS has already been imported before...
+            testcppmgs = SermonGoldExternal.objects.filter(gold=gs_obj, externalid=cppm_id, externaltype=external_test).first()
+            
+            # If not: then one of 17 GS's had been identified and must be added to the database.
+            if testcppmgs == None:
+                external = "cppm_x"
+            else:
+                external = "cppm"
+                           
+        # External 
+                       
+        # Add newly created GoldSermon to the SermonGoldExternal table
+        # so that we can always link up other stuff from the CPPM data to the
+        # GoldSermon
+
+        # In case the Signature is already in the database, the id in the json file and the corresponding GS must still be 
+        # added to the GS External tabe. The same goes for the EQ External table!
+         
+        # Now  we can add the newly created GoldSermon (or the existing GS) to the GoldSermonExternal table
+        # so that we can always link up other stuff from the CPPM data to the GoldSermon
+
+        # Now we can store the GS External object
+        gsex_obj = SermonGoldExternal.objects.filter(gold=gs_obj,externalid=cppm_id, externaltype=external).first()            
         if gsex_obj == None:
             # Create the new GS External object, add type and original CPPM number
             gsex_obj = SermonGoldExternal.objects.create(gold=gs_obj, externaltype=external, externalid=cppm_id, externaltextid=cppm_textid)                
@@ -7055,76 +6967,163 @@ def reader_CPPM_AF(request):
         name_anonym = "Anonymus"
            
         # Opvragen author
-        auth_obj=Author.objects.filter(name__iexact=name_anonym).first()   
+        auth_obj = Author.objects.filter(name__iexact=name_anonym).first()   
                      
         # Check if there is already a EqualGold created based on the GoldSermon
         # by checking if the id of the EqualGold is stored in the SermonGold record 
-           
+        
+        # Find of the EqualGold record already exists   
         if gs_obj.equal_id == None:
-            # Find of the EqualGold record already exists
-            # Create the new EqualGold record, add incipit, explicit, author
-            eqg_obj = EqualGold.objects.create(incipit=incipit, explicit=explicit, author=auth_obj, atype="acc") # hier gaat het iig mis, moet author instance zij
-            eqg_obj.save()   
-            # Now the new EqualGold needs to be linked to the SermonGold on which it is based.           
             
+            # Create the new EqualGold record, add incipit, explicit, author, atype, raw
+            eqg_obj = EqualGold.objects.create(incipit=incipit, explicit=explicit, author=auth_obj, atype="acc", raw=raw)
+            eqg_obj.save()   
+            
+            # Now the new EqualGold needs to be linked to the SermonGold on which it is based.  
             gs_obj.equal = eqg_obj 
             gs_obj.save()
-                        
-           
-            # Add newly created EqualGold to the EqualGoldExternal table
-            # so that we can always link up other stuff from the CPPM data to the
-            # EqualGold
-
-            # Check if the EG External object already exists: TH: onzeker of dit werkt
-
-            # Code for externaltype
-            external = "cppm"
             
-            eqgex_obj = EqualGoldExternal.objects.filter(equal=eqg_obj, externaltype=external).first()             
-            if eqgex_obj == None:
-            # Create the new EG External object, add type and original CPPM number
-                eqgex_obj = EqualGoldExternal.objects.create(equal=eqg_obj, externaltype=external, externalid=cppm_id, externaltextid=cppm_textid)  
-                eqgex_obj.save() 
-
-            # Project
+            # Code for externaltype imported EQ:
+            external = "cppm"
            
-            # The name of the project needs to linked to the EqualGold.             
-            # The project label that needs to be added
-            project_name_1 = "Brepols-CPPM"
-            project_name_2 = "Passim"
+        else:             
+            eqg_obj = gs_obj.equal
+            
+            # And still keep the EG object... 
+            
+            # To make sure that the External table is not polluted with double objects when the import is executed twice
+            # we need to make sure that the external type is not cppm_x but cppm! Otherwise all records with externaltype == "cppm" will 
+            # be doubled with externaltype == "cppm_x"
 
-            # Check if the project label "Brepols-CPPM" already exits in the Project2 table
-            projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
-            if projectfound_1 == None:
-                # If the projectname does not already exist, it needs to be added to the database
-                projectcppm_1 = Project2.objects.create(name = project_name_1)
-                # And a link should be made between this new material and corresponding Portrait table
-                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
+            external_test = "cppm"
+            
+            # Find out if the EG has already been imported...
+            testcppmeqg = EqualGoldExternal.objects.filter(equal=eqg_obj, externalid=cppm_id, externaltype=external_test).first()
+
+            # If not: then one of 17 EG's had been identified and must be added to the database.
+            if testcppmeqg == None:
+                external = "cppm_x"
             else:
-                # In case there is a projectfound, check for a link, if so, nothing should happen, 
-                # than there is already a link between the EqualGold and a the project name
-                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
-                if eqgprjlink == None:
-                    # If the project name already exists, but not the link, than only a link should be 
-                    # made between the EqualGold and the projectname
-                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1) 
+                external = "cppm"
+        
+        # Now  we can add the newly created EqualGold (or the existing EG) to the EqualGoldExternal table
+        # so that we can always link up other stuff from the CPPM data to the EqualGold
+        eqgex_obj = EqualGoldExternal.objects.filter(equal=eqg_obj, externalid=cppm_id, externaltype=external).first() 
+        if eqgex_obj == None:
+        # Create the new EG External object, add type and original CPPM number
+            eqgex_obj = EqualGoldExternal.objects.create(equal=eqg_obj, externaltype=external, externalid=cppm_id, externaltextid=cppm_textid)  
+            eqgex_obj.save() 
+
+        # Count
+        count += 1 
+        cppm = row['Number']
+        #print(cppm)
+        #print("Count =", count)
+
+        # Project
+           
+        # The name of the project needs to linked to the EqualGold.             
+        # The project label that needs to be added
+            
+        project_name_1 = "Brepols-CPPM"
+        project_name_2 = "Passim"
+
+        # AFs linked to an CPPM Signature also need to have a projectlabel
+
+        # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+        projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+        if projectfound_1 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_1 = Project2.objects.create(name = project_name_1)
+            # And a link should be made between this new material and corresponding Portrait table
+            EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the EqualGold and a the project name
+            eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
+            if eqgprjlink == None:
+                
+                testprojectlst.append(code)
+
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1) 
              
-            # Check if the project label "Passim" already exits in the Project2 table
-            projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
-            if projectfound_2 == None:
-                # If the projectname does not already exist, it needs to be added to the database
-                projectcppm_2 = Project2.objects.create(name = project_name_2)
-                # And a link should be made between this new material and corresponding Portrait table
-                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_2)
-            else:
-                # In case there is a projectfound, check for a link, if so, nothing should happen, 
-                # than there is already a link between the EqualGold and a the project name
-                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_2).first()
-                if eqgprjlink == None:
-                    # If the project name already exists, but not the link, than only a link should be 
-                    # made between the EqualGold and the projectname
-                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_2)
-             
+        # Check if the project label "Passim" already exits in the Project2 table
+        projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
+        if projectfound_2 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_2 = Project2.objects.create(name = project_name_2)
+            # And a link should be made between this new material and corresponding Portrait table
+            EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_2)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the EqualGold and a the project name
+            eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_2).first()
+            if eqgprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                testprojectlst2.append(code)                               
+                EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_2)
+
+    #print(len(testcodelst))
+    #print(len(testprojectlst))
+    #print(len(testprojectlst2))
+
+    # Brepols-CPPM projectlabel check
+    #print(list(set(testcodelst) - set(testprojectlst))) # Het is de 5055 gs 8742 eqg 7301 die heeft hem al via cppm 2014
+    
+    # Passim projectlabel check
+    # print(list(set(testcodelst) - set(testprojectlst2))) # Passim check
+
+    # Add the Brepols-CPPM project label to ALL AF's linked to a GS that is linked to one or more CPPM signatures
+            
+    # Create queryset for all Signatures that have a code that contains "CPPM"
+    sig_cppm = Signature.objects.filter(code__contains="CPPM")  
+        
+    # print(len(sig_cppm)
+    # print(len(gs_cppm)
+
+    # print(sig_cppm.count()) # 3134
+    # print(gs_cppm.count()) # 2989
+    
+    project_name_1 = "Brepols-CPPM"
+    
+    for item in sig_cppm:
+        #print(item.gold_id)
+        #print(item.code)
+        
+        # Get the GS
+        gs_id = item.gold_id
+        
+        # Get the GS obect
+        sg_obj = SermonGold.objects.filter(id=gs_id).first()
+        
+        # Hier heb ik hem al
+        #print(sg_obj.equal)
+
+        # Get the EG
+        eqg_obj = sg_obj.equal
+
+        # Find if the "Brepols-CPPM" project label is already attached to the AF:
+        
+        # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+        projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+        if projectfound_1 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_1 = Project2.objects.create(name = project_name_1)
+            # And a link should be made between this new material and corresponding Portrait table
+            EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the EqualGold and a the project name
+            eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
+            if eqgprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1)
+     
+
     # What we return is simply the home page
     return redirect('home')
 
@@ -7167,7 +7166,7 @@ def reader_CPPM_manu(request):
                 
                 # Get cppm_shelfmark_norm
                 shelfm_norm = value1.get('cppm_shelfmark_norm')               
-               
+                   
                 # Navigate to the date items
                 for key3, value3 in value1.items():
                     # Get the items from "date":
@@ -7237,7 +7236,7 @@ def reader_CPPM_manu(request):
      
     # Sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers belong to which id and thus manuscript
     manu_df.sort_values(by=['Number'])
-    
+    print(len(manu_df))
     # Iterate over de DF
     for index, row in manu_df.iterrows():
         print(row['Number'], row['DateB'], row['DateA'], row['Shelfmark'], row['Shelf'], row['Manid'], row['Libid'], row['Libname'], row['Idno'], row['Type'])

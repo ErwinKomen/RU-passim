@@ -1,6 +1,6 @@
 {% load static %}
 
-    <div class="navbar navbar-custom navbar-fixed-top">
+    <div class="navbar navbar-custom navbar-fixed-top">        
         <div class="container" url_home="{% url 'home' %}">
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
@@ -8,13 +8,19 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a href="{% url 'home' %}" class="navbar-brand">passim
+
+                <!-- Image -->                
+                <img src="{% static 'seeker/content/IconPassimRGB.png' %}" style="margin-top: 11px; max-height: 30px; width: auto; height: auto;" title="Passim logo"/>
+
+                <a href="{% url 'home' %}" class="navbar-brand">PASSIM
                 [{% if user.is_authenticated %} {{user.username}} {% else %} (not logged in) {% endif %}]                
                 </a>
-            </div>
+            
+            </div>            
             <div class="navbar-collapse collapse">
                 <ul class="nav navbar-nav">
                     {% if user.is_superuser %}
+                    <li><a href="{% url 'home' %}">Home</a></li>
                     <li><a href="{% url 'definitions' %}">Definitions</a></li>
                     {% endif %}
 
@@ -140,10 +146,7 @@
                             <li><a href_was="#" href="{% url 'import_cppm_manuscripts' %}" title="Import CPPM manuscripts">Import CPPM manuscripts</a></li>
 
                             <li role="separator" class="divider"></li>
-                            <li><a href_was="#" href="{% url 'import_cppm_af' %}" title="Import CPPM Authority Files">Import CPPM AFs</a></li>
-
-                            <li role="separator" class="divider"></li>
-                            <li><a href_was="#" href="{% url 'import_cppm_af_raw' %}" title="Import CPPM raw data AFs">Import raw data CPPM AFs</a></li>
+                            <li><a href_was="#" href="{% url 'import_cppm_af' %}" title="Import CPPM Authority Files">Import CPPM AFs</a></li>                                                       
 
                           </ul>
                         </li>
@@ -160,6 +163,7 @@
 
 
                 <ul class="nav navbar-nav navbar-right">
+                    <li><a href="{% url 'about' %}" title="The about page of the PASSIM application">About</a></li>
                     <li class="dropdown">
                       <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                          aria-haspopup="true" aria-expanded="false">Help<span class="caret"></span></a>
@@ -178,7 +182,7 @@
                     </li>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
-                           aria-haspopup="true" aria-expanded="false">User profile<span class="caret"></span></a>
+                           aria-haspopup="true" aria-expanded="false">User<span class="caret"></span></a>
                         <ul class="dropdown-menu">
                           {% if user.id %}
                             <li><a href="{% url 'user_details' user.id  %}" title="Edit user name and email">User</a></li>

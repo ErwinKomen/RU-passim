@@ -436,8 +436,7 @@ urlpatterns = [
     re_path(r'^reader/import/ead/$', ReaderEad.as_view(), name='import_ead'),
     re_path(r'^reader/import/huwa/$', ReaderHuwaImport.as_view(), name='import_huwa'),
     re_path(r'^reader/import/trans/ssg/$', ReaderTransEqgImport.as_view(), name='import_trans_eqg'),
-    re_path(r'^reader/import/cppm_af/$', passim.reader.views.reader_CPPM_AF, name='import_cppm_af'), 
-    re_path(r'^reader/import/cppm_af_raw/$', passim.reader.views.reader_CPPM_AF_raw, name='import_cppm_af_raw'), 
+    re_path(r'^reader/import/cppm_af/$', passim.reader.views.reader_CPPM_AF, name='import_cppm_af'),     
     re_path(r'^reader/import/cppm_manu/$', passim.reader.views.reader_CPPM_manu, name='import_cppm_manuscripts'), 
     # =============================================================================================
 
@@ -491,7 +490,7 @@ urlpatterns = [
 
     # Uncomment the next line to enable the admin:
     re_path(r'^admin/', admin.site.urls, name='admin_base'),
-]
+] 
 
 if USE_DASH:
     print("Using dash")
