@@ -356,7 +356,7 @@ class MyPassimEdit(BasicDetails):
             context['count_afaddapprove_task'] = profile.profileaddapprovals.filter(atype="def").count()
 
             # Add any related objects
-            context['related_objects'] = self.get_related_objects(profile)
+            context['related_objects'] = self.get_related_objects(profile, context)
 
         except:
             msg = oErr.get_error_message()
@@ -364,7 +364,7 @@ class MyPassimEdit(BasicDetails):
 
         return context
 
-    def get_related_objects(self, instance):
+    def get_related_objects(self, instance, context):
         """Calculate and add related objects:
 
         Currently:
@@ -784,83 +784,84 @@ class MyPassimEdit(BasicDetails):
             related_objects.append(copy.copy(stemmaset))
 
             # [4] ===============================================================
-            # Get all 'ImportSet' objects that belong to the current user (=profile)
-            importset = dict(title="Excel import sets", prefix="xlsimp")  
-            if resizable: importset['gridclass'] = "resizable dragdrop"
-            importset['savebuttons'] = bMayEdit
-            importset['saveasbutton'] = False
-            rel_list =[]
+            if context['is_app_editor']:
+                # Get all 'ImportSet' objects that belong to the current user (=profile)
+                importset = dict(title="Excel import sets", prefix="xlsimp")  
+                if resizable: importset['gridclass'] = "resizable dragdrop"
+                importset['savebuttons'] = bMayEdit
+                importset['saveasbutton'] = False
+                rel_list =[]
 
-            qs_imports = ImportSet.objects.filter(profile=instance).order_by('excel')
-            # Also store the count
-            importset['count'] = qs_imports.count()
-            importset['instance'] = instance
-            importset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+                qs_imports = ImportSet.objects.filter(profile=instance).order_by('excel')
+                # Also store the count
+                importset['count'] = qs_imports.count()
+                importset['instance'] = instance
+                importset['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
 
-            # And store an introduction
-            lIntro = []
-            lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
-            lIntro.append('href="{}">Excel import submissions</a> page.'.format(reverse('importset_list')))
-            sIntro = " ".join(lIntro)
-            importset['introduction'] = sIntro
+                # And store an introduction
+                lIntro = []
+                lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
+                lIntro.append('href="{}">Excel import submissions</a> page.'.format(reverse('importset_list')))
+                sIntro = " ".join(lIntro)
+                importset['introduction'] = sIntro
 
-            # These elements have an 'order' attribute, but...
-            #   ... but that order may *NOT be corrected here
-            # check_order(qs_imports)
+                # These elements have an 'order' attribute, but...
+                #   ... but that order may *NOT be corrected here
+                # check_order(qs_imports)
 
-            # Walk these imports
-            order = 0
-            for obj in qs_imports:
-                # The [obj] is of type `ImportSet`
+                # Walk these imports
+                order = 0
+                for obj in qs_imports:
+                    # The [obj] is of type `ImportSet`
 
-                rel_item = []
-                order += 1
+                    rel_item = []
+                    order += 1
 
-                # TODO:
-                # Relevant columns for the Your visualisations are:
-                # 1 - filename of the ImportSet submission
-                # 2 - type (manuscript or authority file)
-                # 3 - status
-                # 4 - date
+                    # TODO:
+                    # Relevant columns for the Your visualisations are:
+                    # 1 - filename of the ImportSet submission
+                    # 2 - type (manuscript or authority file)
+                    # 3 - status
+                    # 4 - date
 
-                # SetDef: Order within the set of Your visualizations
-                add_one_item(rel_item, order, False, align="right", draggable=True)
+                    # SetDef: Order within the set of Your visualizations
+                    add_one_item(rel_item, order, False, align="right", draggable=True)
 
-                # Name: the filename of the import submission
-                sName = obj.get_name()
-                url = reverse('importset_details', kwargs={'pk': obj.id})
-                add_one_item(rel_item, sName, False, main=True, link=url)
+                    # Name: the filename of the import submission
+                    sName = obj.get_name()
+                    url = reverse('importset_details', kwargs={'pk': obj.id})
+                    add_one_item(rel_item, sName, False, main=True, link=url)
 
-                # Type: what the import submission describes (M/SSG)
-                sType = obj.get_type()
-                add_one_item(rel_item, sType, False, main=False)
+                    # Type: what the import submission describes (M/SSG)
+                    sType = obj.get_type()
+                    add_one_item(rel_item, sType, False, main=False)
 
-                # Status: status of the submission
-                sStatus = obj.get_status()
-                add_one_item(rel_item, sStatus, False)
+                    # Status: status of the submission
+                    sStatus = obj.get_status()
+                    add_one_item(rel_item, sStatus, False)
 
-                # Date: last save date of submission
-                sDate = obj.get_saved()
-                add_one_item(rel_item, sDate, False) # , align="right")
+                    # Date: last save date of submission
+                    sDate = obj.get_saved()
+                    add_one_item(rel_item, sDate, False) # , align="right")
 
-                if bMayEdit:
-                    # Actions that can be performed on this item
-                    add_one_item(rel_item, self.get_field_value("stemma", obj, "buttons"), False)
+                    if bMayEdit:
+                        # Actions that can be performed on this item
+                        add_one_item(rel_item, self.get_field_value("stemma", obj, "buttons"), False)
 
-                # Add this line to the list
-                rel_list.append(dict(id=obj.id, cols=rel_item))
+                    # Add this line to the list
+                    rel_list.append(dict(id=obj.id, cols=rel_item))
             
-            importset['rel_list'] = rel_list
-            importset['columns'] = [
-                '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
-                '{}<span title="Name of the Excel file submitted">Name</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Type of submission">Type</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Status of the submission">Status</span>{}'.format(sort_start, sort_end), 
-                '{}<span title="Date last saved">Date</span>{}'.format(sort_start, sort_end), 
-                ]
-            if bMayEdit:
-                importset['columns'].append("")
-            related_objects.append(copy.copy(importset))
+                importset['rel_list'] = rel_list
+                importset['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="Name of the Excel file submitted">Name</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Type of submission">Type</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Status of the submission">Status</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Date last saved">Date</span>{}'.format(sort_start, sort_end), 
+                    ]
+                if bMayEdit:
+                    importset['columns'].append("")
+                related_objects.append(copy.copy(importset))
 
         except:
             msg = oErr.get_error_message()
