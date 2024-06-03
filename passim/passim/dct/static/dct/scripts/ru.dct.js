@@ -2828,7 +2828,7 @@ var ru = (function ($, ru) {
           // Get the targeturl
           targetid = $(el).closest("span").attr("targetid");
           targeturl = $(targetid).attr("targeturl");
-          err = targetid;
+          err = targetid.replace("import_form", "import_err");
 
           // Try to find the report
           reportid = $(el).closest("table").find("td span:contains('Report:')");
@@ -2846,7 +2846,7 @@ var ru = (function ($, ru) {
           data = $(frm).serializeArray();
 
           // Indicate that we are working
-          $(targetid).html(loc_sWaiting);
+          $(err).html(loc_sWaiting);
 
           // Perform a POST request with this
           $.post(targeturl, data, function (response) {
@@ -2857,6 +2857,7 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
+                  $(err).html("");
                   // Should have a new target URL
                   targeturl = response['targeturl'];
                   if (targeturl !== undefined && targeturl !== "") {

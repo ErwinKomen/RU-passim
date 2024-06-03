@@ -117,7 +117,10 @@ def import_path(instance, filename):
 
         if os.path.exists(sAbsPath):
             # Remove it
-            os.remove(sAbsPath)
+            try:
+                os.remove(sAbsPath)
+            except:
+                oErr.Status("Could not remove file now: {}".format(sAbsPath))
 
     except:
         msg = oErr.get_error_message()
@@ -1579,12 +1582,16 @@ class ImportSet(models.Model):
                     if obligatory and sRef is None:
                         html_err.append("Sermon: expecting a value for `{}` at row **{}**".format(sKey, idx+2))
                     elif not sRef is None:
-                        if not isinstance(sRef, str):
+                        # Note: string or int - both are allowed here
+                        if not isinstance(sRef, str) and not isinstance(sRef, int):
                             if is_error:
                                 html_err.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
                             else:
                                 html_wrn.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
                         else:
+                            # Make sure it becomes string, if it is not
+                            if not isinstance(sRef, str):
+                                sRef = str(sRef)
                             if not max_length is None:
                                 if len(sRef) > max_length:
                                     html_wrn.append("Sermon: string in column `{}` too large at row **{}**".format(sKey, idx+2))
@@ -1607,6 +1614,7 @@ class ImportSet(models.Model):
             """Check whether an item is a stringified list"""
 
             oErr = ErrHandle()
+            html_main = []
             try:
                 for idx, sItem in enumerate(oSermList[sKey]):
                     if not sItem is None:
@@ -1623,8 +1631,11 @@ class ImportSet(models.Model):
                                         obj = cls.objects.filter(**{"{}__iexact".format(field): sItem}).first()
                                     if obj is None:
                                         html_list = html_err if obligatory else html_wrn
-                                        html_list.append("Sermon: unknown `{}` item [{}] at row **{}**".format(
-                                            sKey, sItem, idx+2))
+                                        sMainPart = "Sermon: unknown `{}` item [{}]".format(sKey, sItem)
+                                        if not sMainPart in html_main:
+                                            html_main.append(sMainPart)
+                                            html_list.append("{} row **{}**".format(sMainPart,idx+2))
+
                             except:
                                 # Not a legitimate json string
                                 html_err.append("Sermon: {} must be a legitimate JSON string at row **{}**".format(
@@ -1728,7 +1739,10 @@ class ImportSet(models.Model):
                     col_no = idx+1
                     v = ws_sermo.cell(row=row_no, column=col_no).value
                     if not isinstance(v, str):
-                        html_err.append("Sermon column number **{}** must be string".format(col_no))
+                        # Note: allow columns 24-26 to not be present.
+                        #       those are: Personal Datasets, Literature, SSG links
+                        if v is None and col_no < 24:
+                            html_err.append("Sermon column number **{}** must be string".format(col_no))
                     else:
                         if v.lower() != sColumn.lower():
                             html_err.append("Sermons column number **{}** expect title `{}`, but excel uses title `{}`".format(
@@ -1751,6 +1765,10 @@ class ImportSet(models.Model):
                     row_values = [x.value for x in row]
                     v = None if len(row_values) ==0 else row_values[0]
                     if row_num > 1 and not v is None and v!= "":
+                        # Possibly append row values if needed
+                        while len(row_values) < len(lst_column):
+                            row_values.append(None)
+
                         if row_num > row_last:
                             row_last = row_num
                         # Add all items to their individual lists
@@ -1888,7 +1906,14 @@ class ImportSet(models.Model):
                 self.report = sReport
                 self.status = "rej"
                 self.save()
-                sBack = sReport
+
+            sBack = sReport
+
+            # Make sure to close the excel
+            wb.close()
+            # Double check the status of this file
+            sStatus = "closed" if self.excel.closed else "open"
+            # oErr.Status("Importset/do_verify finishes Workbook as: {}".format(sStatus))
 
         except:
             msg = oErr.get_error_message()
@@ -1966,19 +1991,30 @@ class ImportSet(models.Model):
         response = None
         oErr = ErrHandle()
         try:
+            # Just monitor the excel status
+            if not self.excel is None:
+                sStatus = "closed" if self.excel.closed else "open"
+                # oErr.Status("ImportSet excel file status = {}".format(sStatus))
+                if sStatus == "open":
+                    iDoubleCheck = 1
+
             # Check if the order is specified
             if self.order is None or self.order <= 0:
                 # Specify the order
                 self.order = ImportSet.objects.filter(profile=self.profile).count() + 1
             # Adapt the save date
             self.saved = get_current_datetime()
-
+            
             # If the status is 'cre'..
             if self.status == "cre":
                 # Check if an excel file has been specified
                 if self.importtype in ['manu', 'ssg'] and not self.excel is None and not self.excel.file is None:
                     # Move on to the status 'chg'
                     self.status = "chg"
+
+            ## Possibly first close the file
+            #if not self.excel is None:
+            #    self.excel.close()
 
             response = super(ImportSet, self).save(force_insert, force_update, using, update_fields)
         except:

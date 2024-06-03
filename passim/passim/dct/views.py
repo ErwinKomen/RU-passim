@@ -3005,6 +3005,25 @@ class ImportSetEdit(BasicDetails):
         # Return the context we have made
         return context
 
+    def before_save(self, form, instance):
+        bStatus = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Do we have changed data?
+            if hasattr(form, "changed_data"):
+                changed = form.changed_data
+                # Has the excel been changed?
+                if "excel" in changed:
+                    # The excel has changed - reset some stuff
+                    form.instance.status = "chg"
+                    form.instance.report = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetEdit/before_save")
+    
+        return bStatus, msg
+
     def get_button(self, instance, is_app_editor):
         """Create and show the buttons that are appropriate at this stage"""
 
@@ -3086,24 +3105,6 @@ class ImportSetEdit(BasicDetails):
             oErr.DoError("ImportSetEdit/check_hlist")
             return False
 
-    #def get_importmode(self, instance):
-    #    sBack = ""
-    #    bResult = True
-    #    oErr = ErrHandle()
-        
-    #    try:
-    #        mode = ""
-    #        if instance.status in ['chg', 'rej']: # 'cre', 
-    #            mode = "verify"
-    #        elif instance.status in ['ver']:
-    #            mode = "submit"
-    #        sBack = mode
-    #    except:
-    #        msg = oErr.get_error_message()
-    #        oErr.DoError("ImportSetEdit/after_save")
-    #        bResult = False
-    #    return sBack
-    
 
 class ImportSetDetails(ImportSetEdit):
     """The HTML variant of [ImportSetEdit]"""
@@ -3116,30 +3117,6 @@ class ImportSetDetails(ImportSetEdit):
             self.check_hlist(instance)
         return None
 
-    def before_save(self, form, instance):
-        bStatus = True
-        msg = ""
-        # Do we already have an instance?
-        if instance == None or instance.id == None:
-            # See if we have the profile id
-            profile = Profile.get_user_profile(self.request.user.username)
-            form.instance.profile = profile
-        # Do we have cleaned data?
-        if hasattr(form, "cleaned_data"):
-            cleaned = form.cleaned_data
-
-            # (1) Preliminary order
-            order = 1
-            obj = profile.profile_importsetitems.all().order_by("-order").first()
-            if obj != None:
-                order = obj.order + 1
-
-            # (4) Re-calculate the order
-            instance.adapt_order()
-
-        # Return as usual
-        return bStatus, msg
-
     def add_to_context(self, context, instance):
         # First process what needs to be done anyway
         context = super(ImportSetDetails, self).add_to_context(context, instance)
@@ -3151,12 +3128,49 @@ class ImportSetDetails(ImportSetEdit):
             # Do we have an instance defined?
             if not instance is None:
                 context['importmode'] = instance.get_importmode()
+                context['instance'] = instance
                 sButtons = render_to_string("dct/xlsimp_form.html", context, self.request)
                 context['after_details'] = sButtons
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ImportSetDetails/add_to_context")
         return context
+
+    def before_save(self, form, instance):
+        
+        bStatus = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # First do the more basic one
+            bStatus, msg = super(ImportSetDetails, self).before_save(form, instance)
+            
+            # Do we already have an instance?
+            if instance == None or instance.id == None:
+                # See if we have the profile id
+                profile = Profile.get_user_profile(self.request.user.username)
+                form.instance.profile = profile
+            else:
+                profile = instance.profile
+
+            # Do we have cleaned data?
+            if hasattr(form, "cleaned_data"):
+                cleaned = form.cleaned_data
+
+                # (1) Preliminary order
+                order = 1
+                obj = profile.profile_importsetitems.all().order_by("-order").first()
+                if obj != None:
+                    order = obj.order + 1
+
+                # (4) Re-calculate the order
+                instance.adapt_order()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetEdit/before_save")
+
+        # Return as usual
+        return bStatus, msg
 
 
 class ImportSetProcess(BasicPart):
@@ -3180,11 +3194,7 @@ class ImportSetProcess(BasicPart):
             importset = self.obj
 
             # Find out what we are doing here
-            importmode = self.qd.get("importmode", "")
-            # What if we have no importmode?
-            if importmode == "":
-                # Then try to look at the instance itself
-                importmode = importset.get_importmode()
+            importmode = importset.get_importmode()
 
             # Action depends on the import mode
             if importmode == "verify":
@@ -3201,7 +3211,14 @@ class ImportSetProcess(BasicPart):
                     result = importset.do_submit()
                     data['result'] = result
 
-                    data['targeturl'] = reverse('importset_details', kwargs={'pk': importset.id})
+                # Always
+                data['targeturl'] = reverse('importset_details', kwargs={'pk': importset.id})
+            else:
+                # Undefined importmode?
+                oErr.Status("Undefined importmode [{}]".format(importmode))
+
+            if not "targeturl" in data:
+                oErr.Status("targeturl is not defined in data")
  
             context['data'] = data
         except:
