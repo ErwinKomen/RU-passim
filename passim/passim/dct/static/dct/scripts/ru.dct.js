@@ -2817,19 +2817,36 @@ var ru = (function ($, ru) {
       do_importset: function (el) {
         var targetid = "",
             targeturl = "",
+            reportid = "",
             data = null,
             err = "#import_err",
             frm = null;
 
         try {
+          // Disable the button
+          $(el).attr("disable", true);
           // Get the targeturl
           targetid = $(el).closest("span").attr("targetid");
           targeturl = $(targetid).attr("targeturl");
           err = targetid;
+
+          // Try to find the report
+          reportid = $(el).closest("table").find("td span:contains('Report:')");
+          if (reportid.length > 0) {
+            reportid = $(reportid).closest("tr").find("td").last();
+            if (reportid.length > 0) {
+              $(reportid).html("verifying...");
+            }
+          }
+
+
           // Get the form information
           frm = $(targetid).closest("form");
           // Get the data
           data = $(frm).serializeArray();
+
+          // Indicate that we are working
+          $(targetid).html(loc_sWaiting);
 
           // Perform a POST request with this
           $.post(targeturl, data, function (response) {

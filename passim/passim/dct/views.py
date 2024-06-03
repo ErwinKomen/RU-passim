@@ -444,7 +444,9 @@ class MyPassimEdit(BasicDetails):
 
             # Create what is needed for the custom context
             sgroupForm = self.form_list[1]['forminstance']
-            context = dict(profile=profile, sgroupForm=sgroupForm)
+            # context = dict(profile=profile, sgroupForm=sgroupForm)
+            context['profile'] = profile
+            context['sgroupForm'] = sgroupForm
             sitemset['customshow'] = render_to_string("dct/sgroup_add.html", context, self.request)
 
             rel_list =[]

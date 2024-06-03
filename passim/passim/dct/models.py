@@ -1,6 +1,7 @@
 """Models for the DCT app: dynamic comparison tables
 
 """
+import enum
 from django.apps.config import AppConfig
 from django.apps import apps
 from django.db import models, transaction
@@ -24,9 +25,9 @@ from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE, MEDIA_ROOT
 from passim.basic.models import UserSearch
 from passim.basic.views import base64_decode, base64_encode
-from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
+from passim.seeker.models import Author, Keyword, get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
-    SermonDescr, EqualGold
+    SermonDescr, EqualGold, Feast
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
@@ -1569,10 +1570,79 @@ class ImportSet(models.Model):
     def do_verify(self):
         """Verify the Excel"""
 
+        def check_for_string(sKey, is_error=False, max_length=None, exclude=None, cls=None, allowed=None, obligatory=False):
+            """Check whether an item is a string"""
+
+            oErr= ErrHandle()
+            try:
+                for idx, sRef in enumerate(oSermList[sKey]):
+                    if obligatory and sRef is None:
+                        html_err.append("Sermon: expecting a value for `{}` at row **{}**".format(sKey, idx+2))
+                    elif not sRef is None:
+                        if not isinstance(sRef, str):
+                            if is_error:
+                                html_err.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
+                            else:
+                                html_wrn.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
+                        else:
+                            if not max_length is None:
+                                if len(sRef) > max_length:
+                                    html_wrn.append("Sermon: string in column `{}` too large at row **{}**".format(sKey, idx+2))
+                            if not exclude is None:
+                                if any( ele in exclude for ele in sRef):
+                                    html_err.append("Sermon: `{}` may not contain '{}' at row **{}**".format(sKey, exclude, idx+2))
+                            if not cls is None:
+                                obj = cls.objects.filter(name__iexact=sRef).first()
+                                if obj is None:
+                                    html_wrn.append("Sermon: unknown `{}` item [{}] at row **{}**".format(sKey, sRef, idx+2))
+                            if not allowed is None:
+                                if not sRef in allowed:
+                                    html_err.append("Sermon `{}` must be one of {} at row **{}**".format(sKey, allowed, idx+2))
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("check_for_string")
+
+        def check_for_list(sKey, cls=None, field=None, obligatory=False):
+            """Check whether an item is a stringified list"""
+
+            oErr = ErrHandle()
+            try:
+                for idx, sItem in enumerate(oSermList[sKey]):
+                    if not sItem is None:
+                        if not isinstance(sItem, str):
+                            html_err.append("Sermon: unintelligable `{}` at row **{}**".format(sKey, idx+2))
+                        elif not cls is None:
+                            # Try to parse it
+                            try:
+                                lst_item = json.loads(sItem)
+                                for sItem in lst_item:
+                                    if field is None:
+                                        obj = cls.objects.filter(name__iexact=sItem).first()
+                                    else:
+                                        obj = cls.objects.filter(**{"{}__iexact".format(field): sItem}).first()
+                                    if obj is None:
+                                        html_list = html_err if obligatory else html_wrn
+                                        html_list.append("Sermon: unknown `{}` item [{}] at row **{}**".format(
+                                            sKey, sItem, idx+2))
+                            except:
+                                # Not a legitimate json string
+                                html_err.append("Sermon: {} must be a legitimate JSON string at row **{}**".format(
+                                            sKey, idx+2))
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("check_for_list")
+                
+
         sBack = ""
         oErr = ErrHandle()
         html_err = []
         html_wrn = []
+        lst_column = ["Order", "Parent", "FirstChild", "Next", "Type", "External ids", "Status", "Locus", 
+                      "Attributed author", "Section title", "Lectio", "Title", "Incipit", "Explicit", "Postscriptum", 
+                      "Feast", "Bible reference(s)", "Cod. notes", "Note", "Keywords", "Keywords (user)", 
+                      "Gryson/Clavis (manual)", "Gryson/Clavis (auto)", "Personal Datasets", "Literature", "SSG links"]
+        oSermList = {}
         try:
             # Get the path to this Excel
             excel_path = os.path.abspath(os.path.join(MEDIA_ROOT, self.excel.name))
@@ -1646,14 +1716,158 @@ class ImportSet(models.Model):
                 if library is None:
                     html_wrn.append("Manuscript has no library specified")
 
+                # They should all four be supplied
+                if shelfmark is None or country is None or city is None or library is None:
+                    html_err.append("Manuscript lacks one of: shelf-mark, country, city, library")
+
             # Verify the information on the sermons sheet
             if len(html_err) == 0 and not ws_sermo is None:
-                # Look for
-                pass
+                # Check that all the 26 column names are there
+                row_no = 1
+                for idx, sColumn in enumerate(lst_column):
+                    col_no = idx+1
+                    v = ws_sermo.cell(row=row_no, column=col_no).value
+                    if not isinstance(v, str):
+                        html_err.append("Sermon column number **{}** must be string".format(col_no))
+                    else:
+                        if v.lower() != sColumn.lower():
+                            html_err.append("Sermons column number **{}** expect title `{}`, but excel uses title `{}`".format(
+                            col_no, sColumn, v))
+
+                # If we have column name errors
+                if len(html_err) > 0:
+                    # Provide a warning message with the right column names
+                    sColumns = "`{}`".format("`, `".join(lst_column))
+                    html_wrn.append("The sheet [Sermons] must have these column names: {}".format(sColumns))
+
+                # Create dictionary with lists
+                for col_name in lst_column:
+                    oSermList[col_name] = []
+
+                # Iterate over the rows
+                row_last = -1
+                row_num = 1
+                for row in ws_sermo.iter_rows():
+                    row_values = [x.value for x in row]
+                    v = None if len(row_values) ==0 else row_values[0]
+                    if row_num > 1 and not v is None and v!= "":
+                        if row_num > row_last:
+                            row_last = row_num
+                        # Add all items to their individual lists
+                        for idx, col_name in enumerate(lst_column):
+                            v = row_values[idx]
+                            oSermList[col_name].append(v)
+                    # Go to the next row
+                    row_num += 1
+
+                # The lists for Order, Parent, First,Next must be there
+                lst_mustbe = ['Order', 'Parent', 'FirstChild', 'Next']
+                for sListName in lst_mustbe:
+                    if len(oSermList[sListName]) == 0:
+                        html_err.append("Sermon sheet misses values for column [{}]".format(sListName))
+
+                # The first four columns may only contain numbers: [order, parent, first, next]
+                order_prev = 0
+                lst_order = []
+                for row_no in range(2, row_last+1):
+                    idx = row_no - 2
+                    order = oSermList['Order'][idx]
+                    lst_order.append(order)
+                    if not isinstance(order,int):
+                        # Order must always be there and it must be an integer
+                        html_err.append("Sermon order must be specified and must be integer (row={})".format(row_no))
+                        break
+                    else:
+                        if order > order_prev:
+                            order_prev = order
+                        else:
+                            html_err.append("Sermon order at row {} must be higher than previous row".format(row_no))
+                            break
+
+                    # Getting here means there is some ligit data
+                    parent = oSermList['Parent'][idx]
+                    if not parent is None:
+                        # Check parent is among previous ones
+                        if isinstance(parent, int):
+                            if not parent in lst_order:
+                                html_err.append("Sermon parent wrong at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon parent at row {} must be integer".format(row_no))
+
+                    # Review use of firstchild
+                    firstchild =  oSermList['FirstChild'][idx]
+                    if not firstchild is None:
+                        if isinstance(firstchild, int):
+                            if not firstchild > order:
+                                html_err.append("Sermon firstchild must be higher than current row order at row {}".format(row_no))
+                            elif not firstchild in oSermList['Order']:
+                                html_err.append("Sermon firstchild must be part of 'Order' column at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon firstchild at row {} must be integer".format(row_no))
+
+                    # Consider next sibling
+                    nextsib =  oSermList['Next'][idx]
+                    if not nextsib is None:
+                        if isinstance(nextsib, int):
+                            if not nextsib > order:
+                                html_err.append("Sermon next must be higher than current row order at row {}".format(row_no))
+                            elif not nextsib in oSermList['Order']:
+                                html_err.append("Sermon next must be part of 'Order' column at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon next at row {} must be integer".format(row_no))
+                    # Continue to the next row
+
+                # Check column 'Type'
+                type_allowed = ['Structural', 'Plain']
+                check_for_string("Type", allowed=['Structural', 'Plain'])
+
+                # Column 'Status' is irrelevant, as it will be set itself
+
+                # Column locus: check type and length
+                check_for_string("Locus", is_error=True, max_length=15, obligatory=False)
+
+                # Check attributed author(s): do they occur in the database?
+                check_for_string("Attributed author", cls=Author)
+
+                # Check for proper string in: section title, lectio, title
+                check_for_string("Section title")
+                check_for_string("Lectio")
+                check_for_string("Title")
+
+                # Check the incipit/explicit/postscriptum
+                check_for_string("Incipit", exclude="[]")
+                check_for_string("Explicit", exclude="[]")
+                check_for_string("Postscriptum", exclude="[]")
+
+                # A FEAST must be a stringified JSON list of strings
+                check_for_list("Feast", cls=Feast, obligatory=True)
+
+                # Check whether Bible ref is a string
+                check_for_string("Bible reference(s)")
+                check_for_string("Cod. notes")
+                check_for_string("Note")
+
+                # Keywords must be stringified JSON list of strings
+                check_for_list("Keywords", cls=Keyword, obligatory=True)
+                check_for_list("Keywords (user)", cls=Keyword)
+
+                # Check signatures
+                check_for_list("Gryson/Clavis (manual)", cls=Signature, field="code")
+                check_for_list("Gryson/Clavis (auto)", cls=Signature, field="code")
+
+                # Personal datasets must already exist, I guess
+                check_for_list("Personal Datasets", cls=Collection)
+
+                # Literature must be a stringified JSON list of strings
+                check_for_list("Literature")
+
+                # SSG links must be JSON lists of strings, pointing to an SSG via their PASSIM code
+                check_for_list("SSG links", cls=EqualGold, field="code")
+
 
             # Combine into reports
-            sWarning = "\n".join(html_wrn)
-            sError = "\n".join(html_err)
+            sWarning = "  \n".join(html_wrn)
+            sError = "  \n".join(html_err)
             # Do we have a warning/error report?
             if sError == "":
                 # There are no errors - maybe only warnings?
