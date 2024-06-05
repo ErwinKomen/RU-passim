@@ -1599,17 +1599,17 @@ class ImportSet(models.Model):
 
         return bResult
 
-    def do_submit(self, profile):
+    def do_submit(self):   #, profile):
         """Submit the ImportSet"""
 
         sBack = ""
         oErr = ErrHandle()
         try:
             # Create a review item if it doesn't exist yet
-            obj = ImportReview.objects.filter(importset=self, moderator=profile).first()
+            obj = ImportReview.objects.filter(importset=self).first()
             if obj is None:
                 # Create one
-                obj = ImportReview.objects.create(importset=self, moderator=profile)
+                obj = ImportReview.objects.create(importset=self)
             # Make sure to [re]set the ImportReview status
             if obj.status != "cre":
                 # It has not been just created: set to change
@@ -2036,6 +2036,10 @@ class ImportSet(models.Model):
             sNotes = markdown(self.notes)
         return sNotes    
 
+    def get_owner(self):
+        sBack = self.profile.user.username
+        return sBack
+
     def get_report_html(self):
         """Convert the markdown report"""
 
@@ -2147,8 +2151,8 @@ class ImportReview(models.Model):
 
     # [1] Link to the importset
     importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_reviews")
-    # [1] Link to the moderator
-    moderator = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="moderator_reviews")
+    # [0-1] Link to the moderator - as soon as it is assigned
+    moderator = models.ForeignKey(Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name="moderator_reviews")
     # [1] The import-set items may be ordered (and they can be re-ordered by the user)
     order = models.IntegerField("Order", default=0)
 
@@ -2170,7 +2174,12 @@ class ImportReview(models.Model):
     def adapt_order(self):
         """Re-calculate the order and adapt where needed"""
 
-        qs = self.moderator.moderator_reviews.all().order_by("order", "id")
+        # Do we have a moderator?
+        if self.moderator is None:
+            qs = ImportReview.objects.all().order_by("moderator", "order", "id")
+        else:
+            # We DO have a moderator
+            qs = self.moderator.moderator_reviews.all().order_by("order", "id")
         order = 1
         with transaction.atomic():
             # Walk all the SetList objects
@@ -2200,6 +2209,7 @@ class ImportReview(models.Model):
                     importset.save()
                     # Also change my own status
                     self.status = "rej"
+                    self.moderator = profile
                     self.save()
                 elif verdict == "acc":
                     # Accept the submission
@@ -2216,6 +2226,7 @@ class ImportReview(models.Model):
 
                     # And change my own status
                     self.status = "acc"
+                    self.moderator = profile
                     self.save()
 
         except:
@@ -2229,6 +2240,12 @@ class ImportReview(models.Model):
 
         sDate = get_crpp_date(self.created, True)
         return sDate
+
+    def get_moderator(self):
+        sBack = ""
+        if not self.moderator is None:
+            sBack = self.moderator.user.username
+        return sBack
 
     def get_notes_html(self):
         """Convert the markdown notes"""
@@ -2279,7 +2296,12 @@ class ImportReview(models.Model):
             # Check if the order is specified
             if self.order is None or self.order <= 0:
                 # Specify the order
-                self.order = ImportReview.objects.filter(moderator=self.moderator).count() + 1
+                if self.moderator is None:
+                    # Order the ones without moderator
+                    self.order = ImportReview.objects.filter(moderator__isnull=True).count() + 1
+                else:
+                    # This particular moderator
+                    self.order = ImportReview.objects.filter(moderator=self.moderator).count() + 1
 
             # If needed, set the review status
 

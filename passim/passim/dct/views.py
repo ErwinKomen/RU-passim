@@ -804,7 +804,7 @@ class MyPassimEdit(BasicDetails):
                 # And store an introduction
                 lIntro = []
                 lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
-                lIntro.append('href="{}">Excel import submissions</a> page.'.format(reverse('importset_list')))
+                lIntro.append('href="{}">Excel import submissions</a>.'.format(reverse('importset_list')))
                 sIntro = " ".join(lIntro)
                 importset['introduction'] = sIntro
 
@@ -865,6 +865,94 @@ class MyPassimEdit(BasicDetails):
                 if bMayEdit:
                     importset['columns'].append("")
                 related_objects.append(copy.copy(importset))
+
+            # [5] ===============================================================
+            if context['is_app_moderator']:
+                # Get all 'ImportReview' objects that belong to the current user (=profile)
+                importreview = dict(title="Excel import reviews", prefix="xlsrev")  
+                if resizable: importreview['gridclass'] = "resizable dragdrop"
+                importreview['savebuttons'] = bMayEdit
+                importreview['saveasbutton'] = False
+                rel_list =[]
+
+                qs_reviews = ImportReview.objects.all().order_by('moderator__user__username', 'order')
+                # Also store the count
+                importreview['count'] = qs_reviews.count()
+                importreview['instance'] = instance
+                importreview['detailsview'] = reverse('mypassim_details') #, kwargs={'pk': instance.id})
+
+                # And store an introduction
+                lIntro = []
+                lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
+                lIntro.append('href="{}">Excel import reviews</a>.'.format(reverse('importreview_list')))
+                sIntro = " ".join(lIntro)
+                importreview['introduction'] = sIntro
+
+                # These elements have an 'order' attribute, but...
+                #   ... but that order may *NOT be corrected here
+                # check_order(qs_reviews)
+
+                # Walk these imports
+                order = 0
+                for obj in qs_reviews:
+                    # The [obj] is of type `ImportReview`
+
+                    rel_item = []
+                    order += 1
+
+                    importset = obj.importset
+
+                    # TODO:
+                    # Relevant columns for the Your visualisations are:
+                    # 1 - filename of the ImportReview submission
+                    # 2 - user
+                    # 3 - type (manuscript or authority file)
+                    # 4 - status
+                    # 5 - date
+
+                    # SetDef: Order within the set of Your visualizations
+                    add_one_item(rel_item, order, False, align="right", draggable=True)
+
+                    # The user who has submitted this
+                    sUser = obj.get_owner()
+                    add_one_item(rel_item, sUser, False, main=False)
+
+                    # Name: the filename of the import submission
+                    sName = importset.get_name()
+                    url = reverse('importreview_details', kwargs={'pk': obj.id})
+                    add_one_item(rel_item, sName, False, main=True, link=url)
+
+                    # Type: what the import submission describes (M/SSG)
+                    sType = importset.get_type()
+                    add_one_item(rel_item, sType, False, main=False)
+
+                    # Status: status of the review
+                    sStatus = obj.get_status()
+                    add_one_item(rel_item, sStatus, False)
+
+                    # Date: last save date of review
+                    sDate = obj.get_saved()
+                    add_one_item(rel_item, sDate, False) # , align="right")
+
+                    if bMayEdit:
+                        # Actions that can be performed on this item
+                        add_one_item(rel_item, self.get_field_value("stemma", obj, "buttons"), False)
+
+                    # Add this line to the list
+                    rel_list.append(dict(id=obj.id, cols=rel_item))
+            
+                importreview['rel_list'] = rel_list
+                importreview['columns'] = [
+                    '{}<span title="Default order">Order<span>{}'.format(sort_start_int, sort_end),
+                    '{}<span title="User who submitted this Excel">User</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Name of the Excel file submitted">Name</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Type of submission">Type</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Status of the review">Review</span>{}'.format(sort_start, sort_end), 
+                    '{}<span title="Date last saved">Date</span>{}'.format(sort_start, sort_end), 
+                    ]
+                if bMayEdit:
+                    importreview['columns'].append("")
+                related_objects.append(copy.copy(importreview))
 
         except:
             msg = oErr.get_error_message()
@@ -993,6 +1081,7 @@ class MyPassimEdit(BasicDetails):
             {"prefix": "dctdef",    "cls": SetDef},
             {"prefix": "stemma",    "cls": StemmaSet},
             {"prefix": "xlsimp",    "cls": ImportSet},
+            {"prefix": "xlsrev",    "cls": ImportReview},
             ]
 
         try:
@@ -3210,7 +3299,9 @@ class ImportSetProcess(BasicPart):
                 if status == "ver":
                     # Yes, it has been verified: now submit it
                     profile = self.request.user.user_profiles.first()
-                    result = importset.do_submit(profile)
+                    # result = importset.do_submit(profile)
+                    # Note: the profile is of the submitter, not necessarily of the moderator
+                    result = importset.do_submit()
                     data['result'] = result
 
                 # Always
@@ -3295,17 +3386,18 @@ class ImportReviewListView(BasicList):
     new_button = True
     use_team_group = True
     order_cols = ['importset__profile__user__username', 'order', 'importset__name', 'importset__importtype', 
-                  'importset__status', 'status', 'saved', 'created']
+                  'moderator__user__username', 'importset__status', 'status', 'saved', 'created']
     order_default = order_cols
     order_heads = [
         {'name': 'Owner',   'order': 'o=1','type': 'str', 'custom': 'owner',    'linkdetails': True},
         {'name': 'Order',   'order': 'o=2','type': 'int', 'field': 'order',     'linkdetails': True},
         {'name': 'File',    'order': 'o=3','type': 'str', 'custom': 'filename', 'linkdetails': True, 'main': True},
         {'name': 'Type',    'order': 'o=4','type': 'str', 'custom': 'type',     'linkdetails': True},
-        {'name': 'Status',  'order': 'o=5','type': 'str', 'custom': 'stimport', 'linkdetails': True},
-        {'name': 'Review',  'order': 'o=6','type': 'str', 'custom': 'streview', 'linkdetails': True},
-        {'name': 'Saved',   'order': 'o=7','type': 'str', 'custom': 'date',     'linkdetails': True, 'align': 'right'},
-        {'name': 'Created', 'order': 'o=8','type': 'str', 'custom': 'created',  'linkdetails': True, 'align': 'right'},
+        {'name': 'Moderator','order':'o=5','type': 'str', 'custom': 'moderator','linkdetails': True},
+        {'name': 'Status',  'order': 'o=6','type': 'str', 'custom': 'stimport', 'linkdetails': True},
+        {'name': 'Review',  'order': 'o=7','type': 'str', 'custom': 'streview', 'linkdetails': True},
+        {'name': 'Saved',   'order': 'o=8','type': 'str', 'custom': 'date',     'linkdetails': True, 'align': 'right'},
+        {'name': 'Created', 'order': 'o=9','type': 'str', 'custom': 'created',  'linkdetails': True, 'align': 'right'},
                 ]
     filters = [ 
         {"name": "Name",    "id": "filter_name",      "enabled": False},
@@ -3347,6 +3439,8 @@ class ImportReviewListView(BasicList):
             sBack = instance.importset.get_status()
         elif custom == "owner":
             sBack = instance.get_owner()
+        elif custom == "moderator":
+            sBack = instance.get_moderator()
 
         return sBack, sTitle
 
@@ -3385,6 +3479,7 @@ class ImportReviewEdit(BasicDetails):
                 {'type': 'plain', 'label': "Created:",  'value': instance.get_created()                             },
                 {'type': 'plain', 'label': "Saved:",    'value': instance.get_saved()                               },
                 {'type': 'safe',  'label': "Status:",   'value': instance.get_status(True),                         },
+                {'type': 'safe',  'label': "Moderator:",'value': instance.get_moderator(),                          },
                 {'type': 'safe',  'label': "Verdict",   'value': self.get_button(instance, is_app_editor)           },
                 {'type': 'safe',  'label': "Notes:",    'value': instance.get_notes_html(),  'field_key': 'notes'   },
                 ]
@@ -3398,7 +3493,7 @@ class ImportReviewEdit(BasicDetails):
             profile_user = Profile.get_user_profile(self.request.user.username)
             # (2) Set default permission
             permission = ""
-            if profile_owner.id == profile_user.id:
+            if not profile_owner is None and profile_owner.id == profile_user.id:
                 # (3) Any creator of the ImportReview may write it
                 permission = "write"
             else:
