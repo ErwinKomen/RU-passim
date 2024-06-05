@@ -4168,9 +4168,9 @@ class Manuscript(models.Model):
                 # ===================================
 
                 # Retrieve or create a new manuscript with default values
-                sCity = oManu.get("city", "")
-                sCountry = oManu.get("country", "")
-                sLibrary = oManu.get("library", "")
+                sCity = oManu.get("city", "").strip()
+                sCountry = oManu.get("country", "").strip()
+                sLibrary = oManu.get("library", "").strip()
                 lCity = None
                 lCountry = None
                 lLibrary = None

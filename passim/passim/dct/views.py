@@ -22,6 +22,7 @@ from io import StringIO
 import copy
 import json
 import csv
+import openpyxl
 
 # ======= imports from my own application ======
 from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
@@ -35,7 +36,7 @@ from passim.seeker.models import get_crpp_date, get_current_datetime, process_li
 from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
     SavedItem, SavedSearch, SelectItem, SavedVis, SaveGroup, ImportSet, ImportReview
 from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm, SaveGroupForm, SgroupSelForm, \
-    ImportSetForm
+    ImportSetForm, ImportReviewForm
 from passim.approve.models import EqualChange, EqualApproval
 from passim.stemma.models import StemmaItem, StemmaSet
 
@@ -2883,7 +2884,7 @@ class ImportSetListView(BasicList):
     plural_name = "Excel import submissions"
     new_button = True
     use_team_group = True
-    order_cols = ['order', 'excel', 'importtype', 'status', 'profile__user__username', 'saved', 'created']
+    order_cols = ['order', 'name', 'importtype', 'status', 'profile__user__username', 'saved', 'created']
     order_default = order_cols
     order_heads = [
         {'name': 'Order',   'order': 'o=1','type': 'int', 'field': 'order',     'linkdetails': True},
@@ -2928,7 +2929,7 @@ class ImportSetListView(BasicList):
             sBack = instance.get_name()
         elif custom == "type":
             sBack = instance.get_type()
-        elif custom == "type":
+        elif custom == "status":
             sBack = instance.get_status()
         elif custom == "owner":
             sBack = instance.profile.user.username
@@ -2965,7 +2966,7 @@ class ImportSetEdit(BasicDetails):
             is_app_editor = context['is_app_editor']
             # Define the main items to show and edit
             context['mainitems'] = [
-                {'type': 'line',  'label': "Excel file:",   'value': instance.get_name(),        'field_key': 'excel'  },
+                {'type': 'line',  'label': "Excel file:",   'value': instance.get_name_html(),   'field_key': 'excel'  },
                 {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
                 {'type': 'plain', 'label': "Type:",         'value': instance.get_type(),        'field_key': 'importtype'},
                 {'type': 'safe',  'label': "Status:",       'value': instance.get_status(True),     },
@@ -3057,47 +3058,47 @@ class ImportSetEdit(BasicDetails):
             if arg_hlist in self.qd and arg_savenew in self.qd:
                 # Interpret the list of information that we receive
                 hlist = json.loads(self.qd[arg_hlist])
-                # Interpret the savenew parameter
-                savenew = self.qd[arg_savenew]
+                ## Interpret the savenew parameter
+                #savenew = self.qd[arg_savenew]
 
-                # Make sure we are not saving
-                self.do_not_save = True
-                # But that we do a new redirect
-                self.newRedirect = True
+                ## Make sure we are not saving
+                #self.do_not_save = True
+                ## But that we do a new redirect
+                #self.newRedirect = True
 
-                # Change the redirect URL
-                if self.redirectpage == "":
-                    self.redirectpage = reverse('stemmaset_details', kwargs={'pk': instance.id})
+                ## Change the redirect URL
+                #if self.redirectpage == "":
+                #    self.redirectpage = reverse('stemmaset_details', kwargs={'pk': instance.id})
 
-                # What we have is the ordered list of Manuscript id's that are part of this collection
-                with transaction.atomic():
-                    # Make sure the orders are correct
-                    for idx, item_id in enumerate(hlist):
-                        order = idx + 1
-                        lstQ = [Q(stemmaset=instance)]
-                        lstQ.append(Q(**{"id": item_id}))
-                        obj = StemmaItem.objects.filter(*lstQ).first()
-                        if obj != None:
-                            if obj.order != order:
-                                obj.order = order
-                                obj.save()
-                                bChanges = True
-                # See if any need to be removed
-                existing_item_id = [str(x.id) for x in StemmaItem.objects.filter(stemmaset=instance)]
-                delete_id = []
-                for item_id in existing_item_id:
-                    if not item_id in hlist:
-                        delete_id.append(item_id)
-                if len(delete_id)>0:
-                    lstQ = [Q(stemmaset=instance)]
-                    lstQ.append(Q(**{"id__in": delete_id}))
-                    StemmaItem.objects.filter(*lstQ).delete()
-                    bChanges = True
+                ## What we have is the ordered list of Manuscript id's that are part of this collection
+                #with transaction.atomic():
+                #    # Make sure the orders are correct
+                #    for idx, item_id in enumerate(hlist):
+                #        order = idx + 1
+                #        lstQ = [Q(stemmaset=instance)]
+                #        lstQ.append(Q(**{"id": item_id}))
+                #        obj = StemmaItem.objects.filter(*lstQ).first()
+                #        if obj != None:
+                #            if obj.order != order:
+                #                obj.order = order
+                #                obj.save()
+                #                bChanges = True
+                ## See if any need to be removed
+                #existing_item_id = [str(x.id) for x in StemmaItem.objects.filter(stemmaset=instance)]
+                #delete_id = []
+                #for item_id in existing_item_id:
+                #    if not item_id in hlist:
+                #        delete_id.append(item_id)
+                #if len(delete_id)>0:
+                #    lstQ = [Q(stemmaset=instance)]
+                #    lstQ.append(Q(**{"id__in": delete_id}))
+                #    StemmaItem.objects.filter(*lstQ).delete()
+                #    bChanges = True
 
-                if bChanges:
-                    # (6) Re-calculate the set of setlists
-                    force = True if bDebug else False
-                    #instance.update_ssglists(force)
+                #if bChanges:
+                #    # (6) Re-calculate the set of setlists
+                #    force = True if bDebug else False
+                #    #instance.update_ssglists(force)
 
             return True
         except:
@@ -3208,7 +3209,8 @@ class ImportSetProcess(BasicPart):
                 status = importset.status
                 if status == "ver":
                     # Yes, it has been verified: now submit it
-                    result = importset.do_submit()
+                    profile = self.request.user.user_profiles.first()
+                    result = importset.do_submit(profile)
                     data['result'] = result
 
                 # Always
@@ -3227,4 +3229,416 @@ class ImportSetProcess(BasicPart):
         return context
 
 
+class ImportSetDownload(BasicPart):
+    """Facilitate downloading one imported file"""
+
+    MainModel = ImportSet
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "excel"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        manu_fields = []
+        oErr = ErrHandle()
+
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
+
+            # Make sure we only look at lower-case Dtype
+            dtype = dtype.lower()
+
+            # Get the instance
+            instance = self.obj
+
+            # Is this Excel?
+            if dtype == "excel" or dtype == "xlsx":
+                # Find and open the appropriate workbook
+                wb = openpyxl.load_workbook(instance.excel.path)
+
+                # Save it
+                wb.save(response)
+                sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetDownload/get_data")
+
+        return sData
+
+# =================== Model views for EXCEL REVIEW ========
+
+
+class ImportReviewListView(BasicList):
+    """Listview of ImportReview"""
+
+    model = ImportReview
+    listform = ImportReviewForm
+    has_select2 = True
+    bUseFilter = True
+    prefix = "imprev"
+    sg_name = "Excel import review"
+    plural_name = "Excel import reviews"
+    new_button = True
+    use_team_group = True
+    order_cols = ['importset__profile__user__username', 'order', 'importset__name', 'importset__importtype', 
+                  'importset__status', 'status', 'saved', 'created']
+    order_default = order_cols
+    order_heads = [
+        {'name': 'Owner',   'order': 'o=1','type': 'str', 'custom': 'owner',    'linkdetails': True},
+        {'name': 'Order',   'order': 'o=2','type': 'int', 'field': 'order',     'linkdetails': True},
+        {'name': 'File',    'order': 'o=3','type': 'str', 'custom': 'filename', 'linkdetails': True, 'main': True},
+        {'name': 'Type',    'order': 'o=4','type': 'str', 'custom': 'type',     'linkdetails': True},
+        {'name': 'Status',  'order': 'o=5','type': 'str', 'custom': 'stimport', 'linkdetails': True},
+        {'name': 'Review',  'order': 'o=6','type': 'str', 'custom': 'streview', 'linkdetails': True},
+        {'name': 'Saved',   'order': 'o=7','type': 'str', 'custom': 'date',     'linkdetails': True, 'align': 'right'},
+        {'name': 'Created', 'order': 'o=8','type': 'str', 'custom': 'created',  'linkdetails': True, 'align': 'right'},
+                ]
+    filters = [ 
+        {"name": "Name",    "id": "filter_name",      "enabled": False},
+        {"name": "Owner",   "id": "filter_owner",     "enabled": False},
+        {"name": "Type",    "id": "filter_type",      "enabled": False},
+        ]
+    searches = [
+        {'section': '', 'filterlist': [
+            {'filter': 'name',  'dbfield': 'name',      'keyS': 'fname',  
+             'keyList': 'namelist', 'infield': 'name' },
+            {'filter': 'owner', 'fkfield': 'profile',   'keyList': 'ownlist', 'infield': 'id' },
+            {'filter': 'type',  'dbfield': 'importtype','keyList': 'importtypelist',
+             'keyType': 'fieldchoice',  'infield': 'abbr' }
+            ]},
+        {'section': 'other', 'filterlist': [] }
+         ]
+
+    def initializations(self):
+        # Some things are needed for initialization
+        return None
+
+    def get_field_value(self, instance, custom):
+        sBack = ""
+        sTitle = ""
+
+        if custom == "date":
+            # sBack = instance.saved.strftime("%d/%b/%Y %H:%M")
+            sBack = instance.get_saved()
+        elif custom == "created":
+            # sBack = instance.created.strftime("%d/%b/%Y %H:%M")
+            sBack = instance.get_created()
+        elif custom == "filename":
+            sBack = instance.importset.get_name()
+        elif custom == "type":
+            sBack = instance.importset.get_type()
+        elif custom == "streview":
+            sBack = instance.get_status()
+        elif custom == "stimport":
+            sBack = instance.importset.get_status()
+        elif custom == "owner":
+            sBack = instance.get_owner()
+
+        return sBack, sTitle
+
+    def adapt_search(self, fields):
+        lstExclude=None
+        qAlternative = None
+        oErr = ErrHandle()
+        try:
+            pass
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewListView/adapt_search")
+
+        return fields, lstExclude, qAlternative
+
+
+class ImportReviewEdit(BasicDetails):
+    model = ImportReview
+    mForm = ImportReviewForm
+    prefix = 'imprev'
+    prefix_type = "simple"
+    title = "Import review"
+    use_team_group = True
+    mainitems = []
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+
+        oErr = ErrHandle()
+        try:
+            is_app_editor = context['is_app_editor']
+            # Define the main items to show and edit
+            context['mainitems'] = [
+                {'type': 'line',  'label': "Submission:",'value': instance.get_submission()                         },
+                {'type': 'line',  'label': "Details:",  'value': self.get_import_details(instance, is_app_editor)   },
+                {'type': 'plain', 'label': "Created:",  'value': instance.get_created()                             },
+                {'type': 'plain', 'label': "Saved:",    'value': instance.get_saved()                               },
+                {'type': 'safe',  'label': "Status:",   'value': instance.get_status(True),                         },
+                {'type': 'safe',  'label': "Verdict",   'value': self.get_button(instance, is_app_editor)           },
+                {'type': 'safe',  'label': "Notes:",    'value': instance.get_notes_html(),  'field_key': 'notes'   },
+                ]
+            
+            # Signal that we do have select2
+            context['has_select2'] = True
+
+            # Determine what the permission level is of this collection for the current user
+            # (1) Is this user a different one than the one who created the collection?
+            profile_owner = instance.moderator
+            profile_user = Profile.get_user_profile(self.request.user.username)
+            # (2) Set default permission
+            permission = ""
+            if profile_owner.id == profile_user.id:
+                # (3) Any creator of the ImportReview may write it
+                permission = "write"
+            else:
+                # (4) permission for different users
+                if context['is_app_moderator']:
+                    # (5) what if the user is an app_moderator?
+                    permission = "write"
+                else:
+                    # (5) any other users may only read
+                    permission = "read"
+
+            context['permission'] = permission
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/add_to_context")
+
+        # Return the context we have made
+        return context
+
+    def get_import_details(self, instance, is_app_editor):
+        """Collect the import details in a HTML string"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not instance is None:
+                context = dict(instance = instance.importset)
+                context['is_app_editor'] = is_app_editor
+                sBack = render_to_string("dct/xlsimp_details.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/get_import_details")
+        return sBack
+
+    def before_save(self, form, instance):
+        bStatus = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Do we have changed data?
+            if hasattr(form, "changed_data"):
+                changed = form.changed_data
+                # Has the excel been changed?
+                if "excel" in changed:
+                    # The excel has changed - reset some stuff
+                    form.instance.status = "chg"
+                    form.instance.report = ""
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/before_save")
+    
+        return bStatus, msg
+
+    def get_button(self, instance, is_app_editor):
+        """Create and show the buttons that are appropriate at this stage"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        html = []
+        try:
+            if not instance is None:
+                context = dict(instance=instance)
+                # context['importmode'] = instance.get_importmode()
+                context['is_app_editor'] = is_app_editor
+                sBack = render_to_string("dct/xlsrev_button.html", context, self.request)
+ 
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/get_button")
+
+        return sBack
+
+    def check_hlist(self, instance):
+        """Check if a hlist parameter is given, and hlist saving is called for"""
+
+        oErr = ErrHandle()
+        bChanges = False
+        bDebug = True
+        prefix = "super"
+
+        try:
+            arg_hlist = "{}-hlist".format(prefix)
+            arg_savenew = "{}-savenew".format(prefix)
+            if arg_hlist in self.qd and arg_savenew in self.qd:
+                # Interpret the list of information that we receive
+                hlist = json.loads(self.qd[arg_hlist])
+                ## Interpret the savenew parameter
+                #savenew = self.qd[arg_savenew]
+
+                ## Make sure we are not saving
+                #self.do_not_save = True
+                ## But that we do a new redirect
+                #self.newRedirect = True
+
+                ## Change the redirect URL
+                #if self.redirectpage == "":
+                #    self.redirectpage = reverse('stemmaset_details', kwargs={'pk': instance.id})
+
+                ## What we have is the ordered list of Manuscript id's that are part of this collection
+                #with transaction.atomic():
+                #    # Make sure the orders are correct
+                #    for idx, item_id in enumerate(hlist):
+                #        order = idx + 1
+                #        lstQ = [Q(stemmaset=instance)]
+                #        lstQ.append(Q(**{"id": item_id}))
+                #        obj = StemmaItem.objects.filter(*lstQ).first()
+                #        if obj != None:
+                #            if obj.order != order:
+                #                obj.order = order
+                #                obj.save()
+                #                bChanges = True
+                ## See if any need to be removed
+                #existing_item_id = [str(x.id) for x in StemmaItem.objects.filter(stemmaset=instance)]
+                #delete_id = []
+                #for item_id in existing_item_id:
+                #    if not item_id in hlist:
+                #        delete_id.append(item_id)
+                #if len(delete_id)>0:
+                #    lstQ = [Q(stemmaset=instance)]
+                #    lstQ.append(Q(**{"id__in": delete_id}))
+                #    StemmaItem.objects.filter(*lstQ).delete()
+                #    bChanges = True
+
+                #if bChanges:
+                #    # (6) Re-calculate the set of setlists
+                #    force = True if bDebug else False
+                #    #instance.update_ssglists(force)
+
+            return True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/check_hlist")
+            return False
+
+
+class ImportReviewDetails(ImportReviewEdit):
+    """The HTML variant of [ImportReviewEdit]"""
+
+    rtype = "html"
+    
+    def custom_init(self, instance):
+        if instance != None:
+            # Check for hlist saving
+            self.check_hlist(instance)
+        return None
+
+    def add_to_context(self, context, instance):
+        # First process what needs to be done anyway
+        context = super(ImportReviewDetails, self).add_to_context(context, instance)
+
+        sBack = ""
+        oErr = ErrHandle()
+        html = []
+        try:
+            # Do we have an instance defined?
+            if not instance is None:
+                context['instance'] = instance
+                # TODO: adapt
+                sButtons = render_to_string("dct/xlsrev_form.html", context, self.request)
+                context['after_details'] = sButtons
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewDetails/add_to_context")
+        return context
+
+    def before_save(self, form, instance):
+        
+        bStatus = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # First do the more basic one
+            bStatus, msg = super(ImportReviewDetails, self).before_save(form, instance)
+            
+            # Do we already have an instance?
+            if instance == None or instance.id == None:
+                # See if we have the profile id
+                profile = Profile.get_user_profile(self.request.user.username)
+                form.instance.profile = profile
+            else:
+                profile = instance.profile
+
+            # Do we have cleaned data?
+            if hasattr(form, "cleaned_data"):
+                cleaned = form.cleaned_data
+
+                # (1) Preliminary order
+                order = 1
+                obj = profile.profile_importsetitems.all().order_by("-order").first()
+                if obj != None:
+                    order = obj.order + 1
+
+                # (4) Re-calculate the order
+                instance.adapt_order()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewEdit/before_save")
+
+        # Return as usual
+        return bStatus, msg
+
+
+class ImportReviewProcess(BasicPart):
+    """Process a verdict"""
+
+    MainModel = ImportReview
+
+    def add_to_context(self, context):
+
+        # Gather all necessary data
+        data = {}
+
+        oErr = ErrHandle()
+        try:
+            # Check validity
+            if not self.userpermissions("w"):
+                # Don't do anything
+                return context
+
+            # Get the ImportReview object
+            importreview = self.obj
+
+            # Find out what we are doing here
+            importverdict = self.qd.get("importverdict")
+            if importverdict is None:
+                importverdict = "rej"
+
+            # Set the verdict in the ImportReview model
+            profile = self.request.user.user_profiles.first()
+            result = importreview.do_process(profile, importverdict)
+            data['result'] = result
+            # Always
+            data['targeturl'] = reverse('importreview_details', kwargs={'pk': importreview.id})
+
+            if not "targeturl" in data:
+                oErr.Status("targeturl is not defined in data")
+ 
+            context['data'] = data
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewProcess")
+        return context
 

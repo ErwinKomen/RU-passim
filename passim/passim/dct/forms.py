@@ -453,7 +453,7 @@ class ImportSetForm(BasicModelForm):
 
             # Set queryset(s) - for details view
             self.fields['ownlist'].queryset = Profile.objects.all()
-            self.fields['importtypelist'].queryset = FieldChoice.objects.filter(field=SELITEM_TYPE).order_by("english_name")
+            self.fields['importtypelist'].queryset = FieldChoice.objects.filter(field=IMPORT_TYPE).order_by("english_name")
 
             self.fields['namelist'].queryset = ImportSet.objects.filter(profile=profile)
             
@@ -469,6 +469,74 @@ class ImportSetForm(BasicModelForm):
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ImportSetForm")
+        return None
+
+
+class ImportReviewForm(BasicModelForm):
+    profileid = forms.CharField(required=False)
+    ownlist  = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ProfileWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple profiles...', 
+                                    'style': 'width: 100%;', 'class': 'searching'}))
+    importtypelist   = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ImportTypeWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 
+                                    'Select multiple types...', 'style': 'width: 100%;'}))
+    fname = forms.CharField(label=_("Project"), required=False,
+            widget=forms.TextInput(attrs={'class': 'typeahead searching projects input-sm', 
+                                              'placeholder': 'Name of the file...', 'style': 'width: 100%;'}))
+    namelist    = ModelMultipleChoiceField(queryset=None, required=False, 
+            widget=ImportSetWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple file names...', 
+                                              'style': 'width: 100%;', 'class': 'searching'}))
+
+    class Meta:
+        model = ImportReview
+        fields = ['notes']  # 'moderator', 
+        widgets={
+            'notes':   forms.Textarea(attrs={'rows': 1, 'cols': 40, 'style': 'height: 40px; width: 100%;',
+                                    'placeholder': 'Optionally add your own notes...'}),
+            #'importtype':  forms.Select(attrs={'style': 'width: 100%;'})
+                 }
+
+    def __init__(self, *args, **kwargs):
+        # Obligatory for this type of form!!!
+        self.username = kwargs.pop('username', "")
+        self.team_group = kwargs.pop('team_group', "")
+        self.userplus = kwargs.pop('userplus', "")
+        # Start by executing the standard handling
+        super(ImportReviewForm, self).__init__(*args, **kwargs)
+
+        oErr = ErrHandle()
+        try:
+            username = self.username
+            profile = Profile.get_user_profile(username)
+            team_group = self.team_group
+
+            # Some fields are not required
+            #self.fields['excel'].required = False
+            # self.fields['profile'].required = False
+            self.fields['notes'].required = False
+            #self.fields['importtype'].required = False
+
+            # Make sure the profile is set correctly
+            # self.fields['profileid'].initial = profile.id
+
+            # Set queryset(s) - for details view
+            self.fields['ownlist'].queryset = Profile.objects.all()
+            self.fields['importtypelist'].queryset = FieldChoice.objects.filter(field=IMPORT_TYPE).order_by("english_name")
+
+            self.fields['namelist'].queryset = ImportSet.objects.all()
+            
+            # Get the instance
+            if 'instance' in kwargs:
+                instance = kwargs['instance']
+                # Adapt the profile if this is needed
+                # self.fields['profileid'].initial = instance.profile.id
+
+                #if instance.importtype == "":
+                #    self.fields['importtype'].initial = "manu"
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReviewForm")
         return None
 
 

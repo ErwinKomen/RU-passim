@@ -1,15 +1,23 @@
 {% if is_app_editor %}
   <span targetid="#import_form_{{instance.id}}" class="selitem">
     {% if importmode == "verify" %}
-    <a role="button" class="btn btn-xs jumbo-2" onclick="ru.dct.do_importset(this);"
-       title="Verify this Excel file import definition">
-      Verify import file
-    </a>
+      <a role="button" class="btn btn-xs jumbo-2" onclick="ru.dct.do_importset(this);"
+         title="Verify this Excel file import definition">
+        Verify import file
+      </a>
     {% elif importmode == "submit" %}
-    <a role="button" class="btn btn-xs jumbo-3" onclick="ru.dct.do_importset(this);"
-       title="Submit this Excel file import definition to a moderator of the PASSIM project">
-      Submit to moderator
-    </a>
+      <a role="button" class="btn btn-xs jumbo-3" onclick="ru.dct.do_importset(this);"
+         title="Submit this Excel file import definition to a moderator of the PASSIM project">
+        Submit to moderator
+      </a>
+    {% elif importmode == "review" %}
+      <span style="color: darkblue; font-size: larger;">
+        The Excel manuscript description has been <b>submitted for review.</b>
+    </span>
+    {% elif importmode == "accepted" %}
+      <span style="color: darkgreen; font-size: larger;">
+        The Excel file has been <b>accepted</b> and its manuscript has been <b>imported</b>.
+    </span>
     {% endif %}
   </span>
 {% endif %}

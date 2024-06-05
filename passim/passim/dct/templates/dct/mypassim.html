@@ -48,9 +48,10 @@
             <tr><td valign="top">Email:</td><td valign="top" colspan="2">{{user.email}}</td></tr>
             <tr><td valign="top">First name:</td><td valign="top" colspan="2">{{user.first_name}}</td></tr>
             <tr><td valign="top">Last name:</td><td valign="top">{{user.last_name}}</td>
+            <tr><td valign="top">Affiliation:</td><td valign="top">{{profile.affiliation}}</td>
               <td>
-                <a href="{% url 'user_details' profile.user.id  %}" role="button" title="Edit user information" class="btn btn-xs jumbo-1">
-                  <span class="glyphicon glyphicon-pencil" title="Edit user information"></span>
+                <a href="{% url 'profile_details' profile.id  %}" role="button" title="Edit user profile information" class="btn btn-xs jumbo-1">
+                  <span class="glyphicon glyphicon-pencil" title="Edit user profile information"></span>
                 </a>
               </td>
             </tr>

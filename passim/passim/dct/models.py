@@ -28,6 +28,7 @@ from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import Author, Keyword, get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
     SermonDescr, EqualGold, Feast
+from passim.reader.excel import ManuscriptUploadExcel
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
@@ -1535,7 +1536,7 @@ class ImportSet(models.Model):
     saved = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.importtype)
         return sBack
 
     def adapt_order(self):
@@ -1556,13 +1557,68 @@ class ImportSet(models.Model):
                 order += 1
         return None
 
-    def do_submit(self):
+    def do_import(self):
+        bResult = True
+        oErr = ErrHandle()
+        lst_err = []
+        try:
+            # Actually perform the import
+            if self.status == "acc":
+                # Yes, we may perform the import
+                username = self.profile.user.username
+
+                # What if this is a manuscript upload?
+                if self.importtype == "manu":
+                    oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+                    kwargs = {'profile': self.profile, 'username': username, 'team_group': ""}
+                    # Indicate that a NEW one should be created, if already existing
+                    manucreate = True
+
+                    bResult = ManuscriptUploadExcel.upload_one_excel(
+                        self.excel.path, self.name, lst_err, oResult, kwargs, manucreate)
+
+                    # What if the result is positive?
+                    if bResult:
+                        # We have a positive result: Add the link to the manuscript
+                        self.manuscript = oResult.get("obj")
+                        if self.manuscript is None:
+                            oErr.Status("ImportSet/do_import: successful import, but no return manuscript")
+                        else:
+                            # All is in order, so save the results
+                            self.save()
+
+                elif self.importtype == "ssg":
+                    # This is an Authority File
+                    # TODO: add code to import an AF
+                    oErr.Status("do_import: cannot yet process Authority Files")
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_import")
+            bResult = False
+
+        return bResult
+
+    def do_submit(self, profile):
         """Submit the ImportSet"""
 
         sBack = ""
         oErr = ErrHandle()
         try:
+            # Create a review item if it doesn't exist yet
+            obj = ImportReview.objects.filter(importset=self, moderator=profile).first()
+            if obj is None:
+                # Create one
+                obj = ImportReview.objects.create(importset=self, moderator=profile)
+            # Make sure to [re]set the ImportReview status
+            if obj.status != "cre":
+                # It has not been just created: set to change
+                obj.status = "chg"
+                obj.save()
+
+            # Set my own status to "submitted"
             self.status = "sub"
+            self.save()
 
         except:
             msg = oErr.get_error_message()
@@ -1942,6 +1998,10 @@ class ImportSet(models.Model):
                 mode = "verify"
             elif self.status in ['ver']:
                 mode = "submit"
+            elif self.status in ['sub']:
+                mode = "review"
+            elif self.status in ['acc']:
+                mode = "accepted"
             sBack = mode
         except:
             msg = oErr.get_error_message()
@@ -1953,6 +2013,19 @@ class ImportSet(models.Model):
         sBack = ""
         if not self.name is None:
             sBack = self.name
+        return sBack
+
+    def get_name_html(self):
+        """Get the name as well as a link to download the Excel file"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.name is None:
+                sBack = '<span class="badge jumbo-1">{}</span>'.format(self.name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/get_name_html")
         return sBack
 
     def get_notes_html(self):
@@ -1971,6 +2044,26 @@ class ImportSet(models.Model):
             sReport = markdown(self.report)
         return sReport    
 
+    def get_result(self):
+        """Get a button to go to the imported result"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if self.importtype == "manu" and not self.manuscript is None:
+                url = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
+                #sBack = '<span class="badge signature ot"><a href="{}"></a></span>'.format(url)
+                sBack = '<a role="button" class="btn btn-xs jumbo-1" href="{}">Manuscript</a>'.format(url)
+            elif self.importtype == "ssg" and not self.equal is None:
+                url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+                # sBack = '<span class="badge signature gr"><a href="{}"></a></span>'.format(url)
+                sBack = '<a role="button" class="btn btn-xs jumbo-1" href="{}">Authority File</a>'.format(url)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/get_submission")
+        return sBack
+
     def get_saved(self):
         """REturn the saved date in a readable form"""
 
@@ -1982,6 +2075,12 @@ class ImportSet(models.Model):
         sStatus = self.get_status_display()
         if html:
             sStatus = '<span class="badge signature ot">{}</span>'.format(sStatus)
+            # Check if there is a result
+            sResult = self.get_result()
+            if sResult != "":
+                # There is a result, so add it to the status
+                sStatus = '{}<span>&nbsp;</span>{}'.format(sStatus, sResult)
+
         return sStatus
 
     def get_type(self):
@@ -2050,6 +2149,8 @@ class ImportReview(models.Model):
     importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_reviews")
     # [1] Link to the moderator
     moderator = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="moderator_reviews")
+    # [1] The import-set items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
 
     # [0-1] Optional notes for this review
     notes = models.TextField("Notes", blank=True, null=True)
@@ -2063,14 +2164,83 @@ class ImportReview(models.Model):
     saved = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        sBack = "{}: {} (id={})".format(self.moderator.user.username, self.order, self.id)
         return sBack
+
+    def adapt_order(self):
+        """Re-calculate the order and adapt where needed"""
+
+        qs = self.moderator.moderator_reviews.all().order_by("order", "id")
+        order = 1
+        with transaction.atomic():
+            # Walk all the SetList objects
+            for obj in qs:
+                # Check if the order is as it should be
+                if obj.order != order:
+                    #No: adapt the order
+                    obj.order = order
+                    # And save it
+                    obj.save()
+                # Keep track of how the order should be
+                order += 1
+        return None
+
+    def do_process(self, profile, verdict):
+        """Process action of moderator to accept or reject the Importset"""
+
+        result = ""
+        oErr = ErrHandle()
+        try:
+            # Get tot he importset
+            importset = self.importset
+            if not importset is None:
+                if verdict == "rej":
+                    # Reject the submission
+                    importset.status = "rej"    # It is now rejected
+                    importset.save()
+                    # Also change my own status
+                    self.status = "rej"
+                    self.save()
+                elif verdict == "acc":
+                    # Accept the submission
+                    importset.status = "acc"
+                    importset.save()
+
+                    # First: try to import the Excel
+                    bResult = importset.do_import()
+                    if not bResult:
+                        # Something has gone wrong
+                        importset.status = "rej"
+                        importset.notes = "### ERROR\nCould not perform the import\n\n{}".format(importset.notes)
+                        importset.save()
+
+                    # And change my own status
+                    self.status = "acc"
+                    self.save()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/do_process")
+
+        return result
 
     def get_created(self):
         """REturn the created date in a readable form"""
 
         sDate = get_crpp_date(self.created, True)
         return sDate
+
+    def get_notes_html(self):
+        """Convert the markdown notes"""
+
+        sNotes = "-"
+        if self.notes != None:
+            sNotes = markdown(self.notes)
+        return sNotes    
+
+    def get_owner(self):
+        sBack = self.importset.profile.user.username
+        return sBack
 
     def get_saved(self):
         """REturn the saved date in a readable form"""
@@ -2079,12 +2249,41 @@ class ImportReview(models.Model):
         sDate = get_crpp_date(self.saved, True)
         return sDate
 
+    def get_status(self, html=False):
+        sStatus = self.get_status_display()
+        if html:
+            sStatus = '<span class="badge signature gr">{}</span>'.format(sStatus)
+        return sStatus
+
+    def get_submission(self):
+        """Get a button to go to this submission"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.importset is None:
+                url = reverse('importset_details', kwargs={'pk': self.importset.id})
+                sBack = '<span class="badge signature ot"><a href="{}"></a></span>'.format(url)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/get_submission")
+        return sBack
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None
         oErr = ErrHandle()
         try:
             # Adapt the save date
             self.saved = get_current_datetime()
+
+            # Check if the order is specified
+            if self.order is None or self.order <= 0:
+                # Specify the order
+                self.order = ImportReview.objects.filter(moderator=self.moderator).count() + 1
+
+            # If needed, set the review status
+
+            # Perform the normal logic
             response = super(ImportReview, self).save(force_insert, force_update, using, update_fields)
         except:
             msg = oErr.get_error_message()
@@ -2092,4 +2291,22 @@ class ImportReview(models.Model):
         # Return the response when saving
         return response
 
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = ImportReview.objects.filter(moderator=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/update_order")
+            bOkay = False
+        return bOkay
 

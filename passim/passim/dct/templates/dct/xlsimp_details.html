@@ -1,0 +1,13 @@
+{% if is_app_editor %}
+  <table class="func-view">
+    <tbody>
+      <tr><td>Excel file:</td><td>{{instance.get_name_html|safe}}</td></tr>
+      <tr><td>Owner:</td><td>{{instance.get_owner}}</td></tr>
+      <tr><td>Type:</td><td>{{instance.get_type}}</td></tr>
+      <tr><td>Status:</td><td>{{instance.get_status}}</td></tr>
+      <tr><td>Report:</td><td>{{instance.get_report_html|safe}}</td></tr>
+      <tr><td>Saved:</td><td>{{instance.get_saved}}</td></tr>
+      <tr><td>Created:</td><td>{{instance.get_status}}</td></tr>
+    </tbody>
+  </table>
+{% endif %}

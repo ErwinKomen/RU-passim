@@ -1,0 +1,24 @@
+{% if is_app_editor %}
+  <!-- Allowing to download the Excel manuscript -->
+  <div class="container-small">
+    <form>
+      {% csrf_token %}
+      <a role="button" href="#" downloadtype="excel" class="btn btn-sm jumbo-1"
+         onclick="ru.basic.post_download(this);"
+         contentid="#import_result_{{instance.id}}"
+         ajaxurl="{% url 'importset_download' instance.id %}">Download Excel file</a>
+    </form>
+  </div>
+
+  <!-- Facilitating submitting a verdict -->
+  <div>
+    <form id="import_form_{{instance.id}}" targeturl="{% url 'importreview_process' instance.id %}">
+      {% csrf_token %}
+      <div class="hidden">
+        <input type="text" id="id_importverdict" name="importverdict" value="{{importverdict}}" />
+      </div>
+    </form>
+  </div>
+  <div id="import_err_{{instance.id}}"></div>
+  <div id="import_result_{{instance.id}}"></div>
+{% endif %}
