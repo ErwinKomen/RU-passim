@@ -4147,6 +4147,7 @@ class Manuscript(models.Model):
             keyfield = kwargs.get("keyfield", "name")
             sourcetype = kwargs.get("sourcetype", "")
             bManuCreate = kwargs.get("manucreate", False)
+            projects = kwargs.get("projects")
 
             # Need to have external information
             externals = oManu.get("externals")
@@ -4275,7 +4276,8 @@ class Manuscript(models.Model):
 
                     if not bSkip:
                         # Issue #479: get the default project(s) - may be more than one
-                        projects = profile.get_defaults()
+                        if projects is None or projects.count() == 0:
+                            projects = profile.get_defaults()
                         # Link the manuscript to the projects, if not already done
                         obj.set_projects(projects)
 
@@ -7496,64 +7498,82 @@ class EqualGold(models.Model):
     def do_ranges(self, lst_verses = None, force = False, bSave = True):
         bResult = True
         bDebug = False
-        if self.bibleref == None or self.bibleref == "":
-            # Remove any existing bibrange objects
-            # ... provided they are not used for SermonDescr
-            self.equalbibranges.filter(sermon__isnull=True).delete()
-        else:
-            # done = Information.get_kvalue("biblerefs")
-            if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
-                # Open a Reference object
-                oRef = Reference(self.bibleref)
+        oErr = ErrHandle()
+        try:
+            if self.bibleref == None or self.bibleref == "":
+                # Remove any existing bibrange objects
+                # ... provided they are not used for SermonDescr
+                self.equalbibranges.filter(sermon__isnull=True).delete()
+            else:
+                # done = Information.get_kvalue("biblerefs")
+                if force or self.verses == None or self.verses == "" or self.verses == "[]" or lst_verses != None:
+                    # Open a Reference object
+                    oRef = Reference(self.bibleref)
 
-                # Do we have verses already?
-                if lst_verses == None:
+                    # Do we have verses already?
+                    if lst_verses == None:
 
-                    # Calculate the scripture verses
-                    bResult, msg, lst_verses = oRef.parse()
-                else:
-                    bResult = True
-                if bResult:
-                    # Add this range to the equalgold (if it's not there already)
-                    verses = json.dumps(lst_verses)
-                    if self.verses != verses:
-                        self.verses = verses
-                        if bSave:
-                            self.save()
-                    # Check and add (if needed) the corresponding BibRange object
-                    for oScrref in lst_verses:
-                        intro = oScrref.get("intro", None)
-                        added = oScrref.get("added", None)
-                        # THis is one book and a chvslist
-                        book, chvslist = oRef.get_chvslist(oScrref)
+                        if self.bibleref == "ACT 7; PSA 115:15; HEB 12:4; DAN 13; GEN 39; JOB 7:1; SIR 25:33":
+                            iStop = 1
+                        # Calculate the scripture verses
+                        bResult, msg, lst_verses = oRef.parse()
+                        # Where there any errors?
+                        if len(oRef.errors) > 0:
+                            # Add the errors to the list
+                            lst_verses.append(dict(intro="", added="", scr_refs=[], errors=oRef.errors))
+                    else:
+                        bResult = True
+                    if bResult:
+                        # Add this range to the equalgold (if it's not there already)
+                        verses = json.dumps(lst_verses)
+                        if self.verses != verses:
+                            self.verses = verses
+                            if bSave:
+                                self.save()
+                        # Check and add (if needed) the corresponding BibRange object
+                        for oScrref in lst_verses:
+                            intro = oScrref.get("intro", None)
+                            added = oScrref.get("added", None)
 
-                        # Possibly create an appropriate Bibrange object (or emend it)
-                        # Note: this will also add BibVerse objects
-                        obj = BibRange.get_range_equal(self, book, chvslist, intro, added)
+                            # Check if this contains errors
+                            if "errors" in oScrref:
+                                # This is an item containing a list of errors
+                                oErr.Status("Errors in EqualGold {}: {}".format(self.id, oScrref['errors']))
+                            else:
+
+                                # THis is one book and a chvslist
+                                book, chvslist = oRef.get_chvslist(oScrref)
+
+                                # Possibly create an appropriate Bibrange object (or emend it)
+                                # Note: this will also add BibVerse objects
+                                obj = BibRange.get_range_equal(self, book, chvslist, intro, added)
                         
-                        if obj == None:
-                            # Show that something went wrong
-                            print("do_ranges0 eqg={} unparsable: {}".format(self.id, self.bibleref), file=sys.stderr)
-                        else:
-                            # Add BibVerse objects if needed
-                            verses_new = oScrref.get("scr_refs", [])
-                            verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
-                            # Remove outdated verses
-                            deletable = []
-                            for item in verses_old:
-                                if item not in verses_new: deletable.append(item)
-                            if len(deletable) > 0:
-                                obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
-                            # Add new verses
-                            with transaction.atomic():
-                                for item in verses_new:
-                                    if not item in verses_old:
-                                        verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
-                    if bDebug:
-                        print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
-                else:
-                    if bDebug:
-                        print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
+                                if obj == None:
+                                    # Show that something went wrong
+                                    print("do_ranges0 eqg={} unparsable: {}".format(self.id, self.bibleref), file=sys.stderr)
+                                else:
+                                    # Add BibVerse objects if needed
+                                    verses_new = oScrref.get("scr_refs", [])
+                                    verses_old = [x.bkchvs for x in obj.bibrangeverses.all()]
+                                    # Remove outdated verses
+                                    deletable = []
+                                    for item in verses_old:
+                                        if item not in verses_new: deletable.append(item)
+                                    if len(deletable) > 0:
+                                        obj.bibrangeverses.filter(bkchvs__in=deletable).delete()
+                                    # Add new verses
+                                    with transaction.atomic():
+                                        for item in verses_new:
+                                            if not item in verses_old:
+                                                verse = BibVerse.objects.create(bibrange=obj, bkchvs=item)
+                        if bDebug:
+                            print("do_ranges1: {} verses={}".format(self.bibleref, self.verses), file=sys.stderr)
+                    else:
+                        if bDebug:
+                            print("do_ranges2 unparsable: {}".format(self.bibleref), file=sys.stderr)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/do_ranges")
         return None
     
     def get_author(self):
@@ -10253,6 +10273,7 @@ class SermonDescr(models.Model):
             keyfield = kwargs.get("keyfield", "name")
             profile = kwargs.get("profile")
             sourcetype = kwargs.get("sourcetype")
+            projects = kwargs.get("projects")
 
             # Figure out whether this sermon item already exists or not
             locus = oSermo['locus']
@@ -10335,8 +10356,9 @@ class SermonDescr(models.Model):
 
             # Figure out if project assignment should be done
             if type.lower() != "structural" and not profile is None and obj.projects.count() == 0:
-                # Assign the default projects
-                projects = profile.get_defaults()
+                if projects is None or projects.count() == 0:
+                    # Assign the default projects
+                    projects = profile.get_defaults()
                 obj.set_projects(projects)
 
         except:

@@ -27,7 +27,7 @@ from passim.basic.models import UserSearch
 from passim.basic.views import base64_decode, base64_encode
 from passim.seeker.models import Author, Keyword, get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
-    SermonDescr, EqualGold, Feast
+    SermonDescr, EqualGold, Feast, Project2
 from passim.reader.excel import ManuscriptUploadExcel
 
 STANDARD_LENGTH=255
@@ -1535,6 +1535,9 @@ class ImportSet(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(default=get_current_datetime)
 
+    # Many-to-many stuff
+    projects = models.ManyToManyField(Project2, through="ImportSetProject", related_name="projects_importset")
+
     def __str__(self):
         sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.importtype)
         return sBack
@@ -1570,7 +1573,8 @@ class ImportSet(models.Model):
                 # What if this is a manuscript upload?
                 if self.importtype == "manu":
                     oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
-                    kwargs = {'profile': self.profile, 'username': username, 'team_group': ""}
+                    kwargs = {'profile': self.profile, 'username': username, 'team_group': "",
+                              'projects': self.projects.all()}
                     # Indicate that a NEW one should be created, if already existing
                     manucreate = True
 
@@ -1599,7 +1603,7 @@ class ImportSet(models.Model):
 
         return bResult
 
-    def do_submit(self):   #, profile):
+    def do_submit(self):
         """Submit the ImportSet"""
 
         sBack = ""
@@ -2040,6 +2044,30 @@ class ImportSet(models.Model):
         sBack = self.profile.user.username
         return sBack
 
+    def get_projects_html(self):
+        """Get the list of projects to which the import will be assigned"""
+
+        sBack = "(none)"
+        oErr = ErrHandle()
+        try:
+            # Get the queryset
+            qs = self.projects.all()
+            if qs.count() > 0:
+                html = []
+                for obj in qs:
+                    if obj.__class__.__name__ == "Project2":
+                        project = obj
+                    else:
+                        project = obj.project
+                    url = reverse('project2_details', kwargs={'pk': project.id})
+                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                sBack = ",".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_projects")
+
+        return sBack
+
     def get_report_html(self):
         """Convert the markdown report"""
 
@@ -2331,4 +2359,25 @@ class ImportReview(models.Model):
             oErr.DoError("ImportReview/update_order")
             bOkay = False
         return bOkay
+
+
+class ImportSetProject(models.Model):
+    """Project associated with the import set"""
+
+    # [1] Obligatory importset
+    importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_projects")
+    # [1] Obligatory project
+    project = models.ForeignKey(Project2, on_delete=models.CASCADE, related_name="importset_projects")
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sName = self.importset.name
+        if sName is None or sName == "":
+            sName = "id{}".format(self.importset.id)
+        sBack = "{}-{}".format(sName, self.project.name)
+        return sBack
+
+
+
 

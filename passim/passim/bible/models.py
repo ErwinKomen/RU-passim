@@ -187,6 +187,7 @@ class Reference():
     pos = 0             # Running position within string
     sr = []             # List of scripture reference objects
     sr_idx = -1         # Index of the current item in [sr]
+    errors = []         # Possible list of errors
     
     def __init__(self, bibleref):
         self.ref_string = bibleref
@@ -195,6 +196,7 @@ class Reference():
             self.ref_len = len(self.ref_string)
             self.pos = 0
             self.sr = []
+            self.errors = []
         return super(Reference, self).__init__()
 
     def get_range(self):
@@ -502,7 +504,7 @@ class Reference():
 
             # Work on line: 
             # <ScrRef> ::= <BkRef> (SPACE* ";" SPACE* <BkRef>)*
-            bFound, bi = self.bnf_BkRef()
+            bFound, bi, msg = self.bnf_BkRef()
             # Continue while there is still space
             while bFound and not self.is_end():
                 # Skip spaces
@@ -512,12 +514,12 @@ class Reference():
                 if sNext == ";":
                     self.pos += 1
                     self.skip_spaces()
-                    bFound, bi = self.bnf_BkRef(bi)
+                    bFound, bi, msg = self.bnf_BkRef(bi)
                 elif self.has_following(";"):
                     added = self.get_remainder(";")
                     self.add_added(added)
                     self.skip_spaces()
-                    bFound, bi = self.bnf_BkRef(bi)
+                    bFound, bi, msg = self.bnf_BkRef(bi)
                 else:
                     bFound = False
                 ## Reset [bi]
@@ -611,13 +613,19 @@ class Reference():
                     else:
                         # See if there indeed is another <ChVs>
                         bFound, msg = self.bnf_ChVs(bi)
+                        if not bFound:
+                            # Make sure we return false
+                            # bStatus = False
+                            # Make sure the last item in the [sr] is not kept
+                            self.sr.pop(self.sr_idx)
+                            self.sr_idx -= 1
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Reference/bnf_BkRef")
             bStatus = False
 
         # All we return directly is the Status
-        return bStatus, bi
+        return bStatus, bi, msg
 
     def bnf_ChVs(self, bi):
         """Process <ChVs> line for bnf_BkRefs
@@ -627,6 +635,11 @@ class Reference():
                             <Ch> SPACE* ("-")$ SPACE* <Ch> ||
                             <Ch> ("*") ":" <Vs> (SPACE* "," SPACE* <Vss>)* ("*")
         """
+        
+        def get_book_abbr(bi):
+            sBook = Book.get_abbr(bi)
+            sBook = sBook if sBook != "" else str(bi)
+            return sBook
 
         oErr = ErrHandle()
         msg = ""
@@ -637,7 +650,12 @@ class Reference():
             chapter = self.get_number()
             if chapter == None:
                 # No number found, so return false
-                msg = "No number found"
+                sBook = get_book_abbr(bi)
+                msg = "No chapter number found for reference to {}".format(sBook)
+                # Add to error list
+                self.errors.append(msg)
+
+                # Set the status to False
                 bStatus = False
                 return bStatus, msg
 
@@ -668,7 +686,9 @@ class Reference():
                 chapter2 = self.get_number()
                 if chapter2 == None or chapter2 < chapter:
                     # Produce an error
-                    msg = "Second chapter must exist and be higher than first"
+                    sBook = get_book_abbr(bi)
+                    msg = "Second chapter of book {} must exist and be higher than first".format(sBook)
+                    self.errors.append(msg)
                     bStatus = False
                     return bStatus, msg
                 # Now we have a range of 2 chapters, e.g. EXO 5-7
@@ -712,10 +732,20 @@ class Reference():
             else:
                 # THis is just a whole chapter
                 num_vss = Chapter.get_vss(bi, chapter)
-                # Fill the array
-                for i in range(num_vss):
-                    verse = i+1
-                    self.add_bkchvs(bi, chapter, verse)
+                if num_vss == 0:
+                    # We found a book + whole chapter, but this chapter has no verses
+                    sBook = get_book_abbr(bi)
+                    msg = "Reference to [{} {}] points to a non-existing chapter".format(sBook, chapter)
+                    # Add to error list
+                    self.errors.append(msg)
+
+                    # Set the status to False
+                    bStatus = False
+                else:
+                    # Fill the array
+                    for i in range(num_vss):
+                        verse = i+1
+                        self.add_bkchvs(bi, chapter, verse)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Reference/bnf_BkRef")

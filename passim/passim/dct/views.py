@@ -29,11 +29,11 @@ from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
-    user_is_superuser, get_selectitem_info
+    user_is_superuser, get_selectitem_info, adapt_m2m
 from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
-from passim.dct.models import ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
+from passim.dct.models import ImportSetProject, ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
     SavedItem, SavedSearch, SelectItem, SavedVis, SaveGroup, ImportSet, ImportReview
 from passim.dct.forms import ResearchSetForm, SetDefForm, RsetSelForm, SaveGroupForm, SgroupSelForm, \
     ImportSetForm, ImportReviewForm
@@ -3059,7 +3059,8 @@ class ImportSetEdit(BasicDetails):
                 {'type': 'safe',  'label': "Notes:",        'value': instance.get_notes_html(),  'field_key': 'notes' },
                 {'type': 'plain', 'label': "Type:",         'value': instance.get_type(),        'field_key': 'importtype'},
                 {'type': 'safe',  'label': "Status:",       'value': instance.get_status(True),     },
-                {'type': 'plain', 'label': "Owner:",        'value': instance.profile.user.username },
+                {'type': 'plain', 'label': "Owner:",        'value': instance.get_owner()           },
+                {'type': 'plain', 'label': "Projects:",     'value': instance.get_projects_html(),'field_list': 'projlist' },
                 {'type': 'plain', 'label': "Created:",      'value': instance.get_created()         },
                 {'type': 'plain', 'label': "Saved:",        'value': instance.get_saved()           },
                 {'type': 'plain', 'label': "Report:",       'value': instance.get_report_html()     },
@@ -3112,6 +3113,47 @@ class ImportSetEdit(BasicDetails):
             msg = oErr.get_error_message()
             oErr.DoError("ImportSetEdit/before_save")
     
+        return bStatus, msg
+
+    def after_save(self, form, instance):
+        """What to do after saving the instance?"""
+
+        def assign_default(profile):
+            oErr = ErrHandle()
+            try:
+                # Get the default assign projects
+                qs = profile.project_approver.filter(status="incl")
+                # Assign those in here
+                for obj in qs:
+                    instance.projects.add(obj.project)
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("ImportSetEdit/assign_default")
+
+        bStatus = True
+        msg = ""
+        oErr = ErrHandle()
+        try:
+            # Get my profile
+            profile = self.request.user.user_profiles.first()
+            # (1) Check: does this importset have projects already?
+            if instance.projects.count() == 0:
+                # No projects yet: assign the default projects for this user
+                assign_default(profile)
+            else:
+                # (2) 'projects'
+                projlist = form.cleaned_data['projlist']
+                adapt_m2m(ImportSetProject, instance, "importset", projlist, "project")
+                # But what if the number of projects reduces to zero?
+                if instance.projects.count() == 0:
+                    # Then we still assign the default project
+                    assign_default(profile)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetEdit/after_save")
+
+        # Return as usual
         return bStatus, msg
 
     def get_button(self, instance, is_app_editor):

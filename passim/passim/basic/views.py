@@ -2102,7 +2102,7 @@ class BasicDetails(DetailView):
                 if bFormsetChanged:
                     # OLD: 
                     frm = self.prepare_form(instance, context)
-
+                
                 # Put the form and the formset in the context
                 context['{}Form'.format(self.prefix)] = frm
                 context['basic_form'] = frm
@@ -2434,7 +2434,7 @@ class BasicDetails(DetailView):
                     if lst_form_ta != None:
                         for item in lst_form_ta:
                             self.lst_typeahead.append(item)
-
+                
             # Get any possible typeahead parameters
             if frm != None:
                 lst_form_ta = getattr(frm, "typeaheads", None)

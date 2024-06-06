@@ -78,6 +78,25 @@ class ImportSetWidget(ModelSelect2MultipleWidget):
         return qs
 
 
+class Project2Widget(ModelSelect2MultipleWidget):
+    model = Project2
+    search_fields = [ 'name__icontains' ]
+    profile = None
+
+    def label_from_instance(self, obj):
+        return obj.name
+
+    def get_queryset(self):
+        if self.queryset is None:
+            if self.profile is None:
+                qs = Project2.objects.all().order_by('name').distinct()
+            else:
+                qs = self.profile.get_editor_projects()
+        else:
+            qs = self.queryset
+        return qs
+
+
 class ProfileOneWidget(ModelSelect2Widget):
     model = Profile
     search_fields = [ 'user__username__icontains' ]
@@ -417,6 +436,8 @@ class ImportSetForm(BasicModelForm):
     namelist    = ModelMultipleChoiceField(queryset=None, required=False, 
             widget=ImportSetWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple file names...', 
                                               'style': 'width: 100%;', 'class': 'searching'}))
+    projlist    = ModelMultipleChoiceField(queryset=None, required=False, 
+                widget=Project2Widget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple projects...', 'style': 'width: 100%;', 'class': 'searching'}))
 
     class Meta:
         model = ImportSet
@@ -456,13 +477,19 @@ class ImportSetForm(BasicModelForm):
             self.fields['importtypelist'].queryset = FieldChoice.objects.filter(field=IMPORT_TYPE).order_by("english_name")
 
             self.fields['namelist'].queryset = ImportSet.objects.filter(profile=profile)
+            projlist = profile.get_editor_projects()
+            self.fields['projlist'].queryset = projlist
+            # self.fields['projlist'].widget.queryset = projlist
+            self.fields['projlist'].widget.profile = profile
             
             # Get the instance
             if 'instance' in kwargs:
                 instance = kwargs['instance']
-                # Adapt the profile if this is needed
-                # self.fields['profileid'].initial = instance.profile.id
 
+                # Set the initial projects already associated to this importset
+                self.fields['projlist'].initial = [x.pk for x in instance.projects.all().order_by('name')] 
+
+                # Possibly adapt importtype
                 if instance.importtype == "":
                     self.fields['importtype'].initial = "manu"
 
