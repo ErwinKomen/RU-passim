@@ -41,6 +41,7 @@ import json
 import csv, re
 import requests
 import openpyxl
+import math
 from threading import Thread
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
@@ -4217,14 +4218,19 @@ def get_hbar_data():
     green = 0
     combidata = {}
     lst_combi = []
-    ptypes = ['sermo', 'super', 'manu']
+    lst_info = []
+    #ptypes = ['manu', 'sermo', 'super']
+    #ptypename = ['Manuscripts', 'Manifestations', 'Authority files']
+    ptypes = ['super', 'sermo', 'manu']
+    ptypename = ['Authority file', 'Manifestation', 'Manuscript']
     try:
         # Get the values for app, edi, imp, man
         stype_list = FieldChoice.objects.filter(field="seeker.stype").values('id', 'abbr')
         oStype = {}
         for oItem in stype_list:
             oStype[oItem['abbr']] = oItem['id']
-        for ptype in ptypes:
+        for idx, ptype in enumerate(ptypes):
+            group = ptypename[idx]
             qs = None
             url_red = ""
             url_ora = ""
@@ -4257,13 +4263,24 @@ def get_hbar_data():
             total = red + green + orange
 
             # Create and add data to the lst_combi
-            lst_combi.append(dict(ptype=ptype, group="Initial", value=red, url=url_red))
-            lst_combi.append(dict(ptype=ptype, group="Edited", value=orange, url=url_ora))
-            lst_combi.append(dict(ptype=ptype, group="Approved", value=green, url=url_gre))
+            approved = math.ceil(green * 100 / total)
+            edited = math.ceil(orange * 100 / total)
+            initial = 100 - approved - edited # math.ceil(red * 100 / total)
+            lst_combi.append(dict(group=group, approved=approved, edited=edited, initial=initial))
+
+            # We need more information: put that in lst_info
+            lst_info.append(dict(group=group,
+                                  app=green, edi=orange, ini=red, 
+                                  app_url=url_gre, edi_url=url_ora, ini_url=url_red))
+            # Create a list of data
+            lst_info.append(dict(group=group, subgroup="approved", value=green, url=url_gre))
+            lst_info.append(dict(group=group, subgroup="edited", value=orange, url=url_ora))
+            lst_info.append(dict(group=group, subgroup="initial", value=red, url=url_red))
 
         # Combine into combidata
         combidata['status'] = "ok"
         combidata["data"] = lst_combi
+        combidata["info"] = lst_info
     except:
         msg = oErr.get_error_message()
         combidata['msg'] = msg

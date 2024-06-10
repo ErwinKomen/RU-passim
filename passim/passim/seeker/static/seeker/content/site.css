@@ -2129,3 +2129,9 @@ a.email {
     border-radius: 2px;
 }
 
+/* Home page bar chart visualization */
+
+.passim-chart .axis path, .passim-chart .axis line {
+    fill: none;
+    stroke: none;
+}

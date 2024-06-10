@@ -27,73 +27,76 @@ var ru = (function ($, ru) {
   ru.passim.seeker = (function ($, config) {
     // Define variables for ru.passim.seeker here
     var loc_example = "",
-        loc_bManuSaved = false,
-        loc_vscrolling = 0,
-        loc_simulation = null,
-        loc_network_options = {},
-        loc_network_linktypes = null,
-        loc_newSermonNumber = 0,
-        loc_clicked_nodeid = "",
-        loc_manual_colors = [],
-        loc_progr = [],         // Progress tracking
-        loc_urlStore = "",      // Keep track of URL to be shown
-        loc_goldlink_td = null, // Where the goldlink selection should go
-        loc_goldlink = {},      // Store one or more goldlinks
-        loc_divErr = "passim_err",
-        loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
-        loc_vis_params = {
-          "overlap": {
-            "options": ["overlap_alternatives", "overlap_scount", "overlap_linktypes", "overlap_direction", "overlap_histcoll"],
-            "ids": ["network_overlap_slider", "gravity_overlap_slider"]
-          },
-          "transmission": {
-            "options": [],
-            "ids": ["network_trans_slider", "gravity_trans_slider"]
-          }
+      loc_bManuSaved = false,
+      loc_vscrolling = 0,
+      loc_simulation = null,
+      loc_network_options = {},
+      loc_network_linktypes = null,
+      loc_newSermonNumber = 0,
+      loc_clicked_nodeid = "",
+      loc_manual_colors = [],
+      loc_progr = [],         // Progress tracking
+      loc_urlStore = "",      // Keep track of URL to be shown
+      loc_goldlink_td = null, // Where the goldlink selection should go
+      loc_goldlink = {},      // Store one or more goldlinks
+      loc_divErr = "passim_err",
+      loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
+      loc_vis_params = {
+        "overlap": {
+          "options": ["overlap_alternatives", "overlap_scount", "overlap_linktypes", "overlap_direction", "overlap_histcoll"],
+          "ids": ["network_overlap_slider", "gravity_overlap_slider"]
         },
-        lAddTableRow = [
-          { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
-            "select2_options": { "templateSelection": ru.passim.litref_template }
-          },
-          // super
-          { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead,
-            "select2_options": { "templateSelection": ru.passim.sg_template }
-          },
-          { "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
-            "select2_options": { "templateSelection": ru.passim.ssg_template }
-          },
+        "transmission": {
+          "options": [],
+          "ids": ["network_trans_slider", "gravity_trans_slider"]
+        }
+      },
+      lAddTableRow = [
+        { "table": "manu_search", "prefix": "manu", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
+        {
+          "table": "gedi_formset", "prefix": "gedi", "counter": false, "events": ru.passim.init_typeahead,
+          "select2_options": { "templateSelection": ru.passim.litref_template }
+        },
+        // super
+        { "table": "scol_formset", "prefix": "scol", "counter": false, "events": ru.passim.init_typeahead },
+        {
+          "table": "ssgeq_formset", "prefix": "ssgeq", "counter": false, "events": ru.passim.init_typeahead,
+          "select2_options": { "templateSelection": ru.passim.sg_template }
+        },
+        {
+          "table": "ssglink_formset", "prefix": "ssglink", "counter": false, "events": ru.passim.init_typeahead,
+          "select2_options": { "templateSelection": ru.passim.ssg_template }
+        },
 
-          // gold
-          { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "glit_formset", "prefix": "glit", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
+        // gold
+        { "table": "gkw_formset", "prefix": "gkw", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "geq_formset", "prefix": "geq", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "glink_formset", "prefix": "glink", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "sglit_formset", "prefix": "sglit", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "glit_formset", "prefix": "glit", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "eqgcol_formset", "prefix": "eqgcol", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "gsign_formset", "prefix": "gsign", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "gcol_formset", "prefix": "gcol", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "gftxt_formset", "prefix": "gftxt", "counter": false, "events": ru.passim.init_typeahead },
 
-          // manu
-          { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mcol_formset", "prefix": "mcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
-                    
-          // sermon
-          { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sdsign_formset", "prefix": "sdsign", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sdkw_formset", "prefix": "sdkw", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
-          { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
-        ];
+        // manu
+        { "table": "mprov_formset", "prefix": "mprov", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "mlit_formset", "prefix": "mlit", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "mcol_formset", "prefix": "mcol", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "mext_formset", "prefix": "mext", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "mkw_formset", "prefix": "mkw", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "mdr_formset", "prefix": "mdr", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "lrel_formset", "prefix": "lrel", "counter": false, "events": ru.passim.init_typeahead },
+
+        // sermon
+        { "table": "sdcol_formset", "prefix": "sdcol", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "sdsign_formset", "prefix": "sdsign", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "stog_formset", "prefix": "stog", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "sdkw_formset", "prefix": "sdkw", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "sedi_formset", "prefix": "sedi", "counter": false, "events": ru.passim.init_typeahead },
+        { "table": "srmsign_formset", "prefix": "srmsign", "counter": false, "events": ru.passim.init_typeahead }
+      ];
 
     const rgb2hex = (rgb) => `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
 
@@ -105,27 +108,27 @@ var ru = (function ($, ru) {
        */
       addLegend: function (options) {
         var sMethod = "", // Sampling method
-            iSize = 0,    // Sample size
-            sExcl = "";   // Exclusion string
+          iSize = 0,    // Sample size
+          sExcl = "";   // Exclusion string
 
         try {
           // Check to see if the correct options are there
           if (!('divsvg' in options && 'x' in options &&
-                 'y' in options && 'legend' in options)) {
+            'y' in options && 'legend' in options)) {
             private_methods.errMsg("Error in addLegend: missing option");
             return false;
           }
           d3.select(options['divsvg']).append("svg:g")
-              .append("svg:text")
-              .attr("x", options['x'])
-              .attr("y", options['y'])
-              .attr("class", "ca-legendtext")
-              .text(options['legend']);
+            .append("svg:text")
+            .attr("x", options['x'])
+            .attr("y", options['y'])
+            .attr("class", "ca-legendtext")
+            .text(options['legend']);
           d3.select(options['divsvg']).append("svg:g")
-              .append("svg:text")
-              .attr("x", options['x'])
-              .attr("y", options['y'] + 15)
-              .attr("class", "ca-legendtext");
+            .append("svg:text")
+            .attr("x", options['x'])
+            .attr("y", options['y'] + 15)
+            .attr("class", "ca-legendtext");
 
           return true;
         } catch (err) {
@@ -143,7 +146,7 @@ var ru = (function ($, ru) {
        */
       codico_hlisttree: function (elRoot) {
         var hList = [],
-            srm_codi = {};
+          srm_codi = {};
 
         try {
           // Create a lis of the current hierarchy
@@ -169,8 +172,8 @@ var ru = (function ($, ru) {
        */
       codico_renumber: function (elRoot) {
         var counter = 1,
-            sRuler = "<div class=\"codico-ruler\"><hr /></div>",
-            number = 0;
+          sRuler = "<div class=\"codico-ruler\"><hr /></div>",
+          number = 0;
 
         try {
           // Get the number of elements
@@ -389,21 +392,21 @@ var ru = (function ($, ru) {
        */
       prepend_styles: function (sDiv, sType) {
         var lData = [],
-            el = null,
-            i, j,
-            sheets = document.styleSheets,
-            used = "",
-            elems = null,
-            tData = [],
-            rules = null,
-            rule = null,
-            s = null,
-            sSvg = "",
-            defs = null;
+          el = null,
+          i, j,
+          sheets = document.styleSheets,
+          used = "",
+          elems = null,
+          tData = [],
+          rules = null,
+          rule = null,
+          s = null,
+          sSvg = "",
+          defs = null;
 
         try {
           // Get the correct element
-          if (sType === "svg") { sSvg = " svg";}
+          if (sType === "svg") { sSvg = " svg"; }
           el = $(sDiv + sSvg).first().get(0);
           // Get all the styles used 
           for (i = 0; i < sheets.length; i++) {
@@ -443,7 +446,7 @@ var ru = (function ($, ru) {
               lData.push("</head><body>");
               // lData.push(el.outerHTML);
               lData.push(tData.join("\n"));
-              
+
               lData.push("</body></html>");
               break;
             case "svg":
@@ -481,10 +484,10 @@ var ru = (function ($, ru) {
        */
       sermon_treetotable: function (elRoot, elTable, selectedid) {
         var elTbody = null,
-            elSel = null,
-            elAnc = null,
-            sermonid = "",
-            rows = [];
+          elSel = null,
+          elAnc = null,
+          sermonid = "",
+          rows = [];
 
         try {
           // Get a list of the <div> elements
@@ -526,25 +529,25 @@ var ru = (function ($, ru) {
        */
       sermon_treelist: function (elDiv, selectedid) {
         var elTbody = null,
-            elTd = null,
-            elSermon = null,
-            elParent = null,
-            sermons = [],
-            sermonid = "",
-            targeturl = "",
-            hidden = "",
-            selected = "",
-            nodeid = -1,
-            childof = -1,
-            maxdepth = -1,
-            hasChildren = false,
-            colspan = 0,
-            td = "",
-            tr = "",
-            lTr = [],
-            level = -1,
-            idx = -1,
-            lBack = [];
+          elTd = null,
+          elSermon = null,
+          elParent = null,
+          sermons = [],
+          sermonid = "",
+          targeturl = "",
+          hidden = "",
+          selected = "",
+          nodeid = -1,
+          childof = -1,
+          maxdepth = -1,
+          hasChildren = false,
+          colspan = 0,
+          td = "",
+          tr = "",
+          lTr = [],
+          level = -1,
+          idx = -1,
+          lBack = [];
 
         try {
           // Get all the sermons
@@ -554,11 +557,11 @@ var ru = (function ($, ru) {
           for (idx = 0; idx < sermons.length; idx++) {
             elSermon = sermons[idx];
             level = parseInt($(elSermon).attr("level"), 10);
-            if (level > maxdepth) { maxdepth = level;}
+            if (level > maxdepth) { maxdepth = level; }
           }
 
           // Start creating the head
-          lBack.push("<thead><tr><th colspan='{0}'>Details of this manuscript's {1} items</th><th>id</th></tr></thead>".format(maxdepth+1, sermons.length));
+          lBack.push("<thead><tr><th colspan='{0}'>Details of this manuscript's {1} items</th><th>id</th></tr></thead>".format(maxdepth + 1, sermons.length));
           lBack.push("<tbody>");
 
           // Walk all the sermons
@@ -595,7 +598,7 @@ var ru = (function ($, ru) {
             if (hasChildren) {
               if (level > 1) {
                 // Indicate level depth
-                lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level-1, (level-1) * 20));
+                lTr.push("  <td class='arg-pre' colspan='{0}' style='min-width: {1}px;'></td>".format(level - 1, (level - 1) * 20));
               }
               // This starts a new level
               lTr.push("  <td class='arg-plus' style='min-width: 20px;' onclick='crpstudio.htable.plus_click(this, \"func-inline\");'>+</td>");
@@ -632,7 +635,7 @@ var ru = (function ($, ru) {
           return [];
         }
       },
-      
+
       /**
        * sermon_tree
        *    Convert [elTable] into a correct TREE structure
@@ -643,14 +646,14 @@ var ru = (function ($, ru) {
        */
       sermon_tree: function (elTable, row) {
         var oTree = {},
-            previous = null,
-            parent = null,
-            children = [],
-            select = [],
-            rowidx = -1,
-            nodeid = "",
-            sermonid = "",
-            search = "";
+          previous = null,
+          parent = null,
+          children = [],
+          select = [],
+          rowidx = -1,
+          nodeid = "",
+          sermonid = "",
+          search = "";
 
         try {
           // What is the node we have?
@@ -732,12 +735,12 @@ var ru = (function ($, ru) {
        */
       sermon_down: function (oTree, row) {
         var sermonid = "",
-            i = 0,
-            child = [],
-            parent = null,
-            next = null,
-            prev = null,
-            node = null;
+          i = 0,
+          child = [],
+          parent = null,
+          next = null,
+          prev = null,
+          node = null;
 
         try {
           // Get the sermonid in the row
@@ -794,10 +797,10 @@ var ru = (function ($, ru) {
        */
       sermon_reorder: function (elTable, oTree) {
         var lst_this = [],
-            prevtr = null,
-            oNode = null,
-            row = null,
-            i = 0;
+          prevtr = null,
+          oNode = null,
+          row = null,
+          i = 0;
 
         try {
           // Get a list of nodes
@@ -833,8 +836,8 @@ var ru = (function ($, ru) {
        */
       sermon_list: function (oNode, lst_this) {
         var next = null,
-            i = 0,
-            child = [];
+          i = 0,
+          child = [];
 
         try {
           // Add myself to the list
@@ -863,16 +866,16 @@ var ru = (function ($, ru) {
        * @parem {int} level
        * @returns {text}
        */
-      sermon_simple: function(oNode, level) {
+      sermon_simple: function (oNode, level) {
         var lHtml = [],
-            next = null,
-            spaces = "";
+          next = null,
+          spaces = "";
 
         try {
           if (level === undefined) { level = 0; }
           // Print this node
-          spaces = Array( level * 2 +1).join(" ");
-          lHtml.push(spaces + oNode['sermonid'] + "\t"+ oNode['rowidx']);
+          spaces = Array(level * 2 + 1).join(" ");
+          lHtml.push(spaces + oNode['sermonid'] + "\t" + oNode['rowidx']);
           // Treat children
           next = oNode['firstchild'];
           while (next !== null) {
@@ -895,9 +898,9 @@ var ru = (function ($, ru) {
        */
       sermon_node: function (node, sermonid) {
         var child = null,
-            children = [],
-            i = 0,
-            response = null;
+          children = [],
+          i = 0,
+          response = null;
 
         try {
           // Validate
@@ -971,15 +974,15 @@ var ru = (function ($, ru) {
        */
       sermon_exchange: function (elSrc, elDst) {
         var nodesrcid = -1,
-            nodedstid = -1,
-            highid = -1,
-            lowid = -1,
-            children = [],
-            counter = 1,
-            mapping = {},
-            oTree = {},
-            method = "new",
-            elTable = null;
+          nodedstid = -1,
+          highid = -1,
+          lowid = -1,
+          children = [],
+          counter = 1,
+          mapping = {},
+          oTree = {},
+          method = "new",
+          elTable = null;
 
         try {
           // Get the table
@@ -998,7 +1001,7 @@ var ru = (function ($, ru) {
               // Change all the children of the original source
               $(elTable).find("tr.form-row").each(function (idx, el) {
                 var sNodeSrc = nodesrcid.toString(),
-                    sNodeDst = nodedstid.toString();
+                  sNodeDst = nodedstid.toString();
 
                 // Is this row a child of source?
                 if ($(el).attr("childof") === sNodeSrc) {
@@ -1078,7 +1081,7 @@ var ru = (function ($, ru) {
               // Now apply the mapping
               $(elTable).find("tr.form-row").each(function (idx, el) {
                 var nodeid = $(el).attr("nodeid"),
-                    childof = $(el).attr("childof");
+                  childof = $(el).attr("childof");
 
                 // Check if a mapping is needed
                 if (nodeid in mapping) {
@@ -1087,7 +1090,7 @@ var ru = (function ($, ru) {
                 if (childof in mapping) {
                   $(el).attr("childof", mapping[childof])
                 }
-                
+
               });
 
               break;
@@ -1099,7 +1102,7 @@ var ru = (function ($, ru) {
               // move 
               break;
           }
-          
+
           // Re-number the sermon list
           private_methods.sermon_renumber(elTable);
 
@@ -1147,22 +1150,22 @@ var ru = (function ($, ru) {
        */
       sermon_hlisttree: function (elRoot) {
         var hList = [],
-            srm_codi = {};
+          srm_codi = {};
 
         try {
           $(elRoot).find("div.tree").each(function (idx, el) {
             var sermonid = "",
-                previd = "",
-                nextid = "",
-                firstchild = "",
-                parent = "",
-                srm_match = null,
-                elTreeNext = null,
-                elTreePrev = null,
-                elTreeChild = null,
-                elTreeParent = null,
-                elHr = null,
-                oNew = {};
+              previd = "",
+              nextid = "",
+              firstchild = "",
+              parent = "",
+              srm_match = null,
+              elTreeNext = null,
+              elTreePrev = null,
+              elTreeChild = null,
+              elTreeParent = null,
+              elHr = null,
+              oNew = {};
 
             // Get my own sermonid
             sermonid = $(el).attr("sermonid");
@@ -1271,10 +1274,10 @@ var ru = (function ($, ru) {
        */
       screenCoordsForRect: function (svgRect) {
         var pt = null,
-            elSvg = null,
-            rect = null,
-            oBound = {},
-            matrix;
+          elSvg = null,
+          rect = null,
+          oBound = {},
+          matrix;
 
         try {
           // Get the root <svg>
@@ -1301,10 +1304,10 @@ var ru = (function ($, ru) {
        */
       var_move: function (elStart, sDirection, sType) {
         var elRow = null,
-            el = null,
-            tdCounter = null,
-            rowSet = null,
-            iLen = 0;
+          el = null,
+          tdCounter = null,
+          rowSet = null,
+          iLen = 0;
 
         try {
           // Find out what type we have
@@ -1349,7 +1352,7 @@ var ru = (function ($, ru) {
               // Look for a <td> element with class "counter"
               tdCounter = $(el).find("td.counter");
               if (tdCounter.length > 0) {
-                $(tdCounter).html(index+1);
+                $(tdCounter).html(index + 1);
               }
             }
             if (sType === "") {
@@ -1376,11 +1379,12 @@ var ru = (function ($, ru) {
        */
       draw_hpie_chart: function (divid, data) {
         var chartformat = null,
-            i = 0,
-            title = {
-              'hpie_sermo': 'Sermons',
-              'hpie_manu': 'Manuscripts',
-              'hpie_super': 'SSGs'};
+          i = 0,
+          title = {
+            'hpie_sermo': 'Sermons',
+            'hpie_manu': 'Manuscripts',
+            'hpie_super': 'SSGs'
+          };
 
         try {
           chartformat = {
@@ -1393,7 +1397,7 @@ var ru = (function ($, ru) {
             }]
           };
           for (i = 0; i < data.length; i++) {
-            chartformat.series[0].data.push({name: data[i].name, y: data[i].value});
+            chartformat.series[0].data.push({ name: data[i].name, y: data[i].value });
           }
 
           Highcharts.chart(divid, chartformat);
@@ -1412,37 +1416,37 @@ var ru = (function ($, ru) {
        */
       draw_pie_chart: function (divid, data, bAddLegend) {
         var margin = null,
-            width_g = 400,
-            height_g = 200,
-            translate_h = 0,
-            translate_legend = 0,
-            width = 0,
-            height = 0,
-            viewbox = "",
-            mySvg = null,
-            svg = null,
-            legendG = null,
-            pie = null,
-            path = null,
-            label = null,
-            arcLabel = null,
-            arc = null,
-            arcs = null,
-            radius = null,
-            arcRadius = null,
-            title = {
-              'pie_sermo': 'Manifestations',
-              'pie_manu': 'Manuscripts',
-              'pie_super': 'Authority files',
-              'super_graph_attr': 'Attributed authors'
-            },
-            g = null,
-            color = null,
-            colidx = -1,    // COlor index into array [color]
-            i = 0,
-            showGuide = null,
-            openListview = null,
-            tooltip = null, showTooltip = null, moveTooltip = null, hideTooltip = null;
+          width_g = 400,
+          height_g = 200,
+          translate_h = 0,
+          translate_legend = 0,
+          width = 0,
+          height = 0,
+          viewbox = "",
+          mySvg = null,
+          svg = null,
+          legendG = null,
+          pie = null,
+          path = null,
+          label = null,
+          arcLabel = null,
+          arc = null,
+          arcs = null,
+          radius = null,
+          arcRadius = null,
+          title = {
+            'pie_sermo': 'Manifestations',
+            'pie_manu': 'Manuscripts',
+            'pie_super': 'Authority files',
+            'super_graph_attr': 'Attributed authors'
+          },
+          g = null,
+          color = null,
+          colidx = -1,    // COlor index into array [color]
+          i = 0,
+          showGuide = null,
+          openListview = null,
+          tooltip = null, showTooltip = null, moveTooltip = null, hideTooltip = null;
 
         try {
           // Set the margin, width and height
@@ -1485,7 +1489,7 @@ var ru = (function ($, ru) {
 
           // Tooltip data respond function
           showTooltip = function (event, d) {
-            var ptc = Math.round( parseInt(d.data.value, 10) * 100 / parseInt(d.data.total, 10));
+            var ptc = Math.round(parseInt(d.data.value, 10) * 100 / parseInt(d.data.total, 10));
             tooltip.transition().duration(100).style("opacity", 1.0);
             // tooltip.html(d.length + " SSGs have a set of " + d.x0 + " sermon(s)")
             tooltip.html(d.data.name +
@@ -1500,7 +1504,7 @@ var ru = (function ($, ru) {
           // Make sure the tooltip shows about where the user hovers
           moveTooltip = function (event, d) {
             tooltip.style("left", (event.x + 10) + "px")
-                   .style("top", (event.y - 35) + "px");
+              .style("top", (event.y - 35) + "px");
           };
           // Change the opacity again
           hideTooltip = function (event, d) {
@@ -1532,52 +1536,43 @@ var ru = (function ($, ru) {
 
           // Generate the arcs
           arc = g.selectAll("arc")
-                 .data(arcs)
-                 .enter()
-                 .append("g")
-                 .attr("class", "arc passim-pie-arc")
-                 .on("click", openListview)
-                 .on("mouseover", showTooltip)
-                 .on("mousemove", moveTooltip)
-                 .on("mouseleave", hideTooltip);
+            .data(arcs)
+            .enter()
+            .append("g")
+            .attr("class", "arc passim-pie-arc")
+            .on("click", openListview)
+            .on("mouseover", showTooltip)
+            .on("mousemove", moveTooltip)
+            .on("mouseleave", hideTooltip);
 
           // Draw the arc paths
           arc.append("path")
-              .attr("d", path)
-              .attr("fill", function (d, i) {
-                return color(i);
-              })
-              .attr("opacity", "0.8");
+            .attr("d", path)
+            .attr("fill", function (d, i) {
+              return color(i);
+            })
+            .attr("opacity", "0.8");
 
           console.log(arc);
 
           // Add a label to each of the arcs
 
           svg.append("g")
-             .attr("transform", "translate(" + translate_h + "," + height_g / 2 + ")")
-             .attr("font-family", "sans-serif").attr("font-size", 10).attr("text-anchor", "middle")
-             .selectAll("text")
-             .data(arcs)
-             .join("text")
-             .attr("transform", function (d) {
-               return "translate(" + arcLabel.centroid(d) + ")";
-             });
-            /* This would have been to add a <tspan> with the number to the pie
-            .call(text => text.append("tspan")
-               //.attr("x", 0)
-               .attr("y", "0.1em")
-               .attr("font-weight", "bold")
-               .text(function (d) {
-                 return d.data.value.toLocaleString();
-               })
-               ); */
+            .attr("transform", "translate(" + translate_h + "," + height_g / 2 + ")")
+            .attr("font-family", "sans-serif").attr("font-size", 10).attr("text-anchor", "middle")
+            .selectAll("text")
+            .data(arcs)
+            .join("text")
+            .attr("transform", function (d) {
+              return "translate(" + arcLabel.centroid(d) + ")";
+            });
 
           svg.append("g")
-              .attr("transform", "translate(" + translate_h + "," + 20 + ")")
-              .attr("text-anchor", "middle")
-              .append("text")
-              .text(title[divid])
-              .attr("class", "title");
+            .attr("transform", "translate(" + translate_h + "," + 20 + ")")
+            .attr("text-anchor", "middle")
+            .append("text")
+            .text(title[divid])
+            .attr("class", "title");
 
           // Add a tooltip <div>
           tooltip = d3.select("#" + divid)
@@ -1625,6 +1620,227 @@ var ru = (function ($, ru) {
           private_methods.errMsg("draw_pie_chart", ex);
         }
       },
+
+      /**
+       * draw_hbar_chart
+       *    Show a normalized horizontal stacked bar chart using D3
+       *
+       *  The data is expected to be: 'count', 'freq'
+       *  See: https://observablehq.com/@d3/stacked-normalized-horizontal-bar/2
+       *
+       */
+      draw_hbar_chart: function (divid, data, info) {
+        var margin = null,
+          width_g = 550,
+          height_g = 200,
+          svg = null,
+          width = 0,
+          height = 0,
+          series = null,
+          scale_x = null,
+          scale_y = null,
+          offset_x = 95,
+          color = null,
+          colidx = -1,    // COlor index into array [color]
+          oColor = {},
+          subgroups = null,
+          groups = null,
+          stackedData = null,
+          barGroups = null,
+          tooltip = null,
+          oNames = {approved: "Checked", edited: "Edited", initial: "Auto-import"},
+          showTooltip = null, moveTooltip = null, hideTooltip = null,
+          openListview = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 20, left: 20 }
+          width = width_g - margin.left - margin.right;
+          height = height_g - margin.top - margin.bottom;
+
+          // Do *NOT* use a viewbox, otherwise downloading as PNG doesn't work
+          // viewbox = "0 0 970 510";
+
+          // Clear up what was there
+          $(divid).html("");
+
+          // The subgroups are: Initial, Edited, Approved (i.e. value within a bar)
+          subgroups = Object.keys(data[0]).slice(1);
+          // The groups: AF, Manuscript etc (i.e. which bar is being shown)
+          groups = data.map(d => d.group);
+
+          // Define the colors that we want to use
+          color = d3.scaleOrdinal()
+            .domain(subgroups)
+            .range(['darkblue', 'blue', 'lightblue']);
+
+          // New way to handle click function
+          openListview = function (event, d) {
+            var elDiv = null;
+            var group = d.data.group,
+              oInfo = null,
+
+              key = $(this.parentNode).attr("key");
+            oInfo = info.find((item) => item.group === group && item.subgroup === key);
+            elDiv = oInfo.url;
+            // window.location.href = elDiv;
+            window.open(elDiv, "_blank");
+          }
+
+          // Tooltip data respond function
+          showTooltip = function (event, d) {
+            var ptc = 0,
+                key = "",
+                sTooltipText = "";
+
+            d3.select(this)
+              .attr("opacity", 0.6)
+              .attr("y", function (a) {
+                return scale_y(a.data.group) - 2;
+              })
+              .attr("height", function () {
+                return scale_y.bandwidth() + 4;
+              });
+
+            key = $(event.target.parentNode).attr("key");
+
+            //ptc = Math.round(parseInt(d.data.value, 10) * 100 / parseInt(d.data.total, 10));
+            tooltip.transition().duration(100).style("opacity", 1.0);
+            sTooltipText = $(event.target).closest("g").attr("ptc") + "%"
+              + ":</br><b>" + oNames[key] + "</b>: " + $(event.target).closest("g").attr("value");
+            tooltip
+              .html(sTooltipText);
+          };
+          // Make sure the tooltip shows about where the user hovers
+          moveTooltip = function (event, d) {
+            tooltip.style("left", (event.x + 10) + "px")
+              .style("top", (event.y - 35) + "px");
+          };
+          // Change the opacity again
+          hideTooltip = function (event, d) {
+            tooltip.transition().duration(300).style("opacity", 0);
+          //  // Restore all colors to their original
+          //  $(event.target).closest("svg").find(".arc > path").each(function () {
+          //    $(this).attr("opacity", "0.8");
+          //  });
+            d3.select(this)
+              .attr("opacity", 1)
+              .attr("y", function (b) {
+                return scale_y(b.data.group);
+              })
+              .attr("height", function () {
+                return scale_y.bandwidth();
+              });
+          };
+
+          // Create an SVG top node
+          svg = d3.select(divid).append("svg")
+            .attr("width", width_g)
+            .attr("height", height_g)
+            .attr("style", "max-width: 100%; height: auto;")
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+          // Prepare the scales for positional and color encodings.
+          scale_x = d3.scaleLinear()
+            .domain([0, 100])
+            .range([margin.left, width - margin.right - margin.left]);
+
+          scale_y = d3.scaleBand()
+            .domain(groups)
+            .range([0, height])
+            .padding([0.2])
+          // Add axis left
+          svg.append("g")
+            .attr("transform", `translate(${offset_x + margin.left}, 0)`)
+            .attr("class", "axis")
+            .style("font-size", "14px")
+            .call(d3.axisLeft(scale_y).tickSizeOuter(0));
+
+          // Stack per subgroup
+          stackedData = d3.stack()
+            .keys(subgroups)
+            (data);
+
+          // Build up the svg
+          barGroups = svg.append("g")
+            .selectAll("g")
+            // Enter in the stack data = loop key per key = group per group
+            .data(stackedData)
+            .join("g")
+            .attr("fill", function (d) {
+              return color(d.key);
+            })
+            .attr("key", function (d) { return d.key; })
+            .selectAll("rect")
+            // enter a second time = loop subgroup per subgroup to add all rectangles
+            .data(d => d)
+            //.join("rect")
+            .enter()
+            .append("g")
+            .attr("ptc", function (d) {
+              // The index points to the specific group
+              // The key points to the 
+              return d.data[$(this.parentNode).attr("key")];
+            })
+            .attr("value", function (d) {
+              var group = d.data.group,
+                  oInfo = null,
+
+                  key = $(this.parentNode).attr("key");
+              oInfo = info.find( (item) => item.group === group && item.subgroup === key );
+              return oInfo.value;
+            })
+            .on('click', openListview)
+            .on('mouseenter', showTooltip)
+            .on('mousemove', moveTooltip)
+            .on('mouseleave', hideTooltip);
+
+          barGroups
+            .append("rect")
+            .attr("x", function (d) {
+              return scale_x(d[0]) + offset_x;
+            })
+            .attr("y", function (d) {
+              return scale_y(d.data.group);
+            })
+            .attr("height", scale_y.bandwidth())
+            .attr("width", function (d) {
+              return scale_x(d[1]) - scale_x(d[0]);
+            })
+
+          // Add percentage text to bargroup, if width is enough
+          // Always add a popup
+          barGroups
+            .append("text")
+            .attr("color", "white")
+            .attr("text-anchor", "middle")
+            .attr("x", function (a) {
+              // position in the middle of the bar
+              return offset_x + (scale_x(a[0]) + scale_x(a[1])) / 2;
+            })
+            .attr("y", function (a) {
+              // Vertically in the middle of the bar
+              return 5 + scale_y(a.data.group) + scale_y.bandwidth() / 2;
+            })
+            .text(function (a) {
+              var ptc = $(this.parentNode).attr("ptc"),
+                sResult = "",
+                iptc = 0;
+              iptc = Number(ptc);
+              sResult = (iptc >= 5) ? `${ptc}%` : "";
+              return sResult
+            });
+
+          // Add a tooltip <div>
+          tooltip = d3.select(divid)
+            .append("div").attr("class", "tooltip").style("opacity", 0);
+
+        } catch (ex) {
+          private_methods.errMsg("draw_hbar_chart", ex);
+        }
+      },
+
 
       /**
        * draw_line_chart
@@ -3569,22 +3785,38 @@ var ru = (function ($, ru) {
       init_charts: function () {
         var charts = ['sermo', 'super', 'manu'],
             elStart = null,
-            divid = null,
+            divid = "#passim-hbar",
             data = null,
+            info = null,
             ptype = "",
+            bShowPie = false,
             i = 0;
         try {
 
-          // Check if this is the HOME Page, for which the pie charts need to be drawn
-          for (i = 0; i < charts.length; i++) {
-            ptype = charts[i];
-            divid = "pie_" + ptype;
-            elStart = "#" + divid;
-            if ($(elStart).length > 0 && g_pie_data !== undefined && ptype in g_pie_data) {
-              data = g_pie_data[ptype];
-              private_methods.draw_pie_chart(divid, data);
+          // Do we need to shoe the pie chart?
+          if (bShowPie) {
+            // Check if this is the HOME Page, for which the pie charts need to be drawn
+            for (i = 0; i < charts.length; i++) {
+              ptype = charts[i];
+              divid = "pie_" + ptype;
+              elStart = "#" + divid;
+              if ($(elStart).length > 0 && g_pie_data !== undefined && ptype in g_pie_data) {
+                data = g_pie_data[ptype];
+                private_methods.draw_pie_chart(divid, data);
+              }
+            }
+          } else {
+            // We are going to show the horizontal bar chart(s)
+            // divid = $("div.passim-chart").first();
+            if (divid !== null && $(divid).length > 0 && g_hbar_data !== undefined) {
+              // get the data
+              data = g_hbar_data["data"];
+              info = g_hbar_data["info"];
+              // Draw the hbar chart
+              private_methods.draw_hbar_chart(divid, data, info);
             }
           }
+
 
          } catch (ex) {
           private_methods.errMsg("init_charts", ex);
