@@ -12397,7 +12397,8 @@ class ManuscriptListView(BasicList):
              'keyS': 'passimcode', 'keyFk': 'code', 'keyList': 'passimlist', 'infield': 'id'},
             
             # Signature NEW signature
-            {'filter': 'authority_file_signature', 'fkfield': 'manuitems__itemsermons__sermonsignatures',     'help': 'signature', # HOE MOET DIE fkfield worden genoemd? Filteren op twee links
+            {'filter': 'authority_file_signature', 'fkfield': 'manuitems__itemsermons__equalgolds__equal_goldsermons__goldsignatures',     
+             'help': 'signature', # HOE MOET DIE fkfield worden genoemd? Filteren op twee links
              'keyS': 'signature', 'keyFk': 'code', 'keyId': 'signatureid', 'keyList': 'siglist', 'infield': 'code' }, # Q expressie toevoegen
 
             ## Sign manual SERMON KAN LATER WEG
