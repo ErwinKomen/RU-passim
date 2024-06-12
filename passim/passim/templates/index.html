@@ -17,11 +17,7 @@
     </h1>
     <p class="lead">
       <span class="" style="color: black; font-size: large;"> An Open Source research tool for the study of Latin patristic sermons and their medieval manuscript transmission.</span>
-    </p>
-    <p>
-      <span style="font-weight: bold; font-size: medium;">Disclaimer: </span>
-      <span style="color: red; font-size: medium;">This is a beta version</span>
-    </p>
+    </p>    
   </div>
 
   {% if is_404 %}
@@ -36,14 +32,74 @@
     </div>
   {% endif %}
 
+  
+ <div class="row">
+   <div class="col-md-12">
+      <div class="search">SEARCH</div>
+
+       <div class="buttonbox">
+         <a class="button1" href="{% url 'equalgold_list' %}" target="_blank"></a>       
+         <div style="font-size: 15px; ">AUTHORITY FILES</div>
+       </div>
+
+       <div class="buttonbox">
+         <a class="button2" href="{% url 'sermon_list' %}" target="_blank"></a>       
+         <div style="font-size: 15px; ">MANIFESTATIONS</div>
+       </div>
+
+       <div class="buttonbox">
+         <a class="button3" href="{% url 'manuscript_list' %}" target="_blank"></a>       
+         <div style="font-size: 15px; ">MANUSCRIPTS</div>
+       </div>
+
+      <p>
+        The PASSIM research tool provides access to a database of metadata on antique and medieval works and their 
+        manuscript transmission, with a focus on Latin patristic sermons. There are three main categories of information. 
+        <a href="{% url 'equalgold_list' %}" target="_blank">Authority files</a> serve as stable identifiers for texts. 
+        The unique features of the texts in their manuscript context 
+        (e.g., titles, incorrect author attributions, alternative incipits) are recorded 
+        under <a href="{% url 'sermon_list' %}" target="_blank">Manifestations</a>. 
+        General information and content descriptions of the <a href="{% url 'manuscript_list' %}" target="_blank">Manuscripts</a> 
+        constitute the third category. PASSIM functions as a virtual research environment, allowing users to save searches, create personal datasets, 
+        visualize results and export data. We provide Tutorials on functionalities and tools.
+      </p> 
+    </div>
+  </div>
+
   <div class="row">
+    <div class="col-md-6 bgimg">
+    <p>
+      Initially built for a dataset of patristic sermons and their manuscripts, PASSIM houses also other datasets. 
+      Users can isolate specific datasets (<a href="{% url 'project2_list' %}" target="_blank">Projects</a>) 
+        to execute a targeted search. Current projects in PASSIM include:
+    </p>
+    <!--buttons and link to description-->
+    
+    
+    {% if prj_links|length > 0 %}
+    <table>
+        {% for prj_item in prj_links %}
+        <tr>
+            <td>
+            <a href="{{prj_item.url}}">{{prj_item.name}}</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+
+    <p>
+      <br />
+      Interested in importing your own data into PASSIM? See the <a href="{% url 'home' %}" target="_blank">Contribute</a> page.
+    </p>
+
+    </div>
+
     <div class="col-md-6 bgimg">
       <h2>Summary</h2>
       <p>
-        Currently the web application hosts {{count_sermon}} sermons, that are part of {{count_manu}} manuscripts.
-        We keep track of the information that is extracted from external <a href="{% url 'source_list' %}" target="_blank">sources</a>
-        (<a href="{% url 'about' %}">statistics</a>).
-        More details can be found on the <a href="{% url 'literature_list' %}" target="_blank">bibliography page</a>.
+        The PASSIM dataset is under development. It currently contains {{count_ssg}} authority files, {{count_sermon}} manifestations and {{count_manu}} manuscripts.        
       </p>
 
       <div class="row" style="height: 200px;" targeturl="{% url 'guide' %}">
@@ -55,48 +111,32 @@
         </div>
       </div>
 
-      <p>Not sure about the colours? See this <a href="{% url 'guide' %}">explanation</a>.</p>
 
-      <h2>Latest news</h2>
-      {% if newsitem_list %}
-      {% for item in newsitem_list %}
-      <div class="panel-news panel-default">
-        <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
-          <span>{{item.title}}</span>
-          <span class="pull-right" style="font-size: smaller;">
-            {% if item.saved|date:"j/b/o" == item.created|date:"j/b/o" %}
-            <i>{{item.saved|date:"j/b/o"}}</i>
-            {% else %}
-            <i>{{item.created|date:"j/b/o"}} - {{item.saved|date:"j/b/o"}}</i>
-            {% endif %}
-          </span>
-        </div>
-        <div class="collapse newsitem" id="news-item-{{item.id}}">
-          {{item.msg|safe}}
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <p><i>(There is no news yet)</i></p>
-      {% endif %}
+      <p>See this <a href="{% url 'guide' %}" target="_blank">explanation</a> for the figures.</p> 
+           
+
+      
+     
     </div>
-    <div class="col-md-6">
-      <h2>Project</h2>
-      <p>See the PASSIM <a href="https://applejack.science.ru.nl/passimproject" target="_blank">project page</a> for more information.</p>
+  </div>
 
-      <h2>Getting started</h2>
+   <div class="row">
+   <div class="col-md-12">           
       <p>
-        The passim application has been designed by the Technical Service Group of the Humanities Lab at the Radboud University Nijmegen.
-        Any researcher is invited to register (via <a role="button" class="btn btn-default btn-xs" href="{% url 'signup' %}">sign up</a>).
-        Regular researchers are able to read and search through the information that is provided.
-      </p>
-      <p>
-        {% if user.is_authenticated %}
-        (See the <b>Extra</b> menu for logout and other options)
-        {% endif %}
-      </p>
+        <br>
+        The PASSIM research tool was designed by the Radboud Humanities Computer Lab and funded by the European Research Council (ERC) 
+        under the European Union's Horizon 2020 research and innovation programme under grant agreement No ERC-2018-stg 802210. 
+        Manuscript images were taken from Sankt Gallen, Stiftsbibl. 433 <a href="https://e-codices.unifr.ch/en" target="_blank">e-codices.unifr.ch</a>
+               
+        <a href="https://erc.europa.eu/" target="_blank" style="margin: 10px;">
+          <img src="https://erc.europa.eu/sites/default/files/LOGO_ERC-FLAG_EU_.jpg" style='max-width: 300px; width: auto; height: auto;' title="European Research Council"/>        
+        </a>
 
+        <a href="https://www.ru.nl/en/radboud-institute-for-culture-history" target="_blank" style="margin: 10px;">
+          <img  src="https://cls.ru.nl/RU_logo.svg" style='max-width: 300px; width: auto; height: auto;' title="Radboud Universiteit"/>        
+        </a>         
 
+      </p> 
     </div>
   </div>
 </div>

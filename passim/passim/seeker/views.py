@@ -774,6 +774,7 @@ def home(request, errortype=None):
             print("counting for statistics")
         context['count_sermon'] = SermonDescr.objects.exclude(mtype="tem").count()
         context['count_manu'] = Manuscript.objects.exclude(mtype="tem").count()
+        context['count_ssg'] = EqualGold.objects.count()
 
         # Gather pie-chart data
         if bDebug: 
@@ -787,6 +788,18 @@ def home(request, errortype=None):
         else:
             thread = Thread(target=scan_transcriptions)
             thread.start()
+
+        # Add
+        prj_links = []
+        prj_names = ['Passim', 'HUWA/CSEL', 'Brepols-CPPM'] # add rest
+        for sName in prj_names:
+            # Find the project fitting the name
+            obj = Project2.objects.filter(name__iexact = sName).first()
+            if not obj is None:
+                url = reverse('project2_details', kwargs={'pk': obj.id})
+                oItem = dict(url=url, name=sName)
+            prj_links.append(oItem)
+        context['prj_links'] = prj_links
 
         # Check if the user's / profile's information is up-to-date
         user = request.user
@@ -959,6 +972,19 @@ def about(request):
                 'site_url': admin.site.site_url}
     context = get_application_context(request, context)
     # context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
+
+    # Check the newsitems for validity
+    if bDebug: 
+        # ========== DEBUG ============
+        print("- Calling check_until")
+    NewsItem.check_until()
+
+    # Create the list of news-items
+    lstQ = []
+    lstQ.append(Q(status='val'))
+    newsitem_list = NewsItem.objects.filter(*lstQ).order_by('-created', '-saved')
+    context['newsitem_list'] = newsitem_list
+
 
     # Calculate statistics
     sites = {}
@@ -7450,7 +7476,7 @@ class UserEdit(BasicDetails):
             {'type': 'plain', 'label': "Username:",     'value': instance.username}, # ,    'field_key': "username"},
             {'type': 'plain', 'label': "Email:",        'value': instance.email,       'field_key': "email"},
             {'type': 'plain', 'label': "First name:",   'value': instance.first_name,  'field_key': "first_name"},
-            {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},
+            {'type': 'plain', 'label': "Last name:",    'value': instance.last_name,   'field_key': "last_name"},            
             ]
 
         # Adapt the permission, if this is the actual user that is logged in
@@ -7464,7 +7490,10 @@ class UserEdit(BasicDetails):
                 # This is not the current user
                 self.permission = "readonly"
             context['permission'] = self.permission
-
+        
+        # Add the url password change
+        # <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
+        # context['pwchange'] = "<a href="{% url 'admin:password_change' %}">Change password</a>"
         # Return the context we have made
         return context
 
@@ -7509,7 +7538,8 @@ class ProfileEdit(BasicDetails):
             {'type': 'plain', 'label': "Status:",       'value': instance.get_ptype_display(),          'field_key': 'ptype'},
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project editing rights:", 'value': instance.get_editor_projects_markdown(),     'field_list': 'editlist'},
-            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'}
+            {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'},           
+            {'type': 'safe',  'label': "", 'value': instance.get_changepw(), }          
             ]
 
         # If this is a moderator, add a button for editing rights
@@ -7540,6 +7570,8 @@ class ProfileEdit(BasicDetails):
 
         # Return the context we have made
         return context
+
+    
 
     def after_save(self, form, instance):
         msg = ""
@@ -7630,6 +7662,7 @@ class ProfileEdit(BasicDetails):
     def get_history(self, instance):
         return passim_get_history(instance)
 
+    
 
 class ProfileDetails(ProfileEdit):
     """Like Profile Edit, but then html output"""
@@ -16559,10 +16592,10 @@ class LibraryListView(BasicList):
                 html = []
                 html.append("<span>{}</span>".format(count))
                 # Create the URL
-                url = "{}?manu-library={}".format(reverse('search_manuscript'), instance.id)
+                url = "{}?manu-library={}".format(reverse('search_manuscript'), instance.id) 
                 # Add a link to them
                 html.append('<a role="button" class="btn btn-xs jumbo-3" title="Go to these manuscripts" ')
-                html.append(' href="{}"><span class="glyphicon glyphicon-chevron-right"></span></a>'.format(url))
+                html.append(' href="{}"><span class="glyphicon glyphicon-chevron-right"></span></a>'.format(url)) # modify span
                 sBack = "\n".join(html)
         elif custom == "libtype":
             if instance.libtype != "":

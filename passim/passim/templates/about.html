@@ -22,7 +22,15 @@
       </p>
       <p>PASSIM will bridge two disciplinary divides, between patristic and medieval sermon studies and between textual criticism and reception studies. Developing an interdisciplinary methodology with a wide applicability in the study of intellectual history, this project will introduce patristic preaching as a vibrant strand in the tapestry of the medieval religious tradition.
       </p>
+
+      <h3>Contribute</h3>
+      <p>
+        In addition to the data of the <a href="https://www.ru.nl/onderzoek/onderzoeksprojecten/passim-project" target="_blank">PASSIM project</a>, 
+        the PASSIM research tool also houses other datasets (see <a href="{% url 'project2_list' %}" target="_blank">Projects</a>). 
+        Interested in using PASSIM to house your data? A tool for bulk import is under construction. In the meantime, contact <a href="mailto:shari.boodts@ru.nl">shari.boodts@ru.nl</a> for more information.
+      </p>      
     </div>
+
     <div class="col-md-6">
       <section id='statistics'>
         <h3>Statistics</h3>
@@ -79,8 +87,37 @@
         </span>
       </p>
 
-      <h3>Requirements</h3>
-      <p>Please see the <a href="{% url 'technical' %}">technical</a> information page.</p>
+      <h3>Quickly to</h3>        
+        <ul>
+          <li><a href="{% url 'guide' %}" target="_blank">User manual</a></li>
+          <li><a href="{% url 'technical' %}" target="_blank">Technical information</a></li>
+          <li>Tutorials</li>
+        </ul>
+
+
+      <h3>News</h3>
+      {% if newsitem_list %}
+      {% for item in newsitem_list %}
+      <div class="panel-news panel-default">
+        <div class="panel-heading collapsed" data-toggle="collapse" data-target="#news-item-{{item.id}}">
+          <span>{{item.title}}</span>
+          <span class="pull-right" style="font-size: smaller;">
+            {% if item.saved|date:"j/b/o" == item.created|date:"j/b/o" %}
+            <i>{{item.saved|date:"j/b/o"}}</i>
+            {% else %}
+            <i>{{item.created|date:"j/b/o"}} - {{item.saved|date:"j/b/o"}}</i>
+            {% endif %}
+          </span>
+        </div>
+        <div class="collapse newsitem" id="news-item-{{item.id}}">
+          {{item.msg|safe}}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p><i>(There is no news yet)</i></p>
+      {% endif %}
+    </div>
     </div>
 
   </div>

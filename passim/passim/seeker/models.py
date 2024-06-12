@@ -1681,6 +1681,19 @@ class Profile(models.Model):
 
         sBack = ", ".join(lHtml)
         return sBack
+    
+    def get_changepw(self):
+        # Here the button that directs the user to the
+        sBack = ""                   
+        # Create the URL 
+        url = reverse('admin:password_change')             
+        # Add a link to them
+        sBack = '<span class="btn btn-primary"> <a href="{}">Change password &raquo;</a></span>'.format(url)             
+        print(sBack)
+        return sBack
+
+
+
 
     def get_defaults(self):
         """List of projects to which this user (profile) has APPROVER rights"""

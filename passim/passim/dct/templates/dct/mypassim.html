@@ -11,12 +11,10 @@
 
 {% block content %}
 
-<div class="container body-content">
-  <h2>My PASSIM</h2>
+<div class="container body-content">  
   <div class="row">
     <div class="col-md-12">
-      My PASSIM is the place to quickly get to what is important for <b>your</b> work.
-      <span style="color: darkred;">This is a beta version.</span>
+      <h3>Hello{% if user.is_authenticated %} {{user.username}}{% else %}(not logged in){% endif %}, welcome to MyResearch. Your own PASSIM work environment.</h3>      
     </div>
   </div>
 
@@ -37,10 +35,10 @@
 
       <section>
         <h3>
-          <span class="glyphicon glyphicon-minus"></span>
-          <span data-toggle="collapse" data-target="#profile-area">Profile</span>
+          <span class="glyphicon glyphicon-plus"></span>
+          <span data-toggle="collapse" data-target="#profile-area">User information</span>
         </h3>
-        <div id="profile-area" class="collapse-indicator in">
+        <div id="profile-area" class="collapse-indicator collapse">
           <p>This is the information that you have provided</p>
           <table style="width: 100%;">
             <!-- Profile information -->
@@ -107,15 +105,26 @@
 
     <div class="col-md-6">
       <section>
-        <h3>Datasets</h3>
-        <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}">my datasets</a>
-        (current size: {{count_datasets}}).
-        </p>
+        <h3>
+          <span class="glyphicon glyphicon-plus"></span>
+          <span data-toggle="collapse" data-target="#saved_datasets-area">Saved datasets</span>
+        </h3>
+        <div id="saved_datasets-area" class="collapse-indicator collapse">
+          <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}">my datasets</a>
+          (current size: {{count_datasets}}).
+          </p>
+        </div>
       </section>
 
       {% if is_app_editor %}
         <section>
-          <h3>Edit actions</h3>
+          <h3>See ‘Help’ menu for editor options</h3>
+          <h3>
+          <span class="glyphicon glyphicon-plus"></span>
+          <span data-toggle="collapse" data-target="#edit_action-area">Edit actions</span>
+         </h3>
+         <div id="edit_action-area" class="collapse-indicator collapse">
+          
           <p>Importing projects can be done by an editor via JSON, Excel and some other ways.
             The items an editor can import are: Manuscript, Manifestation, Historical Collection and Authority File.</p>
 
@@ -154,12 +163,21 @@
               </td>
             </tr>
            </table>
+           
+         </div>
+        </section>
+        <section>
+          <h3>
+            <span class="glyphicon glyphicon-plus"></span>
+            <span data-toggle="collapse" data-target="#field_af-area">Field changes Authority File</span>
+          </h3>
+          <div id="field_af-area" class="collapse-indicator collapse">
            <table>
             <!-- Empty table row -->
             <tr><td colspan="3">&nbsp;</td></tr>
             <tr>
               <td colspan="1">
-                <h4>Field changes Authority File</h4>
+                
               </td>
               <td>
                 <a role="button" class="btn btn-xs jumbo-1" 
@@ -209,12 +227,21 @@
                 </a>
               </td>
             </tr>
-
+            </table>
+           </div>
+        </section>
             <!-- Empty table row -->
+        <section>
+          <h3>
+            <span class="glyphicon glyphicon-plus"></span>
+            <span data-toggle="collapse" data-target="#af_project-area">Authority File projects</span>
+          </h3>
+          <div id="af_project-area" class="collapse-indicator collapse">
+            <table>
             <tr><td colspan="3">&nbsp;</td></tr>
             <tr>
-              <td colspan="3">
-                <h4>Authority File project additions, removals and deletions</h4>
+              <td colspan="3">                
+                <h4>(additions, removals and deletions)</h4>
               </td>
             </tr>
             
@@ -258,8 +285,10 @@
                 </a>
               </td>
             </tr>
-           </table>
+            </table>
+           </div>
         </section>
+        
       {% endif %}
 
     </div>
