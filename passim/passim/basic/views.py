@@ -2714,7 +2714,10 @@ class BasicPart(View):
                         extension = "xlsx"
                     elif self.dtype == "tei" or self.dtype == "xml-tei":
                         extension = "xml"
-                    sDbName = "passim_{}_{}.{}".format(downloadname, obj_id, extension)
+                    if obj_id == "n":
+                        sDbName = "passim_{}.{}".format(downloadname, extension)
+                    else:
+                        sDbName = "passim_{}_{}.{}".format(downloadname, obj_id, extension)
                     sContentType = ""
                     if self.dtype == "csv":
                         sContentType = "text/tab-separated-values"

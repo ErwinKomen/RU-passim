@@ -359,6 +359,7 @@ urlpatterns = [
     re_path(r'^importset/edit(?:/(?P<pk>\d+))?/$', ImportSetEdit.as_view(), name='importset_edit'),
     re_path(r'^importset/process(?:/(?P<pk>\d+))?/$', ImportSetProcess.as_view(), name='importset_process'),
     re_path(r'^importset/download(?:/(?P<pk>\d+))?/$', ImportSetDownload.as_view(), name='importset_download'),
+    re_path(r'^importset/manu/template$', ImportSetManuTempDownload.as_view(), name='importset_manu_template'),
 
     re_path(r'^importreview/list', ImportReviewListView.as_view(), name='importreview_list'),
     re_path(r'^importreview/details(?:/(?P<pk>\d+))?/$', ImportReviewDetails.as_view(), name='importreview_details'),
