@@ -1625,11 +1625,11 @@ var ru = (function ($, ru) {
        * draw_hbar_chart
        *    Show a normalized horizontal stacked bar chart using D3
        *
-       *  The data is expected to be: 'count', 'freq'
+       *  The data is idiosyncratic. See the function get_hbar_data() in views.py
        *  See: https://observablehq.com/@d3/stacked-normalized-horizontal-bar/2
        *
        */
-      draw_hbar_chart: function (divid, data, info) {
+      draw_hbar_chart: function (divid, data) {
         var margin = null,
           width_g = 550,
           height_g = 200,
@@ -1648,7 +1648,185 @@ var ru = (function ($, ru) {
           stackedData = null,
           barGroups = null,
           tooltip = null,
-          oNames = {approved: "Checked", edited: "Edited", initial: "Auto-import"},
+          //oNames = {approved: "Checked", edited: "Edited", initial: "Auto-import"},
+          showTooltip = null, moveTooltip = null, hideTooltip = null,
+          openListview = null;
+
+        try {
+          // Set the margin, width and height
+          margin = { top: 20, right: 20, bottom: 20, left: 20 }
+          width = width_g - margin.left - margin.right;
+          height = height_g - margin.top - margin.bottom;
+
+          // Do *NOT* use a viewbox, otherwise downloading as PNG doesn't work
+          // viewbox = "0 0 970 510";
+
+          // Clear up what was there
+          $(divid).html("");
+
+          // The subgroups are: Initial, Edited, Approved (i.e. value within a bar)
+          // subgroups = Object.keys(data[0]).slice(1);
+          subgroups = data.map(d => d.subgroup);
+          // The groups: AF, Manuscript etc (i.e. which bar is being shown)
+          groups = data.map(d => d.group);
+
+          // Define the colors that we want to use
+          color = d3.scaleOrdinal()
+            .domain(subgroups)
+            .range(['darkblue', 'blue', 'lightblue']);
+
+          // New way to handle click function
+          openListview = function (event, d) {
+            var elDiv = d.url;
+            window.open(elDiv, "_blank");
+          }
+
+          // Tooltip data respond function
+          showTooltip = function (event, d) {
+            var ptc = 0,
+                rectonly = null,
+                sTooltipText = "";
+
+            // Find the rect
+            rectonly = $(event.target).find("rect").first();
+            $(rectonly).attr("opacity", 0.6);
+            $(rectonly).attr("y", scale_y(d.group) - 2);
+            $(rectonly).attr("height", scale_y.bandwidth() + 4);
+
+            tooltip.transition().duration(100).style("opacity", 1.0);
+            sTooltipText = d.ptc + "%" + ":</br><b>" + d.label + "</b>: " + d.value;
+            tooltip
+              .html(sTooltipText);
+          };
+          // Make sure the tooltip shows about where the user hovers
+          moveTooltip = function (event, d) {
+            tooltip.style("left", (event.x + 10) + "px")
+              .style("top", (event.y - 35) + "px");
+          };
+          // Change the opacity again
+          hideTooltip = function (event, d) {
+            var rectonly = null;
+
+            tooltip.transition().duration(300).style("opacity", 0);
+            // Find the rect
+            rectonly = $(event.target).find("rect").first();
+            $(rectonly).attr("opacity", 1);
+            $(rectonly).attr("y", scale_y(d.group));
+            $(rectonly).attr("height", scale_y.bandwidth());
+          };
+
+          // Create an SVG top node
+          svg = d3.select(divid).append("svg")
+            .attr("width", width_g)
+            .attr("height", height_g)
+            .attr("style", "max-width: 100%; height: auto;")
+            .attr("xmlns", "http://www.w3.org/2000/svg")
+            .attr("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+          // Prepare the scales for positional and color encodings.
+          scale_x = d3.scaleLinear()
+            .domain([0, 100])
+            .range([margin.left, width - margin.right - margin.left]);
+
+          scale_y = d3.scaleBand()
+            .domain(groups)
+            .range([0, height])
+            .padding([0.2])
+          // Add axis left
+          svg.append("g")
+            .attr("transform", `translate(${offset_x + margin.left}, 0)`)
+            .attr("class", "axis")
+            .style("font-size", "14px")
+            .call(d3.axisLeft(scale_y).tickSizeOuter(0));
+
+          // Build up the svg on the basis of the [data]
+          barGroups = svg.append("g")
+            .selectAll("g")
+            .data(data)
+            .join("g")
+            .attr("fill", function (d) {
+              return color(d.subgroup);
+            })
+            .on('click', openListview)
+            .on('mouseenter', showTooltip)
+            .on('mousemove', moveTooltip)
+            .on('mouseleave', hideTooltip);
+
+          // Add a <rect> to each <g>
+          barGroups
+            .append("rect")
+            .attr("x", function (d) {
+              return scale_x(d.start) + offset_x;
+            })
+            .attr("y", function (d) {
+              return scale_y(d.group);
+            })
+            .attr("height", scale_y.bandwidth())
+            .attr("width", function (d) {
+              // Note: need to do this in such a way, that the margin left is not important anymore
+              return scale_x(d.ptc + d.start) - scale_x(d.start);
+            });
+
+          // Add a <text> to each <g>
+          barGroups
+            .append("text")
+            .attr("color", "white")
+            .attr("text-anchor", "middle")
+            .attr("x", function (d) {
+              // position in the middle of the bar
+              return offset_x + scale_x(d.start) + (scale_x(d.ptc + d.start) - scale_x(d.start) ) / 2 ;
+            })
+            .attr("y", function (d) {
+              // Vertically in the middle of the bar
+              return 5 + scale_y(d.group) + scale_y.bandwidth() / 2;
+            })
+            .text(function (d) {
+              var sResult = "",
+                ptc = d.ptc,
+                iptc = 0;
+              iptc = Number(ptc);
+              sResult = (iptc >= 5) ? `${ptc}%` : "";
+              return sResult
+            });
+
+          // Add a tooltip <div>
+          tooltip = d3.select(divid)
+            .append("div").attr("class", "tooltip").style("opacity", 0);
+
+        } catch (ex) {
+          private_methods.errMsg("draw_hbar_chart", ex);
+        }
+      },
+
+
+      /**
+       * draw_hbar_chart_working
+       *    Show a normalized horizontal stacked bar chart using D3
+       *
+       *  The data is expected to be: 'count', 'freq'
+       *  See: https://observablehq.com/@d3/stacked-normalized-horizontal-bar/2
+       *
+       */
+      draw_hbar_chart_working: function (divid, data, info) {
+        var margin = null,
+          width_g = 550,
+          height_g = 200,
+          svg = null,
+          width = 0,
+          height = 0,
+          series = null,
+          scale_x = null,
+          scale_y = null,
+          offset_x = 95,
+          color = null,
+          colidx = -1,    // COlor index into array [color]
+          oColor = {},
+          subgroups = null,
+          groups = null,
+          stackedData = null,
+          barGroups = null,
+          tooltip = null,
+          oNames = { approved: "Checked", edited: "Edited", initial: "Auto-import" },
           showTooltip = null, moveTooltip = null, hideTooltip = null,
           openListview = null;
 
@@ -1690,8 +1868,8 @@ var ru = (function ($, ru) {
           // Tooltip data respond function
           showTooltip = function (event, d) {
             var ptc = 0,
-                key = "",
-                sTooltipText = "";
+              key = "",
+              sTooltipText = "";
 
             d3.select(this)
               .attr("opacity", 0.6)
@@ -1719,10 +1897,10 @@ var ru = (function ($, ru) {
           // Change the opacity again
           hideTooltip = function (event, d) {
             tooltip.transition().duration(300).style("opacity", 0);
-          //  // Restore all colors to their original
-          //  $(event.target).closest("svg").find(".arc > path").each(function () {
-          //    $(this).attr("opacity", "0.8");
-          //  });
+            //  // Restore all colors to their original
+            //  $(event.target).closest("svg").find(".arc > path").each(function () {
+            //    $(this).attr("opacity", "0.8");
+            //  });
             d3.select(this)
               .attr("opacity", 1)
               .attr("y", function (b) {
@@ -1785,10 +1963,10 @@ var ru = (function ($, ru) {
             })
             .attr("value", function (d) {
               var group = d.data.group,
-                  oInfo = null,
+                oInfo = null,
 
-                  key = $(this.parentNode).attr("key");
-              oInfo = info.find( (item) => item.group === group && item.subgroup === key );
+                key = $(this.parentNode).attr("key");
+              oInfo = info.find((item) => item.group === group && item.subgroup === key);
               return oInfo.value;
             })
             .on('click', openListview)
@@ -1837,10 +2015,9 @@ var ru = (function ($, ru) {
             .append("div").attr("class", "tooltip").style("opacity", 0);
 
         } catch (ex) {
-          private_methods.errMsg("draw_hbar_chart", ex);
+          private_methods.errMsg("draw_hbar_chart_working", ex);
         }
       },
-
 
       /**
        * draw_line_chart
@@ -3813,7 +3990,8 @@ var ru = (function ($, ru) {
               data = g_hbar_data["data"];
               info = g_hbar_data["info"];
               // Draw the hbar chart
-              private_methods.draw_hbar_chart(divid, data, info);
+              private_methods.draw_hbar_chart(divid, info);
+              //private_methods.draw_hbar_chart_working(divid, data, info);
             }
           }
 

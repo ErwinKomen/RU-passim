@@ -4269,13 +4269,13 @@ def get_hbar_data():
             lst_combi.append(dict(group=group, approved=approved, edited=edited, initial=initial))
 
             # We need more information: put that in lst_info
-            lst_info.append(dict(group=group,
-                                  app=green, edi=orange, ini=red, 
-                                  app_url=url_gre, edi_url=url_ora, ini_url=url_red))
+            #lst_info.append(dict(group=group,
+            #                      app=green, edi=orange, ini=red, 
+            #                      app_url=url_gre, edi_url=url_ora, ini_url=url_red))
             # Create a list of data
-            lst_info.append(dict(group=group, subgroup="approved", value=green, url=url_gre))
-            lst_info.append(dict(group=group, subgroup="edited", value=orange, url=url_ora))
-            lst_info.append(dict(group=group, subgroup="initial", value=red, url=url_red))
+            lst_info.append(dict(group=group, subgroup="approved", value=green, start=0, ptc=approved, url=url_gre, label="Checked"))
+            lst_info.append(dict(group=group, subgroup="edited", value=orange, start=approved, ptc=edited, url=url_ora, label="Edited"))
+            lst_info.append(dict(group=group, subgroup="initial", value=red, start=approved+edited, ptc=initial, url=url_red, label="Auto-import"))
 
         # Combine into combidata
         combidata['status'] = "ok"
