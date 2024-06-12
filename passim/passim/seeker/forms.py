@@ -1968,7 +1968,7 @@ class SearchManuForm(PassimModelForm):
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap     = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1',
-                                          'label': 'Percentage of overlap'})) # , 'value':'100'
+                                          'label': 'Percentage of overlap', 'default': '50'})) # , 'value':'100'
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     

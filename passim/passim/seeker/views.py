@@ -12653,76 +12653,85 @@ class ManuscriptListView(BasicList):
                 overlap = fields.get('overlap', "0")
                 # Use an overt truth 
                 fields['overlap'] = Q(mtype="man")
-                if 'collist_hist' in fields and fields['collist_hist'] != None:
-                    coll_list = fields['collist_hist']
-                    if len(coll_list) > 0:
+                coll_list_hist = fields.get('collist_hist')
+                coll_list_ssg = fields.get("collist_ssg")
+                base_manu_list = fields.get('cmpmanuidlist')
+
+                # Only one [coll_list] may count
+                coll_list = coll_list_hist if coll_list_hist.count() > 0 else coll_list_ssg
+                # if coll_list.count() > 0:
+                #if 'collist_hist' in fields and fields['collist_hist'] != None:
+                #    coll_list = fields['collist_hist']
+                if len(coll_list) > 0:
+                    # Yes, overlap specified
+                    if isinstance(overlap, int):
+                        # We also need to have the profile
+                        profile = Profile.get_user_profile(self.request.user.username)
+
+                        # Make sure the string is interpreted as an integer
+                        overlap = int(overlap)
+                        # Now add a Q expression that includes:
+                        # 1 - Greater than or equal the overlap percentage
+                        # 2 - The list of historical collections
+                        # 3 - This particular user
+                        fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap) & \
+                            Q(manu_colloverlaps__collection__in=coll_list) & \
+                            Q(manu_colloverlaps__profile=profile)
+
+                        # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+                
+                        # (1) Possible manuscripts only filter on: mtype=man, prjlist
+                        lstQ = []
+                        # if prjlist != None: lstQ.append(Q(project__in=prjlist))
+                        lstQ.append(Q(mtype="man"))
+                        lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
+                        manu_list = Manuscript.objects.filter(*lstQ)
+
+                        # Now calculate the overlap for all
+                        with transaction.atomic():
+                            for coll in coll_list:
+                                for manu in manu_list:
+                                    ptc = CollOverlap.get_overlap(profile, coll, manu)
+
+                if len(base_manu_list) > 0:
+                    # if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
+                    # The base manuscripts with which the comparison goes
+                    base_manu_list = fields['cmpmanuidlist']
+                    if len(base_manu_list) > 0:
                         # Yes, overlap specified
                         if isinstance(overlap, int):
-                            # We also need to have the profile
-                            profile = Profile.get_user_profile(self.request.user.username)
-
                             # Make sure the string is interpreted as an integer
                             overlap = int(overlap)
-                            # Now add a Q expression that includes:
-                            # 1 - Greater than or equal the overlap percentage
-                            # 2 - The list of historical collections
-                            # 3 - This particular user
-                            fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap) & \
-                               Q(manu_colloverlaps__collection__in=coll_list) & \
-                               Q(manu_colloverlaps__profile=profile)
-
+                            # Now add a Q expression
+                            # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
                             # Make sure to actually *calculate* the overlap between the different collections and manuscripts
+
+                            # (1) Get a list of SSGs associated with these manuscripts
+                            base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
+                            base_ssg_list = [x['id'] for x in base_ssg_list]
+                            base_count = len(base_ssg_list)
                 
-                            # (1) Possible manuscripts only filter on: mtype=man, prjlist
+                            # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
                             lstQ = []
                             # if prjlist != None: lstQ.append(Q(project__in=prjlist))
                             lstQ.append(Q(mtype="man"))
-                            lstQ.append(Q(manuitems__itemsermons__equalgolds__collections__in=coll_list))
+                            lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
                             manu_list = Manuscript.objects.filter(*lstQ)
 
+                            # We also need to have the profile
+                            profile = Profile.get_user_profile(self.request.user.username)
                             # Now calculate the overlap for all
+                            manu_include = []
                             with transaction.atomic():
-                                for coll in coll_list:
-                                    for manu in manu_list:
-                                        ptc = CollOverlap.get_overlap(profile, coll, manu)
-                    if 'cmpmanuidlist' in fields and fields['cmpmanuidlist'] != None:
-                        # The base manuscripts with which the comparison goes
-                        base_manu_list = fields['cmpmanuidlist']
-                        if len(base_manu_list) > 0:
-                            # Yes, overlap specified
-                            if isinstance(overlap, int):
-                                # Make sure the string is interpreted as an integer
-                                overlap = int(overlap)
-                                # Now add a Q expression
-                                # fields['overlap'] = Q(manu_colloverlaps__overlap__gte=overlap)
-                                # Make sure to actually *calculate* the overlap between the different collections and manuscripts
-
-                                # (1) Get a list of SSGs associated with these manuscripts
-                                base_ssg_list = EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__in=base_manu_list).values('id')
-                                base_ssg_list = [x['id'] for x in base_ssg_list]
-                                base_count = len(base_ssg_list)
-                
-                                # (2) Possible overlapping manuscripts only filter on: mtype=man, prjlist and the SSG list
-                                lstQ = []
-                                # if prjlist != None: lstQ.append(Q(project__in=prjlist))
-                                lstQ.append(Q(mtype="man"))
-                                lstQ.append(Q(manuitems__itemsermons__equalgolds__id__in=base_ssg_list))
-                                manu_list = Manuscript.objects.filter(*lstQ)
-
-                                # We also need to have the profile
-                                profile = Profile.get_user_profile(self.request.user.username)
-                                # Now calculate the overlap for all
-                                manu_include = []
-                                with transaction.atomic():
-                                    for manu in manu_list:
-                                        # Get a list of SSG id's associated with this particular manuscript
-                                        manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
-                                        if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
-                                            # Add this manuscript to the list 
-                                            if not manu.id in manu_include:
-                                                manu_include.append(manu.id)
-                                fields['cmpmanuidlist'] = None
-                                fields['cmpmanu'] = Q(id__in=manu_include)
+                                for manu in manu_list:
+                                    # Get a list of SSG id's associated with this particular manuscript
+                                    manu_ssg_list = [x['id'] for x in EqualGold.objects.filter(sermondescr_super__sermon__msitem__manu__id=manu.id).values('id')]
+                                    if get_overlap_ptc(base_ssg_list, manu_ssg_list) >= overlap:
+                                        # Add this manuscript to the list 
+                                        if not manu.id in manu_include:
+                                            manu_include.append(manu.id)
+                            fields['cmpmanuidlist'] = None
+                            fields['cmpmanu'] = Q(id__in=manu_include)
 
             # Process the date range stuff
             date_from = fields.get("date_from")
