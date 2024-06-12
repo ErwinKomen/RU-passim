@@ -1,0 +1,17 @@
+{% if is_app_editor %}
+  {% if instance.status == "rej" or instance.status == "acc" %}
+    <span><i>Verdict has been given</i></span>
+  {% else %}
+    <span targetid="#import_form_{{instance.id}}" class="selitem">
+      <a role="button" class="btn btn-xs jumbo-2" onclick="ru.dct.do_importreview(this, 'rej');"
+         title="Reject this Excel file import definition">
+        Reject
+      </a>
+      <span>&nbsp;</span>
+      <a role="button" class="btn btn-xs jumbo-3" onclick="ru.dct.do_importreview(this, 'acc');"
+         title="Accept this Excel file import definition">
+        Accept
+      </a>
+    </span>
+  {% endif %}
+{% endif %}

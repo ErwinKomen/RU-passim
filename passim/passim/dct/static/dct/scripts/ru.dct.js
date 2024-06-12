@@ -2809,27 +2809,37 @@ var ru = (function ($, ru) {
         }
       },
 
+
       /**
-       * do_importset
-       *    Request to process an ImportSet definition
+       * do_importreview
+       *    Request to process an ImportReview definition
        *
        */
-      do_importset: function (el) {
+      do_importreview: function (el, verdict) {
         var targetid = "",
-            targeturl = "",
-            data = null,
-            err = "#import_err",
-            frm = null;
+          targeturl = "",
+          reportid = "",
+          data = null,
+          err = "#import_err",
+          frm = null;
 
         try {
+          // Disable the Reject and Accept buttons
+          $(el).closest("span").find("a").attr("disable", true);
           // Get the targeturl
           targetid = $(el).closest("span").attr("targetid");
           targeturl = $(targetid).attr("targeturl");
-          err = targetid;
+          err = targetid.replace("import_form", "import_err");
+
           // Get the form information
           frm = $(targetid).closest("form");
           // Get the data
           data = $(frm).serializeArray();
+          // Add the import verdict
+          data.push({ name: "importverdict", value: verdict });
+
+          // Indicate that we are working
+          $(err).html(loc_sWaiting);
 
           // Perform a POST request with this
           $.post(targeturl, data, function (response) {
@@ -2840,6 +2850,104 @@ var ru = (function ($, ru) {
               switch (response.status) {
                 case "ready":
                 case "ok":
+                  $(err).html("");
+                  // Should have a new target URL
+                  targeturl = response['targeturl'];
+                  if (targeturl !== undefined && targeturl !== "") {
+                    // Go open that targeturl
+                    window.location = targeturl;
+                  } else {
+                    // Tell user can't go anywhere
+                    $(err).html("Sorry, I am missing the targeturl");
+                  }
+                  break;
+                case "error":
+                  if ("html" in response) {
+                    // Show the HTML in the targetid
+                    $(err).html(response['html']);
+                    // If there is an error, indicate this
+                    if (response.status === "error") {
+                      if ("msg" in response) {
+                        if (typeof response['msg'] === "object") {
+                          lHtml = []
+                          lHtml.push("Errors:");
+                          $.each(response['msg'], function (key, value) { lHtml.push(key + ": " + value); });
+                          $(err).html(lHtml.join("<br />"));
+                        } else {
+                          $(err).html("Error: " + response['msg']);
+                        }
+                      } else {
+                        $(err).html("<code>There is an error</code>");
+                      }
+                    }
+                  } else {
+                    // Send a message
+                    $(err).html("<i>There is no <code>html</code> in the response from the server</i>");
+                  }
+                  break;
+                default:
+                  // Something went wrong -- show the page or not?
+                  $(err).html("The status returned is unknown: " + response.status);
+                  break;
+              }
+
+            }
+          });
+
+        } catch (ex) {
+          private_methods.errMsg("do_importreview", ex);
+        }
+      },
+
+      /**
+       * do_importset
+       *    Request to process an ImportSet definition
+       *
+       */
+      do_importset: function (el) {
+        var targetid = "",
+            targeturl = "",
+            reportid = "",
+            data = null,
+            err = "#import_err",
+            frm = null;
+
+        try {
+          // Disable the button
+          $(el).attr("disable", true);
+          // Get the targeturl
+          targetid = $(el).closest("span").attr("targetid");
+          targeturl = $(targetid).attr("targeturl");
+          err = targetid.replace("import_form", "import_err");
+
+          // Try to find the report
+          reportid = $(el).closest("table").find("td span:contains('Report:')");
+          if (reportid.length > 0) {
+            reportid = $(reportid).closest("tr").find("td").last();
+            if (reportid.length > 0) {
+              $(reportid).html("verifying...");
+            }
+          }
+
+
+          // Get the form information
+          frm = $(targetid).closest("form");
+          // Get the data
+          data = $(frm).serializeArray();
+
+          // Indicate that we are working
+          $(err).html(loc_sWaiting);
+
+          // Perform a POST request with this
+          $.post(targeturl, data, function (response) {
+            // Action depends on the response
+            if (response === undefined || response === null || !("status" in response)) {
+              private_methods.errMsg("No status returned");
+            } else {
+              switch (response.status) {
+                case "ready":
+                case "ok":
+                  $(err).html("");
                   // Should have a new target URL
                   targeturl = response['targeturl'];
                   if (targeturl !== undefined && targeturl !== "") {

@@ -41,6 +41,7 @@ import json
 import csv, re
 import requests
 import openpyxl
+import math
 from threading import Thread
 from openpyxl.utils.cell import get_column_letter
 import sqlite3
@@ -781,6 +782,7 @@ def home(request, errortype=None):
             # ========== DEBUG ============
             print("Fetching pie chart data")
         context['pie_data'] = get_pie_data()
+        context['hbar_data'] = get_hbar_data()
 
         # Possibly start getting new Stemmatology results
         if bOverrideSync and user_is_superuser(request):
@@ -4223,6 +4225,93 @@ def get_pie_data():
         combidata['status'] = "error"
     return combidata 
 
+
+def get_hbar_data():
+    """Fetch data for a particular type of horizontal bar chart for the home page
+    
+    Result: list of objects, where each object has at least the following features:
+       1: ptype - Determines which of the three bar charts (currently: 'sermo', 'super', 'manu')
+       2: group - One of three 'groups' within a bar chart (Initial, Edited, Approved)
+       3: value - Number of items within the (ptype, group) combination
+       4: url   - URL to get at this item
+
+    See idea in: https://observablehq.com/@d3/stacked-normalized-horizontal-bar/2
+    """
+
+    oErr = ErrHandle()
+    red = 0
+    orange = 0
+    green = 0
+    combidata = {}
+    lst_combi = []
+    lst_info = []
+    #ptypes = ['manu', 'sermo', 'super']
+    #ptypename = ['Manuscripts', 'Manifestations', 'Authority files']
+    ptypes = ['super', 'sermo', 'manu']
+    ptypename = ['Authority file', 'Manifestation', 'Manuscript']
+    try:
+        # Get the values for app, edi, imp, man
+        stype_list = FieldChoice.objects.filter(field="seeker.stype").values('id', 'abbr')
+        oStype = {}
+        for oItem in stype_list:
+            oStype[oItem['abbr']] = oItem['id']
+        for idx, ptype in enumerate(ptypes):
+            group = ptypename[idx]
+            qs = None
+            url_red = ""
+            url_ora = ""
+            url_gre = ""
+            if ptype == "sermo":
+                qs = SermonDescr.objects.exclude(Q(mtype='tem') & Q(msitem__isnull=True)).order_by('stype').values('stype')
+                url_red = "{}?sermo-stypelist={}&sermo-stypelist={}".format(reverse('sermon_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['edi'])
+                url_gre = "{}?sermo-stypelist={}".format(reverse('sermon_list'), oStype['app'])
+            elif ptype == "super":
+                qs = EqualGold.objects.filter(moved__isnull=True,atype='acc').order_by('stype').values('stype')
+                url_red = "{}?ssg-stypelist={}&ssg-stypelist={}".format(reverse('equalgold_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['edi'])
+                url_gre = "{}?ssg-stypelist={}".format(reverse('equalgold_list'), oStype['app'])
+            elif ptype == "manu":
+                qs = Manuscript.objects.exclude(Q(mtype='tem')).order_by('stype').values('stype')
+                url_red = "{}?manu-stypelist={}&manu-stypelist={}".format(reverse('manuscript_list'), oStype['imp'], oStype['man'])
+                url_ora = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['edi'])
+                url_gre = "{}?manu-stypelist={}".format(reverse('manuscript_list'), oStype['app'])
+            # Calculate the different stype values
+            if qs != None:
+                app = sum(x['stype'] == "app" for x in qs)  # Approved
+                edi = sum(x['stype'] == "edi" for x in qs)  # Edited
+                imp = sum(x['stype'] == "imp" for x in qs)  # Imported
+                man = sum(x['stype'] == "man" for x in qs)  # Manually created
+                und = sum(x['stype'] == "-" for x in qs)    # Undefined
+                red = imp + und + man
+                orange = edi
+                green = app
+            total = red + green + orange
+
+            # Create and add data to the lst_combi
+            approved = math.ceil(green * 100 / total)
+            edited = math.ceil(orange * 100 / total)
+            initial = 100 - approved - edited # math.ceil(red * 100 / total)
+            lst_combi.append(dict(group=group, approved=approved, edited=edited, initial=initial))
+
+            # We need more information: put that in lst_info
+            #lst_info.append(dict(group=group,
+            #                      app=green, edi=orange, ini=red, 
+            #                      app_url=url_gre, edi_url=url_ora, ini_url=url_red))
+            # Create a list of data
+            lst_info.append(dict(group=group, subgroup="approved", value=green, start=0, ptc=approved, url=url_gre, label="Checked"))
+            lst_info.append(dict(group=group, subgroup="edited", value=orange, start=approved, ptc=edited, url=url_ora, label="Edited"))
+            lst_info.append(dict(group=group, subgroup="initial", value=red, start=approved+edited, ptc=initial, url=url_red, label="Auto-import"))
+
+        # Combine into combidata
+        combidata['status'] = "ok"
+        combidata["data"] = lst_combi
+        combidata["info"] = lst_info
+    except:
+        msg = oErr.get_error_message()
+        combidata['msg'] = msg
+        combidata['status'] = "error"
+    return combidata 
 
 
 class LocationListView(BasicList):

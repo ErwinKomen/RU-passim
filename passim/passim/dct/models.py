@@ -1,6 +1,7 @@
 """Models for the DCT app: dynamic comparison tables
 
 """
+import enum
 from django.apps.config import AppConfig
 from django.apps import apps
 from django.db import models, transaction
@@ -24,9 +25,10 @@ from passim.utils import ErrHandle
 from passim.settings import TIME_ZONE, MEDIA_ROOT
 from passim.basic.models import UserSearch
 from passim.basic.views import base64_decode, base64_encode
-from passim.seeker.models import get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
+from passim.seeker.models import Author, Keyword, get_current_datetime, get_crpp_date, build_abbr_list, COLLECTION_SCOPE, \
     Collection, Manuscript, Profile, CollectionSuper, Signature, SermonDescrKeyword, \
-    SermonDescr, EqualGold
+    SermonDescr, EqualGold, Feast, Project2
+from passim.reader.excel import ManuscriptUploadExcel
 
 STANDARD_LENGTH=255
 ABBR_LENGTH = 5
@@ -116,7 +118,10 @@ def import_path(instance, filename):
 
         if os.path.exists(sAbsPath):
             # Remove it
-            os.remove(sAbsPath)
+            try:
+                os.remove(sAbsPath)
+            except:
+                oErr.Status("Could not remove file now: {}".format(sAbsPath))
 
     except:
         msg = oErr.get_error_message()
@@ -1530,8 +1535,11 @@ class ImportSet(models.Model):
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(default=get_current_datetime)
 
+    # Many-to-many stuff
+    projects = models.ManyToManyField(Project2, through="ImportSetProject", related_name="projects_importset")
+
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.importtype)
         return sBack
 
     def adapt_order(self):
@@ -1552,13 +1560,69 @@ class ImportSet(models.Model):
                 order += 1
         return None
 
+    def do_import(self):
+        bResult = True
+        oErr = ErrHandle()
+        lst_err = []
+        try:
+            # Actually perform the import
+            if self.status == "acc":
+                # Yes, we may perform the import
+                username = self.profile.user.username
+
+                # What if this is a manuscript upload?
+                if self.importtype == "manu":
+                    oResult = {'status': 'ok', 'count': 0, 'sermons': 0, 'msg': "", 'user': username}
+                    kwargs = {'profile': self.profile, 'username': username, 'team_group': "",
+                              'projects': self.projects.all()}
+                    # Indicate that a NEW one should be created, if already existing
+                    manucreate = True
+
+                    bResult = ManuscriptUploadExcel.upload_one_excel(
+                        self.excel.path, self.name, lst_err, oResult, kwargs, manucreate)
+
+                    # What if the result is positive?
+                    if bResult:
+                        # We have a positive result: Add the link to the manuscript
+                        self.manuscript = oResult.get("obj")
+                        if self.manuscript is None:
+                            oErr.Status("ImportSet/do_import: successful import, but no return manuscript")
+                        else:
+                            # All is in order, so save the results
+                            self.save()
+
+                elif self.importtype == "ssg":
+                    # This is an Authority File
+                    # TODO: add code to import an AF
+                    oErr.Status("do_import: cannot yet process Authority Files")
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/do_import")
+            bResult = False
+
+        return bResult
+
     def do_submit(self):
         """Submit the ImportSet"""
 
         sBack = ""
         oErr = ErrHandle()
         try:
+            # Create a review item if it doesn't exist yet
+            obj = ImportReview.objects.filter(importset=self).first()
+            if obj is None:
+                # Create one
+                obj = ImportReview.objects.create(importset=self)
+            # Make sure to [re]set the ImportReview status
+            if obj.status != "cre":
+                # It has not been just created: set to change
+                obj.status = "chg"
+                obj.save()
+
+            # Set my own status to "submitted"
             self.status = "sub"
+            self.save()
 
         except:
             msg = oErr.get_error_message()
@@ -1569,10 +1633,87 @@ class ImportSet(models.Model):
     def do_verify(self):
         """Verify the Excel"""
 
+        def check_for_string(sKey, is_error=False, max_length=None, exclude=None, cls=None, allowed=None, obligatory=False):
+            """Check whether an item is a string"""
+
+            oErr= ErrHandle()
+            try:
+                for idx, sRef in enumerate(oSermList[sKey]):
+                    if obligatory and sRef is None:
+                        html_err.append("Sermon: expecting a value for `{}` at row **{}**".format(sKey, idx+2))
+                    elif not sRef is None:
+                        # Note: string or int - both are allowed here
+                        if not isinstance(sRef, str) and not isinstance(sRef, int):
+                            if is_error:
+                                html_err.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
+                            else:
+                                html_wrn.append("Sermon: expecting string value for `{}` at row **{}**".format(sKey, idx+2))
+                        else:
+                            # Make sure it becomes string, if it is not
+                            if not isinstance(sRef, str):
+                                sRef = str(sRef)
+                            if not max_length is None:
+                                if len(sRef) > max_length:
+                                    html_wrn.append("Sermon: string in column `{}` too large at row **{}**".format(sKey, idx+2))
+                            if not exclude is None:
+                                if any( ele in exclude for ele in sRef):
+                                    html_err.append("Sermon: `{}` may not contain '{}' at row **{}**".format(sKey, exclude, idx+2))
+                            if not cls is None:
+                                obj = cls.objects.filter(name__iexact=sRef).first()
+                                if obj is None:
+                                    html_wrn.append("Sermon: unknown `{}` item [{}] at row **{}**".format(sKey, sRef, idx+2))
+                            if not allowed is None:
+                                if not sRef in allowed:
+                                    html_err.append("Sermon `{}` must be one of {} at row **{}**".format(sKey, allowed, idx+2))
+
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("check_for_string")
+
+        def check_for_list(sKey, cls=None, field=None, obligatory=False):
+            """Check whether an item is a stringified list"""
+
+            oErr = ErrHandle()
+            html_main = []
+            try:
+                for idx, sItem in enumerate(oSermList[sKey]):
+                    if not sItem is None:
+                        if not isinstance(sItem, str):
+                            html_err.append("Sermon: unintelligable `{}` at row **{}**".format(sKey, idx+2))
+                        elif not cls is None:
+                            # Try to parse it
+                            try:
+                                lst_item = json.loads(sItem)
+                                for sItem in lst_item:
+                                    if field is None:
+                                        obj = cls.objects.filter(name__iexact=sItem).first()
+                                    else:
+                                        obj = cls.objects.filter(**{"{}__iexact".format(field): sItem}).first()
+                                    if obj is None:
+                                        html_list = html_err if obligatory else html_wrn
+                                        sMainPart = "Sermon: unknown `{}` item [{}]".format(sKey, sItem)
+                                        if not sMainPart in html_main:
+                                            html_main.append(sMainPart)
+                                            html_list.append("{} row **{}**".format(sMainPart,idx+2))
+
+                            except:
+                                # Not a legitimate json string
+                                html_err.append("Sermon: {} must be a legitimate JSON string at row **{}**".format(
+                                            sKey, idx+2))
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("check_for_list")
+                
+
         sBack = ""
         oErr = ErrHandle()
         html_err = []
         html_wrn = []
+        lst_column = ["Order", "Parent", "FirstChild", "Next", "Type", "External ids", "Status", "Locus", 
+                      "Attributed author", "Section title", "Lectio", "Title", "Incipit", "Explicit", "Postscriptum", 
+                      "Feast", "Bible reference(s)", "Cod. notes", "Note", "Keywords", "Keywords (user)", 
+                      "Gryson/Clavis (manual)", "Gryson/Clavis (auto)", "Personal Datasets", "Literature", "SSG links"]
+        oSermList = {}
         try:
             # Get the path to this Excel
             excel_path = os.path.abspath(os.path.join(MEDIA_ROOT, self.excel.name))
@@ -1590,7 +1731,9 @@ class ImportSet(models.Model):
                     ws_sermo = wb[sname]
                     lst_ws.append(ws_sermo)
             # Check if we have the correct number of worksheets
-            if len(lst_ws) != 2:
+            if len(wb.sheetnames) >2:
+                html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
+            elif len(lst_ws) != 2:
                 # Are there more sheets?
                 if len(lst_ws) > 2:
                     html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
@@ -1605,9 +1748,204 @@ class ImportSet(models.Model):
                     else:
                         html_err.append( "The Excel sheet's names are unintelligable. They should be: 'Manuscript', 'Sermons'")
 
+            # Verify the information on the manuscript sheet
+            if len(html_err) == 0 and not ws_manu is None:
+                # Read in the first two columns
+                row_no = 1
+                oValues = {}
+                while ws_manu.cell(row=row_no, column=1).value:
+                    # First row gets special treatment
+                    k = ws_manu.cell(row=row_no, column=1).value
+                    v = ws_manu.cell(row=row_no, column=2).value
+                    if row_no == 1:
+                        if k != "Field" or v != "Value":
+                            html_err.append("Manuscript columns should be [Field], [Value]")
+                            break
+                    else:
+                        # Make sure we use case insensitivity
+                        k = k.lower()
+                        # Check that key is not there yet
+                        if k in oValues:
+                            html_err.append("Manuscript field is used multiple times: [{}]".format(k))
+                            break
+                        else:
+                            oValues[k] = v
+
+                    row_no += 1
+
+                # Check at least for shelf mark, country, city, library
+                shelfmark = oValues.get("shelf mark")
+                country = oValues.get("country")
+                city = oValues.get("city")
+                library = oValues.get("library")
+                if shelfmark is None:
+                    html_wrn.append("Manuscript has no shelf mark specified")
+                if country is None:
+                    html_wrn.append("Manuscript has no country specified")
+                if city is None:
+                    html_wrn.append("Manuscript has no city specified")
+                if library is None:
+                    html_wrn.append("Manuscript has no library specified")
+
+                # They should all four be supplied
+                if shelfmark is None or country is None or city is None or library is None:
+                    html_err.append("Manuscript lacks one of: shelf-mark, country, city, library")
+
+            # Verify the information on the sermons sheet
+            if len(html_err) == 0 and not ws_sermo is None:
+                # Check that all the 26 column names are there
+                row_no = 1
+                for idx, sColumn in enumerate(lst_column):
+                    col_no = idx+1
+                    v = ws_sermo.cell(row=row_no, column=col_no).value
+                    if not isinstance(v, str):
+                        # Note: allow columns 24-26 to not be present.
+                        #       those are: Personal Datasets, Literature, SSG links
+                        if v is None and col_no < 24:
+                            html_err.append("Sermon column number **{}** must be string".format(col_no))
+                    else:
+                        if v.lower() != sColumn.lower():
+                            html_err.append("Sermons column number **{}** expect title `{}`, but excel uses title `{}`".format(
+                            col_no, sColumn, v))
+
+                # If we have column name errors
+                if len(html_err) > 0:
+                    # Provide a warning message with the right column names
+                    sColumns = "`{}`".format("`, `".join(lst_column))
+                    html_wrn.append("The sheet [Sermons] must have these column names: {}".format(sColumns))
+
+                # Create dictionary with lists
+                for col_name in lst_column:
+                    oSermList[col_name] = []
+
+                # Iterate over the rows
+                row_last = -1
+                row_num = 1
+                for row in ws_sermo.iter_rows():
+                    row_values = [x.value for x in row]
+                    v = None if len(row_values) ==0 else row_values[0]
+                    if row_num > 1 and not v is None and v!= "":
+                        # Possibly append row values if needed
+                        while len(row_values) < len(lst_column):
+                            row_values.append(None)
+
+                        if row_num > row_last:
+                            row_last = row_num
+                        # Add all items to their individual lists
+                        for idx, col_name in enumerate(lst_column):
+                            v = row_values[idx]
+                            oSermList[col_name].append(v)
+                    # Go to the next row
+                    row_num += 1
+
+                # The lists for Order, Parent, First,Next must be there
+                lst_mustbe = ['Order', 'Parent', 'FirstChild', 'Next']
+                for sListName in lst_mustbe:
+                    if len(oSermList[sListName]) == 0:
+                        html_err.append("Sermon sheet misses values for column [{}]".format(sListName))
+
+                # The first four columns may only contain numbers: [order, parent, first, next]
+                order_prev = 0
+                lst_order = []
+                for row_no in range(2, row_last+1):
+                    idx = row_no - 2
+                    order = oSermList['Order'][idx]
+                    lst_order.append(order)
+                    if not isinstance(order,int):
+                        # Order must always be there and it must be an integer
+                        html_err.append("Sermon order must be specified and must be integer (row={})".format(row_no))
+                        break
+                    else:
+                        if order > order_prev:
+                            order_prev = order
+                        else:
+                            html_err.append("Sermon order at row {} must be higher than previous row".format(row_no))
+                            break
+
+                    # Getting here means there is some ligit data
+                    parent = oSermList['Parent'][idx]
+                    if not parent is None:
+                        # Check parent is among previous ones
+                        if isinstance(parent, int):
+                            if not parent in lst_order:
+                                html_err.append("Sermon parent wrong at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon parent at row {} must be integer".format(row_no))
+
+                    # Review use of firstchild
+                    firstchild =  oSermList['FirstChild'][idx]
+                    if not firstchild is None:
+                        if isinstance(firstchild, int):
+                            if not firstchild > order:
+                                html_err.append("Sermon firstchild must be higher than current row order at row {}".format(row_no))
+                            elif not firstchild in oSermList['Order']:
+                                html_err.append("Sermon firstchild must be part of 'Order' column at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon firstchild at row {} must be integer".format(row_no))
+
+                    # Consider next sibling
+                    nextsib =  oSermList['Next'][idx]
+                    if not nextsib is None:
+                        if isinstance(nextsib, int):
+                            if not nextsib > order:
+                                html_err.append("Sermon next must be higher than current row order at row {}".format(row_no))
+                            elif not nextsib in oSermList['Order']:
+                                html_err.append("Sermon next must be part of 'Order' column at row {}".format(row_no))
+                        else:
+                            html_err.append("Sermon next at row {} must be integer".format(row_no))
+                    # Continue to the next row
+
+                # Check column 'Type'
+                type_allowed = ['Structural', 'Plain']
+                check_for_string("Type", allowed=['Structural', 'Plain'])
+
+                # Column 'Status' is irrelevant, as it will be set itself
+
+                # Column locus: check type and length
+                check_for_string("Locus", is_error=True, max_length=15, obligatory=False)
+
+                # Check attributed author(s): do they occur in the database?
+                check_for_string("Attributed author", cls=Author)
+
+                # Check for proper string in: section title, lectio, title
+                check_for_string("Section title")
+                check_for_string("Lectio")
+                check_for_string("Title")
+
+                # Check the incipit/explicit/postscriptum
+                check_for_string("Incipit", exclude="[]")
+                check_for_string("Explicit", exclude="[]")
+                check_for_string("Postscriptum", exclude="[]")
+
+                # A FEAST must be a stringified JSON list of strings
+                check_for_list("Feast", cls=Feast, obligatory=True)
+
+                # Check whether Bible ref is a string
+                check_for_string("Bible reference(s)")
+                check_for_string("Cod. notes")
+                check_for_string("Note")
+
+                # Keywords must be stringified JSON list of strings
+                check_for_list("Keywords", cls=Keyword, obligatory=True)
+                check_for_list("Keywords (user)", cls=Keyword)
+
+                # Check signatures
+                check_for_list("Gryson/Clavis (manual)", cls=Signature, field="code")
+                check_for_list("Gryson/Clavis (auto)", cls=Signature, field="code")
+
+                # Personal datasets must already exist, I guess
+                check_for_list("Personal Datasets", cls=Collection)
+
+                # Literature must be a stringified JSON list of strings
+                check_for_list("Literature")
+
+                # SSG links must be JSON lists of strings, pointing to an SSG via their PASSIM code
+                check_for_list("SSG links", cls=EqualGold, field="code")
+
+
             # Combine into reports
-            sWarning = "\n".join(html_wrn)
-            sError = "\n".join(html_err)
+            sWarning = "  \n".join(html_wrn)
+            sError = "  \n".join(html_err)
             # Do we have a warning/error report?
             if sError == "":
                 # There are no errors - maybe only warnings?
@@ -1628,7 +1966,14 @@ class ImportSet(models.Model):
                 self.report = sReport
                 self.status = "rej"
                 self.save()
-                sBack = sReport
+
+            sBack = sReport
+
+            # Make sure to close the excel
+            wb.close()
+            # Double check the status of this file
+            sStatus = "closed" if self.excel.closed else "open"
+            # oErr.Status("Importset/do_verify finishes Workbook as: {}".format(sStatus))
 
         except:
             msg = oErr.get_error_message()
@@ -1657,6 +2002,10 @@ class ImportSet(models.Model):
                 mode = "verify"
             elif self.status in ['ver']:
                 mode = "submit"
+            elif self.status in ['sub']:
+                mode = "review"
+            elif self.status in ['acc']:
+                mode = "accepted"
             sBack = mode
         except:
             msg = oErr.get_error_message()
@@ -1670,6 +2019,19 @@ class ImportSet(models.Model):
             sBack = self.name
         return sBack
 
+    def get_name_html(self):
+        """Get the name as well as a link to download the Excel file"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.name is None:
+                sBack = '<span class="badge jumbo-1">{}</span>'.format(self.name)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSet/get_name_html")
+        return sBack
+
     def get_notes_html(self):
         """Convert the markdown notes"""
 
@@ -1678,6 +2040,34 @@ class ImportSet(models.Model):
             sNotes = markdown(self.notes)
         return sNotes    
 
+    def get_owner(self):
+        sBack = self.profile.user.username
+        return sBack
+
+    def get_projects_html(self):
+        """Get the list of projects to which the import will be assigned"""
+
+        sBack = "(none)"
+        oErr = ErrHandle()
+        try:
+            # Get the queryset
+            qs = self.projects.all()
+            if qs.count() > 0:
+                html = []
+                for obj in qs:
+                    if obj.__class__.__name__ == "Project2":
+                        project = obj
+                    else:
+                        project = obj.project
+                    url = reverse('project2_details', kwargs={'pk': project.id})
+                    html.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project.name))
+                sBack = ",".join(html)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_projects")
+
+        return sBack
+
     def get_report_html(self):
         """Convert the markdown report"""
 
@@ -1685,6 +2075,26 @@ class ImportSet(models.Model):
         if self.report != None:
             sReport = markdown(self.report)
         return sReport    
+
+    def get_result(self):
+        """Get a button to go to the imported result"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if self.importtype == "manu" and not self.manuscript is None:
+                url = reverse('manuscript_details', kwargs={'pk': self.manuscript.id})
+                #sBack = '<span class="badge signature ot"><a href="{}"></a></span>'.format(url)
+                sBack = '<a role="button" class="btn btn-xs jumbo-1" href="{}">Manuscript</a>'.format(url)
+            elif self.importtype == "ssg" and not self.equal is None:
+                url = reverse('equalgold_details', kwargs={'pk': self.equal.id})
+                # sBack = '<span class="badge signature gr"><a href="{}"></a></span>'.format(url)
+                sBack = '<a role="button" class="btn btn-xs jumbo-1" href="{}">Authority File</a>'.format(url)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/get_submission")
+        return sBack
 
     def get_saved(self):
         """REturn the saved date in a readable form"""
@@ -1697,6 +2107,12 @@ class ImportSet(models.Model):
         sStatus = self.get_status_display()
         if html:
             sStatus = '<span class="badge signature ot">{}</span>'.format(sStatus)
+            # Check if there is a result
+            sResult = self.get_result()
+            if sResult != "":
+                # There is a result, so add it to the status
+                sStatus = '{}<span>&nbsp;</span>{}'.format(sStatus, sResult)
+
         return sStatus
 
     def get_type(self):
@@ -1706,19 +2122,30 @@ class ImportSet(models.Model):
         response = None
         oErr = ErrHandle()
         try:
+            # Just monitor the excel status
+            if not self.excel is None:
+                sStatus = "closed" if self.excel.closed else "open"
+                # oErr.Status("ImportSet excel file status = {}".format(sStatus))
+                if sStatus == "open":
+                    iDoubleCheck = 1
+
             # Check if the order is specified
             if self.order is None or self.order <= 0:
                 # Specify the order
                 self.order = ImportSet.objects.filter(profile=self.profile).count() + 1
             # Adapt the save date
             self.saved = get_current_datetime()
-
+            
             # If the status is 'cre'..
             if self.status == "cre":
                 # Check if an excel file has been specified
                 if self.importtype in ['manu', 'ssg'] and not self.excel is None and not self.excel.file is None:
                     # Move on to the status 'chg'
                     self.status = "chg"
+
+            ## Possibly first close the file
+            #if not self.excel is None:
+            #    self.excel.close()
 
             response = super(ImportSet, self).save(force_insert, force_update, using, update_fields)
         except:
@@ -1752,8 +2179,10 @@ class ImportReview(models.Model):
 
     # [1] Link to the importset
     importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_reviews")
-    # [1] Link to the moderator
-    moderator = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="moderator_reviews")
+    # [0-1] Link to the moderator - as soon as it is assigned
+    moderator = models.ForeignKey(Profile, on_delete=models.SET_NULL, blank=True, null=True, related_name="moderator_reviews")
+    # [1] The import-set items may be ordered (and they can be re-ordered by the user)
+    order = models.IntegerField("Order", default=0)
 
     # [0-1] Optional notes for this review
     notes = models.TextField("Notes", blank=True, null=True)
@@ -1767,14 +2196,96 @@ class ImportReview(models.Model):
     saved = models.DateTimeField(default=get_current_datetime)
 
     def __str__(self):
-        sBack = "{}: {}-{}".format(self.profile.user.username, self.order, self.selitemtype)
+        sBack = "{}: {} (id={})".format(self.moderator.user.username, self.order, self.id)
         return sBack
+
+    def adapt_order(self):
+        """Re-calculate the order and adapt where needed"""
+
+        # Do we have a moderator?
+        if self.moderator is None:
+            qs = ImportReview.objects.all().order_by("moderator", "order", "id")
+        else:
+            # We DO have a moderator
+            qs = self.moderator.moderator_reviews.all().order_by("order", "id")
+        order = 1
+        with transaction.atomic():
+            # Walk all the SetList objects
+            for obj in qs:
+                # Check if the order is as it should be
+                if obj.order != order:
+                    #No: adapt the order
+                    obj.order = order
+                    # And save it
+                    obj.save()
+                # Keep track of how the order should be
+                order += 1
+        return None
+
+    def do_process(self, profile, verdict):
+        """Process action of moderator to accept or reject the Importset"""
+
+        result = ""
+        oErr = ErrHandle()
+        try:
+            # Get tot he importset
+            importset = self.importset
+            if not importset is None:
+                if verdict == "rej":
+                    # Reject the submission
+                    importset.status = "rej"    # It is now rejected
+                    importset.save()
+                    # Also change my own status
+                    self.status = "rej"
+                    self.moderator = profile
+                    self.save()
+                elif verdict == "acc":
+                    # Accept the submission
+                    importset.status = "acc"
+                    importset.save()
+
+                    # First: try to import the Excel
+                    bResult = importset.do_import()
+                    if not bResult:
+                        # Something has gone wrong
+                        importset.status = "rej"
+                        importset.notes = "### ERROR\nCould not perform the import\n\n{}".format(importset.notes)
+                        importset.save()
+
+                    # And change my own status
+                    self.status = "acc"
+                    self.moderator = profile
+                    self.save()
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/do_process")
+
+        return result
 
     def get_created(self):
         """REturn the created date in a readable form"""
 
         sDate = get_crpp_date(self.created, True)
         return sDate
+
+    def get_moderator(self):
+        sBack = ""
+        if not self.moderator is None:
+            sBack = self.moderator.user.username
+        return sBack
+
+    def get_notes_html(self):
+        """Convert the markdown notes"""
+
+        sNotes = "-"
+        if self.notes != None:
+            sNotes = markdown(self.notes)
+        return sNotes    
+
+    def get_owner(self):
+        sBack = self.importset.profile.user.username
+        return sBack
 
     def get_saved(self):
         """REturn the saved date in a readable form"""
@@ -1783,17 +2294,90 @@ class ImportReview(models.Model):
         sDate = get_crpp_date(self.saved, True)
         return sDate
 
+    def get_status(self, html=False):
+        sStatus = self.get_status_display()
+        if html:
+            sStatus = '<span class="badge signature gr">{}</span>'.format(sStatus)
+        return sStatus
+
+    def get_submission(self):
+        """Get a button to go to this submission"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            if not self.importset is None:
+                url = reverse('importset_details', kwargs={'pk': self.importset.id})
+                sBack = '<span class="badge signature ot"><a href="{}"></a></span>'.format(url)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/get_submission")
+        return sBack
+
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None
         oErr = ErrHandle()
         try:
             # Adapt the save date
             self.saved = get_current_datetime()
+
+            # Check if the order is specified
+            if self.order is None or self.order <= 0:
+                # Specify the order
+                if self.moderator is None:
+                    # Order the ones without moderator
+                    self.order = ImportReview.objects.filter(moderator__isnull=True).count() + 1
+                else:
+                    # This particular moderator
+                    self.order = ImportReview.objects.filter(moderator=self.moderator).count() + 1
+
+            # If needed, set the review status
+
+            # Perform the normal logic
             response = super(ImportReview, self).save(force_insert, force_update, using, update_fields)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("ImportReview/save")
         # Return the response when saving
         return response
+
+    def update_order(profile):
+        oErr = ErrHandle()
+        bOkay = True
+        try:
+            # Something has happened
+            qs = ImportReview.objects.filter(moderator=profile).order_by('order', 'id')
+            with transaction.atomic():
+                order = 1
+                for obj in qs:
+                    if obj.order != order:
+                        obj.order = order
+                        obj.save()
+                    order += 1
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportReview/update_order")
+            bOkay = False
+        return bOkay
+
+
+class ImportSetProject(models.Model):
+    """Project associated with the import set"""
+
+    # [1] Obligatory importset
+    importset = models.ForeignKey(ImportSet, on_delete=models.CASCADE, related_name="importset_projects")
+    # [1] Obligatory project
+    project = models.ForeignKey(Project2, on_delete=models.CASCADE, related_name="importset_projects")
+    # [1] And a date: the date of saving this manuscript
+    created = models.DateTimeField(default=get_current_datetime)
+
+    def __str__(self):
+        sName = self.importset.name
+        if sName is None or sName == "":
+            sName = "id{}".format(self.importset.id)
+        sBack = "{}-{}".format(sName, self.project.name)
+        return sBack
+
+
 
 

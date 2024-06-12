@@ -2102,7 +2102,7 @@ class BasicDetails(DetailView):
                 if bFormsetChanged:
                     # OLD: 
                     frm = self.prepare_form(instance, context)
-
+                
                 # Put the form and the formset in the context
                 context['{}Form'.format(self.prefix)] = frm
                 context['basic_form'] = frm
@@ -2333,7 +2333,7 @@ class BasicDetails(DetailView):
                             cls = obj.__class__
                             obj_retrieved = cls.objects.filter(id=obj.id).first()
                             print("retrieved id={}".format(obj_retrieved.id))
-
+                            
                             # Make sure the form is actually saved completely
                             # Issue #426: put it up here
                             frm.save()
@@ -2434,7 +2434,7 @@ class BasicDetails(DetailView):
                     if lst_form_ta != None:
                         for item in lst_form_ta:
                             self.lst_typeahead.append(item)
-
+                
             # Get any possible typeahead parameters
             if frm != None:
                 lst_form_ta = getattr(frm, "typeaheads", None)
