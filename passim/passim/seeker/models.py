@@ -5265,7 +5265,7 @@ class Manuscript(models.Model):
             html.append('<span class="glyphicon glyphicon-question-sign" style="color: blue;"></span>')
             html.append('</a>')
             html.append('<span id="basic_h_similars" class="collapse">')
-            html.append('Because data was important from different sources,\
+            html.append('Because data was imported from different sources,\
                 it is possible there are multiple records in PASSIM for the same manuscript.\
                 This field shows an AI-generated, unverified list of 3 most likely doubles for this record,\
                 based on similarity of the shelfmark.')
@@ -5280,7 +5280,7 @@ class Manuscript(models.Model):
                     # get the url
                     url = reverse("manuscript_details", kwargs={'pk': obj.id})
                     # Get the passim manuscript ID
-                    manu_id = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, obj.id)
+                    manu_id = '<span class="badge signature gr"><a href="{}" style="cursor: alias;" target="_blank">{}</a></span>'.format(url, obj.id)
 
                     # Combine
                     html.append("{} {}".format(shelfmark, manu_id))
@@ -9943,6 +9943,8 @@ class MsItem(models.Model):
             self.next = None
             self.codico = dst_codico
             self.order = dst_items + 1
+            # And also reset my *MANUSCRIPT* (issue #768)
+            self.manu = dst_codico.manuscript
             self.save()
 
             # (2) set the 'next' item to me
