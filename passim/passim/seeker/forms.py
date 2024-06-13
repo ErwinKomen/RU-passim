@@ -2820,7 +2820,7 @@ class CollectionForm(PassimModelForm):
     """Collection list"""
 
     collection_ta = forms.CharField(label=_("Collection"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection (or collections using wildcards)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)

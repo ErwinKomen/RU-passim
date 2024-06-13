@@ -5618,7 +5618,7 @@ class SermonListView(BasicList):
         {'name': 'Incipit ... Explicit', 
                                 'order': 'o=3', 'type': 'str',  'custom': 'incexpl', 'main': True, 'linkdetails': True},
         {'name': 'Manuscript',  'order': 'o=4', 'type': 'str',  'custom': 'manuscript'},
-        {'name': 'Ms Date',     'order': 'o=5', 'type': 'str',  'custom': 'msdate',
+        {'name': 'Date',        'order': 'o=5', 'type': 'str',  'custom': 'msdate',
          'title': 'Date of the manuscript'},
         {'name': 'Section',     'order': 'o=6', 'type': 'str',  'custom': 'sectiontitle', 
          'allowwrap': True,    'autohide': "on", 'filter': 'filter_sectiontitle'},
@@ -5647,7 +5647,7 @@ class SermonListView(BasicList):
                 {"name": "Project",          "id": "filter_project",        "enabled": False},
                 {"name": "Collection...",    "id": "filter_collection",     "enabled": False, "head_id": "none"},
                 {"name": "Manuscript...",    "id": "filter_manuscript",     "enabled": False, "head_id": "none"},
-                {"name": "Sermon",           "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
+                {"name": "Manifestation",    "id": "filter_collsermo",      "enabled": False, "head_id": "filter_collection"},
                 # Issue #416: Delete the option to search for a GoldSermon personal dataset
                 # {"name": "Sermon Gold",      "id": "filter_collgold",       "enabled": False, "head_id": "filter_collection"},
                 {"name": "Authority file",   "id": "filter_collsuper",      "enabled": False, "head_id": "filter_collection"},
@@ -11042,7 +11042,7 @@ class ManuscriptEdit(BasicDetails):
     model = Manuscript  
     mForm = ManuscriptForm
     prefix = 'manu'
-    titlesg = "Manuscript identifier"
+    titlesg = "Manuscript"
     rtype = "json"
     new_button = True
     mainitems = []
@@ -12271,7 +12271,7 @@ class ManuscriptListView(BasicList):
         {'name': 'City/Location',    'order': 'o=1', 'type': 'str', 'custom': 'city',
                     'title': 'City or other location, such as monastery'},
         {'name': 'Library',  'order': 'o=2', 'type': 'str', 'custom': 'library'},
-        {'name': 'Name',     'order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
+        {'name': 'Shelfmark','order': 'o=3', 'type': 'str', 'custom': 'name', 'main': True, 'linkdetails': True},
         {'name': '',         'order': '',    'type': 'str', 'custom': 'saved',   'align': 'right'},
         {'name': 'Doubles',  'order': '',    'type': 'int', 'custom': 'similars','align': 'right'},
         {'name': 'Items',    'order': '',    'type': 'int', 'custom': 'count',   'align': 'right'},
@@ -15537,14 +15537,14 @@ class EqualGoldListView(BasicList):
         {"name": "Gryson/Clavis/Other code","id": "filter_signature", "enabled": False},
         {"name": "Keyword",         "id": "filter_keyword",           "enabled": False},
         {"name": "Status",          "id": "filter_stype",             "enabled": False},
-        {"name": "Manifestation count", "id": "filter_scount",        "enabled": False},
-        {"name": "AF relation count","id": "filter_ssgcount",         "enabled": False},
+        {"name": "Manifestation links", "id": "filter_scount",        "enabled": False},
+        {"name": "Authority file links","id": "filter_ssgcount",      "enabled": False},
         {"name": "Project",         "id": "filter_project",           "enabled": False},        
         {"name": "Transcription",   "id": "filter_transcr",           "enabled": False},        
         {"name": "Linked via manuscript","id": "filter_manuscript",   "enabled": False},        
         {"name": "Collection/Dataset...","id": "filter_collection",   "enabled": False, "head_id": "none"},
         {"name": "Manuscript",      "id": "filter_collmanu",          "enabled": False, "head_id": "filter_collection"},
-        {"name": "Sermon",          "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
+        {"name": "Manifestation",   "id": "filter_collsermo",         "enabled": False, "head_id": "filter_collection"},
         # issue #727: remove SermonGold filter
         # {"name": "Sermon Gold",     "id": "filter_collgold",          "enabled": False, "head_id": "filter_collection"},
         {"name": "Authority file",  "id": "filter_collsuper",         "enabled": False, "head_id": "filter_collection"},
