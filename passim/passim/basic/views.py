@@ -632,8 +632,7 @@ def make_ordering(qs, qd, order_default, order_cols, order_heads):
                             order.append(Lower(order_item).desc(nulls_last=True))
                         else:
                             order.append(F(order_item).desc(nulls_last=True))
-
-
+        
            #  order.append(Lower(order_cols[0]))
         if sType == 'str':
             if len(order) > 0:

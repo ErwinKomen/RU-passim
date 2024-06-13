@@ -5380,6 +5380,9 @@ class SermonEdit(BasicDetails):
                         instance.fulltext = sText
                         instance.save()
 
+                # Always double check the [siglist] parameter
+                instance.do_signatures()
+
             ## Make sure the 'verses' field is adapted, if needed
             #bResult, msg = instance.adapt_verses()
 

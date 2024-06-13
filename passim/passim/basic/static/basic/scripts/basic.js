@@ -33,6 +33,7 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_orderrow = "",      // The contents of the main listview <tr> with 'sortable' items
         loc_filter = [],        // Building a complex filter
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
@@ -3521,6 +3522,12 @@ var ru = (function ($, ru) {
 
           // Adapt the #qfilter
           $("#qfilter").val(JSON.stringify(loc_filter));
+
+          // Also reset the "o" (order) search value
+          $(".search_ordered_start input[name='o']").val("");
+
+          // And then do a search start
+          ru.basic.search_start(elStart);
 
           } catch (ex) {
             private_methods.errMsg("search_clear", ex);

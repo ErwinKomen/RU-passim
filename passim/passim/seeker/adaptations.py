@@ -44,7 +44,7 @@ adaptation_list = {
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
         'collectiontype', 'huwadoubles', 'manu_setlists'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
-                    'projectorphans'],
+                    'projectorphans', 'siglists'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -1692,6 +1692,33 @@ def adapt_projectorphans():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_siglists():
+    """Reset the siglist field contents"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Re-doc the siglist in all SermonDescr
+        qs = SermonDescr.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_signatures()
+        # Re-doc the siglist in all SermonGold
+        qs = SermonGold.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_signatures()
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 
 # =========== Part of sermongold_list ==================
 def adapt_sermon_gsig():
