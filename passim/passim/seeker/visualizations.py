@@ -1308,3 +1308,99 @@ class EqualGoldChrono(BasicPart):
 
         return context
 
+
+# ============================= downloads ==========================================================
+
+
+class CollectionDownload(BasicPart):
+    """Facilitate downloading datasets to some extent"""
+
+    MainModel = Collection
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "csv"       # downloadtype
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt is None or dt == "":
+            dt = self.qd.get("dtype")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        return context
+
+    def get_queryset(self, prefix):
+        """The queryset closely follows issue #716"""
+
+        oErr = ErrHandle()
+        qs = None
+        try:
+            user = self.request.user
+            if not user is None:
+                # Find out who this is
+                profile = user.user_profiles.first()
+                
+                # Get the Collection object
+                instance = self.obj
+                if not instance is None:
+                    # There is an object, so figure out what this is
+                    scope = instance.scope      # I.e: priv, team, publ
+                    coltype = instance.type     # I.e: sermo, gold, manu, super
+                    settype = instance.settype  # I.e: pd, hc
+
+                # Get parameters
+                name = self.qd.get("name", "")
+
+                # Construct the QS
+                lstQ = []
+                if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+                qs = Author.objects.filter(*lstQ).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("")
+
+        return qs
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        oErr = ErrHandle()
+        try:
+
+            if dtype == "json":
+                # Loop
+                for author in self.get_queryset(prefix):
+                    row = {"id": author.id, "name": author.name}
+                    lData.append(row)
+                # convert to string
+                sData = json.dumps(lData)
+            else:
+                # Create CSV string writer
+                output = StringIO()
+                delimiter = "\t" if dtype == "csv" else ","
+                csvwriter = csv.writer(output, delimiter=delimiter, quotechar='"')
+                # Headers
+                headers = ['id', 'name']
+                csvwriter.writerow(headers)
+                # Loop
+                for author in self.get_queryset(prefix):
+                    row = [author.id, author.name]
+                    csvwriter.writerow(row)
+
+                # Convert to string
+                sData = output.getvalue()
+                output.close()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionDownload/get_data")
+
+        return sData
+
+

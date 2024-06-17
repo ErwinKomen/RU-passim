@@ -8846,6 +8846,7 @@ class CollPrivDetails(CollAnyEdit):
         oErr = ErrHandle()
 
         try:
+            download_url = reverse('collection_download', kwargs={'pk': instance.id})
 
             # Action depends on instance.type: M/S/SG/SSG
             if instance.type == "manu":
@@ -8854,6 +8855,7 @@ class CollPrivDetails(CollAnyEdit):
                 if resizable: manuscripts['gridclass'] = "resizable dragdrop"
                 manuscripts['savebuttons'] = True
                 manuscripts['saveasbutton'] = True
+                manuscripts['downloadview'] = download_url
 
                 # Check ordering
                 qs_manu = instance.manuscript_col.all().order_by(
@@ -8915,6 +8917,7 @@ class CollPrivDetails(CollAnyEdit):
                 if resizable: sermons['gridclass'] = "resizable dragdrop"
                 sermons['savebuttons'] = True
                 sermons['saveasbutton'] = True
+                sermons['downloadview'] = download_url
 
                 qs_sermo = instance.sermondescr_col.all().order_by(
                         'order', 'sermon__author__name', 'sermon__siglist', 'sermon__srchincipit', 'sermon__srchexplicit')
@@ -8973,6 +8976,7 @@ class CollPrivDetails(CollAnyEdit):
                 if resizable: goldsermons['gridclass'] = "resizable dragdrop"
                 goldsermons['savebuttons'] = True
                 goldsermons['saveasbutton'] = True
+                goldsermons['downloadview'] = download_url
 
                 qs_sermo = instance.gold_col.all().order_by(
                         'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
@@ -9031,6 +9035,7 @@ class CollPrivDetails(CollAnyEdit):
                 if resizable: supers['gridclass'] = "resizable dragdrop"
                 supers['savebuttons'] = True
                 supers['saveasbutton'] = True
+                supers['downloadview'] = download_url
 
                 qs_sermo = instance.super_col.all().order_by(
                         'order', 'super__author__name', 'super__firstsig', 'super__srchincipit', 'super__srchexplicit')
