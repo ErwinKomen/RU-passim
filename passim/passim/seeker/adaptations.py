@@ -44,7 +44,7 @@ adaptation_list = {
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
         'collectiontype', 'huwadoubles', 'manu_setlists'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
-                    'projectorphans', 'siglists'],
+                    'projectorphans', 'codesort', 'siglists'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -1702,14 +1702,50 @@ def adapt_siglists():
     try:
         # Re-doc the siglist in all SermonDescr
         qs = SermonDescr.objects.all()
+        iNumber = qs.count()
+        count = 0
         with transaction.atomic():
             for obj in qs:
+                count += 1
                 obj.do_signatures()
+                if count % 1000 == 0:
+                    oErr.Status("adapt_siglists SermonDescr {} / {}".format(count, iNumber))
+
         # Re-doc the siglist in all SermonGold
         qs = SermonGold.objects.all()
+        iNumber = qs.count()
+        count = 0
         with transaction.atomic():
             for obj in qs:
+                count += 1
                 obj.do_signatures()
+                if count % 1000 == 0:
+                    oErr.Status("adapt_siglists SermonGold {} / {}".format(count, iNumber))
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_codesort():
+    """Set the codesort field contents"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Create [codesort] contents for model Signature
+        qs = Signature.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_codesort()
+        # Create [codesort] contents for model SermonSignature
+        qs = SermonSignature.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_codesort()
 
         # Everything has been processed correctly now
         msg = "ok"

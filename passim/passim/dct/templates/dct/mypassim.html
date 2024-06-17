@@ -111,7 +111,7 @@
           <span data-toggle="collapse" data-target="#saved_datasets-area">Saved datasets</span>
         </h3>
         <div id="saved_datasets-area" class="collapse-indicator collapse">
-          <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}">my datasets</a>
+          <p>List of <a role="button" class="btn btn-xs jumbo-1"  href="{% url 'collpriv_list' %}{{start_datasets}}">my datasets</a>
           (current size: {{count_datasets}}).
           </p>
         </div>

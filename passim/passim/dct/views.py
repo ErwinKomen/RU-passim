@@ -31,7 +31,7 @@ from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
     user_is_superuser, get_selectitem_info, adapt_m2m
-from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
+from passim.seeker.models import COLLECTION_SCOPE, FieldChoice, SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ImportSetProject, ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
@@ -285,6 +285,8 @@ class MyPassimEdit(BasicDetails):
 
         oErr = ErrHandle()
         bAllowSermonesReset = False
+        method_startup = "owner"
+        method_startup = "private"
         try:
             profile = self.object
             context['profile'] = profile
@@ -292,6 +294,15 @@ class MyPassimEdit(BasicDetails):
             context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
             context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
             context['sermones_allow'] = bAllowSermonesReset
+            # Set the initial configuration for the saved datasets
+            if method_startup == "private":
+                obj = FieldChoice.objects.filter(field=COLLECTION_SCOPE, abbr="priv").first()
+                if not obj is None:
+                    context['start_datasets'] = "?priv-colscope={}".format(obj.id)
+            # Alternative: set the owner
+            elif method_startup == "owner":
+                context['start_datasets'] = "?priv-owner={}".format(profile.id)
+
 
             # Special treatment: we have select2 and we have at least one form 
             initial = {}
