@@ -1277,6 +1277,9 @@ def adapt_similars():
                 for idx, oItem in enumerate(lst_add):
                     # Add the item
                     obj = ManuscriptSimilar.objects.create(src_id=oItem['src_id'], dst_id=oItem['dst_id'])
+        else:
+            # This should not be signed off yet
+            bResult = False
         # Everything has been processed correctly now
         msg = "ok"
     except:
