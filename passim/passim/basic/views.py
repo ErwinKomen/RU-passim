@@ -3056,7 +3056,7 @@ class BasicPart(View):
             kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
 
             # Get the queryset, which is based on the listview parameters
-            qs = self.get_queryset()
+            qs = self.get_queryset(prefix)
 
             # Start workbook
             wb = openpyxl.Workbook()
