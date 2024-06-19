@@ -12,12 +12,12 @@ import sqlite3
 import pandas as pd
 import copy
 from unidecode import unidecode
-from passim.settings import MEDIA_DIR
+from passim.settings import MEDIA_DIR, MEDIA_ROOT
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle, RomanNumbers
 from passim.basic.models import UserSearch
-from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
+from passim.seeker.models import ManuscriptSimilar, get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
     SourceInfo, SermonGoldSame, SermonGoldKeyword, EqualGoldKeyword, Signature, Ftextlink, ManuscriptExt, \
@@ -42,9 +42,9 @@ adaptation_list = {
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
         'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
-        'collectiontype', 'huwadoubles', 'manu_setlists'], # 'sermonesdates',
+        'collectiontype', 'huwadoubles', 'manu_setlists', 'similars'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
-                    'projectorphans'],
+                    'projectorphans', 'codesort', 'siglists'],
     'sermongold_list': ['sermon_gsig', 'huwa_opera_import'],
     'equalgold_list': [
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
@@ -1232,6 +1232,62 @@ def adapt_manu_setlists():
         msg = oErr.get_error_message()
     return bResult, msg
 
+def adapt_similars():
+    """Fill the manuscript deduplications"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        filename = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", "manu_dedups.json"))
+        if os.path.exists(filename):
+            # Read the file
+            with open(filename, "r") as f:
+                lst_dedup = json.load(f)
+
+            # List of additions to be made
+            lst_add = []
+
+            # walk through the similars
+            for idx, oItem in enumerate(lst_dedup):
+                if idx % 500 == 0:
+                    print("adapt_similars: {}".format(idx))
+                # Get tha manuscript and the duplicate candicates
+                manuscriptId = oItem.get("manuscriptId")
+                duplicateCandidates = oItem.get("duplicateCandidates")
+                if not manuscriptId is None and not duplicateCandidates is None:
+                    # Get existing list of duplicateCandidates
+                    oCurrent = { x['dst__id'] : x['id']
+                                   for x in ManuscriptSimilar.objects.filter(src_id=manuscriptId).values("id", "dst__id")}
+                    # (1) create a list of deletables
+                    delete_id = []
+                    for dst_id, sim_id in oCurrent.items():
+                        if not dst_id in duplicateCandidates:
+                            delete_id.append(sim_id)
+                    # (2) Delete whatever needs to be deleted
+                    if len(delete_id) > 0:
+                        ManuscriptSimilar.objects.filter(id__in=delete_id).delete()
+                    # Prepare an addition
+                    for dst_id in duplicateCandidates:
+                        if not dst_id in oCurrent.keys():
+                            lst_add.append(dict(src_id=manuscriptId, dst_id=dst_id))
+
+            # Add what needs to be added
+            with transaction.atomic():
+                for idx, oItem in enumerate(lst_add):
+                    # Add the item
+                    obj = ManuscriptSimilar.objects.create(src_id=oItem['src_id'], dst_id=oItem['dst_id'])
+        else:
+            # This should not be signed off yet
+            bResult = False
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 # =========== Part of sermon_list ==================
 def adapt_nicknames():
     oErr = ErrHandle()
@@ -1692,6 +1748,69 @@ def adapt_projectorphans():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_siglists():
+    """Reset the siglist field contents"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Re-doc the siglist in all SermonDescr
+        qs = SermonDescr.objects.all()
+        iNumber = qs.count()
+        count = 0
+        with transaction.atomic():
+            for obj in qs:
+                count += 1
+                obj.do_signatures()
+                if count % 1000 == 0:
+                    oErr.Status("adapt_siglists SermonDescr {} / {}".format(count, iNumber))
+
+        # Re-doc the siglist in all SermonGold
+        qs = SermonGold.objects.all()
+        iNumber = qs.count()
+        count = 0
+        with transaction.atomic():
+            for obj in qs:
+                count += 1
+                obj.do_signatures()
+                if count % 1000 == 0:
+                    oErr.Status("adapt_siglists SermonGold {} / {}".format(count, iNumber))
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_codesort():
+    """Set the codesort field contents"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    try:
+        # Create [codesort] contents for model Signature
+        qs = Signature.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_codesort()
+        # Create [codesort] contents for model SermonSignature
+        qs = SermonSignature.objects.all()
+        with transaction.atomic():
+            for obj in qs:
+                obj.do_codesort()
+
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+
 
 # =========== Part of sermongold_list ==================
 def adapt_sermon_gsig():

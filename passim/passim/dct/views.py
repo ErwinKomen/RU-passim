@@ -23,14 +23,15 @@ import copy
 import json
 import csv
 import openpyxl
+import os
 
 # ======= imports from my own application ======
-from passim.settings import APP_PREFIX, MEDIA_DIR, WRITABLE_DIR
+from passim.settings import APP_PREFIX, MEDIA_DIR, MEDIA_ROOT, WRITABLE_DIR
 from passim.utils import ErrHandle
 from passim.basic.views import BasicList, BasicDetails, BasicPart
 from passim.seeker.views import get_application_context, get_breadcrumbs, user_is_ingroup, nlogin, user_is_authenticated, \
     user_is_superuser, get_selectitem_info, adapt_m2m
-from passim.seeker.models import SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
+from passim.seeker.models import COLLECTION_SCOPE, FieldChoice, SermonDescr, EqualGold, Manuscript, Signature, Profile, CollectionSuper, Collection, Project2, \
     Basket, BasketMan, BasketSuper, BasketGold
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, get_searchable, get_now_time
 from passim.dct.models import ImportSetProject, ResearchSet, SetList, SetDef, get_passimcode, get_goldsig_dct, \
@@ -284,6 +285,8 @@ class MyPassimEdit(BasicDetails):
 
         oErr = ErrHandle()
         bAllowSermonesReset = False
+        method_startup = "owner"
+        method_startup = "private"
         try:
             profile = self.object
             context['profile'] = profile
@@ -291,6 +294,15 @@ class MyPassimEdit(BasicDetails):
             context['dct_count'] = SetDef.objects.filter(researchset__profile=profile).count()
             context['count_datasets'] = Collection.objects.filter(settype="pd", owner=profile).count()
             context['sermones_allow'] = bAllowSermonesReset
+            # Set the initial configuration for the saved datasets
+            if method_startup == "private":
+                obj = FieldChoice.objects.filter(field=COLLECTION_SCOPE, abbr="priv").first()
+                if not obj is None:
+                    context['start_datasets'] = "?priv-colscope={}".format(obj.id)
+            # Alternative: set the owner
+            elif method_startup == "owner":
+                context['start_datasets'] = "?priv-owner={}".format(profile.id)
+
 
             # Special treatment: we have select2 and we have at least one form 
             initial = {}
@@ -803,8 +815,10 @@ class MyPassimEdit(BasicDetails):
 
                 # And store an introduction
                 lIntro = []
-                lIntro.append('View and work with <a role="button" class="btn btn-xs jumbo-1" ')
+                lIntro.append('<div class="row"><div class="col-md-7">View and work with <a role="button" class="btn btn-xs jumbo-1" ')
                 lIntro.append('href="{}">Excel import submissions</a>.'.format(reverse('importset_list')))
+                template_buttons = render_to_string("dct/xlsimp_templates.html", context, self.request)
+                lIntro.append('</div><div class="col-md-2">Templates:</div>{}</div>'.format(template_buttons))
                 sIntro = " ".join(lIntro)
                 importset['introduction'] = sIntro
 
@@ -3411,6 +3425,61 @@ class ImportSetDownload(BasicPart):
             oErr.DoError("ImportSetDownload/get_data")
 
         return sData
+
+
+class ImportSetManuTempDownload(BasicPart):
+    """Facilitate downloading one imported file"""
+
+    MainModel = None
+    template_name = "seeker/download_status.html"
+    action = "download"
+    dtype = "excel"       # downloadtype
+    downloadname = "template_manuscript"
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        dt = self.qd.get('downloadtype', "")
+        if dt != None and dt != '':
+            self.dtype = dt
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        manu_fields = []
+        oErr = ErrHandle()
+
+        try:
+            # Need to know who this user (profile) is
+            profile = Profile.get_user_profile(self.request.user.username)
+            username = profile.user.username
+            team_group = app_editor
+
+            # Make sure we only look at lower-case Dtype
+            dtype = dtype.lower()
+
+            # Get the path where the template is stored
+            template_path = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", "passim_manuscript_template.xlsx"))
+
+            # Is this Excel?
+            if dtype == "excel" or dtype == "xlsx":
+                # Find and open the appropriate workbook
+                wb = openpyxl.load_workbook(template_path)
+
+                # Save it
+                wb.save(response)
+                sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("ImportSetManuTempDownload/get_data")
+
+        return sData
+
+
+
 
 # =================== Model views for EXCEL REVIEW ========
 

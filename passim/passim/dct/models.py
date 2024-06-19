@@ -1722,6 +1722,7 @@ class ImportSet(models.Model):
             sheetnames = wb.sheetnames
             ws_manu = None
             ws_sermo = None
+            ws_info = None
             lst_ws = []
             for sname in sheetnames:
                 if "manuscript" in sname.lower():
@@ -1730,9 +1731,11 @@ class ImportSet(models.Model):
                 elif "sermons" in sname.lower():
                     ws_sermo = wb[sname]
                     lst_ws.append(ws_sermo)
+                elif "info" in sname.lower():
+                    ws_info = wb[sname]
             # Check if we have the correct number of worksheets
-            if len(wb.sheetnames) >2:
-                html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons'")
+            if len(wb.sheetnames) >3:
+                html_err.append( "The Excel should contain just one sheet 'Manuscript' and one sheet 'Sermons' (and optionally 'Info')")
             elif len(lst_ws) != 2:
                 # Are there more sheets?
                 if len(lst_ws) > 2:

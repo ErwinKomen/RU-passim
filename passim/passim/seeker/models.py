@@ -15,6 +15,7 @@ import pytz
 from django.urls import reverse
 from datetime import datetime
 from markdown import markdown
+from unidecode import unidecode
 import sys, os, io, re
 import copy
 import json
@@ -1691,9 +1692,6 @@ class Profile(models.Model):
         sBack = '<span class="btn btn-primary"> <a href="{}">Change password &raquo;</a></span>'.format(url)             
         print(sBack)
         return sBack
-
-
-
 
     def get_defaults(self):
         """List of projects to which this user (profile) has APPROVER rights"""
@@ -5265,7 +5263,7 @@ class Manuscript(models.Model):
             html.append('<span class="glyphicon glyphicon-question-sign" style="color: blue;"></span>')
             html.append('</a>')
             html.append('<span id="basic_h_similars" class="collapse">')
-            html.append('Because data was important from different sources,\
+            html.append('Because data was imported from different sources,\
                 it is possible there are multiple records in PASSIM for the same manuscript.\
                 This field shows an AI-generated, unverified list of 3 most likely doubles for this record,\
                 based on similarity of the shelfmark.')
@@ -5280,7 +5278,7 @@ class Manuscript(models.Model):
                     # get the url
                     url = reverse("manuscript_details", kwargs={'pk': obj.id})
                     # Get the passim manuscript ID
-                    manu_id = '<span class="badge signature gr"><a href="{}">{}</a></span>'.format(url, obj.id)
+                    manu_id = '<span class="badge signature gr"><a href="{}" style="cursor: alias;" target="_blank">{}</a></span>'.format(url, obj.id)
 
                     # Combine
                     html.append("{} {}".format(shelfmark, manu_id))
@@ -8300,10 +8298,11 @@ class SermonGold(models.Model):
     def do_signatures(self):
         """Create or re-make a JSON list of signatures"""
 
-        lSign = []
-        for item in self.goldsignatures.all().order_by('-editype'):
-            lSign.append(item.short())
-        siglist = json.dumps(lSign)
+        siglist = self.get_signatures_markdown(plain=True)
+        #lSign = []
+        #for item in self.goldsignatures.all().order_by('code', '-editype'):
+        #    lSign.append(item.short())
+        #siglist = json.dumps(lSign)
         if siglist != self.siglist:
             self.siglist = siglist
             # And save myself
@@ -8654,20 +8653,29 @@ class SermonGold(models.Model):
             lSign.append(item.short())
         return lSign
 
-    def get_signatures_markdown(self):
+    def get_signatures_markdown(self, plain=False):
         lHtml = []
         # The prefered sequence of codes (Gryson, Clavis, Other)
         editype_pref_seq = ['gr', 'cl', 'ot']
         # Use the prefered sequence of codes 
         for editype in editype_pref_seq:        
             # Visit all signatures 
-            sublist = Signature.objects.filter(gold=self, editype=editype).order_by('code')
-            for sig in sublist:
-                # Determine where clicking should lead to
-                url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                # Create a display for this topic
-                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
-            sBack = ", ".join(lHtml)
+            sublist = Signature.objects.filter(gold=self, editype=editype).order_by(Lower('codesort'))
+            if plain:
+                # Simpler stuff
+                lst_siglist = sublist.values("codesort")
+                for item in lst_siglist:
+                    lHtml.append(item['codesort'])
+            else:
+                for sig in sublist:
+                    # Determine where clicking should lead to
+                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                    # Create a display for this topic
+                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            if plain:
+                sBack = json.dumps(lHtml)
+            else:
+                sBack = ", ".join(lHtml)
         return sBack
          
     def get_ssg_markdown(self):
@@ -9943,6 +9951,8 @@ class MsItem(models.Model):
             self.next = None
             self.codico = dst_codico
             self.order = dst_items + 1
+            # And also reset my *MANUSCRIPT* (issue #768)
+            self.manu = dst_codico.manuscript
             self.save()
 
             # (2) set the 'next' item to me
@@ -10792,11 +10802,24 @@ class SermonDescr(models.Model):
         """Create or re-make a JSON list of signatures"""
 
         lSign = []
-        for item in self.sermonsignatures.all():
-            lSign.append(item.short())
-        self.siglist = json.dumps(lSign)
-        # And save myself
-        self.save()
+        oErr = ErrHandle
+        bResult = True
+        try:
+            # Use the same method as for showing
+            siglist_new = self.get_eqsetsignatures_markdown(type='combi', plain=True)
+            if self.siglist != siglist_new:
+                # And save myself
+                self.save()
+
+            #for item in self.sermonsignatures.all().order_by('code'):
+            #    lSign.append(item.short())
+            #self.siglist = json.dumps(lSign)
+            ## And save myself
+            #self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("SermonDescr/do_signatures")
+        return bResult
 
     def getdepth(self):
         depth = 1
@@ -11054,22 +11077,52 @@ class SermonDescr(models.Model):
                 gold_id_list = [x['id'] for x in gold_list]
                 auto_list = copy.copy(gold_id_list)
                 manual_list = []
-                for sig in self.sermonsignatures.filter(editype = editype).order_by('code'):               
-                    if sig.gsig:
-                        gold_id_list.append(sig.gsig.gold.id)
-                    else:
-                        manual_list.append(sig.id)           
-                # (a) Show the gold signatures           
-                for sig in Signature.objects.filter(gold__id__in=gold_id_list, editype = editype).order_by('code'):
-                    # Determine where clicking should lead to
-                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                    # Check if this is an automatic code
-                    auto = "" if sig.gold.id in auto_list else "view-mode"
-                    lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype, auto, url,sig.code))            
-                # (b) Show the manual ones
-                for sig in self.sermonsignatures.filter(id__in=manual_list, editype = editype).order_by('code'):
-                    # Create a display for this topic - without URL
-                    lHtml.append("<span class='badge signature {}'>{}</span>".format(sig.editype,sig.code))
+                if plain:
+                    lst_siglist = self.sermonsignatures.filter(editype = editype
+                                ).order_by('codesort').values('id', 'gsig__gold__id')
+                    if lst_siglist.count() > 0:
+                        for sig in lst_siglist:
+                            gold_id = sig.get('gsig__gold__id')
+                            if gold_id:
+                                gold_id_list.append(gold_id)
+                            else:
+                                manual_list.append(sig['id'])
+
+                else:
+                    for sig in self.sermonsignatures.filter(editype = editype).order_by('codesort'):               
+                        if sig.gsig:
+                            gold_id_list.append(sig.gsig.gold.id)
+                        else:
+                            manual_list.append(sig.id)  
+                        
+                # Speed-up treatment if this is just 'plain'
+                if plain:
+                    # (a) Gold signatures
+                    if len(gold_id_list) > 0:
+                        lst_siglist = Signature.objects.filter(gold__id__in=gold_id_list, 
+                                        editype = editype).order_by(Lower('codesort')).values('codesort')
+                        for item in lst_siglist:
+                            lHtml.append(item['codesort'])
+
+                    # (b) Manual ones
+                    if len(manual_list) > 0:
+                        lst_siglist = self.sermonsignatures.filter(id__in=manual_list, 
+                                        editype = editype).order_by(Lower('codesort')).values('codesort')
+                        for item in lst_siglist:
+                            lHtml.append(item['codesort'])
+                else:
+                    # (a) Show the gold signatures           
+                    for sig in Signature.objects.filter(gold__id__in=gold_id_list, editype = editype).order_by(Lower('codesort')):
+                        # Determine where clicking should lead to
+                        url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                        # Check if this is an automatic code
+                        auto = "" if sig.gold.id in auto_list else "view-mode"
+                        lHtml.append("<span class='badge signature {} {}'><a href='{}'>{}</a></span>".format(sig.editype, auto, url,sig.code))            
+                
+                    # (c) Show the manual ones
+                    for sig in self.sermonsignatures.filter(id__in=manual_list, editype = editype).order_by(Lower('codesort')):
+                        # Create a display for this topic - without URL
+                        lHtml.append("<span class='badge signature {}'>{}</span>".format(sig.editype,sig.code))
             else:
                 # Get an ordered set of signatures - automatically linked
                 for sig in Signature.objects.filter(gold__in=gold_list, editype = editype).order_by('code'):
@@ -11635,16 +11688,14 @@ class SermonDescr(models.Model):
 
             # Preliminary saving, before accessing m2m fields
             response = super(SermonDescr, self).save(force_insert, force_update, using, update_fields)
-            # Process signatures
-            lSign = []
-            bCheckSave = False
-            for item in self.sermonsignatures.all():
-                lSign.append(item.short())
-                bCheckSave = True
 
-            # =========== DEBUGGING ================
-            # self.do_ranges(force = True)
-            # ======================================
+            # Process signatures: further down
+            bCheckSave = True
+            #lSign = []
+            #bCheckSave = False
+            #for item in self.sermonsignatures.all():
+            #    lSign.append(item.short())
+            #    bCheckSave = True
 
             # Are we in save_lock?
             if not self.save_lock:
@@ -11660,7 +11711,8 @@ class SermonDescr(models.Model):
 
             # Make sure to save the siglist too
             if bCheckSave: 
-                siglist_new = json.dumps(lSign)
+                siglist_new = self.get_eqsetsignatures_markdown("combi", True)
+                # siglist_new = json.dumps(lSign)
                 if siglist_new != self.siglist:
                     self.siglist = siglist_new
                     # Only now do the actual saving...
@@ -12821,6 +12873,8 @@ class Signature(models.Model):
 
     # [1] It must have a code = gryson code or clavis number
     code = models.CharField("Code", max_length=LONG_STRING)
+    # [0-1] each code must have a sortable field codesort
+    codesort = models.CharField("Code (sortable)", null=True, blank=True, max_length=LONG_STRING)
     # [1] Every signature must be of a limited number of types
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
@@ -12834,12 +12888,32 @@ class Signature(models.Model):
     def short(self):
         return self.code
 
+    def do_codesort(self, do_saving=True):
+        """If need be, adapt the field [codesort] based on [code]"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            codesort = unidecode(self.code, "utf-8")
+            codesort = re.sub('[\[\]\,]+', '', codesort).strip()
+            if self.codesort is None or self.codesort != codesort:
+                self.codesort = codesort
+                if do_saving:
+                    self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("do_codesort")
+
+        return bResult
+
     def find(code, editype):
         obj = Signature.objects.filter(code=code, editype=editype).first()
         return obj
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
         response = None
+        # Does the [codesort] need changing?
+        self.do_codesort(do_saving=False)
         # Double check
         if self.code and self.editype and self.gold_id:
             # Do the saving initially
@@ -12863,6 +12937,8 @@ class SermonSignature(models.Model):
 
     # [1] It must have a code = gryson code or clavis number
     code = models.CharField("Code", max_length=LONG_STRING)
+    # [0-1] each code must have a sortable field codesort
+    codesort = models.CharField("Code (sortable)", null=True, blank=True, max_length=LONG_STRING)
     # [1] Every edition must be of a limited number of types
     editype = models.CharField("Edition type", choices=build_abbr_list(EDI_TYPE), 
                             max_length=5, default="gr")
@@ -12878,11 +12954,31 @@ class SermonSignature(models.Model):
     def short(self):
         return self.code
 
+    def do_codesort(self, do_saving=True):
+        """If need be, adapt the field [codesort] based on [code]"""
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            codesort = unidecode(self.code, "utf-8")
+            codesort = re.sub('[\[\]\,]+', '', codesort).strip()
+            if self.codesort is None or self.codesort != codesort:
+                self.codesort = codesort
+                if do_saving:
+                    self.save()
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("do_codesort")
+
+        return bResult
+
     def find(code, editype):
         obj = SermonSignature.objects.filter(code=code, editype=editype).first()
         return obj
 
     def save(self, force_insert = False, force_update = False, using = None, update_fields = None):
+        # Does the [codesort] need changing?
+        self.do_codesort(do_saving=False)
         # Do the saving initially
         response = super(SermonSignature, self).save(force_insert, force_update, using, update_fields)
         # Adapt list of signatures for the related GOLD

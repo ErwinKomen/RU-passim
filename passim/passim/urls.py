@@ -226,6 +226,7 @@ urlpatterns = [
     re_path(r'^collection/manu/list', CollectionListView.as_view(prefix="manu"), name='collmanu_list'),
     re_path(r'^collection/gold/list', CollectionListView.as_view(prefix="gold"), name='collgold_list'),
     re_path(r'^collection/super/list', CollectionListView.as_view(prefix="super"), name='collsuper_list'),
+    re_path(r'^dataset/download(?:/(?P<pk>\d+))?/$', CollectionDownload.as_view(), name='collection_download'),
 
     re_path(r'^dataset/private/details(?:/(?P<pk>\d+))?/$', CollPrivDetails.as_view(), name='collpriv_details'),
     re_path(r'^dataset/public/details(?:/(?P<pk>\d+))?/$', CollPublDetails.as_view(), name='collpubl_details'), 
@@ -359,6 +360,7 @@ urlpatterns = [
     re_path(r'^importset/edit(?:/(?P<pk>\d+))?/$', ImportSetEdit.as_view(), name='importset_edit'),
     re_path(r'^importset/process(?:/(?P<pk>\d+))?/$', ImportSetProcess.as_view(), name='importset_process'),
     re_path(r'^importset/download(?:/(?P<pk>\d+))?/$', ImportSetDownload.as_view(), name='importset_download'),
+    re_path(r'^importset/manu/template$', ImportSetManuTempDownload.as_view(), name='importset_manu_template'),
 
     re_path(r'^importreview/list', ImportReviewListView.as_view(), name='importreview_list'),
     re_path(r'^importreview/details(?:/(?P<pk>\d+))?/$', ImportReviewDetails.as_view(), name='importreview_details'),

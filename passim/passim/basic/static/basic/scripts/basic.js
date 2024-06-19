@@ -33,6 +33,7 @@ var ru = (function ($, ru) {
         loc_progr = [],         // Progress tracking
         loc_relatedRow = null,  // Row being dragged
         loc_params = "",
+        loc_orderrow = "",      // The contents of the main listview <tr> with 'sortable' items
         loc_filter = [],        // Building a complex filter
         loc_colwrap = [],       // Column wrapping
         loc_sWaiting = " <span class=\"glyphicon glyphicon-refresh glyphicon-refresh-animate\"></span>",
@@ -2714,6 +2715,7 @@ var ru = (function ($, ru) {
         */
       post_download: function (elStart, options) {
         var ajaxurl = "",
+            targetid = "",
             action = "",
             contentid = null,
             response = null,
@@ -2743,21 +2745,27 @@ var ru = (function ($, ru) {
           // obligatory parameter: ajaxurl
           ajaxurl = $(elStart).attr("ajaxurl");
           contentid = $(elStart).attr("contentid");
+          targetid = $(elStart).attr("targetid");
 
           if (options !== undefined && "waitclass" in options) {
             waitclass = "." + options.waitclass;
           }
 
           // Gather the information
-          frm = $(elStart).closest(".container-small").find("form");
-          if (frm.length === 0) {
-            frm = $(elStart).closest("td").find("form");
+          if (targetid === undefined || targetid === "") {
+            frm = $(elStart).closest(".container-small").find("form");
             if (frm.length === 0) {
-              frm = $(elStart).closest(".body-content").find("form");
+              frm = $(elStart).closest("td").find("form");
               if (frm.length === 0) {
-                frm = $(elStart).closest(".container-large.body-content").find("form");
+                frm = $(elStart).closest(".body-content").find("form");
+                if (frm.length === 0) {
+                  frm = $(elStart).closest(".container-large.body-content").find("form");
+                }
               }
             }
+          } else {
+            // A targetid for the form has been specified
+            frm = $(targetid);
           }
           // Check what we have
           if (frm === null || frm.length === 0) {
@@ -2927,6 +2935,11 @@ var ru = (function ($, ru) {
                   // Set the response type to BLOB, since that's what we are expecting back
                   xhr.responseType = "blob";
                   formData = new FormData(frm[0]);
+                  formData.append("action", "download");
+                  if (dtype !== undefined && dtype !== "") {
+                    formData.append("dtype", dtype);
+                  }
+
                   xhr.send(formData);
 
                   // Make sure we know how to handle this
@@ -3521,6 +3534,12 @@ var ru = (function ($, ru) {
 
           // Adapt the #qfilter
           $("#qfilter").val(JSON.stringify(loc_filter));
+
+          // Also reset the "o" (order) search value
+          $(".search_ordered_start input[name='o']").val("");
+
+          // And then do a search start
+          ru.basic.search_start(elStart);
 
           } catch (ex) {
             private_methods.errMsg("search_clear", ex);

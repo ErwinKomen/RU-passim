@@ -16,7 +16,7 @@ import itertools
 
 # ======= imports from my own application ======
 from passim.utils import ErrHandle
-from passim.basic.views import BasicPart
+from passim.basic.views import BasicPart, user_is_ingroup
 from passim.seeker.models import get_crpp_date, get_current_datetime, process_lib_entries, adapt_search, get_searchable, get_now_time, \
     add_gold2equal, add_equal2equal, add_ssg_equal2equal, get_helptext, Information, Country, City, Author, Manuscript, \
     User, Group, Origin, SermonDescr, MsItem, SermonHead, SermonGold, SermonDescrKeyword, SermonDescrEqual, Nickname, NewsItem, \
@@ -33,7 +33,7 @@ from passim.stylo.analysis import bootstrapped_distance_matrices, hierarchical_c
 from passim.dct.models import SavedVis
 
 # ======= from RU-Basic ========================
-from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item
+from passim.basic.views import BasicList, BasicDetails, make_search_list, add_rel_item, app_editor
 
 
 COMMON_NAMES = ["Actibus", "Adiubante", "Africa", "Amen", "Andreas", "Apostolorum", "Apringio", "Augustinus", 
@@ -1307,4 +1307,176 @@ class EqualGoldChrono(BasicPart):
             oErr.DoError("EqualGoldChrono/add_to_context")
 
         return context
+
+
+# ============================= downloads ==========================================================
+
+
+class CollectionDownload(BasicPart):
+    """Facilitate downloading datasets to some extent"""
+
+    MainModel = Collection
+    template_name = "seeker/download_status.html"
+    action = "download"         # This is purely a download function
+    dtype = "csv"               # downloadtype
+    spec_download = True        # Indicate that we should use the [specification]
+    downloadname = "Dataset"    # Part of the name of the downloaded dataset
+    model = None                # This is assigned the correct model, depending on the 
+
+    def custom_init(self):
+        """Calculate stuff"""
+        
+        oErr = ErrHandle()
+        oModel = dict(manu=Manuscript, sermo=SermonDescr, gold=SermonGold, super=EqualGold)
+        try:
+            dt = self.qd.get('downloadtype', "")
+            if dt is None or dt == "":
+                dt = self.qd.get("dtype")
+            if dt != None and dt != '':
+                self.dtype = dt
+            # Get my instance
+            instance = self.obj
+            # What type am I?
+            coltype = instance.type
+            # Set model, depending on coltype
+            cls_this = oModel.get(coltype)
+            if not cls_this is None:
+                self.model = cls_this
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionDownload/custom_init")
+
+    def add_to_context(self, context):
+        # Provide search URL and search name
+        return context
+
+    def get_queryset(self, prefix):
+        """The queryset closely follows issue #716
+        
+        The list of M/S/SG/SSG is given, depending on the collection type
+        This goes via:
+          M   CollectionMan
+          S   CollectionSerm
+          SG  CollectionGold
+          SSG CollectionSuper
+        """
+
+        def may_download(qs, is_editor, my_projects):
+            """Determine if someone may actually download"""
+
+            oErr = ErrHandle()
+            bResult = False
+            max_for_user = 1000
+            try:
+                size = qs.count()
+                if size < max_for_user:
+                    bResult = True
+                else:
+                    # Is this an editor?
+                    if is_editor:
+                        # Only allowed to download if all items have his project label
+                        lst_contains = []
+                        for obj in qs:
+                            # Get project labels for this object
+                            lst_prj = [x['id'] for x in obj.projects.all().values('id')]
+                            for item in lst_prj:
+                                if not item in lst_contains: lst_contains.append(item)
+                        # Check for overal appliance
+                        iBad = 0
+                        for item in lst_contains:
+                            if not item in my_projects:
+                                iBad += 1
+                        if iBad == 0:
+                            bResult = True
+                    else:
+                        # since this is not an editor and the number is higher than [max_for_user]; deny
+                        pass
+            except:
+                msg = oErr.get_error_message()
+                oErr.DoError("may_download")
+            return bResult
+
+        oErr = ErrHandle()
+        qs = None
+        lst_item = []
+        max_number = None
+        my_projects = None
+        is_editor = False
+        try:
+            user = self.request.user
+            if not user is None:
+                # Find out who this is
+                profile = user.user_profiles.first()
+                # Get the projects I am part of
+                my_projects = [ x['id'] for x in profile.editprojects.all().values('id')]
+                
+                # Get the Collection object
+                instance = self.obj
+                if instance is None:
+                    # There is no object specified
+                    pass
+                else:
+                    # There is an object, so figure out what this is
+                    scope = instance.scope      # I.e: priv, team, publ
+                    coltype = instance.type     # I.e: sermo, gold, manu, super
+                    settype = instance.settype  # I.e: pd, hc
+
+                    # Figure out whether this user is allowed to download how much
+                    is_editor = user_is_ingroup(self.request, app_editor)
+                    has_permission = False
+
+                    # Get a list of all the relevant objects
+                    if coltype == "manu":
+                        # Get all the items in this collection
+                        qs = instance.manuscript_col.order_by('order')
+                        has_permission = may_download(qs, is_editor, my_projects)
+                        if has_permission:
+                            # Walk and create a list of objects
+                            for obj in qs:
+                                lst_item.append(obj.manuscript)
+                    elif coltype == "sermo":
+                        # Get all the items in this collection
+                        qs = instance.sermondescr_col.order_by('order')
+                        has_permission = may_download(qs, is_editor, my_projects)
+                        if has_permission:
+                            # Walk and create a list of objects
+                            for obj in qs:
+                                lst_item.append(obj.sermon)
+                    elif coltype == "gold":
+                        # Get all the items in this collection
+                        qs = instance.gold_col.order_by('order')
+                        has_permission = may_download(qs, is_editor, my_projects)
+                        if has_permission:
+                            # Walk and create a list of objects
+                            for obj in qs:
+                                lst_item.append(obj.gold)
+                    elif coltype == "super":
+                        # Get all the items in this collection
+                        qs = instance.super_col.order_by('order')
+                        has_permission = may_download(qs, is_editor, my_projects)
+                        if has_permission:
+                            # Walk and create a list of objects
+                            for obj in qs:
+                                lst_item.append(obj.super)
+
+                    # This now become the qs
+                    qs = lst_item
+
+                    if not has_permission:
+                        self.arErr.append("download_trespass")
+
+                ## Get parameters
+                #name = self.qd.get("name", "")
+
+                ## Construct the QS
+                #lstQ = []
+                #if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
+                #qs = Author.objects.filter(*lstQ).order_by('name')
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("CollectionDownload/get_queryset")
+
+        return qs
+
+
 

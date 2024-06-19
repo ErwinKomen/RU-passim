@@ -1968,7 +1968,7 @@ class SearchManuForm(PassimModelForm):
     rsetone     = ModelChoiceField(queryset=None, required=False)
     overlap     = forms.IntegerField(label=_("percentage overlap"), required=False, 
                 widget=RangeSlider(attrs={'style': 'width: 30%;', 'class': 'searching', 'min': '0', 'max': '100', 'step': '1',
-                                          'label': 'Percentage of overlap'})) # , 'value':'100'
+                                          'label': 'Percentage of overlap', 'default': '50'})) # , 'value':'100'
     searchname = forms.CharField(label=_("Name of this search"), required=False,
                 widget=forms.TextInput(attrs={'class': 'nosearching', 'style': 'width: 50%;', 'placeholder': 'Enter a name for this search'}))
     
@@ -2820,7 +2820,7 @@ class CollectionForm(PassimModelForm):
     """Collection list"""
 
     collection_ta = forms.CharField(label=_("Collection"), required=False,
-                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection(s)...', 'style': 'width: 100%;'}))
+                widget=forms.TextInput(attrs={'class': 'typeahead searching collections input-sm', 'placeholder': 'Collection (or collections using wildcards)...', 'style': 'width: 100%;'}))
     collist     = ModelMultipleChoiceField(queryset=None, required=False, 
                 widget=CollectionWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select multiple collections...', 'style': 'width: 100%;', 'class': 'searching'}))
     collist_m =  ModelMultipleChoiceField(queryset=None, required=False)
