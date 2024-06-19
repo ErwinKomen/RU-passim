@@ -87,14 +87,6 @@
         </span>
       </p>
 
-      <h3>Quickly to</h3>        
-        <ul>
-          <li><a href="{% url 'guide' %}" target="_blank">User manual</a></li>
-          <li><a href="{% url 'technical' %}" target="_blank">Technical information</a></li>
-          <li>Tutorials</li>
-        </ul>
-
-
       <h3>News</h3>
       {% if newsitem_list %}
       {% for item in newsitem_list %}
@@ -117,6 +109,12 @@
       {% else %}
       <p><i>(There is no news yet)</i></p>
       {% endif %}
+      <h3>Quickly to</h3>        
+        <ul>
+          <li><a href="{% url 'guide' %}" target="_blank">User manual</a></li>
+          <li><a href="{% url 'technical' %}" target="_blank">Technical information</a></li>
+          <li>Tutorials</li>
+        </ul>
     </div>
     </div>
 

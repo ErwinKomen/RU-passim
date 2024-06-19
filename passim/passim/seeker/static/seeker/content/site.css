@@ -2176,14 +2176,31 @@ div.acknowledgement {
    
 }
 
+.logoprjbox {
+    display: inline-grid;
+    
+    margin-top: 10px;
+    margin-bottom: 10px;
+        
+}
+
+.logoprjimg {
+    display: inline-block;
+    
+}
+
+.prjname {
+    text-align: center;    
+}
+
 .search {
     text-align: center;
     font-size: x-large;
     font-weight: bold;
     color: slategrey;
-    
+    position: relative;
+    right: 15px;
 }
-
 
 .section-text{
     font-size:50px;

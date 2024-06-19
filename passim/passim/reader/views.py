@@ -7374,6 +7374,261 @@ def reader_CPPM_manu(request):
     return redirect('home')
 
 
+def reader_CPPM_eqset(request):
+
+    # This function first finds which CPPM numbers are named in the Equality Sets but have no bidirectional link, 
+    # for instance,  "3" is named in the "equality_set" for "CPPM I 11" but not the other way around.       
+    
+    # These CPPM numbers need to be added into the database by first adding the Signatures, then a GoldSermon which
+    # automatically leads to a new AF based on the GoldSermon.
+
+    # After this a "partially equals" link will be added between the newly added AF and 
+    # the one already in the database. 
+     
+    # Eerst checken met SB    
+
+    # Can only be done by a super-user
+    if request.user.is_superuser:        
+        pass
+
+    # Read the JSON file from MEDIA_DIR   
+    cppm_t_read = os.path.abspath(os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')) # cppm_texts_mapped_authors.json
+
+    # Open the file
+    cppm_t = open(cppm_t_read, encoding="utf8")  
+
+    # Load the json file 
+    cppm_texts = json.load(cppm_t)
+    
+    # Create lists to be used later on
+    cppm_lst=[] # keys
+    equality_set_lst = [] # numbers in the eqset
+    tf_lst = [] # true/false
+    code_lst = [] # stor signature of the key (to which there is from one side no bidrectionality)
+
+    # Create an empty data frame
+    edition_df = pd.DataFrame(columns=['EQ_CPPM', 'CPPM_num', 'TF'])
+
+    # First at the highest level (the id's (numbers))
+    for key1, value1 in cppm_texts.items(): 
+    
+        # Then one level lower (name / incipit / explicit / title / equality_set)
+        for key2, value2 in value1.items():
+        
+            # First the items that are not mapped are added
+            if key2 == 'mapped' and value2 == False:            
+                
+                # Add number and shelfmark to list  
+                cppm_number = key1
+                #print("Het huidige CPPM nummer (FALSE) is:" + cppm_number)
+                false = "False"
+
+                # This part is for the lower sections
+                for key3, value3 in value1.items():
+                   
+                    # seeker_equalgold_link needs to be added
+                    if key3 == 'seeker_signature':
+                        # zoals ms_items
+                        for value4 in value3:
+                        # Iterate over the items in the list, 
+                        # that can have multiple items                        
+
+                            for key5, value5 in value4.items():                                
+                                # Get the CPPM code
+                                if key5 == 'code': #
+                                    code_imp = value5                                    
+                                    #print(code_imp)
+                                    #code_lst.append(code_imp)
+                       
+                # Get the equality_set (list)
+                item_list = value1.get('equality_set')
+                for cppm_eqs in item_list:
+                    
+                    # Add to cppm_lst
+                    cppm_lst.append(cppm_number)
+                    
+                    # Add to equality_set_lst
+                    equality_set_lst.append(cppm_eqs)
+                    
+                    # Add to tf_lst
+                    tf_lst.append(false)
+                    code_lst.append(code_imp)
+
+                    print(cppm_number, cppm_eqs, false, code_imp)       
+                           
+            elif key2 == 'mapped' and value2 == True:            
+                
+                # Add number and shelfmark to list 
+                cppm_number = key1
+                #print("Het huidige CPPM nummer (TRUE) is:" + cppm_number)                        
+                true = "True"
+
+                # This part is for the lower sections
+                for key3, value3 in value1.items():
+                   
+                    # seeker_equalgold_link needs to be added
+                    if key3 == 'seeker_signature':
+                        # zoals ms_items
+                        for value4 in value3:
+                        # Iterate over the items in the list, 
+                        # that can have multiple items                        
+
+                            for key5, value5 in value4.items():                                
+                                # Get the CPPM code
+                                if key5 == 'code': #
+                                    code_imp = value5                                    
+                                    #print(code_imp)
+                                    #code_lst.append(code_imp)
+
+                # Get the equality_set (list)
+                item_list = value1.get('equality_set')
+                for cppm_eqs in item_list:                                   
+
+                    # Add to cppm_lst
+                    cppm_lst.append(cppm_number)
+                    
+                    # Add to equality_set_lst
+                    equality_set_lst.append(cppm_eqs)
+                    
+                    # Add to tf_lst
+                    tf_lst.append(true)
+                    code_lst.append(code_imp)
+
+                    print(cppm_number, cppm_eqs, true, code_imp)
+        
+    print(len(cppm_lst)) # 947 T+F = 2713
+    print(len(equality_set_lst)) #619 T+F = 2772
+    print(len(tf_lst)) # moet allemaal hetzelfde zijn
+    print(len(code_lst))
+      
+    # dictionary of lists 
+    dict = {'CPPM_num':cppm_lst,'EQ_CPPM':equality_set_lst, 'True/False':tf_lst, 'CPPM_code':code_lst} 
+
+    # Create df out of dict
+    eqs_test = pd.DataFrame(dict)
+
+    # determining the name of the file
+    # file_name = 'CPPM_EQSET.xlsx'
+ 
+    # saving the excel
+    # eqs_test.to_excel(file_name)
+       
+    print(eqs_test)
+
+    # Create empty lists
+    comb1_lst = []
+    comb2_lst = []
+        
+    # Iterate over df
+    for index, row in eqs_test.iterrows():
+        print(row['CPPM_num'], row['EQ_CPPM'], row['CPPM_code'])
+        
+        # Create empty list
+        eq_num_comb_lst = []
+
+        num_cppm = row['CPPM_num']
+        eq_cppm = row['EQ_CPPM']
+        code_cppm = row['CPPM_code']
+
+        # Make combinations of the neqset number and the cppm number
+        comb1 = eq_cppm +","+ num_cppm 
+        
+        # Add to list 1
+        comb1_lst.append(comb1)
+
+        print(comb1)
+
+        # Make combinations of the cppm number and the eqset number
+        comb2 = num_cppm +","+ eq_cppm
+
+        # Add to list 2
+        comb2_lst.append(comb2)
+
+        print(comb2)
+
+    nbd_results = []
+    nbd_eqset = []
+    nbd_cppm = []
+    nbd_code = []
+    nbd_eqset_code = []
+
+    # let op hier moet code_ook een rol spelen, kan ik die niet bij num_cppm bij frotsen?
+
+    # Find out which eqset_cppm combinations are NOT matched by a cppm_eqset combination
+    # and thus see which are not birectional.
+    for element in comb1_lst:
+        print(element)
+        if element not in comb2_lst:
+            # Store in list
+            nbd_results.append(element)
+            
+            # split the element:
+            element_list=element.split(",")
+            
+            # First part is the eqset number
+            eqset_nbd = element_list[0]
+            #print(eqset_nbd)
+
+            # Add to list
+            nbd_eqset.append(eqset_nbd)
+                 
+            # Second part is the cppm number
+            cppm_nbd = element_list[1]
+
+            nbd_cppm.append(cppm_nbd)
+
+            # Create a list with CPPM code (if it is not possible to 
+            code_nbd = "CPPM I " + cppm_nbd
+                               
+            # Add to list
+            nbd_code.append(code_nbd)
+
+            # Create a list with CPPM code (if it is not possible to 
+            eqset_code = "CPPM I " + eqset_nbd
+            
+            # Add to list
+            nbd_eqset_code.append(eqset_code)
+
+
+            print(cppm_nbd, eqset_nbd, code_nbd, eqset_code)
+            
+
+            
+
+
+ 
+    # split up in two lists, not_bi_eqset / not_bi_cppm
+    
+    print(len(nbd_results)) # 895
+    print(len(nbd_eqset))
+    print(len(nbd_cppm))    
+    print(len(nbd_code))
+    print(len(nbd_eqset_code))
+
+ 
+    dict={'Results':nbd_results, 'Eqset':nbd_eqset, 'CPPM':nbd_cppm, 'CodeCPPM':nbd_code, 'CodeEqset':nbd_eqset_code}
+    non_bidirect = pd.DataFrame(dict)    
+
+    print(len(non_bidirect))  
+
+    cppm_t.close()
+    
+    for index, row in non_bidirect.iterrows():
+        print(row['Results'], row['Eqset'], row['CPPM'], row['CodeCPPM'], row['CodeEqset'])
+        
+        result = row['Results']
+        eqset = row['Eqset']
+        cppm = row['CPPM'] 
+        code_cppm = row['CodeCPPM'] 
+        code_eqset= row['CodeEqset']
+
+        # Verder!!! Wellicht ook Signature voor Eqset maken? Dus CPPM I 3?
+
+
+    # What we return is simply the home page
+    return redirect('home')
+
+
 #def reader_CPPM_editions(request):
 
 #    # What we return is simply the home page
