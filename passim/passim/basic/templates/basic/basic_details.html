@@ -160,6 +160,9 @@
 
             </div>
 
+            <!-- Possibility for basic errors -->
+            <div id="basic_err" class="col-md-offset-1"></div>
+
             {% if after_details %}
               <!-- Optionally more after the details view -->
               <div id="after_details" >{{after_details|safe}}</div>
@@ -239,7 +242,7 @@
                   </form>
                 </div>
 
-                {% if is_app_editor and related.downloadview %}
+                {% if related.downloadview and is_app_editor or related.downloadview and permission == "write"  %}
                   <div class="hidden related-download">
                     <form id="download_related_{{related.prefix}}" method="post">
                         {% csrf_token %}
@@ -258,7 +261,7 @@
                       {% endif %}
                       <!-- Always: show/hide the row to show/hide columns -->
                       <span class="pull-right">
-                        {% if is_app_editor and related.downloadview %}
+                        {% if  related.downloadview and is_app_editor or related.downloadview and permission == "write"  %}
                           <!-- If available: provide download button -->
                           <a role="button" class="btn btn-sm jumbo-1" 
                              targetid="#download_related_{{related.prefix}}"

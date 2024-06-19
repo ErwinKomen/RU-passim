@@ -9921,14 +9921,17 @@ class CollectionListView(BasicList):
             ]  
             self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False},
                              {"name": "Type", "id": "filter_coltype", "enabled": False},
-                             {"name": "Scope", "id": "filter_colscope", "enabled": False}]
+                             {"name": "Scope", "id": "filter_colscope", "enabled": False},
+                             {"name": "Owner", "id": "filter_owner", "enabled": False},
+                             ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'},
-                    {'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'colscope', 'keyType': 'fieldchoice', 'infield': 'abbr'}
+                    {'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'colscope', 'keyType': 'fieldchoice', 'infield': 'abbr'},
+                    {'filter': 'owner',     'fkfield': 'owner',  'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+                    # {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     ]},
                 {'section': 'other', 'filterlist': [
-                    {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type'},
                     {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
                     # {'filter': 'scope',  'dbfield': 'scope',  'keyS': 'scope'}

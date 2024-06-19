@@ -1370,31 +1370,25 @@ class CollectionDownload(BasicPart):
           SSG CollectionSuper
         """
 
-        def may_download(qs, is_editor, my_projects):
+        def may_download(qs, size, lst_contains, is_editor, my_projects, lst_bad=[]):
             """Determine if someone may actually download"""
 
             oErr = ErrHandle()
             bResult = False
             max_for_user = 1000
             try:
-                size = qs.count()
+                # size = len(qs)  # qs.count()
                 if size < max_for_user:
                     bResult = True
                 else:
                     # Is this an editor?
                     if is_editor:
-                        # Only allowed to download if all items have his project label
-                        lst_contains = []
-                        for obj in qs:
-                            # Get project labels for this object
-                            lst_prj = [x['id'] for x in obj.projects.all().values('id')]
-                            for item in lst_prj:
-                                if not item in lst_contains: lst_contains.append(item)
                         # Check for overal appliance
                         iBad = 0
                         for item in lst_contains:
                             if not item in my_projects:
                                 iBad += 1
+                                lst_bad.append(item)
                         if iBad == 0:
                             bResult = True
                     else:
@@ -1408,9 +1402,14 @@ class CollectionDownload(BasicPart):
         oErr = ErrHandle()
         qs = None
         lst_item = []
+        lst_forb = []
         max_number = None
         my_projects = None
         is_editor = False
+        str_warning = '<h3>ERROR</h3><p>Regular users can only download datasets of max. 1000 items.</p> \
+            <p>If you would like access to a larger dataset within PASSIM, \
+            please contact the <a href="mailto:{}">moderator</a></p>'
+        str_moderator = "shariboodts"
         try:
             user = self.request.user
             if not user is None:
@@ -1438,49 +1437,57 @@ class CollectionDownload(BasicPart):
                     if coltype == "manu":
                         # Get all the items in this collection
                         qs = instance.manuscript_col.order_by('order')
-                        has_permission = may_download(qs, is_editor, my_projects)
+                        size = qs.count()
+                        prj_ids = [x['manuscript__projects'] for x in qs.values('manuscript__projects').distinct()]
+                        has_permission = may_download(qs, size, prj_ids, is_editor, my_projects, lst_forb)
                         if has_permission:
-                            # Walk and create a list of objects
-                            for obj in qs:
-                                lst_item.append(obj.manuscript)
+                            qs = [x.manuscript for x in qs]
+                        else:
+                            qs = Manuscript.objects.none()
                     elif coltype == "sermo":
                         # Get all the items in this collection
                         qs = instance.sermondescr_col.order_by('order')
-                        has_permission = may_download(qs, is_editor, my_projects)
+                        size = qs.count()
+                        prj_ids = [x['sermon__projects'] for x in qs.values('sermon__projects').distinct()]
+                        has_permission = may_download(qs, size, prj_ids, is_editor, my_projects, lst_forb)
                         if has_permission:
-                            # Walk and create a list of objects
-                            for obj in qs:
-                                lst_item.append(obj.sermon)
+                            qs = [x.sermon for x in qs]
+                        else:
+                            qs = SermonDescr.objects.none()
                     elif coltype == "gold":
                         # Get all the items in this collection
                         qs = instance.gold_col.order_by('order')
-                        has_permission = may_download(qs, is_editor, my_projects)
+                        size = qs.count()
+                        prj_ids = [x['gold__projects'] for x in qs.values('gold__projects').distinct()]
+                        has_permission = may_download(qs, size, prj_ids, is_editor, my_projects, lst_forb)
                         if has_permission:
-                            # Walk and create a list of objects
-                            for obj in qs:
-                                lst_item.append(obj.gold)
+                            qs = [x.gold for x in qs]
+                        else:
+                            qs = SermonGold.objects.none()
                     elif coltype == "super":
                         # Get all the items in this collection
                         qs = instance.super_col.order_by('order')
-                        has_permission = may_download(qs, is_editor, my_projects)
+                        size = qs.count()
+                        prj_ids = [x['super__projects'] for x in instance.super_col.all().values('super__projects').distinct()]
+                        has_permission = may_download(qs, size, prj_ids, is_editor, my_projects, lst_forb)
                         if has_permission:
-                            # Walk and create a list of objects
-                            for obj in qs:
-                                lst_item.append(obj.super)
-
-                    # This now become the qs
-                    qs = lst_item
+                            qs = [x.super for x in qs]
+                        else:
+                            qs = EqualGold.objects.none()
 
                     if not has_permission:
-                        self.arErr.append("download_trespass")
+                        # Get the moderator's email address
+                        mod = Profile.objects.filter(user__username=str_moderator).first()
+                        email = mod.user.email
+                        self.arErr.append(str_warning.format(email))
+                        if len(lst_forb) > 0:
+                            # Figure out which projects this are
+                            lHtml = [x['name'] for x in Project2.objects.filter(id__in=lst_forb).values('name')]
+                            self.arErr.append("<p>Collection contains data from projects you have no permission for:</p><ul>")
+                            for sName in lHtml:
+                                self.arErr.append("<li><code>{}</code></li>".format(sName))
+                            self.arErr.append("</ul>")
 
-                ## Get parameters
-                #name = self.qd.get("name", "")
-
-                ## Construct the QS
-                #lstQ = []
-                #if name != "": lstQ.append(Q(name__iregex=adapt_search(name)))
-                #qs = Author.objects.filter(*lstQ).order_by('name')
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollectionDownload/get_queryset")

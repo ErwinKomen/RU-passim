@@ -2948,7 +2948,9 @@ var ru = (function ($, ru) {
                         blob = null,
                         a = null,
                         url = null,
+                        err_msg = "",
                         filename = "unknown_file.txt",
+                        has_error = false,
                         disposition = null;
 
   
@@ -2959,8 +2961,12 @@ var ru = (function ($, ru) {
                       var matches = filenameRegex.exec(disposition);
                       if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
                     }
+                    // Is there an error signalled in the disposition?
+                    if (disposition && disposition.indexOf('$error$') !== -1) {
+                      has_error = true;
+                    }
 
-                    // Ge tthe contenttype correctly
+                    // Get the contenttype correctly
                     if (dtype in loc_dtype) {
                       contenttype = loc_dtype[dtype];
                     }
@@ -2969,26 +2975,38 @@ var ru = (function ($, ru) {
                       // Create a new Blob object using the 
                       //response data of the onload object
                       blob = new Blob([this.response], { type: contenttype });
-                      //Create a link element, hide it, direct 
-                      //it towards the blob, and then 'click' it programatically
-                      a = document.createElement("a");
-                      a.style = "display: none";
-                      document.body.appendChild(a);
-                      //Create a DOMString representing the blob 
-                      //and point the link element towards it
-                      url = window.URL.createObjectURL(blob);
-                      a.href = url;
-                      a.download = filename;
-                      //programatically click the link to trigger the download
-                      a.click();
-                      //release the reference to the file by revoking the Object URL
-                      window.URL.revokeObjectURL(url);
+                      // If this is an error
+                      if (has_error) {
+                        // Then get the error text
+                        blob.text().then(text => {
+                          err_msg = text;
+                          // Now show the error where it should show up
+                          $("#" + loc_divErr).html(err_msg);
+                        });
 
-                      // Possibly show what we're doing
-                      if ($(dstatus).length > 0) {
-                        $(dstatus).addClass("hidden");
+                      } else {
+
+                        //Create a link element, hide it, direct 
+                        //it towards the blob, and then 'click' it programatically
+                        a = document.createElement("a");
+                        a.style = "display: none";
+                        document.body.appendChild(a);
+                        //Create a DOMString representing the blob 
+                        //and point the link element towards it
+                        url = window.URL.createObjectURL(blob);
+                        a.href = url;
+                        a.download = filename;
+                        //programatically click the link to trigger the download
+                        a.click();
+                        //release the reference to the file by revoking the Object URL
+                        window.URL.revokeObjectURL(url);
+
+                        // Possibly show what we're doing
+                        if ($(dstatus).length > 0) {
+                          $(dstatus).addClass("hidden");
+                        }
+
                       }
-
                     } else {
                       //deal with your error state here
                     }

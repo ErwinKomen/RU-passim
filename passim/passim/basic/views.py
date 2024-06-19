@@ -2695,11 +2695,6 @@ class BasicPart(View):
                         # Use the default download via specification
                         response = self.download_excel(self.dtype)
 
-                        # Check if there was an error
-                        if len(self.arErr) > 0:
-                            # Are we able to somehow divert somewhere else?
-                            response = redirect(reverse('nlogin'))
-
                     else:
                         # Figure out in a more custom manner what the download should be
 
@@ -3026,6 +3021,13 @@ class BasicPart(View):
             response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
             # Get the Data
             sData = self.get_data('', dtype, response)
+
+            # Check for errors
+            if len(self.arErr) > 0:
+                sData = '<div style="background-color: lightyellow;">{}</div>'.format( "<br />".join(self.arErr))
+                sDbName = "{}_ERROR_{}.txt".format(appl_name, downloadname)
+                response = HttpResponse(sData, content_type="text/plain")
+                response['Content-Disposition'] = '$error$; attachment; filename="{}"'.format(sDbName)  
 
         except:
             msg = oErr.get_error_message()
