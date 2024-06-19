@@ -41,6 +41,7 @@ from passim.utils import *
 from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, MEDIA_ROOT
 from passim.seeker.excel import excel_to_list
 from passim.bible.models import Reference, Book, BKCHVS_LENGTH
+from passim.basic.models import Custom
 
 re_number = r'\d+'
 
@@ -7216,7 +7217,7 @@ class Provenance(models.Model):
         return sBack
 
 
-class EqualGold(models.Model):
+class EqualGold(models.Model, Custom):
     """This combines all SermonGold instance belonging to the same group"""
 
     # [0-1] We would very much like to know the *REAL* author
@@ -7291,6 +7292,20 @@ class EqualGold(models.Model):
     # Retain a copy of the field to detect changes in saving
     __original_bibleref = None
     save_lock = False
+
+    # Scheme for downloading and uploading
+    specification = [
+        {'name': 'Status',              'type': 'field', 'path': 'stype',       'readonly': True},
+        {'name': 'Incipit',             'type': 'field', 'path': 'incipit'},
+        {'name': 'Explicit',            'type': 'field', 'path': 'explicit'},
+        {'name': 'Passim code',         'type': 'field', 'path': 'code'},
+        {'name': 'Bible references',    'type': 'field', 'path': 'bibleref'},
+        {'name': 'Gryson/clavis',       'type': 'func',  'path': 'signatures'},
+        {'name': 'Keywords',            'type': 'func',  'path': 'keywords',    'readonly': True},
+        {'name': 'Collections',         'type': 'func',  'path': 'collections', 'readonly': True},
+        {'name': 'Projects',            'type': 'func',  'path': 'projects',    'readonly': True},
+        {'name': 'Comments',            'type': 'func',  'path': 'comments'},
+        ]
 
     def __str__(self):
         name = "" if self.id == None else "eqg_{}".format(self.id)
@@ -7506,6 +7521,33 @@ class EqualGold(models.Model):
         org.save()
         return org
 
+    def custom_get(self, path, **kwargs):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            profile = kwargs.get("profile")
+            username = kwargs.get("username")
+            team_group = kwargs.get("team_group")
+
+            # Use if - elif - else to check the *path* defined in *specification*
+            if path == "signatures":
+                # These are the signatures of all the SG's pointing to me
+                sBack = self.get_signatures_markdown_equal(plain=True)
+                pass
+            elif path == "keywords":
+                sBack = self.get_keywords_markdown(plain=True)
+            elif path == "collections":
+                sBack = self.get_collections_markdown(username=username, team_group=team_group, plain=True)
+            elif path == "projects":
+                sBack = self.get_project_markdown2(plain=True)
+            elif path == "comments":
+                sBack = self.get_comments_markdown(plain=True)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/custom_get")
+        return sBack
+
     def do_ranges(self, lst_verses = None, force = False, bSave = True):
         bResult = True
         bDebug = False
@@ -7653,7 +7695,7 @@ class EqualGold(models.Model):
         sBack = self.code
       return sBack
 
-    def get_collections_markdown(self, username, team_group, settype = None):
+    def get_collections_markdown(self, username, team_group, settype = None, plain=False):
 
         lHtml = []
         # Visit all collections that I have access to
@@ -7662,14 +7704,43 @@ class EqualGold(models.Model):
             # Previous code: this provides a section of the SSG *list* view
             # url = "{}?ssg-collist_ssg={}".format(reverse('equalgold_list'), col.id)
             # EK: what the user expects is a link to the Collection *details* view
-            details_name = 'collany_details'
-            if settype == "hc":
-                details_name = 'collhist_details'
-            elif settype == "pd":
-                details_name = 'collsuper_details'
-            url = reverse(details_name, kwargs={'pk': col.id})
-            lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
-        sBack = ", ".join(lHtml)
+            if plain:
+                lHtml.append(col.name)
+            else:
+                details_name = 'collany_details'
+                if settype == "hc":
+                    details_name = 'collhist_details'
+                elif settype == "pd":
+                    details_name = 'collsuper_details'
+                url = reverse(details_name, kwargs={'pk': col.id})
+                lHtml.append("<span class='collection'><a href='{}'>{}</a></span>".format(url, col.name))
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
+        return sBack
+
+    def get_comments_markdown(self, plain=False):
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            lHtml = []
+            # Visit all comments
+            for comment in self.comments.all():
+                if plain:
+                    lHtml.append(comment.content)
+                else:
+                    # Determine who the user is
+                    username = comment.profile.user.username
+                    # Create a display for this topic
+                    lHtml.append("<span>{}: </span><span>{}</span>".format(username, comment.content))
+            if plain:
+                sBack = json.dumps(lHtml)
+            else:
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("EqualGold/get_comments_markdown")
         return sBack
 
     def get_editions_markdown(self):
@@ -7746,16 +7817,22 @@ class EqualGold(models.Model):
             sBack = adapt_markdown(self.srchincipit)
         return sBack
 
-    def get_keywords_markdown(self):
+    def get_keywords_markdown(self, plain=False):
         lHtml = []
         # Visit all keywords
         for keyword in self.keywords.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
-            # Create a display for this topic
-            lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
+            if plain:
+                lHtml.append(keyword.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?ssg-kwlist={}".format(reverse('equalgold_list'), keyword.id)
+                # Create a display for this topic
+                lHtml.append("<span class='keyword'><a href='{}'>{}</a></span>".format(url,keyword.name))
 
-        sBack = ", ".join(lHtml)
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_keywords_user_markdown(self, profile):
@@ -7868,15 +7945,21 @@ class EqualGold(models.Model):
         # REturn the information
         return sBack
 
-    def get_project_markdown2(self): 
+    def get_project_markdown2(self, plain=False): 
         lHtml = []
         # Visit all project items
         for project2 in self.projects.all().order_by('name'):
-            # Determine where clicking should lead to
-            url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id) 
-            # Create a display for this topic
-            lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
-        sBack = ", ".join(lHtml)
+            if plain:
+                lHtml.append(project2.name)
+            else:
+                # Determine where clicking should lead to
+                url = "{}?ssg-projlist={}".format(reverse('equalgold_list'), project2.id) 
+                # Create a display for this topic
+                lHtml.append("<span class='project'><a href='{}'>{}</a></span>".format(url, project2.name))
+        if plain:
+            sBack = json.dumps(lHtml)
+        else:
+            sBack = ", ".join(lHtml)
         return sBack
 
     def get_goldsigfirst(self):
@@ -7948,7 +8031,7 @@ class EqualGold(models.Model):
             oErr.DoError("EqualGold/get_size")
         return sBack
 
-    def get_signatures_markdown_equal(self):
+    def get_signatures_markdown_equal(self, plain=False):
         lHtml = []
         # The prefered sequence of codes (Gryson, Clavis, Other)
         editype_pref_seq = ['gr', 'cl', 'ot']
@@ -7957,11 +8040,17 @@ class EqualGold(models.Model):
             # Visit all signatures 
             sublist = Signature.objects.filter(gold__equal=self, editype=editype).order_by('code')
             for sig in sublist:
-                # Determine where clicking should lead to
-                url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
-                # Create a display for this topic
-                lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
-            sBack = ", ".join(lHtml)
+                if plain:
+                    lHtml.append(sig.code)
+                else:
+                    # Determine where clicking should lead to
+                    url = "{}?gold-siglist={}".format(reverse('gold_list'), sig.id)
+                    # Create a display for this topic
+                    lHtml.append("<span class='badge signature {}'><a href='{}'>{}</a></span>".format(sig.editype,url,sig.code))
+            if plain:
+                sBack = json.dumps(lHtml)
+            else:
+                sBack = ", ".join(lHtml)
         return sBack
 
     def get_siglist(self):

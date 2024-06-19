@@ -1328,13 +1328,16 @@ class CollectionDownload(BasicPart):
         
         oErr = ErrHandle()
         oModel = dict(manu=Manuscript, sermo=SermonDescr, gold=SermonGold, super=EqualGold)
+        oAbbr = dict(manu="ms", sermo="mf", gold="sg", super="af")
         try:
+            # Process the downloadtype or dtype - but actually irrelevant
             dt = self.qd.get('downloadtype', "")
             if dt is None or dt == "":
                 dt = self.qd.get("dtype")
             if dt != None and dt != '':
                 self.dtype = dt
-            # Get my instance
+
+            # Find out who I am and set my [model]
             instance = self.obj
             # What type am I?
             coltype = instance.type
@@ -1342,6 +1345,12 @@ class CollectionDownload(BasicPart):
             cls_this = oModel.get(coltype)
             if not cls_this is None:
                 self.model = cls_this
+            sAbbr = oAbbr.get(coltype)
+            if sAbbr is None: sAbbr = ""
+
+            # Adapt my downloadname to include the dataset id etc
+            sDate = get_current_datetime().strftime("%Y-%m-%dT%H:%M:%S")
+            self.downloadname = "Dataset_{}{}-{}".format(sAbbr, instance.id, sDate)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("CollectionDownload/custom_init")
