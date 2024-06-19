@@ -8991,7 +8991,8 @@ class CollPrivDetails(CollAnyEdit):
                 if resizable: goldsermons['gridclass'] = "resizable dragdrop"
                 goldsermons['savebuttons'] = True
                 goldsermons['saveasbutton'] = True
-                goldsermons['downloadview'] = download_url
+                # Do *NOT* offer downloadview to datasets with SG
+                # goldsermons['downloadview'] = download_url
 
                 qs_sermo = instance.gold_col.all().order_by(
                         'order', 'gold__author__name', 'gold__siglist', 'gold__equal__code', 'gold__srchincipit', 'gold__srchexplicit')
