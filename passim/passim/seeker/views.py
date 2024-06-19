@@ -11774,7 +11774,8 @@ class ManuscriptEdit(BasicDetails):
         msg = ""
         oErr = ErrHandle()
         try:
-            bResult, msg = add_codico_to_manuscript(instance)
+            # OLD: bResult, msg = add_codico_to_manuscript(instance)
+            bResult, msg = instance.add_codico_to_manuscript()
         except:
             msg = oErr.get_error_message()
             bResult = False
