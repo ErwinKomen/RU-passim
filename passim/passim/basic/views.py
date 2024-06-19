@@ -68,6 +68,7 @@ def get_application_name():
     return "unknown"
 # Provide application-specific information
 PROJECT_NAME = get_application_name()
+APPLICATION_NAME = PROJECT_NAME
 app_uploader = "{}_uploader".format(PROJECT_NAME.lower())
 app_user = "{}_user".format(PROJECT_NAME.lower())
 app_editor = "{}_editor".format(PROJECT_NAME.lower())
@@ -2471,6 +2472,7 @@ class BasicPart(View):
     formset_objects = []    # List of formsets to be processed
     previous = None         # Return to this
     downloadname = None     # Name used for downloading
+    spec_download = False   # Use model's [specification] for default Excel download
     bDebug = False          # Debugging information
     redirectpage = ""       # Where to redirect to
     data = {'status': 'ok', 'html': ''}       # Create data to be returned    
@@ -2688,82 +2690,95 @@ class BasicPart(View):
             elif self.action == "download" and write_permission:
                 # We are being asked to download something
                 if self.dtype != "":
-                    plain_type = ["xlsx", "csv", "excel"]
-                    # Initialise return status
-                    oBack = {'status': 'ok'}
-                    sType = "csv" if (self.dtype == "xlsx") else self.dtype
+                    if self.spec_download:
+                        self.arErr = []
+                        # Use the default download via specification
+                        response = self.download_excel(self.dtype)
 
-                    # Get the data
-                    sData = ""
-                    if not self.dtype in ["excel"]:
-                        sData = self.get_data('', self.dtype)
-                    # Decode the data and compress it using gzip
-                    bUtf8 = (self.dtype != "db")
-                    bUsePlain = (self.dtype in plain_type)
+                        # Check if there was an error
+                        if len(self.arErr) > 0:
+                            # Are we able to somehow divert somewhere else?
+                            response = redirect(reverse('nlogin'))
 
-                    # Create name for download
-                    # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
-                    if self.downloadname is None:
-                        downloadname = self.MainModel.__name__
                     else:
-                        downloadname = self.downloadname
-                    obj_id = "n" if self.obj == None else self.obj.id
-                    extension = self.dtype
-                    if self.dtype == "excel":
-                        extension = "xlsx"
-                    elif self.dtype == "tei" or self.dtype == "xml-tei":
-                        extension = "xml"
-                    if obj_id == "n":
-                        sDbName = "passim_{}.{}".format(downloadname, extension)
-                    else:
-                        sDbName = "passim_{}_{}.{}".format(downloadname, obj_id, extension)
-                    sContentType = ""
-                    if self.dtype == "csv":
-                        sContentType = "text/tab-separated-values"
-                    elif self.dtype == "json":
-                        sContentType = "application/json"
-                    elif self.dtype == "xlsx" or self.dtype == "excel":
-                        sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    elif self.dtype == "hist-svg":
-                        sContentType = "application/svg"
-                        sData = self.qd['downloaddata']
-                        # Set the filename correctly
-                        sDbName = "passim_{}_{}.svg".format(downloadname, obj_id)
-                    elif self.dtype == "hist-png":
-                        sContentType = "image/png"
-                        # Read the base64 encoded part
-                        sData = self.qd['downloaddata']
-                        arPart = sData.split(";")
-                        if len(arPart) > 1:
-                            dSecond = arPart[1]
-                            # Strip off preceding base64 part
-                            sData = dSecond.replace("base64,", "")
-                            # Convert string to bytestring
-                            sData = sData.encode()
-                            # Decode base64 into binary
-                            # Deprecated: sData = base64.decodestring(sData)
-                            sData = base64.decodebytes(sData)
+                        # Figure out in a more custom manner what the download should be
+
+                        plain_type = ["xlsx", "csv", "excel"]
+                        # Initialise return status
+                        oBack = {'status': 'ok'}
+                        sType = "csv" if (self.dtype == "xlsx") else self.dtype
+
+                        # Get the data
+                        sData = ""
+                        if not self.dtype in ["excel"]:
+                            sData = self.get_data('', self.dtype)
+                        # Decode the data and compress it using gzip
+                        bUtf8 = (self.dtype != "db")
+                        bUsePlain = (self.dtype in plain_type)
+
+                        # Create name for download
+                        # sDbName = "{}_{}_{}_QC{}_Dbase.{}{}".format(sCrpName, sLng, sPartDir, self.qcTarget, self.dtype, sGz)
+                        if self.downloadname is None:
+                            downloadname = self.MainModel.__name__
+                        else:
+                            downloadname = self.downloadname
+                        obj_id = "n" if self.obj == None else self.obj.id
+                        extension = self.dtype
+                        if self.dtype == "excel":
+                            extension = "xlsx"
+                        elif self.dtype == "tei" or self.dtype == "xml-tei":
+                            extension = "xml"
+                        if obj_id == "n":
+                            sDbName = "passim_{}.{}".format(downloadname, extension)
+                        else:
+                            sDbName = "passim_{}_{}.{}".format(downloadname, obj_id, extension)
+                        sContentType = ""
+                        if self.dtype == "csv":
+                            sContentType = "text/tab-separated-values"
+                        elif self.dtype == "json":
+                            sContentType = "application/json"
+                        elif self.dtype == "xlsx" or self.dtype == "excel":
+                            sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        elif self.dtype == "hist-svg":
+                            sContentType = "application/svg"
+                            sData = self.qd['downloaddata']
                             # Set the filename correctly
-                            sDbName = "passim_{}_{}.png".format(downloadname, obj_id)
+                            sDbName = "passim_{}_{}.svg".format(downloadname, obj_id)
+                        elif self.dtype == "hist-png":
+                            sContentType = "image/png"
+                            # Read the base64 encoded part
+                            sData = self.qd['downloaddata']
+                            arPart = sData.split(";")
+                            if len(arPart) > 1:
+                                dSecond = arPart[1]
+                                # Strip off preceding base64 part
+                                sData = dSecond.replace("base64,", "")
+                                # Convert string to bytestring
+                                sData = sData.encode()
+                                # Decode base64 into binary
+                                # Deprecated: sData = base64.decodestring(sData)
+                                sData = base64.decodebytes(sData)
+                                # Set the filename correctly
+                                sDbName = "passim_{}_{}.png".format(downloadname, obj_id)
                             
-                    # Excel needs additional conversion
-                    if self.dtype in ["excel"]:
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = self.get_data('', self.dtype, response)
-                    elif self.dtype == "xlsx":
-                        # Convert 'compressed_content' to an Excel worksheet
-                        response = HttpResponse(content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
-                        response = csv_to_excel(sData, response)
-                    else:
-                        response = HttpResponse(sData, content_type=sContentType)
-                        response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                        # Excel needs additional conversion
+                        if self.dtype in ["excel"]:
+                            # Convert 'compressed_content' to an Excel worksheet
+                            response = HttpResponse(content_type=sContentType)
+                            response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                            response = self.get_data('', self.dtype, response)
+                        elif self.dtype == "xlsx":
+                            # Convert 'compressed_content' to an Excel worksheet
+                            response = HttpResponse(content_type=sContentType)
+                            response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+                            response = csv_to_excel(sData, response)
+                        else:
+                            response = HttpResponse(sData, content_type=sContentType)
+                            response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
 
-                    # Continue for all formats
+                        # Continue for all formats
                         
-                    # return gzip_middleware.process_response(request, response)
+                    # return response
                     return response
             elif self.action == "delete" and write_permission:
                 # The user requests this to be deleted
@@ -2959,33 +2974,6 @@ class BasicPart(View):
         # Return the information
         return response
 
-    def userpermissions(self, sType = "w"):
-        """Basic check for valid user permissions"""
-
-        bResult = False
-        oErr = ErrHandle()
-        try:
-            # First step: authentication
-            if user_is_authenticated(self.request):
-                # Second step: app_user
-                is_moderator = user_is_ingroup(self.request, app_moderator)
-                is_app_user = is_moderator or user_is_ingroup(self.request, app_user)
-                is_app_editor = is_moderator or user_is_ingroup(self.request, app_editor)
-                if is_app_user or is_app_editor:
-                    # Any more checking needed?
-                    if sType == "w":
-                        # Allow downloading as user = non-editor
-                        if self.action == "download":
-                            bResult = True
-                        else:
-                            bResult = is_app_editor
-                    else:
-                        bResult = True
-            # Otherwise: no permissions!
-        except:
-            oErr.DoError("BasicPart/userpermissions")
-        return bResult
-
     def action_add(self, instance, details, actiontype):
         """User can fill this in to his/her liking"""
 
@@ -2993,6 +2981,24 @@ class BasicPart(View):
         #   Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
         pass
       
+    def add_to_context(self, context):
+        return context
+
+    def after_save(self, prefix, instance=None, form=None):
+        return True
+
+    def before_delete(self, prefix=None, instance=None):
+        return True
+
+    def before_save(self, prefix, request, instance=None, form=None):
+        return False
+
+    def can_process_formset(self, prefix):
+        return True
+
+    def custom_init(self):
+        pass    
+
     def checkAuthentication(self,request):
         # first check for authentication
         if not request.user.is_authenticated:
@@ -3002,8 +3008,102 @@ class BasicPart(View):
         else:
             return True
 
-    def rebuild_formset(self, prefix, formset):
-        return formset
+    def download_excel(self, dtype):
+        """Create a generic Excel download based on [specification]"""
+
+        response = None
+        oErr = ErrHandle()
+        try:
+
+            # Make a download name
+            downloadname = self.downloadname if self.downloadname else self.model.__name__
+            appl_name = APPLICATION_NAME
+            sDbName = "{}_{}.xlsx".format(appl_name, downloadname)
+
+            # Convert 'compressed_content' to an Excel worksheet
+            sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            response = HttpResponse(content_type=sContentType)
+            response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+            # Get the Data
+            sData = self.get_data('', dtype, response)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_download")
+
+        return response
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        oErr = ErrHandle()
+        try:
+            # Sanity check - should have been done already
+            if not hasattr(self.model, 'specification'):
+                return sData
+
+            # Get the specification
+            specification = getattr(self.model, 'specification')
+
+            # Need to know who this user (profile) is
+            user = self.request.user
+            username = user.username
+            profile = user.user_profiles.first()
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+
+            # Get the queryset, which is based on the listview parameters
+            qs = self.get_queryset()
+
+            # Start workbook
+            wb = openpyxl.Workbook()
+            # Create worksheet with data
+            ws = wb.active
+            ws.title = "Data"
+
+            # Create header cells
+            headers = [x['name'] for x in specification if x['type'] != "" ]
+            headers.insert(0, "Id")
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+            row_num = 1
+            # Walk the items in the queryset
+            for obj in qs:
+                row_num += 1
+                # Add the object id
+                ws.cell(row=row_num, column=1).value = obj.id
+                col_num = 2
+                # Walk the items
+                for item in specification:
+                    if item['type'] != "":
+                        key, value = obj.custom_getkv(item, kwargs=kwargs)
+                        ws.cell(row=row_num, column=col_num).value = value
+                        col_num += 1
+
+            # Save it
+            wb.save(response)
+            sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_data")
+        return sData
+
+    def get_form_kwargs(self, prefix):
+        return None
+
+    def get_instance(self, prefix):
+        return self.obj
+
+    def get_queryset(self, prefix):
+        return None
 
     def initializations(self, request, object_id):
         # Store the previous page
@@ -3047,40 +3147,41 @@ class BasicPart(View):
         # ALWAYS: perform some custom initialisations
         self.custom_init()
 
-    def get_instance(self, prefix):
-        return self.obj
-
     def is_custom_valid(self, prefix, form):
         return True
-
-    def get_queryset(self, prefix):
-        return None
-
-    def get_form_kwargs(self, prefix):
-        return None
-
-    def get_data(self, prefix, dtype, response=None):
-        return ""
-
-    def before_save(self, prefix, request, instance=None, form=None):
-        return False
-
-    def before_delete(self, prefix=None, instance=None):
-        return True
-
-    def after_save(self, prefix, instance=None, form=None):
-        return True
-
-    def add_to_context(self, context):
-        return context
 
     def process_formset(self, prefix, request, formset):
         return None
 
-    def can_process_formset(self, prefix):
-        return True
+    def rebuild_formset(self, prefix, formset):
+        return formset
 
-    def custom_init(self):
-        pass    
+    def userpermissions(self, sType = "w"):
+        """Basic check for valid user permissions"""
+
+        bResult = False
+        oErr = ErrHandle()
+        try:
+            # First step: authentication
+            if user_is_authenticated(self.request):
+                # Second step: app_user
+                is_moderator = user_is_ingroup(self.request, app_moderator)
+                is_app_user = is_moderator or user_is_ingroup(self.request, app_user)
+                is_app_editor = is_moderator or user_is_ingroup(self.request, app_editor)
+                if is_app_user or is_app_editor:
+                    # Any more checking needed?
+                    if sType == "w":
+                        # Allow downloading as user = non-editor
+                        if self.action == "download":
+                            bResult = True
+                        else:
+                            bResult = is_app_editor
+                    else:
+                        bResult = True
+            # Otherwise: no permissions!
+        except:
+            oErr.DoError("BasicPart/userpermissions")
+        return bResult
+
            
 

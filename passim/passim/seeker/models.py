@@ -1693,9 +1693,6 @@ class Profile(models.Model):
         print(sBack)
         return sBack
 
-
-
-
     def get_defaults(self):
         """List of projects to which this user (profile) has APPROVER rights"""
 
