@@ -449,6 +449,7 @@ urlpatterns = [
     re_path(r'^reader/import/trans/ssg/$', ReaderTransEqgImport.as_view(), name='import_trans_eqg'),
     re_path(r'^reader/import/cppm_af/$', passim.reader.views.reader_CPPM_AF, name='import_cppm_af'),     
     re_path(r'^reader/import/cppm_manu/$', passim.reader.views.reader_CPPM_manu, name='import_cppm_manuscripts'), 
+    re_path(r'^reader/import/cppm_eqset/$', passim.reader.views.reader_CPPM_eqset, name='import_cppm_eqset'), 
     # =============================================================================================
 
     # ============== ENRICH STUFF =================================================

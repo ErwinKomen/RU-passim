@@ -73,21 +73,21 @@
       Users can isolate specific datasets (<a href="{% url 'project2_list' %}" target="_blank">Projects</a>) 
         to execute a targeted search. Current projects in PASSIM include:
     </p>
+    
     <!--buttons and link to description-->
-    
-    
+        
     {% if prj_links|length > 0 %}
-    <table>
+        
         {% for prj_item in prj_links %}
-        <tr>
-            <td>
-            <a href="{{prj_item.url}}">{{prj_item.name}}</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+          <div class="logoprjbox">
+            <img src="{{prj_item.picture}}" title="{{prj_item.title}}"style=' margin: 15px; max-width: 90px; width: auto; height: auto;'/>
+            <div class="prjname">
+            <a href="{{prj_item.url}}" target="_blank"'>{{prj_item.nameclean}}</a>
+            </div>
+          </div>
+        {% endfor %}            
+   
     {% endif %}
-
 
     <p>
       <br />
@@ -96,22 +96,9 @@
 
     </div>
 
-    <div class="col-md-6 bgimg">
-      <h2>Summary</h2>
-      <p>
-        The PASSIM dataset is under development. It currently contains {{count_ssg}} authority files, {{count_sermon}} manifestations and {{count_manu}} manuscripts.        
-      </p>
-
+    <div class="col-md-6 bgimg">   
       <div id="passim-hbar" class="row passim-chart" style="height: 200px;" targeturl="{% url 'guide' %}">
-        
       </div>
-
-
-      <p>See this <a href="{% url 'guide' %}" target="_blank">explanation</a> for the figures.</p> 
-           
-
-      
-     
     </div>
   </div>
 
@@ -128,7 +115,7 @@
         </a>
 
         <a href="https://www.ru.nl/en/radboud-institute-for-culture-history" target="_blank" style="margin: 10px;">
-          <img  src="https://cls.ru.nl/RU_logo.svg" style='max-width: 300px; width: auto; height: auto;' title="Radboud Universiteit"/>        
+          <img src="https://cls.ru.nl/RU_logo.svg" style='max-width: 300px; width: auto; height: auto;' title="Radboud Universiteit"/>        
         </a>         
 
       </p> 

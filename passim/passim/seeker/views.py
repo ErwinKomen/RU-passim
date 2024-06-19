@@ -20,6 +20,7 @@ from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.template import Context
+from django.templatetags.static import static
 from django.views.generic.detail import DetailView
 from django.views.generic.base import RedirectView
 from django.views.generic import ListView, View
@@ -48,8 +49,6 @@ import sqlite3
 from io import StringIO
 from itertools import chain
 from unidecode import unidecode
-
-
 
 # ======== imports for PDF creation ==========
 import io  
@@ -791,18 +790,34 @@ def home(request, errortype=None):
             thread = Thread(target=scan_transcriptions)
             thread.start()
 
+        
+
         # Add
         prj_links = []
-        prj_names = ['Passim', 'HUWA/CSEL', 'Brepols-CPPM'] # add rest
-        for sName in prj_names:
+        prj_images = []
+        prj_names = ['Passim', 'HUWA/CSEL', 'Luc De Coninck (KU Leuven)','Brepols-CPPM']
+        prj_namesclean = ['PASSIM', 'CSEL/HUWA', 'Augustine’s sermons', 'Brepols-CPPM']  
+        prj_imagenames = ['IconPassimRGB.png', 'csel.png', 'Leuven.png', 'cppm.png'] 
+                
+        # add rest links to images IconPassimRGB.png / csel.png / cppm.jpg / Leuven.png 
+        for image in prj_imagenames:            
+            url = static ('seeker/content/'+ image)           
+            prj_images.append(url)
+        context['prj_images'] = prj_images 
+        
+        # use the name of the project and get the id of the project
+        for idx, sName in enumerate(prj_names):
             # Find the project fitting the name
             obj = Project2.objects.filter(name__iexact = sName).first()
             if not obj is None:
                 url = reverse('project2_details', kwargs={'pk': obj.id})
                 oItem = dict(url=url, name=sName)
-            prj_links.append(oItem)
+                oItem["picture"] = prj_images[idx]
+                oItem["nameclean"] = prj_namesclean[idx]
+                oItem["title"]= prj_namesclean[idx]
+            prj_links.append(oItem)           
         context['prj_links'] = prj_links
-
+        
         # Check if the user's / profile's information is up-to-date
         user = request.user
         if not request is None and not user is None and not user.id is None:
