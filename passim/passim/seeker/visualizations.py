@@ -1266,7 +1266,6 @@ class EqualGoldChrono(BasicPart):
                     # Initialize dictionary of cumulative weight
                     for year in range(min_year, max_year + 1): 
                         weight_year[year] = 0
-
                 
                 for obj in qs_codico:
                     # Filter out two "no date" scenario's:

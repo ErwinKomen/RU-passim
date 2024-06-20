@@ -41,7 +41,7 @@ adaptation_list = {
         'sermonhierarchy', 'msitemcleanup', 'locationcitycountry', 'templatecleanup', 
         'feastupdate', 'codicocopy', 'passim_project_name_manu', 'doublecodico',
         'codico_origin', 'import_onlinesources', 'dateranges', 'huwaeditions',
-        'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges',
+        'supplyname', 'usersearch_params', 'huwamanudate', 'baddateranges', 'correctdateranges',
         'collectiontype', 'huwadoubles', 'manu_setlists', 'similars'], # 'sermonesdates',
     'sermon_list': ['nicknames', 'biblerefs', 'passim_project_name_sermo', 'huwainhalt',  'huwafolionumbers',
                     'projectorphans', 'codesort', 'siglists'],
@@ -144,6 +144,110 @@ def adapt_baddateranges():
             # Remove them
             Daterange.objects.filter(id__in=lst_delete).delete()
             oErr.Status("adapt_baddaterange removed: {}".format(lst_delete))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_correctdateranges():
+    """Try to correct dateranges. Make use of preferential order.
+    
+    1 - daterange.years
+    2 - codico.years
+    3 - manuscript.years
+    """
+
+    def get_codico_years(oCodi):
+        lBack = None
+        codico_st = oCodi.get("yearstart")
+        codico_fi = oCodi.get("yearfinish")
+        if codico_st and codico_fi:
+            if codico_fi > codico_st:
+                if codico_st > 100 and codico_fi < 1900:
+                    lBack = [codico_st, codico_fi]
+        return lBack
+
+    def get_manu_years(oCodi):
+        lBack = None
+        manu_st = oCodi.get("manuscript__yearstart")
+        manu_fi = oCodi.get("manuscript__yearfinish")
+        if manu_st and manu_fi:
+            if manu_fi > manu_st:
+                if manu_st > 100 and manu_fi < 1900:
+                    lBack = [manu_st, manu_fi]
+        return lBack
+
+    def get_dr_years(lst_dr):
+        # Get the first and last daterange years
+        lBack = None
+        if len(lst_dr) > 0:
+            lBack = [lst_dr[0]['yearstart'], lst_dr.last()['yearfinish']]
+        return lBack
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+
+    try:
+        # Walk all codicological units
+        lst_codico = Codico.objects.all().values(
+            'id', 'yearstart', 'yearfinish', 'manuscript__id', 'manuscript__yearstart', 'manuscript__yearfinish')
+        for oCodico in lst_codico:
+            # Extract the codico id
+            codico_id = oCodico.get("id")
+            manu_id = oCodico.get('manuscript__id')
+
+            # Extract the dateranges for DR, Codico, Manuscript
+            dr_yrs = get_dr_years(Daterange.objects.filter(codico__id = oCodico['id']).order_by(
+                'yearstart', 'yearfinish').values('yearstart', 'yearfinish'))
+            codico_yrs = get_codico_years(oCodico)
+            manu_yrs = get_manu_years(oCodico)
+
+            # Start testing...
+            if dr_yrs is None:
+                # There are no datarange years
+                good_yrs = None
+                if codico_yrs is None:
+                    # Take the manuscript years as a starting point
+                    if not manu_yrs is None:
+                        # Create datarange from manuscript years
+                        obj_dr = Daterange.objects.create(codico_id=codico_id, yearstart=manu_yrs[0], yearfinish=manu_yrs[1])
+                        oErr.Status("Created daterange [{}-{}] for codico {} from manuscript".format(manu_yrs[0], manu_yrs[1], codico_id))
+                        # Take over the daterange years
+                        codico = Codico.objects.filter(id=codico_id).first()
+                        codico.yearstart = manu_yrs[0]
+                        codico.yearfinish = manu_yrs[1]
+                        codico.save()
+                        oErr.Status("Created codico {} years [{}-{}] from manuscript".format(codico_id, manu_yrs[0], manu_yrs[1]))
+                else:
+                    # Create datarange from codico
+                    obj_dr = Daterange.objects.create(codico_id=codico_id, yearstart=codico_yrs[0], yearfinish=codico_yrs[1])
+                    oErr.Status("Created daterange [{}-{}] for codico {} from codico".format(codico_yrs[0], codico_yrs[1], codico_id))
+
+            elif codico_yrs is None:
+                # Take over the daterange years
+                codico = Codico.objects.filter(id=codico_id).first()
+                codico.yearstart = dr_yrs[0]
+                codico.yearfinish = dr_yrs[1]
+                codico.save()
+                oErr.Status("Created codico {} years [{}-{}] from daterange".format(codico_id, dr_yrs[0], dr_yrs[1]))
+                # Double check the manuscript years
+                if manu_yrs is None:
+                    # Take over the daterange years
+                    manu = codico.manuscript
+                    manu.yearstart = dr_yrs[0]
+                    manu.yearfinish = dr_yrs[1]
+                    manu.save()
+                    oErr.Status("Created manuscript {} years [{}-{}] from daterange".format(manu.id, dr_yrs[0], dr_yrs[1]))
+
+            elif manu_yrs is None:
+                # Getting here means that we have dr_yrs and codico_yrs
+                manu = Manuscript.objects.filter(id=manu_id).first()
+                manu.yearstart = dr_yrs[0]
+                manu.yearfinish = dr_yrs[1]
+                manu.save()
+                oErr.Status("Created manuscript {} years [{}-{}] from daterange".format(manu.id, dr_yrs[0], dr_yrs[1]))
+
     except:
         bResult = False
         msg = oErr.get_error_message()
@@ -1231,15 +1335,21 @@ def adapt_similars():
     oErr = ErrHandle()
     bResult = True
     msg = ""
+    DEDUPS_FILE = "manu_dedups.json"
+    DEDUPS_FILE = "manuscript_duplicates_id.json"
     try:
-        filename = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", "manu_dedups.json"))
+        filename = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", DEDUPS_FILE))
         if os.path.exists(filename):
             # Read the file
             with open(filename, "r") as f:
                 lst_dedup = json.load(f)
 
+            # Show where we are
+            oErr.Status("Read adapt_similars file: {}".format(filename))
+
             # List of additions to be made
             lst_add = []
+            count_del = 0
 
             # walk through the similars
             for idx, oItem in enumerate(lst_dedup):
@@ -1260,12 +1370,16 @@ def adapt_similars():
                     # (2) Delete whatever needs to be deleted
                     if len(delete_id) > 0:
                         ManuscriptSimilar.objects.filter(id__in=delete_id).delete()
+                        count_del += len(delete_id)
                     # Prepare an addition
                     for dst_id in duplicateCandidates:
                         if not dst_id in oCurrent.keys():
                             lst_add.append(dict(src_id=manuscriptId, dst_id=dst_id))
+            # Show what has been deleted
+            oErr.Status("Deleted [ManuscriptSimilar]: {}".format(count_del))
 
             # Add what needs to be added
+            oErr.Status("Now adding {} items...".format(len(lst_add)))
             with transaction.atomic():
                 for idx, oItem in enumerate(lst_add):
                     # Add the item
@@ -1273,6 +1387,7 @@ def adapt_similars():
         else:
             # This should not be signed off yet
             bResult = False
+            oErr.Status("Could not find adapt_similars file: {}".format(filename))
         # Everything has been processed correctly now
         msg = "ok"
     except:

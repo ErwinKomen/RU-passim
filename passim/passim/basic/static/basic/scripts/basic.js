@@ -460,6 +460,7 @@ var ru = (function ($, ru) {
           // Find out which direction is needed
           if ($(el).hasClass("fa-sort-down")) sDirection = "asc";
           if ($(elSortable).hasClass("integer")) sSortType = "integer";
+          else if ($(elSortable).hasClass("mixed")) sSortType = "mixed";
           // restore direction everywhere in headers
           $(el).closest("tr").find(".fa.sortshow").each(function (idx, elSort) {
             $(elSort).removeClass("fa-sort-down");
@@ -519,6 +520,66 @@ var ru = (function ($, ru) {
                 if (A < B) { return -1; } else if (A > B) { return 1; } else return 0;
               case "asc":
                 if (A < B) { return 1; } else if (A > B) { return -1; } else return 0;
+            }
+
+          });
+          $.each(rows, function (index, row) {
+            $(elTable).children('tbody').append(row);
+          });
+        } else if (sorttype === "mixed") {
+          rows.sort(function (a, b) {
+            var A_list = $(a).children('td').eq(colidx).text().toUpperCase().trim().split("."),
+              B_list = $(b).children('td').eq(colidx).text().toUpperCase().trim().split("."),
+              sTmp = "",
+              len = 0,
+              A_text = "",
+              A_int = 0,
+              B_text = "",
+              B_int = 0;
+
+            len = A_list.length;
+            if (len === 1) {
+              A_text = A_list.join(".");
+            } else {
+              sTmp = A_list[len - 1].trim();
+              if (/^[0-9]+$/.test(sTmp)) {
+                // Extract the integer
+                A_int = parseInt(sTmp, 10);
+                // Create string from the other part
+                A_text = A_list.slice(0, len - 1).join(".");
+              } else {
+                A_text = A_list.join(".");
+              }
+            }
+
+            len = B_list.length;
+            if (len === 1) {
+              B_text = B_list.join(".");
+            } else {
+              sTmp = B_list[len - 1].trim();
+              if (/^[0-9]+$/.test(sTmp)) {
+                // Extract the integer
+                B_int = parseInt(sTmp, 10);
+                // Create string from the other part
+                B_text = B_list.slice(0, len - 1).join(".");
+              } else {
+                B_text = B_list.join(".");
+              }
+            }
+
+            switch (direction) {
+              case "desc":
+                if (A_text < B_text) { return -1; }
+                else if (A_text > B_text) { return 1; }
+                else if (A_int < B_int) { return -1; }
+                else if (A_int > B_int) { return 1; }
+                else return 0;
+              case "asc":
+                if (A_text < B_text) { return 1; }
+                else if (A_text > B_text) { return -1; }
+                else if (A_int < B_int) { return 1; }
+                else if (A_int > B_int) { return -1; }
+                else return 0;
             }
 
           });
@@ -3963,7 +4024,7 @@ var ru = (function ($, ru) {
        *   Action when user clicks an element that requires toggling a target
        *
        */
-      toggle_click: function (elThis, class_to_close) {
+      toggle_click: function (elThis, class_to_close, sticky) {
         var elGroup = null,
             elTarget = null,
             sStatus = "";
@@ -3981,6 +4042,19 @@ var ru = (function ($, ru) {
               // Check if there is an additional class to close
               if (class_to_close !== undefined && class_to_close !== "") {
                 $("." + class_to_close).addClass("hidden");
+              }
+            }
+            // Should we show the toggling?
+            if (sticky !== undefined && sticky) {
+              // Closed is jumbo-1, open is jumbo-2
+              if ($("#" + elTarget).hasClass("hidden")) {
+                // It is closed: [jumbo-1]
+                $(elThis).removeClass("jumbo-2");
+                $(elThis).addClass("jumbo-1");
+              } else {
+                // It is open: [jumbo-2]
+                $(elThis).addClass("jumbo-2");
+                $(elThis).removeClass("jumbo-1");
               }
             }
           }

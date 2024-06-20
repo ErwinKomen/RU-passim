@@ -5410,8 +5410,8 @@ class Manuscript(models.Model):
 
             # Now look at the similars
             if self.similars.count() > 0:
-                # Walk all the similars
-                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno"):
+                # Walk all the similars: take just the first THREE
+                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno")[:3]:
                     # Get the shelfmark
                     shelfmark = obj.get_full_name(plain=False)
                     # get the url

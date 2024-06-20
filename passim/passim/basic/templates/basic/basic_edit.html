@@ -101,8 +101,8 @@
       <div class="col-md-12">
       {% for section in mainsections %}
         <span>
-          <a class="btn btn-s jumbo-1" role="button" targetid="{{section.id}}" title="Show/Hide {{section.name}}"
-              onclick="ru.basic.toggle_click(this);">{{section.name}}</a>
+          <a class="btn btn-s {% if section.show %}jumbo-2{% else %}jumbo-1{% endif %}" role="button" targetid="{{section.id}}" title="Show/Hide {{section.name}}"
+              onclick="ru.basic.toggle_click(this, '', 'sticky');">{{section.name}}</a>
         </span>
       {% endfor %}
       </div>
@@ -111,7 +111,7 @@
     <!-- Room for each section -->
     {% for section in mainsections %}
       {% if not section.button %}
-        <div id="{{section.id}}" class="hidden panel panel-default">
+        <div id="{{section.id}}" class="{% if not section.show %}hidden{% endif %} panel panel-default">
           <!-- Show this section in a standard way -->
           <h4>{{section.name}}</h4>
 

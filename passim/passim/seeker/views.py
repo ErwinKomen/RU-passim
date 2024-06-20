@@ -14289,7 +14289,7 @@ class EqualGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection           
             context['mainsections'] = [
-            {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
+            {'name': 'Details', 'id': 'equalgold_details', 'show': True, 'fields': [                
                 {'type': 'line', 'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
                 {'type': 'plain', 'label': "Incipit:", 'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide', 'order': 2},
                 {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide', 'order': 3},                 
@@ -14472,7 +14472,7 @@ class EqualGoldEdit(BasicDetails):
                 self.new_button = True
                 context['new_button'] = True
                 # SPecification of the new button
-                context['new_button_title'] = "Sermon Gold"
+                context['new_button_title'] = "Add item to equality set" # See issue #729 "Sermon Gold"
                 context['new_button_name'] = "gold"
                 context['new_button_url'] = reverse("gold_details")
                 context['new_button_params'] = [
@@ -15195,6 +15195,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 index = 1 
                 sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
                 sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_start_mix = '<span class="sortable mixed"><span class="fa fa-sort sortshow"></span>&nbsp;'
                 sort_end = '</span>'
 
                 username = self.request.user.username
@@ -15324,7 +15325,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     manuscripts['columns'] = [                                              
                         '{}<span title="Shelfmark">Shelfmark.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end),                         
-                        '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end),                        
+                        '{}<span title="Date range">date</span>{}'.format(sort_start_int, sort_end),                        
                        #'{}<span title="Collection name">coll.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Item">item</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Folio number">ff</span>{}'.format(sort_start, sort_end),
