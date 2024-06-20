@@ -2134,6 +2134,7 @@ div.acknowledgement {
     background-image: url('/static/seeker/content/Authorityfile.png');
     background-position: center;
     background-size: cover;
+    cursor: alias;
 }
 
 .button2 {
@@ -2148,6 +2149,7 @@ div.acknowledgement {
     background-image: url('/static/seeker/content/Manifestation.png');
     background-position: center;
     background-size: cover;
+    cursor: alias;
 }
 
 .button3 {
@@ -2162,6 +2164,7 @@ div.acknowledgement {
     background-image: url('/static/seeker/content/Manuscript.png');
     background-position: center;
     background-size: cover;
+    cursor: alias;
 }
 
 /* Add button2 and button3 */
@@ -2220,4 +2223,8 @@ a.email {
 .passim-chart .axis path, .passim-chart .axis line {
     fill: none;
     stroke: none;
+}
+
+a[target=_blank] {
+    cursor: alias;
 }

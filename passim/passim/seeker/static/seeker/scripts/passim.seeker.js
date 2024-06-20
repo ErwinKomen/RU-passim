@@ -1684,6 +1684,7 @@ var ru = (function ($, ru) {
           // Tooltip data respond function
           showTooltip = function (event, d) {
             var ptc = 0,
+                label = null,
                 rectonly = null,
                 sTooltipText = "";
 
@@ -1692,6 +1693,9 @@ var ru = (function ($, ru) {
             $(rectonly).attr("opacity", 0.6);
             $(rectonly).attr("y", scale_y(d.group) - 2);
             $(rectonly).attr("height", scale_y.bandwidth() + 4);
+            $(rectonly).css("cursor", "alias");
+            label = $(event.target).find("text").first();
+            $(label).css("cursor", "alias");
 
             tooltip.transition().duration(100).style("opacity", 1.0);
             sTooltipText = d.ptc + "%" + ":</br><b>" + d.label + "</b>: " + d.value;

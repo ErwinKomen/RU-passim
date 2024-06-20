@@ -1351,14 +1351,23 @@ def adapt_similars():
             lst_add = []
             count_del = 0
 
+            # Simply delete all previous values
+            ManuscriptSimilar.objects.all().delete()
+            ## Get a list of current manuscriptIds addressed by ManuscriptSimilar
+            #lst_current_ids = [x['src__id'] for x in ManuscriptSimilar.objects.all().values('src__id').distinct()]
+            
             # walk through the similars
             for idx, oItem in enumerate(lst_dedup):
                 if idx % 500 == 0:
                     print("adapt_similars: {}".format(idx))
-                # Get tha manuscript and the duplicate candicates
+                # Get the manuscript and the duplicate candicates
                 manuscriptId = oItem.get("manuscriptId")
                 duplicateCandidates = oItem.get("duplicateCandidates")
                 if not manuscriptId is None and not duplicateCandidates is None:
+                    ## Make sure to remove this id from the [lst_current_ids]
+                    #if manuscriptId in lst_current_ids:
+                    #    lst_current_ids.remove(manuscriptId)
+
                     # Get existing list of duplicateCandidates
                     oCurrent = { x['dst__id'] : x['id']
                                    for x in ManuscriptSimilar.objects.filter(src_id=manuscriptId).values("id", "dst__id")}
@@ -1375,15 +1384,26 @@ def adapt_similars():
                     for dst_id in duplicateCandidates:
                         if not dst_id in oCurrent.keys():
                             lst_add.append(dict(src_id=manuscriptId, dst_id=dst_id))
-            # Show what has been deleted
-            oErr.Status("Deleted [ManuscriptSimilar]: {}".format(count_del))
 
             # Add what needs to be added
             oErr.Status("Now adding {} items...".format(len(lst_add)))
+            lst_added_src = []
             with transaction.atomic():
                 for idx, oItem in enumerate(lst_add):
                     # Add the item
                     obj = ManuscriptSimilar.objects.create(src_id=oItem['src_id'], dst_id=oItem['dst_id'])
+                    lst_added_src.append(oItem['src_id'])
+            
+            ## Anything left in [lst_current_ids]?
+            #if len(lst_current_ids) > 0:
+            #    lst_also_delete = []
+            #    for manu_id in lst_current_ids:
+            #        if not manu_id in lst_added_src:
+            #            lst_also_delete.append(manu_id)
+            #    ManuscriptSimilar.objects.filter(src__id__in=lst_also_delete).delete()
+            #    count_del += len(lst_also_delete)
+            # Show what has been deleted
+            oErr.Status("Deleted [ManuscriptSimilar]: {}".format(count_del))
         else:
             # This should not be signed off yet
             bResult = False
