@@ -160,6 +160,9 @@
 
             </div>
 
+            <!-- Possibility for basic errors -->
+            <div id="basic_err" class="col-md-offset-1"></div>
+
             {% if after_details %}
               <!-- Optionally more after the details view -->
               <div id="after_details" >{{after_details|safe}}</div>
@@ -239,7 +242,7 @@
                   </form>
                 </div>
 
-                {% if is_app_editor and related.downloadview %}
+                {% if related.downloadview and is_app_editor or related.downloadview and permission == "write"  %}
                   <div class="hidden related-download">
                     <form id="download_related_{{related.prefix}}" method="post">
                         {% csrf_token %}
@@ -258,7 +261,7 @@
                       {% endif %}
                       <!-- Always: show/hide the row to show/hide columns -->
                       <span class="pull-right">
-                        {% if is_app_editor and related.downloadview %}
+                        {% if  related.downloadview and is_app_editor or related.downloadview and permission == "write"  %}
                           <!-- If available: provide download button -->
                           <a role="button" class="btn btn-sm jumbo-1" 
                              targetid="#download_related_{{related.prefix}}"
@@ -333,117 +336,117 @@
                       </thead>
                       <tbody>
                         {% for relrow in related.rel_list %}
-                        {% if relrow.isgroup %}
-                          <tr class="form-row savegroup" rowid="{{relrow.id}}"
-                              mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
-                            <!-- Counter-->
-                            {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
+                          {% if relrow.isgroup %}
+                            <tr class="form-row savegroup" rowid="{{relrow.id}}"
+                                mode="{% if relrow.group_id != '0' %}closed{% else %}open{% endif %}">
+                              <!-- Counter-->
+                              {% if related.use_counter %}<td>{{forloop.counter}}</td>{% endif %}
 
-                            <!-- columns taken together -->
-                            <th colspan="{{related.columns|length}}" align="center"
-                                onclick="ru.basic.related_groupclick(this);"
-                                ondragover="ru.basic.related_dragentergroup(event);">
-                              {{relrow.name}}
-                              <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
-                            </th>
+                              <!-- columns taken together -->
+                              <th colspan="{{related.columns|length}}" align="center"
+                                  onclick="ru.basic.related_groupclick(this);"
+                                  ondragover="ru.basic.related_dragentergroup(event);">
+                                {{relrow.name}}
+                                <span class="badge jumbo-1 gcount" title="This group contains {{relrow.count}} items">{{relrow.count}}</span>
+                              </th>
 
-                          </tr>
-                        {% else %}
+                            </tr>
+                          {% else %}
 
-                        <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}"
-                            rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
-                          <!-- Counter-->
-                          {% if related.use_counter %}
-                          <td>{{forloop.counter}}</td>{% endif %}
+                            <tr class="form-row {% if relrow.group_id > 0 %} hidden{% endif %}"
+                                rowid="{{relrow.id}}" groupid="{{relrow.group_id}}">
+                              <!-- Counter-->
+                              {% if related.use_counter %}
+                              <td>{{forloop.counter}}</td>{% endif %}
 
-                          <!-- Remaining cells -->
-                          {% for relcol in relrow.cols %}
+                              <!-- Remaining cells -->
+                              {% for relcol in relrow.cols %}
 
-                          {% if related.editable and relcol.editable %}
-                          {% if relcol.colspan %}
-                          <td class="rel-edit-mode hidden" colspan="{{relcol.colspan}}" style="width: 100%;">
-                            {{relcol.html}}
-                          </td>
-                          {% endif %}
-                          {% endif %}
-                          <td {% if relcol.title %}title="{{relcol.title}}" {% endif %}
-                              scope="col"
-                              class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %}
-                                              {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}
-                                              {% if relcol.myclasses %}{{relcol.myclasses}}{% endif %}"
-                              {% if relcol.align %}align="{{relcol.align}}" {% endif %}
-                              {% if relcol.draggable %}draggable="true" {% endif %}
-                              {% if relcol.draggable %}
-                              ondragstart="ru.basic.related_drag(event);"
-                              ondragover="ru.basic.related_dragenter(event);"
+                              {% if related.editable and relcol.editable %}
+                              {% if relcol.colspan %}
+                              <td class="rel-edit-mode hidden" colspan="{{relcol.colspan}}" style="width: 100%;">
+                                {{relcol.html}}
+                              </td>
                               {% endif %}
-                              style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}">
-                            {% if relcol.value %}
-                            {% if relcol.link %}
-                              <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
-                            {% else %}
-                              {{relcol.value|safe}}
-                            {% endif %}
-                            {% endif %}
-                          </td>
+                              {% endif %}
+                              <td {% if relcol.title %}title="{{relcol.title}}" {% endif %}
+                                  scope="col"
+                                  class="{% if relcol.nowrap %}tdnowrap{% endif %} {% if relcol.link %}clickable{% endif %}
+                                                  {% if relcol.draggable %}draggable{% endif %} {% if relcol.editable %}rel-view-mode {% endif %}
+                                                  {% if relcol.myclasses %}{{relcol.myclasses}}{% endif %}"
+                                  {% if relcol.align %}align="{{relcol.align}}" {% endif %}
+                                  {% if relcol.draggable %}draggable="true" {% endif %}
+                                  {% if relcol.draggable %}
+                                  ondragstart="ru.basic.related_drag(event);"
+                                  ondragover="ru.basic.related_dragenter(event);"
+                                  {% endif %}
+                                  style="{% if relcol.main %}width: 100%;{% elif relcol.initial == 'small' %}min-width: 10px; max-width: 10px;{% endif %}">
+                                {% if relcol.value %}
+                                {% if relcol.link %}
+                                  <a href="{{relcol.link}}" class="nostyle">{{relcol.value|safe}}</a>
+                                {% else %}
+                                  {{relcol.value|safe}}
+                                {% endif %}
+                                {% endif %}
+                              </td>
 
-                          {% if forloop.first and related.editable and not related.use_counter %}
-                          <td style="min-width: 20px;" valign="top">
-                            <span class="rel-edit-open">
-                              <a href="#" onclick="ru.basic.rel_row_edit(this, 'open');">
-                                <span class="glyphicon glyphicon-pencil"></span>
-                              </a>
-                            </span>
-                            <span class="rel-edit-close hidden">
-                              <a href="#" onclick="ru.basic.rel_row_edit(this, 'close');">
-                                <span class="glyphicon glyphicon-ok"></span>
-                              </a>
-                            </span>
-                          </td>
+                              {% if forloop.first and related.editable and not related.use_counter %}
+                              <td style="min-width: 20px;" valign="top">
+                                <span class="rel-edit-open">
+                                  <a href="#" onclick="ru.basic.rel_row_edit(this, 'open');">
+                                    <span class="glyphicon glyphicon-pencil"></span>
+                                  </a>
+                                </span>
+                                <span class="rel-edit-close hidden">
+                                  <a href="#" onclick="ru.basic.rel_row_edit(this, 'close');">
+                                    <span class="glyphicon glyphicon-ok"></span>
+                                  </a>
+                                </span>
+                              </td>
 
+                              {% endif %}
+                              {% endfor %}
+
+                              <!-- Possible delete cell -->
+
+                            </tr>
                           {% endif %}
-                          {% endfor %}
-
-                          <!-- Possible delete cell -->
-
-                        </tr>
-                        {% endif %}
                         {% endfor %}
 
                         {% if related.editable and is_app_editor %}
-                        <!-- Provide an empty row that can be added -->
-                        <tr class="form-row empty-form">
-                          <!-- A 1-based counter for the forms in this set-->
-                          {% if related.use_counter %}
-                          <td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
+                          <!-- Provide an empty row that can be added -->
+                          <tr class="form-row empty-form">
+                            <!-- A 1-based counter for the forms in this set-->
+                            {% if related.use_counter %}
+                            <td style="min-width: 20px;"><span>__counter__</span></td>{% endif %}
 
-                          <!-- A button to edit or save this item -->
-                          <td valign="top" class="clickable hightlighted" style="min-width: 20px;">
-                            <div class="view-mode hidden">
-                              <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
-                                <span class="glyphicon glyphicon-pencil"></span>
-                              </a>
-                            </div>
-                            <div class="edit-mode">
-                              <a title="Save changes to this item"
-                                 onclick="ru.basic.formset_update(this);"
-                                 targetid="sermongold_eqset"
-                                 targeturl="">
-                                <span class="glyphicon glyphicon-ok"></span>
-                              </a>
-                            </div>
-                          </td>
+                            <!-- A button to edit or save this item -->
+                            <td valign="top" class="clickable hightlighted" style="min-width: 20px;">
+                              <div class="view-mode hidden">
+                                <a onclick="ru.passim.seeker.gold_row_edit(this, 'edit');" title="Edit this item">
+                                  <span class="glyphicon glyphicon-pencil"></span>
+                                </a>
+                              </div>
+                              <div class="edit-mode">
+                                <a title="Save changes to this item"
+                                   onclick="ru.basic.formset_update(this);"
+                                   targetid="sermongold_eqset"
+                                   targeturl="">
+                                  <span class="glyphicon glyphicon-ok"></span>
+                                </a>
+                              </div>
+                            </td>
 
-                        </tr>
+                          </tr>
 
-                        <!-- Add row -->
-                        <tr class="basic-add-row">
-                          <td colspan="5">
-                            <span id="add_one_{{related.prefix}}">
-                              <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
-                            </span>
-                          </td>
-                        </tr>
+                          <!-- Add row -->
+                          <tr class="basic-add-row">
+                            <td colspan="5">
+                              <span id="add_one_{{related.prefix}}">
+                                <a href="#"><span class="glyphicon glyphicon-plus">&nbsp;</span>Add an item</a>
+                              </span>
+                            </td>
+                          </tr>
                         {% endif %}
 
                       </tbody>

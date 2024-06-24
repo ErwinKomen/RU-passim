@@ -790,9 +790,7 @@ def home(request, errortype=None):
             thread = Thread(target=scan_transcriptions)
             thread.start()
 
-        
-
-        # Add
+        # Add links to projects on the homepage
         prj_links = []
         prj_images = []
         prj_names = ['Passim', 'HUWA/CSEL', 'Luc De Coninck (KU Leuven)','Brepols-CPPM']
@@ -7565,6 +7563,9 @@ class UserEdit(BasicDetails):
     no_delete = True
     mainitems = []
 
+    stype_edi_fields = ['username', 'email', 'first_name', 'last_name', 'password',
+                        'is_staff', 'is_superuser', 'groups']
+
     def custom_init(self, instance):
 
         # Set the LISTVIEW to the MyPassim page
@@ -7598,11 +7599,15 @@ class UserEdit(BasicDetails):
                 self.permission = "readonly"
             context['permission'] = self.permission
         
-        # Add the url password change
-        # <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
-        # context['pwchange'] = "<a href="{% url 'admin:password_change' %}">Change password</a>"
         # Return the context we have made
         return context
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class UserDetails(UserEdit):
@@ -7622,6 +7627,9 @@ class ProfileEdit(BasicDetails):
     history_button = True
     no_delete = True
     mainitems = []
+
+    stype_edi_fields = ['ptype', 'affiliation', 
+                        'projects', 'editprojects']
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7646,7 +7654,6 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project editing rights:", 'value': instance.get_editor_projects_markdown(),     'field_list': 'editlist'},
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'},           
-            {'type': 'safe',  'label': "", 'value': instance.get_changepw(), }          
             ]
 
         # If this is a moderator, add a button for editing rights
@@ -7654,6 +7661,13 @@ class ProfileEdit(BasicDetails):
             oItem = dict(type='safe', label='Passim editor:')
             oItem['value'] = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
             oItem['field_key'] = 'editrights'
+            context['mainitems'].append(oItem)
+
+        # For all people: if this is the correct user, allow him/her to change password
+        # See issue #772
+        if not self.request.user is None and instance.user.id == self.request.user.id:
+            # This is the user who may change his/her password
+            oItem = dict(type='safe', label="", value=instance.get_changepw())
             context['mainitems'].append(oItem)
 
         # Adapt the permission, if this is the actual user that is logged in
@@ -7677,8 +7691,6 @@ class ProfileEdit(BasicDetails):
 
         # Return the context we have made
         return context
-
-    
 
     def after_save(self, form, instance):
         msg = ""
@@ -7768,6 +7780,10 @@ class ProfileEdit(BasicDetails):
 
     def get_history(self, instance):
         return passim_get_history(instance)
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
     
 
@@ -9921,14 +9937,17 @@ class CollectionListView(BasicList):
             ]  
             self.filters = [ {"name": "My dataset", "id": "filter_collection", "enabled": False},
                              {"name": "Type", "id": "filter_coltype", "enabled": False},
-                             {"name": "Scope", "id": "filter_colscope", "enabled": False}]
+                             {"name": "Scope", "id": "filter_colscope", "enabled": False},
+                             {"name": "Owner", "id": "filter_owner", "enabled": False},
+                             ]
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'collection','dbfield': 'name',   'keyS': 'collection_ta', 'keyList': 'collist', 'infield': 'name'},
-                    {'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'colscope', 'keyType': 'fieldchoice', 'infield': 'abbr'}
+                    {'filter': 'colscope',  'dbfield': 'scope',  'keyS': 'colscope', 'keyType': 'fieldchoice', 'infield': 'abbr'},
+                    {'filter': 'owner',     'fkfield': 'owner',  'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
+                    # {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     ]},
                 {'section': 'other', 'filterlist': [
-                    {'filter': 'owner',     'fkfield': 'owner',  'keyS': 'owner', 'keyFk': 'id', 'keyList': 'ownlist', 'infield': 'id' },
                     {'filter': 'coltype',   'dbfield': 'type',   'keyS': 'type'},
                     {'filter': 'settype',   'dbfield': 'settype','keyS': 'settype'},
                     # {'filter': 'scope',  'dbfield': 'scope',  'keyS': 'scope'}
@@ -11774,7 +11793,8 @@ class ManuscriptEdit(BasicDetails):
         msg = ""
         oErr = ErrHandle()
         try:
-            bResult, msg = add_codico_to_manuscript(instance)
+            # OLD: bResult, msg = add_codico_to_manuscript(instance)
+            bResult, msg = instance.add_codico_to_manuscript()
         except:
             msg = oErr.get_error_message()
             bResult = False
@@ -14285,7 +14305,7 @@ class EqualGoldEdit(BasicDetails):
             # Notes:
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection           
             context['mainsections'] = [
-            {'name': 'Details', 'id': 'equalgold_details', 'fields': [                
+            {'name': 'Details', 'id': 'equalgold_details', 'show': True, 'fields': [                
                 {'type': 'line', 'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
                 {'type': 'plain', 'label': "Incipit:", 'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide', 'order': 2},
                 {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide', 'order': 3},                 
@@ -14468,7 +14488,7 @@ class EqualGoldEdit(BasicDetails):
                 self.new_button = True
                 context['new_button'] = True
                 # SPecification of the new button
-                context['new_button_title'] = "Sermon Gold"
+                context['new_button_title'] = "Add item to equality set" # See issue #729 "Sermon Gold"
                 context['new_button_name'] = "gold"
                 context['new_button_url'] = reverse("gold_details")
                 context['new_button_params'] = [
@@ -15191,6 +15211,7 @@ class EqualGoldDetails(EqualGoldEdit):
                 index = 1 
                 sort_start = '<span class="sortable"><span class="fa fa-sort sortshow"></span>&nbsp;'
                 sort_start_int = '<span class="sortable integer"><span class="fa fa-sort sortshow"></span>&nbsp;'
+                sort_start_mix = '<span class="sortable mixed"><span class="fa fa-sort sortshow"></span>&nbsp;'
                 sort_end = '</span>'
 
                 username = self.request.user.username
@@ -15320,7 +15341,7 @@ class EqualGoldDetails(EqualGoldEdit):
                     manuscripts['columns'] = [                                              
                         '{}<span title="Shelfmark">Shelfmark.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Origin/Provenance">or./prov.</span>{}'.format(sort_start, sort_end),                         
-                        '{}<span title="Date range">date</span>{}'.format(sort_start, sort_end),                        
+                        '{}<span title="Date range">date</span>{}'.format(sort_start_int, sort_end),                        
                        #'{}<span title="Collection name">coll.</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Item">item</span>{}'.format(sort_start, sort_end),
                         '{}<span title="Folio number">ff</span>{}'.format(sort_start, sort_end),

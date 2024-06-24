@@ -285,8 +285,8 @@ class MyPassimEdit(BasicDetails):
 
         oErr = ErrHandle()
         bAllowSermonesReset = False
-        method_startup = "owner"
         method_startup = "private"
+        method_startup = "owner"
         try:
             profile = self.object
             context['profile'] = profile
@@ -301,7 +301,7 @@ class MyPassimEdit(BasicDetails):
                     context['start_datasets'] = "?priv-colscope={}".format(obj.id)
             # Alternative: set the owner
             elif method_startup == "owner":
-                context['start_datasets'] = "?priv-owner={}".format(profile.id)
+                context['start_datasets'] = "?priv-ownlist={}".format(profile.id)
 
 
             # Special treatment: we have select2 and we have at least one form 
@@ -1550,21 +1550,6 @@ class SelectItemApply(BasicPart):
                         # Remove collection, provided this is the owner
                         if obj.collection.owner.id == profile.id:
                             obj.collection.delete()
-                    #if selitemtype == "manu":
-                    #    # Remove manuscript
-                    #    obj.manuscript.delete()
-                    #elif selitemtype == "serm":
-                    #    # Remove manuscript
-                    #    obj.sermon.delete()
-                    #elif selitemtype == "ssg":
-                    #    # Remove manuscript
-                    #    obj.equal.delete()
-                    #elif selitemtype in ["hist", "pd"]:
-                    #    # Remove manuscript
-                    #    obj.collection.delete()
-                    #elif selitemtype == "svdi":
-                    #    # Remove manuscript
-                    #    obj.saveditem.delete()
 
                 # (2) In all situations: clear the selection
                 delete_id = SelectItem.objects.filter(profile=profile, selitemtype=selitemtype).values("id")

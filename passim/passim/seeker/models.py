@@ -3967,12 +3967,14 @@ class Manuscript(models.Model):
         {'name': 'Library id',          'type': 'fk_id', 'path': 'library',   'fkfield': 'name', 'model': 'Library',      'readonly': True},
         # TODO: change FK project into m2m
         {'name': 'Projects',            'type': 'func',  'path': 'projects'},   #,  'fkfield': 'name', 'model': 'Project2'},
+        {'name': 'Dates',               'type': 'func',  'path': 'dates',  'readonly': True},
 
         {'name': 'Keywords',            'type': 'func',  'path': 'keywords',  'readonly': True},
         {'name': 'Keywords (user)',     'type': 'func',  'path': 'keywordsU'},
         {'name': 'Personal Datasets',   'type': 'func',  'path': 'datasets'},
         {'name': 'Literature',          'type': 'func',  'path': 'literature'},
         {'name': 'External links',      'type': 'func',  'path': 'external_links'},
+        {'name': 'Linked AFs',          'type': 'func',  'path': 'linked_afs'},
         # TODO process issue #509 here
         ]
 
@@ -4132,9 +4134,100 @@ class Manuscript(models.Model):
             oErr.DoError("Manuscript/adapt_manudateranges")
         return bResult
 
-    def add_codico_to_manuscript(self):
-        bResult, msg = add_codico_to_manuscript(self)
-        return bResult, msg
+    def add_codico_to_manuscript(manu):
+        """Check if a manuscript has a Codico, and if not create it"""
+
+        def get_number(items, bFirst):
+            """Extract the first or last consecutive number from the string"""
+
+            number = -1
+            if len(items) > 0:
+                if bFirst:
+                    # Find the first number
+                    for sInput in items:
+                        arNumber = re.findall(r'\d+', sInput)
+                        if len(arNumber) > 0:
+                            number = int(arNumber[0])
+                            break
+                else:
+                    # Find the last number
+                    for sInput in reversed(items):
+                        arNumber = re.findall(r'\d+', sInput)
+                        if len(arNumber) > 0:
+                            number = int(arNumber[-1])
+                            break
+
+            return number
+    
+        oErr = ErrHandle()
+        bResult = False
+        msg = ""
+        try:
+            # Check if the codico exists
+            codi = Codico.objects.filter(manuscript=manu).first()
+            if codi == None:
+                # Get first and last sermons and then their pages
+                items = [x['itemsermons__locus'] for x in manu.manuitems.filter(itemsermons__locus__isnull=False).order_by(
+                    'order').values('itemsermons__locus')]
+                if len(items) > 0:
+                    pagefirst = get_number(items, True)
+                    pagelast = get_number(items, False)
+                else:
+                    pagefirst = 1
+                    pagelast = 1
+                # Create the codico
+                codi = Codico.objects.create(
+                    name=manu.name, support=manu.support, extent=manu.extent,
+                    format=manu.format, order=1, pagefirst=pagefirst, pagelast=pagelast,
+                    origin=manu.origin, manuscript=manu
+                    )
+            else:
+                # Possibly copy stuff from manu to codi
+                bNeedSaving = False
+                if codi.name == "SUPPLY A NAME" and manu.name != "":
+                    codi.name = manu.name ; bNeedSaving = True
+                if codi.support == None and manu.support != None:
+                    codi.support = manu.support ; bNeedSaving = True
+                if codi.extent == None and manu.extent != None:
+                    codi.extent = manu.extent ; bNeedSaving = True
+                if codi.format == None and manu.format != None:
+                    codi.format = manu.format ; bNeedSaving = True
+                if codi.order == 0:
+                    codi.order = 1 ; bNeedSaving = True
+                if codi.origin == None and manu.origin != None:
+                    codi.origin = manu.origin ; bNeedSaving = True
+                # Possibly save changes
+                if bNeedSaving:
+                    codi.save()
+            # Copy provenances
+            if codi.codico_provenances.count() == 0:
+                for mp in manu.manuscripts_provenances.all():
+                    obj = ProvenanceCod.objects.filter(
+                        provenance=mp.provenance, codico=codi, note=mp.note).first()
+                    if obj == None:
+                        obj = ProvenanceCod.objects.create(
+                            provenance=mp.provenance, codico=codi, note=mp.note)
+
+            # Copy keywords
+            if codi.codico_kw.count() == 0:
+                for mk in manu.manuscript_kw.all():
+                    obj = CodicoKeyword.objects.filter(
+                        codico=codi, keyword=mk.keyword).first()
+                    if obj == None:
+                        obj = CodicoKeyword.objects.create(
+                            codico=codi, keyword=mk.keyword)
+
+            # Tie all MsItems that need be to the Codico
+            for msitem in manu.manuitems.all().order_by('order'):
+                if msitem.codico_id == None or msitem.codico == None or msitem.codico.id != codi.id:
+                    msitem.codico = codi
+                    msitem.save()
+            bResult = True
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("add_codico_to_manuscript")
+            bResult = False
+        return bResult, msg    
 
     def action_add_change(self, username, actiontype, path, old_value, new_value):
         # Show that this overwriting took place
@@ -4435,6 +4528,10 @@ class Manuscript(models.Model):
                 sBack = self.get_eqset()
             elif path == "projects":
                 sBack = self.get_projects(plain=True)
+            elif path == "linked_afs":
+                sBack = self.get_linked_afs(plain=True)
+            elif path == "dates":
+                sBack = self.get_date_markdown(plain=True)
         except:
             msg = oErr.get_error_message()
             oErr.DoError("Manuscript/custom_get")
@@ -4801,29 +4898,43 @@ class Manuscript(models.Model):
 
         return ", ".join(lhtml)
 
-    def get_date_markdown(self):
+    def get_date_markdown(self, plain=False):
         """Get the date ranges as a HTML string"""
 
         lhtml = []
-        # Get all the date ranges in the correct order
-        qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
-        # Walk the date range objects
-        for obj in qs:
-            # Determine the output for this one daterange
-            ref = ""
-            if obj.reference: 
-                if obj.pages: 
-                    ref = " <span style='font-size: x-small;'>(see {}, {})</span>".format(obj.reference.get_full_markdown(), obj.pages)
+        sBack = ""
+        oErr = ErrHandle()
+        try:
+            # Get all the date ranges in the correct order
+            qs = Daterange.objects.filter(codico__manuscript=self).order_by('yearstart')
+            # Walk the date range objects
+            for obj in qs:
+                ref = ""
+                # Determine the output for this one daterange
+                if obj.yearstart == obj.yearfinish:
+                    years = "{}".format(obj.yearstart)
                 else:
-                    ref = " <span style='font-size: x-small;'>(see {})</span>".format(obj.reference.get_full_markdown())
-            if obj.yearstart == obj.yearfinish:
-                years = "{}".format(obj.yearstart)
-            else:
-                years = "{}-{}".format(obj.yearstart, obj.yearfinish)
-            item = "<div><span class='badge signature ot'>{}</span>{}</div>".format(years, ref)
-            lhtml.append(item)
+                    years = "{}-{}".format(obj.yearstart, obj.yearfinish)
+                if plain:
+                    lhtml.append(years)
+                else:
+                    # Add a reference if need be
+                    if obj.reference: 
+                        if obj.pages: 
+                            ref = " <span style='font-size: x-small;'>(see {}, {})</span>".format(obj.reference.get_full_markdown(), obj.pages)
+                        else:
+                            ref = " <span style='font-size: x-small;'>(see {})</span>".format(obj.reference.get_full_markdown())
+                    item = "<div><span class='badge signature ot'>{}</span>{}</div>".format(years, ref)
+                    lhtml.append(item)
 
-        return "\n".join(lhtml)
+            if plain:
+                sBack = json.dumps(lhtml)
+            else:
+                sBack = "\n".join(lhtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("Manuscript/get_date_markdown")
+        return sBack
 
     def get_external_markdown(self, plain=False):
         lHtml = []
@@ -4939,6 +5050,33 @@ class Manuscript(models.Model):
             lib = self.library.name
             url = reverse('library_details', kwargs={'pk': self.library.id})
             sBack = "<span class='badge signature ot'><a href='{}'>{}</a></span>".format(url, lib)
+        return sBack
+
+    def get_linked_afs(self, plain=False):
+        """Get a string of all PASSIM codes of AFs linked to the sermons in this manuscript"""
+
+        sBack = ""
+        oErr = ErrHandle()
+        lHtml = []
+        try:
+            # Get a list of all sermons in this manuscript
+            #qs = self.sermondescr_super.all().order_by(
+            #    'sermon__msitem__codico__order', 'sermon__msitem__order').values(
+            #    'super__code')
+
+            qs = self.sermondescr_super.all().order_by('sermon__msitem__codico__order', 'sermon__msitem__order')
+            # Try to get the AF of each SermonDescr
+            for obj in qs:
+                lHtml.append(obj.super.get_code())
+
+            # Combine
+            if plain:
+                sBack = json.dumps(lHtml)
+            else:
+                sBack = ", ".join(lHtml)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_linked_afs")
         return sBack
 
     def get_litrefs_markdown(self, plain=False):
@@ -5265,15 +5403,18 @@ class Manuscript(models.Model):
             html.append('</a>')
             html.append('<span id="basic_h_similars" class="collapse">')
             html.append('Because data was imported from different sources,\
-                it is possible there are multiple records in PASSIM for the same manuscript.\
-                This field shows an AI-generated, unverified list of 3 most likely doubles for this record,\
-                based on similarity of the shelfmark.')
+                it is possible there are multiple records in PASSIM for the same manuscript. \
+                This field shows 3 nearest neighbors of the given shelfmark in terms of similarity of their semantic representations. \
+                A semantic representation aims to grasp the actual meaning of the shelfmark, \
+                despite the possible typographic and orthographic discrepancies. <br /> \
+                The semantic representations were produced using the “text-embedding-ada-002” embedding model by OpenAI. <br /> \
+                The lists of possible candidates were not verified manually and should be used with extreme caution.')
             html.append('</span>')
 
             # Now look at the similars
             if self.similars.count() > 0:
-                # Walk all the similars
-                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno"):
+                # Walk all the similars: take just the first THREE
+                for obj in self.similars.all().order_by("lcity__name", "library__name", "idno")[:3]:
                     # Get the shelfmark
                     shelfmark = obj.get_full_name(plain=False)
                     # get the url
@@ -7689,7 +7830,7 @@ class EqualGold(models.Model, Custom):
       """Make sure to return an intelligable form of the code"""
 
       sBack = ""
-      if self.code == None:
+      if self.code == None or self.code == "ZZZ_DETERMINE":
         sBack = "ssg_{}".format(self.id)
       else:
         sBack = self.code

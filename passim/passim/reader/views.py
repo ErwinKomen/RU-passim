@@ -2809,7 +2809,7 @@ class ReaderEcodex(ReaderImport):
                                                             idno=obj.idno,filename=oResult['filename'])
 
                                     else:
-                                        self.aErr.append("Import-ecodex: failed to download file {}".format(xml_url))
+                                        self.arErr.append("Import-ecodex: failed to download file {}".format(xml_url))
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
@@ -2936,7 +2936,7 @@ class ReaderEad(ReaderImport):
                                                             idno=obj.idno,filename=oResult['filename'])
 
                                     else:
-                                        aErr.append("Import-ead: failed to download file {}".format(xml_url))
+                                        self.arErr.append("Import-ead: failed to download file {}".format(xml_url))
 
                         # Create a report and add it to what we return
                         oContents = {'headers': lHeader, 'list': lst_manual, 'read': lst_read}
