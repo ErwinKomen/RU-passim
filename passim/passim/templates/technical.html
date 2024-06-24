@@ -103,12 +103,19 @@
         <h3>Data access</h3>
         <p>The Passim web application allows downloading data in a number of different ways.</p>
         <ul>
-          <li><b>Manuscript</b>: the information of individual manuscripts, including their sermons, can be downloaded in Excel.
-          The Excel file contains one page with information about the manuscript itself and one page where the sermons,
-          including their hierarchy, are described (one line is one sermon).
+          <li><b>Manuscript</b>: the information of an individual manuscript, including its manifestations, can be downloaded in Excel.
+          The Excel file contains one page with information about the manuscript itself and one page where the manifestations,
+          including their hierarchy, are described (one line is one manifestation).
           </li>
           <li><b>Authors</b>: the list of authors that are defined internally (json, csv or Excel).</li>
           <li><b>Libraries</b>: the whole list of internally defined libraries (json, csv, Excel).</li>
+          <li><b>Datasets</b>: a dataset can be a list of manuscripts, manifestations or authority files. 
+            Users are allowed to download each of these types of datasets as an Excel file. 
+            Signed-in <em>users</em> can download datasets to a maximum of 1000 entries.
+            Signed-in <em>editors</em> can download larger datasets, provided those contains items belonging to the projects for which the editor has rights.
+            <p>Note: Datasets of manuscripts are downloaded as a simple list in Excel, where each row contains just the manuscript information.
+            The sermon manifestations that are part of the manuscript are not automatically included.</p>
+          </li>
         </ul>
 
         <p>Visualizations can be 'saved', so that they are available for future reference from the <a href="/mypassim/details">MyPassim</a> menu.
