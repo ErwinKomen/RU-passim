@@ -790,9 +790,7 @@ def home(request, errortype=None):
             thread = Thread(target=scan_transcriptions)
             thread.start()
 
-        
-
-        # Add
+        # Add links to projects on the homepage
         prj_links = []
         prj_images = []
         prj_names = ['Passim', 'HUWA/CSEL', 'Luc De Coninck (KU Leuven)','Brepols-CPPM']
@@ -7646,7 +7644,6 @@ class ProfileEdit(BasicDetails):
             {'type': 'line',  'label': "Affiliation:",   'value': instance.affiliation,                 'field_key': 'affiliation'},
             {'type': 'line',  'label': "Project editing rights:", 'value': instance.get_editor_projects_markdown(),     'field_list': 'editlist'},
             {'type': 'line',  'label': "Project approval rights:", 'value': instance.get_approver_projects_markdown(),  'field_list': 'projlist'},           
-            {'type': 'safe',  'label': "", 'value': instance.get_changepw(), }          
             ]
 
         # If this is a moderator, add a button for editing rights
@@ -7654,6 +7651,12 @@ class ProfileEdit(BasicDetails):
             oItem = dict(type='safe', label='Passim editor:')
             oItem['value'] = "yes" if username_is_ingroup(instance.user, app_editor) else "no"
             oItem['field_key'] = 'editrights'
+            context['mainitems'].append(oItem)
+
+        # For all people: if this is the correct user, allow him/her to change password
+        if not self.request.user is None and instance.user.id == self.request.user.id:
+            # This is the user who may change his/her password
+            oItem = dict(type='safe', label="", value=instance.get_changepw())
             context['mainitems'].append(oItem)
 
         # Adapt the permission, if this is the actual user that is logged in
