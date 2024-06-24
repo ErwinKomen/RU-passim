@@ -7391,11 +7391,16 @@ def reader_CPPM_eqset(request):
     # vice versa, only in case that they are not added to EqualGoldLink earlier on.
    
     # Can only be done by a super-user
-    if request.user.is_superuser:        
-        pass
+    if not request.user.is_superuser:        
+        # Just go home
+        return redirect("home")
 
     # Read the JSON file from MEDIA_DIR   
-    cppm_t_read = os.path.abspath(os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')) # cppm_texts_mapped_authors.json
+    filename = os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')
+    cppm_t_read = os.path.abspath(filename) # cppm_texts_mapped_authors.json
+    # Check if file is there
+    if not os.path.exists(cppm_t_read):
+        print("Cannot find file: {}".format(filename))
 
     # Open the file
     cppm_t = open(cppm_t_read, encoding="utf8")  
@@ -7500,11 +7505,11 @@ def reader_CPPM_eqset(request):
     #print(len(code_lst))
       
     # dictionary of lists 
-    dict = {'CPPM_num':cppm_lst,'EQ_CPPM':equality_set_lst, 'True/False':tf_lst, 'CPPM_code':code_lst} 
+    dict_of_lists = {'CPPM_num':cppm_lst,'EQ_CPPM':equality_set_lst, 'True/False':tf_lst, 'CPPM_code':code_lst} 
 
     # Create df out of dict
-    eqs_test = pd.DataFrame(dict)
-     
+    eqs_test = pd.DataFrame(dict_of_lists)
+    
     # Create empty lists
     comb1_lst = []
     comb2_lst = []
@@ -7586,10 +7591,10 @@ def reader_CPPM_eqset(request):
     #print(len(nbd_eqset_code))
     
     # Add the five lists to a dictionary
-    dict={'Results':nbd_results, 'Eqset':nbd_eqset, 'CPPM':nbd_cppm, 'CodeCPPM':nbd_code, 'CodeEqset':nbd_eqset_code}
+    dict_of_lists={'Results':nbd_results, 'Eqset':nbd_eqset, 'CPPM':nbd_cppm, 'CodeCPPM':nbd_code, 'CodeEqset':nbd_eqset_code}
 
     # Store the dictionary to a data frame
-    non_bidirect = pd.DataFrame(dict)    
+    non_bidirect = pd.DataFrame(dict_of_lists)    
 
     # Sort the data frame on the 
     non_bidirect.sort_values(by=['Eqset']) # dus op "CPPM I 3"
@@ -7636,7 +7641,7 @@ def reader_CPPM_eqset(request):
             if gs_obj.equal_id == None:
             
                 # Create the new EqualGold record, atype, not author means no code...
-                eqg_obj = EqualGold.objects.create(atype="acc")
+                eqg_obj = EqualGold.objects.create(atype="acc", stype="imp" )
                 eqg_obj.save()   
 
                 eqg_obj2 = eqg_obj
