@@ -53,7 +53,7 @@ adaptation_list = {
         'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
-    'keyword_list': ['kwcategories'], #, 'kwtopics'],
+    'keyword_list': ['kwcategories', 'kwtopicdist'], #, 'kwtopics'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc',
                       'name_datasets', 'coll_setlists'],
     'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
@@ -2905,6 +2905,61 @@ def adapt_kwtopics():
 
         # Show all the keywords that were missed
         oErr.Status("Added topic-cateogry keywords: {}".format(lst_topic))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_kwtopicdis():
+    """Read the topic distribution and add the correct topic keywords"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+    lst_line = []
+    lst_missing = []
+    filename = "doc_topic_dist_full_sermons.csv"
+        
+    try:
+        # Locate the topic distribution file
+        file = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", filename))
+        # Try to read it
+        if os.path.exists(file):
+            # Read it
+            with open(file, mode="r") as f:
+                csv_file = csv.DictReader(f)
+                for line in csv_file:
+                    lst_line.append(line)
+
+            # Read through the file
+            for idx, line in enumerate(lst_line):
+                file_id = line.get("file_id")
+                sig = file_id.replace("_", " ")
+                obj = Signature.objects.filter(code__iexact=sig).first()
+                if obj is None:
+                    lst_missing.append(file_id)
+                    print("Cannot find item {}, signature={}".format(idx, sig))
+                else:
+                    # Try to find the AF
+                    gold = obj.gold
+                    if gold is None:
+                        print("Cannot find gold for item {}, signature={}".format(idx, sig))
+                    else:
+                        af = gold.equal
+                        if af is None:
+                            print("Cannot find AF for item {}, signature={}".format(idx, sig))
+                        else:
+                            # We have the authority file: sort the topics
+                            pass
+
+
+
+        else:
+            # Could not read it
+            oErr.Status("Cannot find topic dist file: {}".format(file))
+
+        # Show all the keywords that were missed
+        oErr.Status("Added topic keywords to AFs.")
     except:
         bResult = False
         msg = oErr.get_error_message()
