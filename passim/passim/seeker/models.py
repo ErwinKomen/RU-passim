@@ -5403,9 +5403,12 @@ class Manuscript(models.Model):
             html.append('</a>')
             html.append('<span id="basic_h_similars" class="collapse">')
             html.append('Because data was imported from different sources,\
-                it is possible there are multiple records in PASSIM for the same manuscript.\
-                This field shows an AI-generated, unverified list of 3 most likely doubles for this record,\
-                based on similarity of the shelfmark.')
+                it is possible there are multiple records in PASSIM for the same manuscript. \
+                This field shows 3 nearest neighbors of the given shelfmark in terms of similarity of their semantic representations. \
+                A semantic representation aims to grasp the actual meaning of the shelfmark, \
+                despite the possible typographic and orthographic discrepancies. <br /> \
+                The semantic representations were produced using the “text-embedding-ada-002” embedding model by OpenAI. <br /> \
+                The lists of possible candidates were not verified manually and should be used with extreme caution.')
             html.append('</span>')
 
             # Now look at the similars

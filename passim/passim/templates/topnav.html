@@ -197,12 +197,12 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                            aria-haspopup="true" aria-expanded="false">User<span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                          {% if user.id %}
-                            <li><a href="{% url 'profile_details' user.id  %}" title="Edit user name and email">Profile user</a></li>
-                          {% endif %}
-                          <li role="separator" class="divider"></li> 
                           <!-- Used to be 'search_sermon' -->
                           {% if user.is_authenticated %}
+                            {% if user.user_profiles.first.id %}
+                              <li><a href="{% url 'profile_details' user.user_profiles.first.id  %}" title="Edit user's' profile">Profile user</a></li>
+                              <li role="separator" class="divider"></li> 
+                            {% endif %}
                             <li><a href="javascript:document.getElementById('logoutForm').submit()">Log off</a></li>
                             <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
                           {% else %}

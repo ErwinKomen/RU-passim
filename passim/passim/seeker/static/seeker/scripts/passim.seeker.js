@@ -1641,6 +1641,7 @@ var ru = (function ($, ru) {
           scale_y = null,
           offset_x = 95,
           color = null,
+          labelcolor = null,
           colidx = -1,    // COlor index into array [color]
           oColor = {},
           subgroups = null,
@@ -1673,7 +1674,14 @@ var ru = (function ($, ru) {
           // Define the colors that we want to use
           color = d3.scaleOrdinal()
             .domain(subgroups)
-            .range(['darkblue', 'blue', 'lightblue']);
+            // Using the colors of the logo...
+            // .range(['#2B3963', '#C0D7E9', '#ECECEC']);
+            .range(['#2B3963', '#C0D7E9', '#A7DFB1']);
+
+          // Define the label colors that we want to use
+          labelcolor = d3.scaleOrdinal()
+            .domain(subgroups)
+            .range(["white", '#2B3963', '#2B3963']);
 
           // New way to handle click function
           openListview = function (event, d) {
@@ -1774,7 +1782,9 @@ var ru = (function ($, ru) {
           // Add a <text> to each <g>
           barGroups
             .append("text")
-            .attr("color", "white")
+            .attr("color", function (d) {
+              return labelcolor(d.subgroup);
+            })
             .attr("text-anchor", "middle")
             .attr("x", function (d) {
               // position in the middle of the bar

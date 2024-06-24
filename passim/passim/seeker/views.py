@@ -7563,6 +7563,9 @@ class UserEdit(BasicDetails):
     no_delete = True
     mainitems = []
 
+    stype_edi_fields = ['username', 'email', 'first_name', 'last_name', 'password',
+                        'is_staff', 'is_superuser', 'groups']
+
     def custom_init(self, instance):
 
         # Set the LISTVIEW to the MyPassim page
@@ -7596,11 +7599,15 @@ class UserEdit(BasicDetails):
                 self.permission = "readonly"
             context['permission'] = self.permission
         
-        # Add the url password change
-        # <li><a href="{% url 'admin:password_change' %}">Change password</a></li>
-        # context['pwchange'] = "<a href="{% url 'admin:password_change' %}">Change password</a>"
         # Return the context we have made
         return context
+
+    def get_history(self, instance):
+        return passim_get_history(instance)
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
 
 class UserDetails(UserEdit):
@@ -7620,6 +7627,9 @@ class ProfileEdit(BasicDetails):
     history_button = True
     no_delete = True
     mainitems = []
+
+    stype_edi_fields = ['ptype', 'affiliation', 
+                        'projects', 'editprojects']
 
     def add_to_context(self, context, instance):
         """Add to the existing context"""
@@ -7654,6 +7664,7 @@ class ProfileEdit(BasicDetails):
             context['mainitems'].append(oItem)
 
         # For all people: if this is the correct user, allow him/her to change password
+        # See issue #772
         if not self.request.user is None and instance.user.id == self.request.user.id:
             # This is the user who may change his/her password
             oItem = dict(type='safe', label="", value=instance.get_changepw())
@@ -7680,8 +7691,6 @@ class ProfileEdit(BasicDetails):
 
         # Return the context we have made
         return context
-
-    
 
     def after_save(self, form, instance):
         msg = ""
@@ -7771,6 +7780,10 @@ class ProfileEdit(BasicDetails):
 
     def get_history(self, instance):
         return passim_get_history(instance)
+
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+        passim_action_add(self, instance, details, actiontype)
 
     
 
