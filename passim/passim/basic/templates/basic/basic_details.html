@@ -98,32 +98,35 @@
 
             <div class="row">
               <div class="col-md-12">
-                <h3>
-                  <span>{{titlesg}} details</span>
-                  {% if title_addition %}
-                    <span>{{title_addition|safe}}</span>
-                  {% endif %}
-                  {% if title_right %}
-                    <span class="pull-right">{{title_right|safe}}</span>
-                  {% elif custombuttons and not new_button %}
-                    <span style="margin-left: 100px;">
-                      {% for citem in custombuttons %}
-                        <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_{{citem.name}}" 
-                           role="button" title="{{citem.title}}">
-                          <span class="glyphicon glyphicon-{{citem.icon}}"></span>
+                {% if title_template %}{{title_template|safe}}
+                {% else %}
+                  <h3>
+                    <span>{{titlesg}} details</span>
+                    {% if title_addition %}
+                      <span>{{title_addition|safe}}</span>
+                    {% endif %}
+                    {% if title_right %}
+                      <span class="pull-right">{{title_right|safe}}</span>
+                    {% elif custombuttons and not new_button %}
+                      <span style="margin-left: 100px;">
+                        {% for citem in custombuttons %}
+                          <a class="btn btn-xs jumbo-1" data-toggle="collapse" data-target="#tab_{{citem.name}}" 
+                             role="button" title="{{citem.title}}">
+                            <span class="glyphicon glyphicon-{{citem.icon}}"></span>
+                          </a>
+                        {% endfor %}
+                      </span>
+                    {% elif is_app_editor and new_button %}
+                      <span id="add_{{new_button_name}}" class="pull-right">
+                        {% csrf_token %}
+                        <a class="btn btn-xs jumbo-3" role="button" 
+                            onclick="document.getElementById('create_new_{{new_button_name}}').submit();" >
+                          <span class="glyphicon glyphicon-plus"></span>{{add_text}} {{new_button_title}}
                         </a>
-                      {% endfor %}
-                    </span>
-                  {% elif is_app_editor and new_button %}
-                    <span id="add_{{new_button_name}}" class="pull-right">
-                      {% csrf_token %}
-                      <a class="btn btn-xs jumbo-3" role="button" 
-                          onclick="document.getElementById('create_new_{{new_button_name}}').submit();" >
-                        <span class="glyphicon glyphicon-plus"></span>{{add_text}} {{new_button_title}}
-                      </a>
-                    </span>
-                  {% endif %}
-                </h3>
+                      </span>
+                    {% endif %}
+                  </h3>
+                {% endif %}
 
                 <!-- Room to have the form-link to create a new list-item -->
                 <div class="hidden" >
@@ -170,7 +173,7 @@
 
             {% if sections and sections|length > 1 %}
               <!-- List of buttons for sections -->
-              <div class="row">
+              <div class="row" style="margin-top: 10px;">
                 <div class="col-md-12">
                 {% for section in sections %}
                   {% if not section.nobutton %}

@@ -46,7 +46,7 @@
               {% if not no_delete %}
                 {% if is_app_editor  or permission == "write" %}
                   <!-- Put the delete button completely to the right-->
-                  <a mode="skip" class="view-mode btn btn-xs jumbo-3 pull-right"
+                  <a mode="skip" class="view-mode btn btn-xs jumbo-3 {% if not del_left %}pull-right{% endif %}"
                      onclick="ru.basic.delete_confirm(this);">
                     <span class="glyphicon glyphicon-remove" title="Delete this item"></span>
                   </a>
@@ -97,7 +97,7 @@
   <!-- Are there any sections? -->
   {% if mainsections and mainsections|length > 0 %}
     <!-- List of buttons for sections -->
-    <div class="row">
+    <div class="row"  style="margin-top: 10px;">
       <div class="col-md-12">
       {% for section in mainsections %}
         <span>

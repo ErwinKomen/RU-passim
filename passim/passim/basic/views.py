@@ -1657,6 +1657,7 @@ class BasicDetails(DetailView):
 
     template_name = ""      # Template for GET
     template_post = ""      # Template for POST
+    title_template = None   # A template to replace the reguler details <h3> title
     formset_objects = []    # List of formsets to be processed
     form_objects = []       # List of form objects
     afternewurl = ""        # URL to move to after adding a new item
@@ -2157,6 +2158,10 @@ class BasicDetails(DetailView):
                     # Retrieve history
                     context['history_contents'] = self.get_history(instance)
 
+            # Possibly replace the regular <h3> part
+            if self.title_template:
+                context['title_template'] = render_to_string( self.title_template, context, self.request)
+
             # Perform CMS operations on the mainitems
             if 'mainitems' in context:
                 view_name = "{}_details".format(basic_name)
@@ -2181,6 +2186,7 @@ class BasicDetails(DetailView):
             if self.bNeedReload:
                 self.bNeedReload = False
                 context['needreload'] = True
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BasicDetails, get_context_data")
