@@ -2073,6 +2073,9 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     display: block;
     width: 100%;
 }
+.pull-right .sitem-button {
+    display: table-row;
+}
 .sitem-button::before {
     content: "";
 }
@@ -2083,6 +2086,9 @@ table.dct-view tr td div.toolbox.dct .tooltip-inner tr td {
     cursor: pointer;
     display: block;
     width: 100%;
+}
+.pull-right .sitem-button-selected {
+    display: table-row;
 }
 .sitem-button-selected::before {
     content: "";

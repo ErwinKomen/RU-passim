@@ -14220,6 +14220,7 @@ class EqualGoldEdit(BasicDetails):
     use_team_group = True
     history_button = True
     comment_button = True
+    title_template = "seeker/af_title.html"
         
     EqgcolFormSet = inlineformset_factory(EqualGold, CollectionSuper,
                                        form=SuperSermonGoldCollectionForm, min_num=0,
@@ -14273,6 +14274,10 @@ class EqualGoldEdit(BasicDetails):
             saveditem_button = get_saveditem_html(self.request, instance, profile, sitemtype="ssg")
             saveditem_form = get_saveditem_html(self.request, instance, profile, "form", sitemtype="ssg")
 
+            # Make it available
+            context['saveditem_button'] = saveditem_button
+            context['del_left'] = True
+
             # Determine the passim code and possibly a warning if this is a moved item
             str_code = instance.get_code()
             if not instance.moved is None:
@@ -14282,8 +14287,9 @@ class EqualGoldEdit(BasicDetails):
             # Define the main items to show and edit
             author_id = None if instance.author is None else instance.author.id
             context['mainitems'] = [
-                {'type': 'plain', 'label': "Status:",         'value': instance.get_stype_light(),'field_key': 'stype'},
-                {'type': 'safe',  'label': "Saved item:",     'value': saveditem_button          },
+                {'type': 'plain', 'label': "Status:",         'value': instance.get_stype_light(),'field_key': 'stype', 'editonly': True},
+                # issue #708 - overhaul
+                # {'type': 'safe',  'label': "Saved item:",     'value': saveditem_button          },
                 {'type': 'plain', 'label': "Gryson/Clavis :", 'value': instance.get_signatures_markdown_equal},               
                 # Issue #295: the [number] (number within author) must be there, though hidden, not editable
                 {'type': 'plain', 'label': "Number:",        'value': instance.number,    'field_key': 'number',   'empty': 'hide'},

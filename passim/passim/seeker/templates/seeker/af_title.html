@@ -1,0 +1,28 @@
+
+<h3>
+  <!-- Traffic lights to the left -->
+  <span style="font-size: 12pt;">{{basic_form.instance.get_stype_light|safe}}</span>
+
+  <!-- Remainder to the right -->
+  <span class="pull-right">
+    <!-- The title itself -->
+    <span>{{titlesg}}</span>
+    <!-- The save button -->
+    <span>{{saveditem_button}}</span>
+  </span>
+
+
+</h3>
+
+{% if is_app_editor and new_button %}
+  <div style="margin-bottom: 10px;">
+    <span id="add_{{new_button_name}}">
+      {% csrf_token %}
+      <a class="btn btn-xs jumbo-3" role="button" 
+          onclick="document.getElementById('create_new_{{new_button_name}}').submit();" >
+        <span class="glyphicon glyphicon-plus"></span>{{add_text}} {{new_button_title}}
+      </a>
+    </span>
+  </div>
+{% endif %}
+
