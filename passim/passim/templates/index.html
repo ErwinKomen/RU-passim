@@ -52,7 +52,7 @@
          <div style="font-size: 15px; ">MANUSCRIPTS</div>
        </div>
 
-      <p>
+      <p>        
         The PASSIM research tool provides access to a database of metadata on antique and medieval works and their 
         manuscript transmission, with a focus on Latin patristic sermons. There are three main categories of information. 
         <a href="{% url 'equalgold_list' %}" target="_blank">Authority files</a> serve as stable identifiers for texts. 
@@ -61,45 +61,47 @@
         under <a href="{% url 'sermon_list' %}" target="_blank">Manifestations</a>. 
         General information and content descriptions of the <a href="{% url 'manuscript_list' %}" target="_blank">Manuscripts</a> 
         constitute the third category. PASSIM functions as a virtual research environment, allowing users to save searches, create personal datasets, 
-        visualize results and export data. We provide Tutorials on functionalities and tools.
+        visualize results and export data. The <a href="{% url 'guide' %}" target="_blank">user manual</a> provides further information on functionalities and tools.
+        <br>
+        <br>
       </p> 
     </div>
   </div>
 
-  <div class="row">
-    <div class="col-md-6 bgimg">
-    <p>
-      Initially built for a dataset of patristic sermons and their manuscripts, PASSIM houses also other datasets. 
-      Users can isolate specific datasets (<a href="{% url 'project2_list' %}" target="_blank">Projects</a>) 
-        to execute a targeted search. Current projects in PASSIM include:
-    </p>
+  <div class="row">    
+        <div class="col-md-6 bgimg">
+        <p>      
+          Initially built for a dataset of patristic sermons and their manuscripts, PASSIM houses also other datasets. 
+          Users can isolate specific datasets (<a href="{% url 'project2_list' %}" target="_blank">Projects</a>) 
+          to execute a targeted search. Current projects in PASSIM include:
+        </p>
     
-    <!--buttons and link to description-->
+        <!--buttons and link to description-->
         
-    {% if prj_links|length > 0 %}
+        {% if prj_links|length > 0 %}
         
-        {% for prj_item in prj_links %}
-          <div class="logoprjbox">
-            <img src="{{prj_item.picture}}" title="{{prj_item.title}}"style=' margin: 15px; max-width: 90px; width: auto; height: auto;'/>
-            <div class="prjname">
-            <a href="{{prj_item.url}}" target="_blank"'>{{prj_item.nameclean}}</a>
-            </div>
-          </div>
-        {% endfor %}            
+            {% for prj_item in prj_links %}
+              <div class="logoprjbox">
+                <img src="{{prj_item.picture}}" title="{{prj_item.title}}"style=' margin: 15px; max-width: 90px; width: auto; height: auto;'/>
+                <div class="prjname">
+                <a href="{{prj_item.url}}" target="_blank"'>{{prj_item.nameclean}}</a>
+                </div>
+              </div>
+            {% endfor %}            
    
-    {% endif %}
+        {% endif %}
 
-    <p>
-      <br />
-      Interested in importing your own data into PASSIM? See the <a href="{% url 'home' %}" target="_blank">Contribute</a> page.
-    </p>
+        <p>
+          <br />
+          Interested in importing your own data into PASSIM? See the <a href="{% url 'home' %}" target="_blank">Contribute</a> page.
+        </p>
+        </div>
 
-    </div>
+        <div class="col-md-6 bgimg">   
+          <div id="passim-hbar" class="row passim-chart" style="height: 200px;" targeturl="{% url 'guide' %}"></div>
+        </div>
 
-    <div class="col-md-6 bgimg">   
-      <div id="passim-hbar" class="row passim-chart" style="height: 200px;" targeturl="{% url 'guide' %}">
-      </div>
-    </div>
+    
   </div>
 
    <div class="row">

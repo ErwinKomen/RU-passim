@@ -45,7 +45,7 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
                            aria-haspopup="true" aria-expanded="false">Tools<span class="caret"></span></a>
                         <ul class="dropdown-menu">                          
-                          <li><a href="{% url 'researchset_list' %}" title="Research Sets for Dynamic comparative tables">Comparative tool</a></li>
+                          <li><a href="{% url 'researchset_list' %}" title="Research Sets for Dynamic comparative tables">Dynamic Comparative Table</a></li>
                           <li><a href="{% url 'sermonboard' %}" title="Gleb's plugin'">Plugin</a></li>
                           {% if is_stemma_user %}
                             <li><a href="{% url 'stemmaset_list' %}" title="Research Sets for Stemmatology">Stemmatology</a></li>
@@ -183,11 +183,11 @@
                         <li><a href="{% url 'about' %}" title="The about page of the PASSIM application">About</a></li>
                         <li><a href="{% url 'about' %}" title="How to quote" >How to quote</a></li>                        
                         <li><a href="{% url 'guide' %}" title="The user manual of the PASSIM application">User manual</a></li>
+                        <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual</a></li>
                         <li><a href="{% url 'technical' %}" title="Technical">Technical information</a></li>
                         <li><a href="{% url 'contact' %}" title="How to contact the PASSIM team" >Contact</a></li>
                         {% if is_app_editor %}
-                         <li role="separator" class="divider"></li>
-                         <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual</a></li>                        
+                         <li role="separator" class="divider"></li>                                                 
                          <li><a href="{% url 'report_list' %}" title="List reports of uploading etc.">Reports</a></li>
                          <li><a href="{% url 'source_list' %}" title="List of source information">Sources</a></li>             
                         {% endif %}

@@ -12316,7 +12316,7 @@ class ManuscriptListView(BasicList):
         {"name": "Manuscript type", "id": "filter_manutype",         "enabled": False},        
         {"name": "Status",          "id": "filter_stype",            "enabled": False},
         {"name": "Project",         "id": "filter_project",          "enabled": False},
-        {"name": "PD",              "id": "filter_colmanu",          "enabled": False},
+        {"name": "Personal Dataset","id": "filter_colmanu",          "enabled": False},
         
         # Issue #717: rename into "Comparative search..."
         # {"name": "Collection/Dataset...",  "id": "filter_collection",     "enabled": False, "head_id": "none"},

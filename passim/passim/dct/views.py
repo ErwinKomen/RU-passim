@@ -1935,7 +1935,7 @@ class ResearchSetListView(BasicList):
     has_select2 = True
     bUseFilter = True
     prefix = "rset"
-    plural_name = "DCT tool page"
+    plural_name = "DCT listview"
     new_button = True
     use_team_group = True
     order_cols = ['name', 'scope', 'profile__user__username', 'saved', '']
@@ -2568,7 +2568,7 @@ class SetDefEdit(BasicDetails):
     mForm = SetDefForm
     prefix = 'sdef'
     prefix_type = "simple"
-    title = "DCT definition"
+    title = "DCT"
     use_team_group = True
     mainitems = []
 
