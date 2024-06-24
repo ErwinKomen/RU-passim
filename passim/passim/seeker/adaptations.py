@@ -53,7 +53,7 @@ adaptation_list = {
         'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
-    'keyword_list': ['kwcategories'],
+    'keyword_list': ['kwcategories'], #, 'kwtopics'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc',
                       'name_datasets', 'coll_setlists'],
     'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
@@ -2867,5 +2867,48 @@ def adapt_kwcategories():
         bResult = False
         msg = oErr.get_error_message()
     return bResult, msg
+
+def adapt_kwtopics():
+    """Make sure each keyword gets put into the correct category"""
+
+    oErr = ErrHandle()
+    bResult = True
+    msg = ""
+        
+    try:
+        # The list of topics
+        lst_topic = [
+            "Judgment and Justice", "The Shepherd and the Herd", "Law and Sin", "Christ and the Jewish People", 
+            "The Tree and its Fruits", "Renewal in Christ, the House of God", "Idolatry, Paganism, Heresy", 
+            "Hope, Faith, and Salvation", "Truth, Lies, Testimony", "Prophets and the Old Testament", 
+            "Eternal Joy and Beatitude", "Sin, Penitence, and Mercy", "Wheat and Chaff, Weeds", 
+            "Riches and Poverty", "Death, Resurrection, Eternal Life", "Via ad Patriam, Jesus the Way", 
+            "Eucharist, Food and Drink, True Satiation", "Martyrdom and Sanctity", 
+            "Conflict, Hatred, Bortherly Correction", "Christus Medicus", "John the Baptist, the Word of God", 
+            "Vigil, Liturgy, Exordium", "Marriage and Chastity", "Paul and His Conversion", "Light and Darkness", 
+            "Concupiscentia Carnis", "Love", "The Miraculous Fisherman", "Crucifixion, the Symbol of the Cross",
+            "The Kingdom of Heaven", "Jewish History, Genealogy of Christ", "Noli me tangere", "The Yoke",
+            "The Lord's Prayer", "Christ and the Church", "Earthly and Heavenly Riches", "Obedience and Orthodoxy",
+            "Symbolic Meaning of Numbers", "Holy Spirit", "Prayer", "The Nature of God, Trinity",
+            "Temptation and the Devil", "The Promis of Eternal Life", "The Father and the Son", "Exegesis", 
+            "Timor Dei", "St. Peter", "Peace, Redemption, and the Haereditas Christi", 
+            "Community, Christian and Pagan Customs", "Grace, Serving the Lord", "Nativity, Mary", "Good and Evil", 
+            "Pride and Humility"]
+
+        # Remove previous topics
+        Keyword.objects.filter(category="top").delete()
+
+        # Add the new topics
+        for idx, topic in enumerate(lst_topic):
+            sTopic = "Topic {}: {}".format(idx+1, topic)
+            obj = Keyword.objects.create(name=sTopic, category="top")
+
+        # Show all the keywords that were missed
+        oErr.Status("Added topic-cateogry keywords: {}".format(lst_topic))
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
 
 
