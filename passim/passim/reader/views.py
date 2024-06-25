@@ -7543,8 +7543,10 @@ def reader_CPPM_eqset(request):
     nbd_cppm = []
     nbd_code = []
     nbd_eqset_code = []
-    delete_equal = []
-    lst_eqset = []      # List of 'pools' of gold id's that should form equality sets
+    delete_equal = []       # List of EqualGold id's that are superfluous and must be deleted
+    equal_redirect = {}     # dictionary of EqualGold id's that must be re-directed to the One eqg, 
+                            #    that should be the target of all SG in the equality set
+    lst_eqset = []          # List of 'pools' of gold id's that should form equality sets
 
     # Find out which eqset_cppm combinations are NOT matched by a cppm_eqset combination
     # and thus see which are not birectional.
@@ -7661,7 +7663,12 @@ def reader_CPPM_eqset(request):
             if equal_this.id != equal_stay.id:
                 # Add to be deleted
                 if not equal_this.id in delete_equal:
+                    print("Adding to delete_equal: {}".format(equal_this.id))
+                    # Indicate this one needs to be deleted
                     delete_equal.append(equal_this.id)
+                    # Anything pointing to [equal_this] must be re-directed to [equal_stay]
+                    if not equal_this.id in equal_redirect:
+                        equal_redirect[equal_this.id] = equal_stay
                 # Change this one's equal gold
                 obj_sg.equal = equal_stay
                 obj_sg.save()
@@ -7695,6 +7702,35 @@ def reader_CPPM_eqset(request):
                 #        delete_equal.append(gold1.equal.id)
                 #        gold1.equal = equal_retain
                 #        gold1.save()
+
+    # Review all EqualGolds that are pointing to an equalGold that is about to be deleted
+    iCountRedirect = 0
+    for obj_sg in SermonGold.objects.filter(equal__id__in=delete_equal):
+        # The equal of this SG should be changed
+        if obj_sg.equal.id in equal_redirect:
+            equal = equal_redirect[obj_sg.equal.id]
+            print("Re direction SG's eqg {} to {}".format(obj_sg.equal.id, equal.id))
+            obj_sg.equal = equal
+            obj_sg.save()
+            iCountRedirect += 1
+
+    # Review all EqualGoldLink items, so that src and dst are adapted, should they point to an Eqg-to-be-deleted
+    for obj_lnk in EqualGoldLink.objects.filter(src__id__in=delete_equal):
+        if obj_lnk.src.id in equal_redirect:
+            equal = equal_redirect[obj_lnk.src.id]
+            print("Re direction LNK.SRC's eqg {} to {}".format(obj_lnk.src.id, equal.id))
+            obj_lnk.src = equal
+            obj_lnk.save()
+            iCountRedirect += 1
+    for obj_lnk in EqualGoldLink.objects.filter(dst__id__in=delete_equal):
+        if obj_lnk.dst.id in equal_redirect:
+            equal = equal_redirect[obj_lnk.dst.id]
+            print("Re direction LNK.DST's eqg {} to {}".format(obj_lnk.dst.id, equal.id))
+            obj_lnk.dst = equal
+            obj_lnk.save()
+            iCountRedirect += 1
+
+    print("Redirected {} items".format(iCountRedirect))
 
     # split up in two lists, not_bi_eqset / not_bi_cppm
     
@@ -7881,6 +7917,9 @@ def reader_CPPM_eqset(request):
                 # It may be deleted
                 delete_actual.append(equal_id)
                 EqualGold.objects.filter(id=equal_id).first().delete()
+            else:
+                # Cannot delete it
+                print("Unable to delete EqualGold {}".format(equal_id))
             
     print("Wanted to delete {}, actually deleted {}".format(len(delete_equal), len(delete_actual)))
 
