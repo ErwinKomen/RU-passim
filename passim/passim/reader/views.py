@@ -7389,624 +7389,679 @@ def reader_CPPM_eqset(request):
 
     # When this is done ALL CPPM numbers (the keys) are linked with the numbers in the Equality set and
     # vice versa, only in case that they are not added to EqualGoldLink earlier on.
-   
-    # Can only be done by a super-user
-    if not request.user.is_superuser:        
-        # Just go home
-        return redirect("home")
 
-    # Read the JSON file from MEDIA_DIR   
-    filename = os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')
-    cppm_t_read = os.path.abspath(filename) # cppm_texts_mapped_authors.json
-    # Check if file is there
-    if not os.path.exists(cppm_t_read):
-        print("Cannot find file: {}".format(filename))
+    def best_set_equal(lst_gold):
+        """Given a list of gold ids (which should form an equality set): figure out what the best one is to survive"""
 
-    # Open the file
-    cppm_t = open(cppm_t_read, encoding="utf8")  
+        obj_eq = None
+        oErr = ErrHandle()
+        equal_id = None
+        size = 0
+        try:
+            # Get a list of all equal id's
+            lst_equal_id = [x['equal__id'] for x in SermonGold.objects.filter(id__in=lst_gold).order_by('equal__id').distinct().values('equal__id')]
+            # Divide into Passim and Cppm
+            lst_equal_cppm = [x for x in lst_equal_id if x in eqg_brepols]
+            lst_equal_passim = [x for x in lst_equal_id if not x in eqg_brepols]
 
-    # Load the json file 
-    cppm_texts = json.load(cppm_t)
+            # Decision depends on the sizes
+            # (a) preference for the Old Passim
+            if len(lst_equal_passim) > 0:
+                # Take the first one from there
+                equal_id = lst_equal_passim[0]
+            elif len(lst_equal_cppm) > 0:
+                # Take the first CPPM/Brepols one
+                equal_id = lst_equal_cppm[0]
+
+            if not equal_id is None:
+                obj_eq = EqualGold.objects.filter(id=equal_id).first()
+
+            size = len(lst_equal_id)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("best_set_equal")
+
+        return obj_eq, size
+
+    def get_eqg_ids(lst_gold):
+        """Given a set of gold ID's that are an equality set: give the matching EqualGold id's"""
+
+        lst_equal_id = [x['equal__id'] for x in SermonGold.objects.filter(id__in=lst_gold).order_by('equal__id').distinct().values('equal__id')]
+        return lst_equal_id
+
+
+    # Make sure we catch errors correctly
+    oErr = ErrHandle()
+    try:   
+        # Can only be done by a super-user
+        if not request.user.is_superuser:        
+            # Just go home
+            oErr.Status("WARNING: attempt by other to execute reader_CPPM_eqset")
+            return redirect("home")
+
+
+        ## Figure out what was imported recentely from CPPM/Brepols
+        cppm_type = "cppm"
+        # Make sure that we know which EqualGold belongs to brepols or not
+        is_brepols = {}
+        eqg_brepols = [x['equal__id'] for x in EqualGoldExternal.objects.filter(externaltype=cppm_type).values('equal__id').order_by('equal__id').distinct()]
+        eqg_all = [x['id'] for x in EqualGold.objects.all().values('id')]
+        eqg_passim = [x for x in eqg_all if not x in eqg_brepols]
+        oErr.Status("EqualGold count: Passim={} ExternalCPPM={}".format(len(eqg_passim), len(eqg_brepols)))
+
+        # Read the JSON file from MEDIA_DIR   
+        filename = os.path.join(MEDIA_DIR, 'cppm_texts_mapped_authors.json')
+        cppm_t_read = os.path.abspath(filename) # cppm_texts_mapped_authors.json
+        # Check if file is there
+        if not os.path.exists(cppm_t_read):
+            print("Cannot find file: {}".format(filename))
+
+        # Open the file
+        cppm_t = open(cppm_t_read, encoding="utf8")  
+
+        # Load the json file 
+        cppm_texts = json.load(cppm_t)
     
-    # Create lists to be used later on
-    cppm_lst=[] # keys
-    equality_set_lst = [] # numbers in the eqset
-    tf_lst = [] # true/false
-    code_lst = [] # stor signature of the key (to which there is from one side no bidrectionality)
+        # Create lists to be used later on
+        cppm_lst=[] # keys
+        equality_set_lst = [] # numbers in the eqset
+        tf_lst = [] # true/false
+        code_lst = [] # stor signature of the key (to which there is from one side no bidrectionality)
 
-    # Create an empty data frame
-    edition_df = pd.DataFrame(columns=['EQ_CPPM', 'CPPM_num', 'TF'])
+        # Create an empty data frame
+        edition_df = pd.DataFrame(columns=['EQ_CPPM', 'CPPM_num', 'TF'])
 
-    # First at the highest level (the id's (numbers))
-    for key1, value1 in cppm_texts.items(): 
+        # First at the highest level (the id's (numbers))
+        for key1, value1 in cppm_texts.items(): 
     
-        # Then one level lower (name / incipit / explicit / title / equality_set)
-        for key2, value2 in value1.items():
+            # Then one level lower (name / incipit / explicit / title / equality_set)
+            for key2, value2 in value1.items():
         
-            # First the items that are not mapped are added
-            if key2 == 'mapped' and value2 == False:            
+                # First the items that are not mapped are added
+                if key2 == 'mapped' and value2 == False:            
                 
-                # Add number and shelfmark to list  
-                cppm_number = key1
-                #print("Het huidige CPPM nummer (FALSE) is:" + cppm_number)
-                false = "False"
+                    # Add number and shelfmark to list  
+                    cppm_number = key1
+                    #print("Het huidige CPPM nummer (FALSE) is:" + cppm_number)
+                    false = "False"
 
-                # This part is for the lower sections
-                for key3, value3 in value1.items():
+                    # This part is for the lower sections
+                    for key3, value3 in value1.items():
                    
-                    # seeker_equalgold_link needs to be added
-                    if key3 == 'seeker_signature':
-                        # zoals ms_items
-                        for value4 in value3:
-                        # Iterate over the items in the list, 
-                        # that can have multiple items                        
+                        # seeker_equalgold_link needs to be added
+                        if key3 == 'seeker_signature':
+                            # zoals ms_items
+                            for value4 in value3:
+                            # Iterate over the items in the list, 
+                            # that can have multiple items                        
 
-                            for key5, value5 in value4.items():                                
-                                # Get the CPPM code
-                                if key5 == 'code': #
-                                    code_imp = value5                                    
+                                for key5, value5 in value4.items():                                
+                                    # Get the CPPM code
+                                    if key5 == 'code': #
+                                        code_imp = value5                                    
                                                            
-                # Get the equality_set (list)
-                item_list = value1.get('equality_set')
-                for cppm_eqs in item_list:
+                    # Get the equality_set (list)
+                    item_list = value1.get('equality_set')
+                    for cppm_eqs in item_list:
                     
-                    # Add to cppm_lst
-                    cppm_lst.append(cppm_number)
+                        # Add to cppm_lst
+                        cppm_lst.append(cppm_number)
                     
-                    # Add to equality_set_lst
-                    equality_set_lst.append(cppm_eqs)
+                        # Add to equality_set_lst
+                        equality_set_lst.append(cppm_eqs)
                     
-                    # Add to tf_lst
-                    tf_lst.append(false)
-                    code_lst.append(code_imp)
+                        # Add to tf_lst
+                        tf_lst.append(false)
+                        code_lst.append(code_imp)
 
-                   # print(cppm_number, cppm_eqs, false, code_imp)       
+                       # print(cppm_number, cppm_eqs, false, code_imp)       
                            
-            elif key2 == 'mapped' and value2 == True:            
+                elif key2 == 'mapped' and value2 == True:            
                 
-                # Add number and shelfmark to list 
-                cppm_number = key1
-                #print("Het huidige CPPM nummer (TRUE) is:" + cppm_number)                        
-                true = "True"
+                    # Add number and shelfmark to list 
+                    cppm_number = key1
+                    #print("Het huidige CPPM nummer (TRUE) is:" + cppm_number)                        
+                    true = "True"
 
-                # This part is for the lower sections
-                for key3, value3 in value1.items():
+                    # This part is for the lower sections
+                    for key3, value3 in value1.items():
                    
-                    # seeker_equalgold_link needs to be added
-                    if key3 == 'seeker_signature':
-                        # zoals ms_items
-                        for value4 in value3:
-                        # Iterate over the items in the list, 
-                        # that can have multiple items                        
+                        # seeker_equalgold_link needs to be added
+                        if key3 == 'seeker_signature':
+                            # zoals ms_items
+                            for value4 in value3:
+                            # Iterate over the items in the list, 
+                            # that can have multiple items                        
 
-                            for key5, value5 in value4.items():                                
-                                # Get the CPPM code
-                                if key5 == 'code': #
-                                    code_imp = value5                                    
+                                for key5, value5 in value4.items():                                
+                                    # Get the CPPM code
+                                    if key5 == 'code': #
+                                        code_imp = value5                                    
                                                        
-                # Get the equality_set (list)
-                item_list = value1.get('equality_set')
-                for cppm_eqs in item_list:                                   
+                    # Get the equality_set (list)
+                    item_list = value1.get('equality_set')
+                    for cppm_eqs in item_list:                                   
 
-                    # Add to cppm_lst
-                    cppm_lst.append(cppm_number)
+                        # Add to cppm_lst
+                        cppm_lst.append(cppm_number)
                     
-                    # Add to equality_set_lst
-                    equality_set_lst.append(cppm_eqs)
+                        # Add to equality_set_lst
+                        equality_set_lst.append(cppm_eqs)
                     
-                    # Add to tf_lst
-                    tf_lst.append(true)
-                    code_lst.append(code_imp)                                    
+                        # Add to tf_lst
+                        tf_lst.append(true)
+                        code_lst.append(code_imp)                                    
         
-    #print(len(cppm_lst)) 
-    #print(len(equality_set_lst)) 
+        #print(len(cppm_lst)) 
+        #print(len(equality_set_lst)) 
     
-    #print(len(tf_lst)) 
-    #print(len(code_lst))
+        #print(len(tf_lst)) 
+        #print(len(code_lst))
       
-    # dictionary of lists 
-    dict_of_lists = {'CPPM_num':cppm_lst,'EQ_CPPM':equality_set_lst, 'True/False':tf_lst, 'CPPM_code':code_lst} 
+        # dictionary of lists 
+        dict_of_lists = {'CPPM_num':cppm_lst,'EQ_CPPM':equality_set_lst, 'True/False':tf_lst, 'CPPM_code':code_lst} 
 
-    # Create df out of dict
-    eqs_test = pd.DataFrame(dict_of_lists)
+        # Create df out of dict
+        eqs_test = pd.DataFrame(dict_of_lists)
     
-    # Create empty lists
-    comb1_lst = []
-    comb2_lst = []
+        # Create empty lists
+        comb1_lst = []
+        comb2_lst = []
         
-    # Iterate over df
-    for index, row in eqs_test.iterrows():
-        print(row['CPPM_num'], row['EQ_CPPM'], row['CPPM_code'])
+        # Iterate over df
+        for index, row in eqs_test.iterrows():
+            print(row['CPPM_num'], row['EQ_CPPM'], row['CPPM_code'])
         
-        # Create empty list
-        eq_num_comb_lst = []
+            # Create empty list
+            eq_num_comb_lst = []
 
-        num_cppm = row['CPPM_num']
-        eq_cppm = row['EQ_CPPM']
-        code_cppm = row['CPPM_code']
+            num_cppm = row['CPPM_num']
+            eq_cppm = row['EQ_CPPM']
+            code_cppm = row['CPPM_code']
 
-        # Make combinations of the neqset number and the cppm number
-        comb1 = eq_cppm +"_"+ num_cppm 
+            # Make combinations of the neqset number and the cppm number
+            comb1 = eq_cppm +"_"+ num_cppm 
         
-        # Add to list 1
-        comb1_lst.append(comb1)        
+            # Add to list 1
+            comb1_lst.append(comb1)        
 
-        # Make combinations of the cppm number and the eqset number
-        comb2 = num_cppm +"_"+ eq_cppm
+            # Make combinations of the cppm number and the eqset number
+            comb2 = num_cppm +"_"+ eq_cppm
 
-        # Add to list 2
-        comb2_lst.append(comb2)
+            # Add to list 2
+            comb2_lst.append(comb2)
 
-    # Create empty lists               
-    nbd_results = []
-    nbd_eqset = []
-    nbd_cppm = []
-    nbd_code = []
-    nbd_eqset_code = []
-    delete_equal = []       # List of EqualGold id's that are superfluous and must be deleted
-    equal_redirect = {}     # dictionary of EqualGold id's that must be re-directed to the One eqg, 
-                            #    that should be the target of all SG in the equality set
-    lst_eqset = []          # List of 'pools' of gold id's that should form equality sets
+        # Create empty lists               
+        nbd_results = []
+        nbd_eqset = []
+        nbd_cppm = []
+        nbd_code = []
+        nbd_eqset_code = []
+        delete_equal = []       # List of EqualGold id's that are superfluous and must be deleted
+        review_equal = []       # List of EqualGold id's that should probably be deleted (manually)
+        equal_redirect = {}     # dictionary of EqualGold id's that must be re-directed to the One eqg, 
+                                #    that should be the target of all SG in the equality set
+        lst_eqset = []          # List of 'pools' of gold id's that should form equality sets
 
-    # Find out which eqset_cppm combinations are NOT matched by a cppm_eqset combination
-    # and thus see which are not birectional.
-    for element in comb1_lst:
+        # Find out which eqset_cppm combinations are NOT matched by a cppm_eqset combination
+        # and thus see which are not birectional.
+        for element in comb1_lst:
         
-        if element in comb2_lst:
-            # They are in both lists: So they must be in the same equality set
-            # Split and find the two CPPM items
-            element_list=element.split("_")
-            sig1_code = "CPPM I {}".format(element_list[0])
-            sig2_code = "CPPM I {}".format(element_list[1])
-            sig1 = Signature.objects.filter(code=sig1_code).first()
-            sig2 = Signature.objects.filter(code=sig2_code).first()
+            if element in comb2_lst:
+                # They are in both lists: So they must be in the same equality set
+                # Split and find the two CPPM items
+                element_list=element.split("_")
+                sig1_code = "CPPM I {}".format(element_list[0])
+                sig2_code = "CPPM I {}".format(element_list[1])
+                sig1 = Signature.objects.filter(code=sig1_code).first()
+                sig2 = Signature.objects.filter(code=sig2_code).first()
             
-            # Check: this should not happen
-            if sig1 is None and sig2 is None:
-                print("HELP!!! unknown to unknown")
-                iStop = 1
+                # Check: this should not happen
+                if sig1 is None and sig2 is None:
+                    print("HELP!!! unknown to unknown")
+                    iStop = 1
 
-            if sig1 is None:
-                # in that case also make the gold
-                gold1 = SermonGold.objects.create()
-                sig1 = Signature.objects.create(code=sig1_code, editype="cl", gold=gold1)
-                # Get the KNOWN gold
-                gold2 = sig2.gold
-                # This should exist and have an equal
-                if not gold2 is None and not gold2.equal is None:
-                    # This is the ideal situation: link gold2 to this equal
-                    gold1.equal = gold2.equal
-                    gold1.save()
+                if sig1 is None:
+                    # in that case also make the gold
+                    gold1 = SermonGold.objects.create()
+                    sig1 = Signature.objects.create(code=sig1_code, editype="cl", gold=gold1)
+                    # Get the KNOWN gold
+                    gold2 = sig2.gold
+                    # This should exist and have an equal
+                    if not gold2 is None and not gold2.equal is None:
+                        # This is the ideal situation: link gold2 to this equal
+                        gold1.equal = gold2.equal
+                        gold1.save()
+                        # And also make sure it ends up in an equality set
+                        lst_eqset.append( [gold1.id, gold2.id] )
+                    else:
+                        # This should not happen
+                        print("expecting an existing gold and equal...")
+                        iStop = 1
+                elif sig2 is None:
+                    # in that case also make the gold
+                    gold1 = SermonGold.objects.create()
+                    sig1 = Signature.objects.create(code=sig1_code, editype="cl", gold=gold1)
+                    # Get the KNOWN gold
+                    gold1 = sig1.gold
+                    # This should exist and have an equal
+                    if not gold1 is None and not gold1.equal is None:
+                        # This is the ideal situation: link gold1 to this equal
+                        gold2.equal = gold1.equal
+                        gold2.save()
+                        # And also make sure it ends up in an equality set
+                        lst_eqset.append( [gold1.id, gold2.id] )
+                    else:
+                        # This should not happen
+                        print("expecting an existing gold and equal...")
+                        iStop = 1
                 else:
-                    # This should not happen
-                    print("expecting an existing gold and equal...")
-                    iStop = 1
-            elif sig2 is None:
-                # in that case also make the gold
-                gold1 = SermonGold.objects.create()
-                sig1 = Signature.objects.create(code=sig1_code, editype="cl", gold=gold1)
-                # Get the KNOWN gold
-                gold1 = sig1.gold
-                # This should exist and have an equal
-                if not gold1 is None and not gold1.equal is None:
-                    # This is the ideal situation: link gold1 to this equal
-                    gold2.equal = gold1.equal
-                    gold2.save()
-                else:
-                    # This should not happen
-                    print("expecting an existing gold and equal...")
-                    iStop = 1
+                    # Both signatures exist: they should point to the same EqualGold
+                    gold1 = sig1.gold
+                    gold2 = sig2.gold
+
+                    bFound = False
+                    for eqset_one in lst_eqset:
+                        if gold1.id in eqset_one:
+                            if not gold2.id in eqset_one:
+                                eqset_one.append(gold2.id)
+                            bFound = True
+                            break
+                        elif gold2.id in eqset_one:
+                            if not gold1.id in eqset_one:
+                                eqset_one.append(gold1.id)
+                            bFound = True
+                            break
+                    if not bFound:
+                        # Create a new one
+                        lst_eqset.append( [gold1.id, gold2.id] )
+
+
             else:
-                # Both signatures exist: they should point to the same EqualGold
-                gold1 = sig1.gold
-                gold2 = sig2.gold
+                # They are *NOT* in both lists 
 
-                bFound = False
-                for eqset_one in lst_eqset:
-                    if gold1.id in eqset_one:
-                        if not gold2.id in eqset_one:
-                            eqset_one.append(gold2.id)
-                        bFound = True
-                        break
-                    elif gold2.id in eqset_one:
-                        if not gold1.id in eqset_one:
-                            eqset_one.append(gold1.id)
-                        bFound = True
-                        break
-                if not bFound:
-                    # Create a new one
-                    lst_eqset.append( [gold1.id, gold2.id] )
-
-
-        else:
-            # They are *NOT* in both lists 
-
-            # Store in list
-            nbd_results.append(element)
+                # Store in list
+                nbd_results.append(element)
             
-            # split the element:
-            element_list=element.split("_")
+                # split the element:
+                element_list=element.split("_")
             
-            # First part is the eqset number
-            eqset_nbd = element_list[0]
+                # First part is the eqset number
+                eqset_nbd = element_list[0]
             
-            # Add to list
-            nbd_eqset.append(eqset_nbd)
+                # Add to list
+                nbd_eqset.append(eqset_nbd)
                  
-            # Second part is the cppm number
-            cppm_nbd = element_list[1]
+                # Second part is the cppm number
+                cppm_nbd = element_list[1]
 
-            nbd_cppm.append(cppm_nbd)
+                nbd_cppm.append(cppm_nbd)
 
-            # Create a list with CPPM code (if it is not possible to 
-            code_nbd = "CPPM I " + cppm_nbd
+                # Create a list with CPPM code (if it is not possible to 
+                code_nbd = "CPPM I " + cppm_nbd
                                
-            # Add to list
-            nbd_code.append(code_nbd)
+                # Add to list
+                nbd_code.append(code_nbd)
 
-            # Create a list with CPPM code (if it is not possible to 
-            eqset_code = "CPPM I " + eqset_nbd
+                # Create a list with CPPM code (if it is not possible to 
+                eqset_code = "CPPM I " + eqset_nbd
             
-            # Add to list
-            nbd_eqset_code.append(eqset_code)
+                # Add to list
+                nbd_eqset_code.append(eqset_code)
 
-            #print(cppm_nbd, eqset_nbd, code_nbd, eqset_code)
+                #print(cppm_nbd, eqset_nbd, code_nbd, eqset_code)
 
-    # Create equality sets where needed
-    for eqset_one in lst_eqset:
-        equal_stay = SermonGold.objects.filter(id=eqset_one[0]).first().equal
-        for gold_id in eqset_one[1:]:
-            # Get the equalgold belonging to this gold id
-            obj_sg = SermonGold.objects.filter(id=gold_id).first()
-            equal_this = obj_sg.equal
-            # Is this the same as the one that should stay?
-            if equal_this.id != equal_stay.id:
-                # Add to be deleted
-                if not equal_this.id in delete_equal:
-                    print("Adding to delete_equal: {}".format(equal_this.id))
-                    # Indicate this one needs to be deleted
-                    delete_equal.append(equal_this.id)
-                    # Anything pointing to [equal_this] must be re-directed to [equal_stay]
-                    if not equal_this.id in equal_redirect:
-                        equal_redirect[equal_this.id] = equal_stay
-                # Change this one's equal gold
-                obj_sg.equal = equal_stay
+        # Create equality sets where needed
+        for eqset_one in lst_eqset:
+            # Figure out which EQG should stay
+            equal_stay, size = best_set_equal(eqset_one)
+
+            # Check if we found an EQG that is *able* to serve as fixed point
+            if equal_stay is None:
+                # Check the size
+                if size > 1:
+                    # No EQG was found for this eqset
+                    oErr.Status("reader_CPPM_eqset: manually combine AFs {} for equality set (gold id's): {}".format(
+                        get_eqg_ids(eqset_one), eqset_one ))
+            else:
+                # We *HAVE* a best match!!
+                for gold_id in eqset_one:
+                    # Get the equalgold belonging to this gold id
+                    obj_sg = SermonGold.objects.filter(id=gold_id).first()
+                    equal_this = obj_sg.equal
+                    # Is this the same as the one that should stay?
+                    if equal_this.id != equal_stay.id:
+                        # Add to be deleted
+                        if not equal_this.id in delete_equal:
+                            # Double check if this one *MAY* be deleted
+                            if equal_this.id in eqg_brepols:
+                                # Yes, this is Brepols, so may be deleted
+                                print("Adding to delete_equal: {}".format(equal_this.id))
+                                # Indicate this one needs to be deleted
+                                delete_equal.append(equal_this.id)
+                                # Anything pointing to [equal_this] must be re-directed to [equal_stay]
+                                if not equal_this.id in equal_redirect:
+                                    equal_redirect[equal_this.id] = equal_stay
+                                # Change this one's equal gold
+                                obj_sg.equal = equal_stay
+                                obj_sg.save()
+                            else:
+                                # No, it is not brepols, so it May not be automatically deleted
+                                review_equal.append(equal_this.id)
+                                oErr.Status("reader_CPPM_eqset: Sermon Gold {} now points to AF {}, but it should point to AF {}. "\
+                                    " Check the AF {} and then manually change the SG's [equal] field to the new AF and remove the old one.".format(
+                                    gold_id, equal_this.id, equal_stay.id, equal_this.id ))
+
+
+
+         # Review all EqualGolds that are pointing to an equalGold that is about to be deleted
+        iCountRedirect = 0
+        for obj_sg in SermonGold.objects.filter(equal__id__in=delete_equal):
+            # The equal of this SG should be changed
+            if obj_sg.equal.id in equal_redirect:
+                equal = equal_redirect[obj_sg.equal.id]
+                print("Re direction SG's eqg {} to {}".format(obj_sg.equal.id, equal.id))
+                obj_sg.equal = equal
                 obj_sg.save()
+                iCountRedirect += 1
 
+        # Review all EqualGoldLink items, so that src and dst are adapted, should they point to an Eqg-to-be-deleted
+        for obj_lnk in EqualGoldLink.objects.filter(src__id__in=delete_equal):
+            if obj_lnk.src.id in equal_redirect:
+                equal = equal_redirect[obj_lnk.src.id]
+                print("Re direction LNK.SRC's eqg {} to {}".format(obj_lnk.src.id, equal.id))
+                obj_lnk.src = equal
+                obj_lnk.save()
+                iCountRedirect += 1
+        for obj_lnk in EqualGoldLink.objects.filter(dst__id__in=delete_equal):
+            if obj_lnk.dst.id in equal_redirect:
+                equal = equal_redirect[obj_lnk.dst.id]
+                print("Re direction LNK.DST's eqg {} to {}".format(obj_lnk.dst.id, equal.id))
+                obj_lnk.dst = equal
+                obj_lnk.save()
+                iCountRedirect += 1
 
+        print("Redirected {} items".format(iCountRedirect))
 
-                #x = gold1.equal_goldsermons.all()
-
-                #equal_retain = gold2.equal
-                ## Check: the equal id I would like to use may not be in the deletables
-                #if equal_retain.id in delete_equal:
-                #    # Take the other one
-                #    equal_retain = gold1.equal
-                #    if equal_retain.id in delete_equal:
-                #        # This should not happen
-                #        print("Should not be deleting equal {}".format(equal_retain.id))
-
-                #if gold1.equal.id == gold2.equal.id:
-                #    # They are in the same equality set: Hooray!
-                #    pass
-                #else:
-                #    # Try to set the retain_id
-                #    if equal_retain.id == gold1.equal.id:
-                #        # That means: remove the gold2 equal id
-                #        delete_equal.append(gold2.equal.id)
-                #        gold2.equal = equal_retain
-                #        gold2.save()
-                #    else:
-                #        # The second should point to the first
-                #        # Keep gold2.equal, remove gold1.equal
-                #        delete_equal.append(gold1.equal.id)
-                #        gold1.equal = equal_retain
-                #        gold1.save()
-
-    # Review all EqualGolds that are pointing to an equalGold that is about to be deleted
-    iCountRedirect = 0
-    for obj_sg in SermonGold.objects.filter(equal__id__in=delete_equal):
-        # The equal of this SG should be changed
-        if obj_sg.equal.id in equal_redirect:
-            equal = equal_redirect[obj_sg.equal.id]
-            print("Re direction SG's eqg {} to {}".format(obj_sg.equal.id, equal.id))
-            obj_sg.equal = equal
-            obj_sg.save()
-            iCountRedirect += 1
-
-    # Review all EqualGoldLink items, so that src and dst are adapted, should they point to an Eqg-to-be-deleted
-    for obj_lnk in EqualGoldLink.objects.filter(src__id__in=delete_equal):
-        if obj_lnk.src.id in equal_redirect:
-            equal = equal_redirect[obj_lnk.src.id]
-            print("Re direction LNK.SRC's eqg {} to {}".format(obj_lnk.src.id, equal.id))
-            obj_lnk.src = equal
-            obj_lnk.save()
-            iCountRedirect += 1
-    for obj_lnk in EqualGoldLink.objects.filter(dst__id__in=delete_equal):
-        if obj_lnk.dst.id in equal_redirect:
-            equal = equal_redirect[obj_lnk.dst.id]
-            print("Re direction LNK.DST's eqg {} to {}".format(obj_lnk.dst.id, equal.id))
-            obj_lnk.dst = equal
-            obj_lnk.save()
-            iCountRedirect += 1
-
-    print("Redirected {} items".format(iCountRedirect))
-
-    # split up in two lists, not_bi_eqset / not_bi_cppm
+        # split up in two lists, not_bi_eqset / not_bi_cppm
     
-    # Find out how many records are in the lists
-    #print(len(nbd_results)) # 895
-    #print(len(nbd_eqset))
-    #print(len(nbd_cppm))    
-    #print(len(nbd_code))
-    #print(len(nbd_eqset_code))
+        # Find out how many records are in the lists
+        #print(len(nbd_results)) # 895
+        #print(len(nbd_eqset))
+        #print(len(nbd_cppm))    
+        #print(len(nbd_code))
+        #print(len(nbd_eqset_code))
     
-    # Add the five lists to a dictionary
-    dict_of_lists={'Results':nbd_results, 'Eqset':nbd_eqset, 'CPPM':nbd_cppm, 'CodeCPPM':nbd_code, 'CodeEqset':nbd_eqset_code}
+        # Add the five lists to a dictionary
+        dict_of_lists={'Results':nbd_results, 'Eqset':nbd_eqset, 'CPPM':nbd_cppm, 'CodeCPPM':nbd_code, 'CodeEqset':nbd_eqset_code}
 
-    # Store the dictionary to a data frame
-    non_bidirect = pd.DataFrame(dict_of_lists)    
+        # Store the dictionary to a data frame
+        non_bidirect = pd.DataFrame(dict_of_lists)    
 
-    # Sort the data frame on the 
-    non_bidirect.sort_values(by=['Eqset']) # dus op "CPPM I 3"
+        # Sort the data frame on the 
+        non_bidirect.sort_values(by=['Eqset']) # dus op "CPPM I 3"
     
-    # Close the file
-    cppm_t.close()    
+        # Close the file
+        cppm_t.close()    
     
-    # Counts for the number of EGL's
-    count_egl_1 = 0
-    count_egl_2 = 0
+        # Counts for the number of EGL's
+        count_egl_1 = 0
+        count_egl_2 = 0
 
-    # Now iterate over the data frame 
-    for index, row in non_bidirect.iterrows():
+        # Now iterate over the data frame 
+        for index, row in non_bidirect.iterrows():
 
-        print(row['Results'], row['Eqset'], row['CPPM'], row['CodeCPPM'], row['CodeEqset'])
+            print(row['Results'], row['Eqset'], row['CPPM'], row['CodeCPPM'], row['CodeEqset'])
         
-        result = row['Results']
-        eqset = row['Eqset']
-        cppm = row['CPPM'] 
-        code_cppm = row['CodeCPPM'] 
-        code_eqset = row['CodeEqset']
+            result = row['Results']
+            eqset = row['Eqset']
+            cppm = row['CPPM'] 
+            code_cppm = row['CodeCPPM'] 
+            code_eqset = row['CodeEqset']
 
-        # Specify the editype
-        editype = 'cl'
+            # Specify the editype
+            editype = 'cl'
 
-        # First check if the Signature exists           
-        sig_obj = Signature.objects.filter(code=code_eqset, editype = 'cl').first() 
+            # First check if the Signature exists           
+            sig_obj = Signature.objects.filter(code=code_eqset, editype = 'cl').first() 
         
-        if sig_obj == None:  
+            if sig_obj == None:  
             
-            # If not create new Signature
-            sig_obj = Signature.objects.create(code=code_eqset, editype=editype)                        
-            sig_obj.save()
+                # If not create new Signature
+                sig_obj = Signature.objects.create(code=code_eqset, editype=editype)                        
+                sig_obj.save()
             
-            # In this case a new GS also needs to be created using the data from the json file
-            gs_obj = SermonGold.objects.create()
-            gs_obj.save()
-
-            # And the new GS needs to be linked to the Signature
-            sig_obj.gold = gs_obj
-            sig_obj.save()
-
-            # Find of the EqualGold record already exists   
-            if gs_obj.equal_id == None:
-            
-                # Create the new EqualGold record, atype, not author means no code...
-                eqg_obj = EqualGold.objects.create(atype="acc", stype="imp" )
-                eqg_obj.save()   
-
-                eqg_obj2 = eqg_obj
-
-                # Now the new EqualGold needs to be linked to the SermonGold on which it is based.  
-                gs_obj.equal = eqg_obj 
+                # In this case a new GS also needs to be created using the data from the json file
+                gs_obj = SermonGold.objects.create()
                 gs_obj.save()
 
-            # Project
+                # And the new GS needs to be linked to the Signature
+                sig_obj.gold = gs_obj
+                sig_obj.save()
+
+                # Find of the EqualGold record already exists   
+                if gs_obj.equal_id == None:
+            
+                    # Create the new EqualGold record, atype, not author means no code...
+                    eqg_obj = EqualGold.objects.create(atype="acc", stype="imp" )
+                    eqg_obj.save()   
+
+                    eqg_obj2 = eqg_obj
+
+                    # Now the new EqualGold needs to be linked to the SermonGold on which it is based.  
+                    gs_obj.equal = eqg_obj 
+                    gs_obj.save()
+
+                # Project
            
-            # The name of the project needs to linked to the new EqualGold.             
+                # The name of the project needs to linked to the new EqualGold.             
             
-            # The project labels that needs to be added:
+                # The project labels that needs to be added:
             
-            project_name_1 = "Brepols-CPPM"
-            project_name_2 = "Passim"
+                project_name_1 = "Brepols-CPPM"
+                project_name_2 = "Passim"
 
-            # AFs linked to an CPPM Signature also need to have a projectlabel
+                # AFs linked to an CPPM Signature also need to have a projectlabel
 
-            # Check if the project label "Brepols-CPPM" already exits in the Project2 table
-            projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
-            if projectfound_1 == None:
-                # If the projectname does not already exist, it needs to be added to the database
-                projectcppm_1 = Project2.objects.create(name = project_name_1)
-                # And a link should be made between this new material and corresponding Portrait table
-                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
-            else:
-                # In case there is a projectfound, check for a link, if so, nothing should happen, 
-                # than there is already a link between the EqualGold and a the project name
-                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
-                if eqgprjlink == None:               
+                # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+                projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+                if projectfound_1 == None:
+                    # If the projectname does not already exist, it needs to be added to the database
+                    projectcppm_1 = Project2.objects.create(name = project_name_1)
+                    # And a link should be made between this new material and corresponding Portrait table
+                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_1)
+                else:
+                    # In case there is a projectfound, check for a link, if so, nothing should happen, 
+                    # than there is already a link between the EqualGold and a the project name
+                    eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_1).first()
+                    if eqgprjlink == None:               
 
-                    # If the project name already exists, but not the link, than only a link should be 
-                    # made between the EqualGold and the projectname
-                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1) 
+                        # If the project name already exists, but not the link, than only a link should be 
+                        # made between the EqualGold and the projectname
+                        EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_1) 
              
-            # Check if the project label "Passim" already exits in the Project2 table
-            projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
-            if projectfound_2 == None:
-                # If the projectname does not already exist, it needs to be added to the database
-                projectcppm_2 = Project2.objects.create(name = project_name_2)
-                # And a link should be made between this new material and corresponding Portrait table
-                EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_2)
-            else:
-                # In case there is a projectfound, check for a link, if so, nothing should happen, 
-                # than there is already a link between the EqualGold and a the project name
-                eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_2).first()
-                if eqgprjlink == None:
-                    # If the project name already exists, but not the link, than only a link should be 
-                    # made between the EqualGold and the projectname                    
-                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_2)
+                # Check if the project label "Passim" already exits in the Project2 table
+                projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
+                if projectfound_2 == None:
+                    # If the projectname does not already exist, it needs to be added to the database
+                    projectcppm_2 = Project2.objects.create(name = project_name_2)
+                    # And a link should be made between this new material and corresponding Portrait table
+                    EqualGoldProject.objects.create(equal = eqg_obj, project = projectcppm_2)
+                else:
+                    # In case there is a projectfound, check for a link, if so, nothing should happen, 
+                    # than there is already a link between the EqualGold and a the project name
+                    eqgprjlink = EqualGoldProject.objects.filter(equal = eqg_obj, project = projectfound_2).first()
+                    if eqgprjlink == None:
+                        # If the project name already exists, but not the link, than only a link should be 
+                        # made between the EqualGold and the projectname                    
+                        EqualGoldProject.objects.create(equal = eqg_obj, project = projectfound_2)
  
-        else:
-            # If the EQSET Signature is already in the database, we need to retrieve the GS and EG objects row['CodeEqset'] 
-            # Moet dit niet ook voor ALLE CPPM nummers gebeuren? Nu alleen voor de niet toegevoegde EQSET CPPM nummers en VV.
-
-            #Ja dus, Dit hier moet op de schop.
-
-            # Of we doen eerst dit hieronder en gaan dan hierna er nog eens overheen? 
-
-            # Maar het plan moet zijn
-
-
-
-            # Get the EQSET Gold Sermon
-            gs_id_eqset = sig_obj.gold_id
-
-            # Get the EQSET GS obect
-            gs_obj_eqset = SermonGold.objects.filter(id=gs_id_eqset).first()
-
-            # Get the EG object CPPM
-            eqg_obj2 = gs_obj_eqset.equal
-        
-        # Get the CPPM AF
-        # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
-        # Get the Signature of the main CPPM number
-        sig_cppm = Signature.objects.filter(code = code_cppm, editype=editype).first()
-
-        # Get the Gold Sermon
-        gs_id = sig_cppm.gold_id
-
-        # Get the GS obect
-        gs_obj = SermonGold.objects.filter(id=gs_id).first()
-           
-        # Get the EG object CPPM
-        eqg_obj1 = gs_obj.equal      
-                   
-        # Make the linktype
-        linktype_prt = "prt"
-                
-        # Find out if the new AF is already linked with the corresponding AF (sig 3 with 11)
-        # Partial Equals with code_cppm and code_eqset...
-        eql_obj1 = EqualGoldLink.objects.filter(dst = eqg_obj2, src = eqg_obj1, linktype=linktype_prt).first()
-        
-        #....and vice versa
-        eql_obj2 = EqualGoldLink.objects.filter(dst = eqg_obj1, src = eqg_obj2, linktype=linktype_prt).first()
-        
-        # If there is no eql_obj1, create one                        
-        if eql_obj1 == None:
-            eql_obj1 = EqualGoldLink.objects.create(dst = eqg_obj2, src = eqg_obj1, linktype=linktype_prt)
-            count_egl_1 += 1
-            eql_obj1.save()
-            
-        # If there is no eql_obj2, create one                        
-        if eql_obj2 == None:
-            eql_obj2 = EqualGoldLink.objects.create(dst = eqg_obj1, src = eqg_obj2, linktype=linktype_prt)
-            count_egl_2 += 1
-            eql_obj2.save()
-
-    #print(str(count_egl_1))
-    #print(str(count_egl_2)) # 709
-
-
-    # Remove those from delete_equal
-    delete_actual = []
-    with transaction.atomic():
-        # Check all the equal gold id's that MIGHT be deleted
-        for equal_id in delete_equal:
-            # Double check: is the deletable used in EqualGoldLink
-            if not EqualGoldLink.objects.filter(dst_id=equal_id).exists() and \
-                not EqualGoldLink.objects.filter(src_id=equal_id).exists():
-                # It may be deleted
-                delete_actual.append(equal_id)
-                EqualGold.objects.filter(id=equal_id).first().delete()
             else:
-                # Cannot delete it
-                print("Unable to delete EqualGold {}".format(equal_id))
-            
-    print("Wanted to delete {}, actually deleted {}".format(len(delete_equal), len(delete_actual)))
+                # If the EQSET Signature is already in the database, we need to retrieve the GS and EG objects row['CodeEqset'] 
+                # Moet dit niet ook voor ALLE CPPM nummers gebeuren? Nu alleen voor de niet toegevoegde EQSET CPPM nummers en VV.
+
+                #Ja dus, Dit hier moet op de schop.
+
+                # Of we doen eerst dit hieronder en gaan dan hierna er nog eens overheen? 
+
+                # Maar het plan moet zijn
 
 
-    count_egl_cppm = 0
-    count_egl_eqset= 0
-    
-    ## Now make sure we get all the EQG Links in the database    
-    ## Basically do the same as above
 
-    ## First sort the df on the key
-    #eqs_test.sort_values(by=['CPPM_code'])
+                # Get the EQSET Gold Sermon
+                gs_id_eqset = sig_obj.gold_id
 
-    ## Iterate over df
-    #for index, row in eqs_test.iterrows():
-    #    print(row['CPPM_num'], row['EQ_CPPM'], row['CPPM_code'])
-            
-    #    code_cppm = row['CPPM_code']         
-    #    eq_cppm = row['EQ_CPPM']
+                # Get the EQSET GS obect
+                gs_obj_eqset = SermonGold.objects.filter(id=gs_id_eqset).first()
 
-    #    # Define editype
-    #    editype = 'cl'
-
-    #    # Part 1
+                # Get the EG object CPPM
+                eqg_obj2 = gs_obj_eqset.equal
         
-    #    # Find the AF belonging to the Signature CPPM
+            # Get the CPPM AF
+            # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
+            # Get the Signature of the main CPPM number
+            sig_cppm = Signature.objects.filter(code = code_cppm, editype=editype).first()
 
-    #    # Get the CPPM AF
-    #    # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
-    #    # Get the Signature of the main CPPM number
-    #    sig_cppm = Signature.objects.filter(code = code_cppm, editype=editype).first()
+            # Get the Gold Sermon
+            gs_id = sig_cppm.gold_id
 
-    #    # Get the Gold Sermon CPPM
-    #    gs_id_cppm = sig_cppm.gold_id
-
-    #    # Get the GS obect CPPM
-    #    gs_obj_cppm = SermonGold.objects.filter(id=gs_id_cppm).first()
+            # Get the GS obect
+            gs_obj = SermonGold.objects.filter(id=gs_id).first()
            
-    #    # Get the EG object CPPM
-    #    eqg_obj_cppm = gs_obj_cppm.equal      
-
-    #    # Part 2
+            # Get the EG object CPPM
+            eqg_obj1 = gs_obj.equal      
                    
-    #    # Find the AF belonging to the Signature EQSET
-    #    # Create a full CPPM Signature using the EQSET cppm number
-    #    eqset_cppm = "CPPM I " + eq_cppm
-
-    #    # Get the EQSET AF
-    #    # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
-    #    # Get the Signature of the main CPPM number
-    #    sig_eqset = Signature.objects.filter(code = eqset_cppm, editype=editype).first()
-
-    #    # Get the Gold Sermon EQSET
-    #    gs_id_eqset = sig_eqset.gold_id
-
-    #    # Get the GS obect EQSET
-    #    gs_obj_eqset = SermonGold.objects.filter(id=gs_id_eqset).first()
-           
-    #    # Get the EG object EQSET
-    #    eqg_obj_eqset = gs_obj_eqset.equal
+            # Make the linktype
+            linktype_prt = "prt"
+                
+            # Find out if the new AF is already linked with the corresponding AF (sig 3 with 11)
+            # Partial Equals with code_cppm and code_eqset...
+            eql_obj1 = EqualGoldLink.objects.filter(dst = eqg_obj2, src = eqg_obj1, linktype=linktype_prt).first()
         
-    #    # Define the linktype
-    #    linktype_prt = "prt"
-
-    #    # Find out if the new AF is already linked with the corresponding AF 
-    #    # Partial Equals with code_cppm and code_eqset...
-    #    eql_obj1 = EqualGoldLink.objects.filter(dst = eqg_obj_eqset, src = eqg_obj_cppm, linktype=linktype_prt).first()
+            #....and vice versa
+            eql_obj2 = EqualGoldLink.objects.filter(dst = eqg_obj1, src = eqg_obj2, linktype=linktype_prt).first()
         
-    #    #....and vice versa
-    #    eql_obj2 = EqualGoldLink.objects.filter(dst = eqg_obj_cppm, src = eqg_obj_eqset, linktype=linktype_prt).first()
-        
-    #    # If there is no eql_obj1, create one                        
-    #    if eql_obj1 == None:
-    #        eql_obj1 = EqualGoldLink.objects.create(dst = eqg_obj_eqset, src = eqg_obj_cppm, linktype=linktype_prt)
-    #        # Keep count
-    #        count_egl_cppm += 1
-    #        eql_obj1.save()
+            # If there is no eql_obj1, create one                        
+            if eql_obj1 == None:
+                eql_obj1 = EqualGoldLink.objects.create(dst = eqg_obj2, src = eqg_obj1, linktype=linktype_prt)
+                count_egl_1 += 1
+                eql_obj1.save()
             
-    #    # If there is no eql_obj2, create one                        
-    #    if eql_obj2 == None:
-    #        eql_obj2 = EqualGoldLink.objects.create(dst = eqg_obj_cppm, src = eqg_obj_eqset, linktype=linktype_prt)
-    #        # Keep count
-    #        count_egl_eqset += 1
-    #        eql_obj2.save()
+            # If there is no eql_obj2, create one                        
+            if eql_obj2 == None:
+                eql_obj2 = EqualGoldLink.objects.create(dst = eqg_obj1, src = eqg_obj2, linktype=linktype_prt)
+                count_egl_2 += 1
+                eql_obj2.save()
 
-    #print(str(count_egl_cppm)) # 1458
-    #print(str(count_egl_eqset)) # 1458
+        #print(str(count_egl_1))
+        #print(str(count_egl_2)) # 709
+
+
+        # Remove those from delete_equal
+        delete_actual = []
+        with transaction.atomic():
+            # Check all the equal gold id's that MIGHT be deleted
+            for equal_id in delete_equal:
+                # Double check: is the deletable used in EqualGoldLink
+                if not EqualGoldLink.objects.filter(dst_id=equal_id).exists() and \
+                    not EqualGoldLink.objects.filter(src_id=equal_id).exists():
+                    # It may be deleted
+                    delete_actual.append(equal_id)
+                    EqualGold.objects.filter(id=equal_id).first().delete()
+                else:
+                    # Cannot delete it
+                    print("Unable to delete EqualGold {}".format(equal_id))
+            
+        print("Wanted to delete {}, actually deleted {}".format(len(delete_equal), len(delete_actual)))
+
+
+        count_egl_cppm = 0
+        count_egl_eqset= 0
+    
+        ## Now make sure we get all the EQG Links in the database    
+        ## Basically do the same as above
+
+        ## First sort the df on the key
+        #eqs_test.sort_values(by=['CPPM_code'])
+
+        ## Iterate over df
+        #for index, row in eqs_test.iterrows():
+        #    print(row['CPPM_num'], row['EQ_CPPM'], row['CPPM_code'])
+            
+        #    code_cppm = row['CPPM_code']         
+        #    eq_cppm = row['EQ_CPPM']
+
+        #    # Define editype
+        #    editype = 'cl'
+
+        #    # Part 1
+        
+        #    # Find the AF belonging to the Signature CPPM
+
+        #    # Get the CPPM AF
+        #    # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
+        #    # Get the Signature of the main CPPM number
+        #    sig_cppm = Signature.objects.filter(code = code_cppm, editype=editype).first()
+
+        #    # Get the Gold Sermon CPPM
+        #    gs_id_cppm = sig_cppm.gold_id
+
+        #    # Get the GS obect CPPM
+        #    gs_obj_cppm = SermonGold.objects.filter(id=gs_id_cppm).first()
+           
+        #    # Get the EG object CPPM
+        #    eqg_obj_cppm = gs_obj_cppm.equal      
+
+        #    # Part 2
+                   
+        #    # Find the AF belonging to the Signature EQSET
+        #    # Create a full CPPM Signature using the EQSET cppm number
+        #    eqset_cppm = "CPPM I " + eq_cppm
+
+        #    # Get the EQSET AF
+        #    # Here the links are made between the cppm numbers in row['CodeCPPM'] and         
+        #    # Get the Signature of the main CPPM number
+        #    sig_eqset = Signature.objects.filter(code = eqset_cppm, editype=editype).first()
+
+        #    # Get the Gold Sermon EQSET
+        #    gs_id_eqset = sig_eqset.gold_id
+
+        #    # Get the GS obect EQSET
+        #    gs_obj_eqset = SermonGold.objects.filter(id=gs_id_eqset).first()
+           
+        #    # Get the EG object EQSET
+        #    eqg_obj_eqset = gs_obj_eqset.equal
+        
+        #    # Define the linktype
+        #    linktype_prt = "prt"
+
+        #    # Find out if the new AF is already linked with the corresponding AF 
+        #    # Partial Equals with code_cppm and code_eqset...
+        #    eql_obj1 = EqualGoldLink.objects.filter(dst = eqg_obj_eqset, src = eqg_obj_cppm, linktype=linktype_prt).first()
+        
+        #    #....and vice versa
+        #    eql_obj2 = EqualGoldLink.objects.filter(dst = eqg_obj_cppm, src = eqg_obj_eqset, linktype=linktype_prt).first()
+        
+        #    # If there is no eql_obj1, create one                        
+        #    if eql_obj1 == None:
+        #        eql_obj1 = EqualGoldLink.objects.create(dst = eqg_obj_eqset, src = eqg_obj_cppm, linktype=linktype_prt)
+        #        # Keep count
+        #        count_egl_cppm += 1
+        #        eql_obj1.save()
+            
+        #    # If there is no eql_obj2, create one                        
+        #    if eql_obj2 == None:
+        #        eql_obj2 = EqualGoldLink.objects.create(dst = eqg_obj_cppm, src = eqg_obj_eqset, linktype=linktype_prt)
+        #        # Keep count
+        #        count_egl_eqset += 1
+        #        eql_obj2.save()
+
+        #print(str(count_egl_cppm)) # 1458
+        #print(str(count_egl_eqset)) # 1458
+    except:
+        msg = oErr.get_error_message()
+        oErr.DoError("reader/reader_CPPM_eqset")
 
     # What we return is simply the home page
     return redirect('home')

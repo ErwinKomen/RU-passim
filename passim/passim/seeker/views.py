@@ -14500,7 +14500,7 @@ class EqualGoldEdit(BasicDetails):
                 self.new_button = True
                 context['new_button'] = True
                 # SPecification of the new button
-                context['new_button_title'] = "Add item to equality set" # See issue #729 "Sermon Gold"
+                context['new_button_title'] = "item to the equality set" # See issue #729 "Sermon Gold"
                 context['new_button_name'] = "gold"
                 context['new_button_url'] = reverse("gold_details")
                 context['new_button_params'] = [
