@@ -8171,7 +8171,7 @@ def reader_CPPM_manifestations_f(request):
                             manif_df.loc[len(manu_df.index)] = work_lst
      
     # Sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers belong to which id and thus manuscript
-    manif_df.sort_values(by=['Number'], ['Order'])
+    manif_df.sort_values(by=['Number', 'Order'])
 
     print(len(manif_df))
 
@@ -8199,18 +8199,18 @@ def reader_CPPM_manifestations_f(request):
 
         # Find the Equal gold object that should be linked to the new SermonDescr object by using the CPPM number
 
-         # Create a list with CPPM code (if it is not possible to 
-         cppm_code = "CPPM I " + cppm
-         print(cppm_code)
+        # Create a list with CPPM code (if it is not possible to 
+        cppm_code = "CPPM I " + cppm
+        print(cppm_code)
          
-         # First check if the Signature exists           
-         sig_obj = Signature.objects.filter(code=cppm_code, editype = 'cl').first()
+        # First check if the Signature exists           
+        sig_obj = Signature.objects.filter(code=cppm_code, editype = 'cl').first()
          
-         # Get the GoldSermon
-         gs_obj = sig_obj.gold
+        # Get the GoldSermon
+        gs_obj = sig_obj.gold
 
-         # Get the EqualGold
-         equal = gsb_obj.equal
+        # Get the EqualGold
+        equal = gsb_obj.equal
 
         # Location
 
@@ -8227,7 +8227,7 @@ def reader_CPPM_manifestations_f(request):
 
         # Check if the manifestation already exists and if not create a new manifestation TH: is dit veilig genoeg?
         sb_obj = SermonDescr.objects.filter(note = full_msdescr, manu=manu, equal=equal).first()
-        if sd_obj = None:
+        if sd_obj == None:
             sd_obj = SermonDescr.object.create(note = full_msdescr, author = author, folio = folio, manu = manu, equal = equal, stype='imp')
         
 
@@ -8238,7 +8238,7 @@ def reader_CPPM_manifestations_f(request):
         # moet dit niet uitgebreid worden met extra kolom, order ofzo? Nu alleen het id van het manuscript
 
         # Check if the SermonDescrExternal object already exists 
-        sdex_obj = SermonDescrExternal.objects.filter(externalid = number, externaltype = external, sermon = sd_obj, ??? = full_msdescr)
+        sdex_obj = SermonDescrExternal.objects.filter(externalid = number, externaltype = external, sermon = sd_obj,  ) # ???= full_msdescr
         # If this is not the case
         if sdex_obj == None:
             # Create the new SermonDescrExternal object, add type and JSON key
