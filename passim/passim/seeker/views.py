@@ -6282,7 +6282,8 @@ class KeywordListView(BasicList):
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
                     # {'filter': 'category',   'dbfield': 'category',     'keyS': 'category',   'keyList': 'kwcatlist', 'infield': 'english_name'  },
-                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 
+                     'infield': 'abbr', 'help': 'keywordcategory'  },
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
                     ]}
                 ]
@@ -6301,7 +6302,8 @@ class KeywordListView(BasicList):
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
-                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 
+                     'infield': 'abbr', 'help': 'keywordcategory'  },
                     ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
