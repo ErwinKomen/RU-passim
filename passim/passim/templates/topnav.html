@@ -182,8 +182,8 @@
                       <ul class="dropdown-menu">
                         <li><a href="{% url 'about' %}" title="The about page of the PASSIM application">About</a></li>
                         <li><a href="{% url 'about' %}" title="How to quote" >How to quote</a></li>                        
-                        <li><a href="{% url 'guide' %}" title="The user manual of the PASSIM application">User manual</a></li>
-                        <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual</a></li>
+                        <li><a href="{% static 'seeker/content/PASSIM_User_Guide_v1.0.pdf'  %}" target="_blank" title="The user manual of the PASSIM application">User manual</a></li>
+                        <li><a href="{% url 'guide' %}" title="The import manual of the PASSIM application">Import manual (coming soon)</a></li>
                         <li><a href="{% url 'technical' %}" title="Technical">Technical information</a></li>
                         <li><a href="{% url 'contact' %}" title="How to contact the PASSIM team" >Contact</a></li>
                         {% if is_app_editor %}

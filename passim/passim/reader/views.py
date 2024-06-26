@@ -7771,7 +7771,7 @@ def reader_CPPM_eqset(request):
         # Specify the editype
         editype = 'cl'
 
-        # First check if the Signature exists        
+        # First check if the Signature exists           
         sig_obj = Signature.objects.filter(code=code_eqset, editype = 'cl').first() 
         
         if sig_obj == None:  
