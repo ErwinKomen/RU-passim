@@ -7151,7 +7151,7 @@ def reader_CPPM_manu(request):
     # Create an empty data frame for later use
     manu_df = pd.DataFrame(columns=['Number','Shelfmark', 'DateB', 'DateA', 'Shelf', 'Manid', 'Libid', 'Libname', 'Idno', 'Type']) #10
     
-    # Find the information wee need, first at the highest level (the id's (numbers))
+    # Find the information we need, first at the highest level (the id's (numbers))
     for key1, value1 in manuscripts_uniform.items():  
         
         # Retrieve the id of the entry
@@ -8012,25 +8012,234 @@ def reader_CPPM_eqset(request):
     return redirect('home')
 
 
-#def reader_CPPM_editions(request):
+def reader_CPPM_manifestations_f(request):
 
-#    # What we return is simply the home page
-#    return redirect('home')
+# Mapped FALSE!
+
+# This function adds the data on manifestations from the json file as new SermonSecr objects to the database, 
+# links these to a CPPM manuscripts (mapped false) and to a EqualGold that are already in the database. 
+# First we collect all the data in a df and then we add them to the database, just like the other CPPM functions.
+
+    # Can only be done by a super-user
+    if not request.user.is_superuser:        
+        # Just go home
+        return redirect("home")
+
+    # Read the JSON file from MEDIA_DIR   
+    filename = os.path.join(MEDIA_DIR, 'manuscripts_uniform.json')
+    cppm_m_read = os.path.abspath(filename) # cppm_texts_mapped_authors.json
+
+    # Check if file is there
+    if not os.path.exists(cppm_m_read):
+        print("Cannot find file: {}".format(filename))
+
+    # Open the file
+    cppm_m = open(cppm_t_read, encoding="utf8")  
+
+    # Load the json file 
+    cppm_manif = json.load(cppm_m)
+
+    # Keep count
+    count = 0 
+
+    # Create an empty data frame for later use
+    manif_df = pd.DataFrame(columns=['Number', 'CPPM', 'Ms_Descr_Str', 'Location', 'Author', 'Order',]) # 6 
+
+    # Number is the key of the json and is stored in the Manuscript External table links to manu id
+
+    # Iterate over the JSON: cppm_manif
+
+    # Let op order!
+
+    # Find the information we need, first at the highest level (the id's (numbers))
+    for key1, value1 in cppm_manif.items():  
+                
+
+        # Retrieve the id of the entry
+        number = key1
+        
+        # Create order for placing manifestations in correct orde in msitems
+        order = 0
+
+        # Then one level lower
+        for key2, value2 in value1.items():
+            
+            # See which manuscripts are not in PASSIM and whose manifestations need to be added to the database
+            # get all the information for these manifestations
+            if key2 == 'mapped' and value2 == False:  
+                
+                # Get cppm_shelfmark_norm
+                shelfm_norm = value1.get('cppm_shelfmark_norm')               
+                   
+                # Navigate to the date items
+                for key3, value3 in value1.items():
+                    
+                    # Right place?
+                    work_lst = []
+
+                    # Navigate to the correct level
+                    if key3 == 'ms_items':                    
+                        for value4 in value3:
+                            # Iterate over the items in the list, 
+                            # that can have multiple items
+                            for key5, value5 in value4.items():
+                                
+                                # First append the current key of the manuscript
+                                work_lst.append.append(number)
+
+                                # Get the CPPM number linked to the manifestation
+                                if key5 == 'cppm_num':
+                                    work_lst.append.append(value5)
+                                    print(value5)
+
+                                # Get the ms_descr_str
+                                elif key5 == 'ms_descr_str':
+                                    work_lst.append.append(value5)
+                                    print(value5)
+
+                                # Get the location of the ms item in the manuscript
+                                elif key5 == 'location':
+                                    work_lst.append.append(value5)
+                                    print(value5)
+
+                                # Get the author
+                                elif key5 == 'author':
+                                    work_lst.append.append(value5)
+                                    print(value5)
+
+                                # Create order of the items within the manuscript
+                                order += 1
+                                work_lst.append.append(order)
+                                print(order)
+                                                    
+                            # Put everything in the empty dataframe created above
+                            manif_df.loc[len(manu_df.index)] = work_lst
+     
+    # Sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers belong to which id and thus manuscript
+    manif_df.sort_values(by=['Number'], ['Order'])
+
+    print(len(manif_df))
+
+    for index, row in manif_df.iterrows():
+        print(row['Number'], row['CPPM'], row['Ms_Descr_Str'], row['Location'], row['Author'], row['Order'])
+
+        number = row['Number']
+        cppm = row['CPPM']
+        full_msdescr = row['Ms_Descr_Str'] 
+        location = ['Location']
+        author = ['Author']
+        order = ['Order']
+
+        # ManuscriptExternal
+        external = 'brepols'
+
+        # Find the id of the CPPM in manuscript the external table             
+        manuex_obj = ManuscriptExternal.objects.filter(externalid=number, externaltype=external).first()             
+    
+        # Get the manuscript object
+        manu = manuex_obj.manu
+    
+        
+        # Equal Gold
+
+        # Find the Equal gold object that should be linked to the new SermonDescr object by using the CPPM number
+
+         # Create a list with CPPM code (if it is not possible to 
+         cppm_code = "CPPM I " + cppm
+         print(cppm_code)
+         
+         # First check if the Signature exists           
+         sig_obj = Signature.objects.filter(code=cppm_code, editype = 'cl').first()
+         
+         # Get the GoldSermon
+         gs_obj = sig_obj.gold
+
+         # Get the EqualGold
+         equal = gsb_obj.equal
+
+        # Location
+
+        # The location should be modified so that in case that there is only a number noting should be imported and
+        # and an (extra) note should be stored and in case of characters before the number these characters should be
+        # removed
+
+        # Author
+
+        # First import the excelfile with the mapping
+
+        # What types should be added?? stype etc
+        
+
+        # Check if the manifestation already exists and if not create a new manifestation TH: is dit veilig genoeg?
+        sb_obj = SermonDescr.objects.filter(note = full_msdescr, manu=manu, equal=equal).first()
+        if sd_obj = None:
+            sd_obj = SermonDescr.object.create(note = full_msdescr, author = author, folio = folio, manu = manu, equal = equal, stype='imp')
+        
+
+        # Add the new manifestation to the SermonDescrExternal
+
+        external = 'cppm'
+
+        # moet dit niet uitgebreid worden met extra kolom, order ofzo? Nu alleen het id van het manuscript
+
+        # Check if the SermonDescrExternal object already exists 
+        sdex_obj = SermonDescrExternal.objects.filter(externalid = number, externaltype = external, sermon = sd_obj, ??? = full_msdescr)
+        # If this is not the case
+        if sdex_obj == None:
+            # Create the new SermonDescrExternal object, add type and JSON key
+            sdex_obj = SermonDescrExternal.objects.filter(sermon = sd_obj, externalid = number, externaltype = external)
+
+        
+        # Project    MODIFY                   
+
+        # The names of the projects "Brepols-CPPM" and "Passim" need to linked to the Manuscripts.             
+        
+        # The project label that needs to be added
+        project_name_1 = "Brepols-CPPM"
+        project_name_2 = "Passim"
+
+        # Check if the project label "Brepols-CPPM" already exits in the Project2 table
+        projectfound_1 = Project2.objects.filter(name__iexact=project_name_1).first()
+        if projectfound_1 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_1 = Project2.objects.create(name = project_name_1)
+            # And a link should be made between this new material and corresponding Manuscript table
+            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_1)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the Manuscript and a the project name
+            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_1).first()
+            if manugprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_1)
+        
+        # Check if the project label "Passim" already exits in the Project2 table
+        projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
+        if projectfound_2 == None:
+            # If the projectname does not already exist, it needs to be added to the database
+            projectcppm_2 = Project2.objects.create(name = project_name_2)
+            # And a link should be made between this new material and corresponding Manuscript table
+            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_2)
+        else:
+            # In case there is a projectfound, check for a link, if so, nothing should happen, 
+            # than there is already a link between the Manuscript and a the project name
+            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_2).first()
+            if manugprjlink == None:
+                # If the project name already exists, but not the link, than only a link should be 
+                # made between the EqualGold and the projectname
+                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_2)
+
+
+
+    # What we return is simply the home page
+    return redirect('home')
 
 #des reader_CPPM_eqset(request):
 
 #    # What we return is simply the home page
 #    return redirect('home')
 
-#def reader_CPPM_addPassim(request):
-
-#    # What we return is simply the home page
-#    return redirect('home')
-
-
-# Eqset, first check on them and mark one directional links
-
-# Add Project Passim to the cppm records
 
 
 
