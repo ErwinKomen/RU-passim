@@ -6282,7 +6282,8 @@ class KeywordListView(BasicList):
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
                     # {'filter': 'category',   'dbfield': 'category',     'keyS': 'category',   'keyList': 'kwcatlist', 'infield': 'english_name'  },
-                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 
+                     'infield': 'abbr', 'help': 'keywordcategory'  },
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
                     ]}
                 ]
@@ -6301,7 +6302,8 @@ class KeywordListView(BasicList):
             self.searches = [
                 {'section': '', 'filterlist': [
                     {'filter': 'keyword',    'dbfield': 'name',         'keyS': 'keyword_ta', 'keyList': 'kwlist', 'infield': 'name' },
-                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 'infield': 'abbr'  },
+                    {'filter': 'category',   'dbfield': 'category',     'keyList': 'kwcatlist', 'keyType': 'fieldchoice', 
+                     'infield': 'abbr', 'help': 'keywordcategory'  },
                     ]},
                 {'section': 'other', 'filterlist': [
                     {'filter': 'visibility', 'dbfield': 'visibility',   'keyS': 'visibility' }
@@ -6358,6 +6360,10 @@ class KeywordListView(BasicList):
             fields['visibility'] = "all"
 
         return fields, lstExclude, qAlternative
+
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
 
 
 # =============== USERKEYWORD ===============================
@@ -14494,7 +14500,7 @@ class EqualGoldEdit(BasicDetails):
                 self.new_button = True
                 context['new_button'] = True
                 # SPecification of the new button
-                context['new_button_title'] = "Add item to equality set" # See issue #729 "Sermon Gold"
+                context['new_button_title'] = "item to the equality set" # See issue #729 "Sermon Gold"
                 context['new_button_name'] = "gold"
                 context['new_button_url'] = reverse("gold_details")
                 context['new_button_params'] = [

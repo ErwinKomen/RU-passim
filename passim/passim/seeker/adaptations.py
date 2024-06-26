@@ -51,7 +51,7 @@ adaptation_list = {
         'author_anonymus', 'latin_names', 'ssg_bidirectional', 's_to_ssg_link', 
         'hccount', 'scount', 'sgcount', 'ssgcount', 'ssgselflink', 'add_manu', 'passim_code', 'passim_project_name_equal', 
         'atype_def_equal', 'atype_acc_equal', 'passim_author_number', 'huwa_ssg_literature',
-        'huwa_edilit_remove', 'searchable'],
+        'huwa_edilit_remove', 'searchable', 'af_stype'],
     'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
     'keyword_list': ['kwcategories', 'kwtopics', 'kwtopicdist'],
@@ -2655,6 +2655,26 @@ def adapt_coll_setlists():
             setlist.adapt_rset(rset_type = "adaptations coll")
 
 
+        # Everything has been processed correctly now
+        msg = "ok"
+    except:
+        bResult = False
+        msg = oErr.get_error_message()
+    return bResult, msg
+
+def adapt_af_stype():
+    """Make sure the STYPE of Authority Files is set to [imp], if otherwise undefined"""
+
+    oErr = ErrHandle()
+    bResult = True
+    bDebug = False
+    msg = ""
+    try:
+        qs = EqualGold.objects.filter(stype="-")
+        with transaction.atomic():
+            for obj in qs:
+                obj.stype = "imp"
+                obj.save()
         # Everything has been processed correctly now
         msg = "ok"
     except:
