@@ -6361,6 +6361,10 @@ class KeywordListView(BasicList):
 
         return fields, lstExclude, qAlternative
 
+    def get_helptext(self, name):
+        """Use the get_helptext function defined in models.py"""
+        return get_helptext(name)
+
 
 # =============== USERKEYWORD ===============================
         
