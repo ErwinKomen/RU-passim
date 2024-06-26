@@ -3,6 +3,7 @@ Adaptations of the database that are called up from the (list)views in the SEEKE
 """
 
 from tracemalloc import start
+from unicodedata import category
 from django.db import transaction
 import re
 import json
@@ -53,7 +54,7 @@ adaptation_list = {
         'huwa_edilit_remove', 'searchable'],
     'profile_list': ['projecteditors', 'projectdefaults'],
     'provenance_list': ['manuprov_m2m'],
-    'keyword_list': ['kwcategories', 'kwtopicdist'], #, 'kwtopics'],
+    'keyword_list': ['kwcategories', 'kwtopics', 'kwtopicdist'],
     "collhist_list": ['passim_project_name_hc', 'coll_ownerless', 'litref_check', 'scope_hc',
                       'name_datasets', 'coll_setlists'],
     'onlinesources_list': ['unicode_name_online', 'unicode_name_litref'],    
@@ -2877,7 +2878,7 @@ def adapt_kwtopics():
         
     try:
         # The list of topics
-        lst_topic = [
+        lst_topic_v1 = [
             "Judgment and Justice", "The Shepherd and the Herd", "Law and Sin", "Christ and the Jewish People", 
             "The Tree and its Fruits", "Renewal in Christ, the House of God", "Idolatry, Paganism, Heresy", 
             "Hope, Faith, and Salvation", "Truth, Lies, Testimony", "Prophets and the Old Testament", 
@@ -2894,6 +2895,22 @@ def adapt_kwtopics():
             "Timor Dei", "St. Peter", "Peace, Redemption, and the Haereditas Christi", 
             "Community, Christian and Pagan Customs", "Grace, Serving the Lord", "Nativity, Mary", "Good and Evil", 
             "Pride and Humility"]
+        lst_topic = [
+            "The Promise of Eternal Life", "The Shepherd and the Herd", 
+            "Christ as the Head of the Church, Ascension, Symbol of the Cross", "John the Baptist, the Word of God", 
+            "Obedience and Orthodoxy", "The Law, the Ten Commandments", "Via ad Patriam, Jesus the Way", 
+            "Light and Darkness", "Death and the Mortal Flesh", "Sin, Confession, and Penitence", 
+            "Eucharist, Food and Drink, True Satiation", "Temptation and the Devil", "Prayer", "Vigil, Resurrection", 
+            "Wisdom, Revelation", "Earthly and Heavenly Riches", "Joy in the Lord, Liturgy", "Concupiscentia Carnis", 
+            "Faith and Charity", "The Tree and its Fruits", "Riches and Poverty", "Conflict, Hatred, Bortherly Correction", 
+            "Prophets and the Old Testament", "Judgment", "Love", "Nativity, Mary", "The Father and the Son, Trinity", 
+            "Renewal in Christ the Foundation", "Truth, Lies, Testimony", "St. Peter", "Justice, Grace, Retribution", 
+            "Martyrdom and Sanctity", "Symbolic Meaning of Numbers", "Marriage and Chastity", "Tribulation and Felicity", 
+            "The Word of God, Seeing and Hearing", "Good and Evil", "Creation", "Wheat and Chaff, Weeds", 
+            "Holy Spirit, Unity of the Church", "Water, Stream?", "Christus Medicus", "The Yoke", "Peace, Unity of the Church",
+            "Idolatry, Paganism, Heresy", "Christ as King, The Miraculous Fisherman", "Epiphany (and blindness of Jews)", 
+            "Paul and His Conversion", "Noli me tangere", "Pride and Humility", "Exegetical motif ", 
+            "Timor Dei", "The Lord's Prayer"]
 
         # Remove previous topics
         Keyword.objects.filter(category="top").delete()
@@ -2910,17 +2927,38 @@ def adapt_kwtopics():
         msg = oErr.get_error_message()
     return bResult, msg
 
-def adapt_kwtopicdis():
+def adapt_kwtopicdist():
     """Read the topic distribution and add the correct topic keywords"""
 
+    def best_topics(line):
+        """Get the best five topics from the line"""
+        oErr = ErrHandle
+        lBack = []
+        try:
+            # Extract list of topics
+            lst_topic_list = [ dict(topic=k, v=v) for k,v in line.items() if "Topic" in k]
+
+            # Sort the topic list
+            lst_topic_list.sort(key=lambda x: x['v'], reverse=True)
+
+            # Return the first five
+            lBack = lst_topic_list[0:5]
+        except:
+            lBack = []
+            msg = oErr.get_error_message()
+        return lBack
+
     oErr = ErrHandle()
-    bResult = True
+    bResult = False
     msg = ""
     lst_line = []
     lst_missing = []
     filename = "doc_topic_dist_full_sermons.csv"
         
     try:
+        # First make sure the correct topic keywords are there
+        # bResult, msg = adapt_kwtopics()
+
         # Locate the topic distribution file
         file = os.path.abspath(os.path.join(MEDIA_ROOT, "passim", filename))
         # Try to read it
@@ -2930,6 +2968,16 @@ def adapt_kwtopicdis():
                 csv_file = csv.DictReader(f)
                 for line in csv_file:
                     lst_line.append(line)
+
+            # Prepare a dictionary of all topics
+            topic_keyword = {}
+            for num in range(1, 54):
+                sName = "Topic {}:".format(num)
+                obj = Keyword.objects.filter(category="top", name__icontains=sName).first()
+                if obj is None:
+                    iStop = 1
+                else:
+                    topic_keyword[sName] = obj
 
             # Read through the file
             for idx, line in enumerate(lst_line):
@@ -2949,9 +2997,16 @@ def adapt_kwtopicdis():
                         if af is None:
                             print("Cannot find AF for item {}, signature={}".format(idx, sig))
                         else:
-                            # We have the authority file: sort the topics
-                            pass
-
+                            # We have the authority file: get the five highest scoring topics
+                            lTopics = best_topics(line)
+                            # Add these topics to the AF
+                            for oTopic in lTopics:
+                                sName = "{}:".format(oTopic['topic'])
+                                kw = topic_keyword[sName]
+                                af.keywords.add(kw)
+                            oErr.Status("Added topics to AF {}".format(af.id))
+            # Indicate that all went wel
+            bResult = True
 
 
         else:
