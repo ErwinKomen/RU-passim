@@ -103,11 +103,17 @@ def fill_store(bForce = False):
 
     global store
     oErr = ErrHandle()
+    bDebug = False
     preproc_data_dir = absjoin(PLUGIN_DIR, "preprocessed_data")
     try:
         # Do we need to proceed?
         if not bForce and len(store) > 0:
             return None
+
+        # Debugging, one-time
+        if bDebug:
+            BoardDataset.scan()
+
         # Walk all available dataset
         for obj in BoardDataset.objects.all():
             # Check if there is name/distances/Uniform
@@ -495,6 +501,9 @@ class GenGraph(object):
                     if ms_ident is None:
                         # Cannot show this for the given dataset
                         msg = "UMAP: cannot work with dataset [{}], because ms_identifier does not exist".format(dataset)
+                    elif dist_matrix.size == 0:
+                        # Cannot show this for the given dataset
+                        msg = "UMAP: cannot show results, because the distance matrix has size zero"
                     else:
                         n_components = 2 if umap_dim == '2D' else 3
                         umap_= UMAP(

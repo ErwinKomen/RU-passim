@@ -12,6 +12,7 @@ from markdown import markdown
 import re, copy
 import pytz
 import os
+import csv
 
 # From own stuff
 from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, PLUGIN_DIR
@@ -41,7 +42,7 @@ class BoardDataset(models.Model):
     # [1] Whether this location is usable right now or not
     status = models.CharField("Board dataset status", choices=build_abbr_list(BOARD_DSET_STATUS), default="act", max_length=6)
 
-    # [1] And a date: the date of saving this manuscript
+    # [1] And a date: the date of saving this BoardDataset
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(default=get_current_datetime)
 
@@ -74,6 +75,7 @@ class BoardDataset(models.Model):
 
         bResult = True
         oErr = ErrHandle()
+        sermon_csv = "char_codes.csv"
         try:
             # Get to the plugin's preprocessed data location
             dir_loc = os.path.abspath(os.path.join(PLUGIN_DIR, "preprocessed_data"))
@@ -94,6 +96,24 @@ class BoardDataset(models.Model):
                             bNeedSaving = True
                     if bNeedSaving:
                         obj.save()
+
+                    # Continue to look for Sermon data
+                    serm_loc = os.path.abspath(os.path.join(dir_loc, obj.location, sermon_csv))
+                    if os.path.exists(serm_loc):
+                        # The location is there: try to load the data
+                        serm_line = []
+                        with open(serm_loc, mode="r", encoding="utf-8") as f:
+                            csv_file = csv.DictReader(f)
+                            for line in csv_file:
+                                serm_line.append(line)
+                        # Walk the list and check if all data is there
+                        for oLine in serm_line:
+                            name = oLine.get("SermonName")
+                            abbr = oLine.get("Code")
+                            psermon = Psermon.objects.filter(dataset=obj, name=name).first()
+                            if psermon is None:
+                                psermon = Psermon.objects.create(dataset=obj, name=name, abbr=abbr)
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BoardDataset/scan")
@@ -325,5 +345,22 @@ class Highlight(models.Model):
 
         sDate = get_crpp_date(self.saved, True)
         return sDate
+
+
+class Psermon(models.Model):
+    """A sermon according to the plugin definition"""
+
+    # [1] The name of the sermon is the [SermonName] field from char_code.csv
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] The symbol is the japanese character code representation of this sermon
+    abbr = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] Each Plugin [Sermon] belongs to one particular dataset
+    dataset = models.ForeignKey(BoardDataset, on_delete=models.CASCADE, related_name="datasetsermons")
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.dataset.name, self.name)
+        return sBack
+
+
 
 

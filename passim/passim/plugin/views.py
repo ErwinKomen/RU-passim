@@ -135,6 +135,7 @@ class BoardApply(BasicPart):
                     arg_dic['umap_dim'] = umap_dim.name
                     arg_dic['umap_hl'] = [x.name for x in highlights]
                     arg_dic['contains'] = [x.name for x in sermons]
+                    # arg_dic['contains'] = [x.abbr for x in sermons]
                     arg_dic['anchor_ms'] = None if anchorman is None else anchorman.get_name()
                     arg_dic['nb_closest'] = nb_closest
                     arg_dic['umap_md'] = umap_md

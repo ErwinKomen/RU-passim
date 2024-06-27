@@ -8066,7 +8066,6 @@ def reader_CPPM_eqset(request):
     # What we return is simply the home page
     return redirect('home')
 
-
 def reader_CPPM_manifestations_f(request):
 
 # Mapped FALSE!
