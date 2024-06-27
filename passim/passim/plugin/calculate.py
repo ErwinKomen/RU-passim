@@ -103,7 +103,7 @@ def fill_store(bForce = False):
 
     global store
     oErr = ErrHandle()
-    bDebug = False
+    bDebug = True
     preproc_data_dir = absjoin(PLUGIN_DIR, "preprocessed_data")
     try:
         # Do we need to proceed?

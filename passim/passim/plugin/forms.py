@@ -7,13 +7,14 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils.translation import gettext_lazy as _
 from django.forms import ModelMultipleChoiceField, ModelChoiceField
 from django.forms.widgets import *
+from django.db.models import Q
 from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget, ModelSelect2Widget
 
 # From my own application
 from passim.utils import ErrHandle
 from passim.basic.forms import BasicModelForm, BasicSimpleForm
 from passim.seeker.models import Signature, Manuscript
-from passim.plugin.models import Highlight, SermonsDistance, SeriesDistance, BoardDataset, Dimension, \
+from passim.plugin.models import Highlight, Pmanuscript, SermonsDistance, SeriesDistance, BoardDataset, Dimension, \
     ClMethod, Highlight, Psermon
 
 
@@ -65,6 +66,34 @@ class SermonsDistanceOneWidget(ModelSelect2Widget):
         if not serm_list is None:
             qs = SermonsDistance.objects.filter(name__in=serm_list).order_by('name')
 
+        # Return result
+        return qs
+
+
+class PmanuscriptOneWidget(ModelSelect2Widget):
+    model = Pmanuscript
+    search_fields = [ 'ms_identifier__icontains', 'name__icontains' ]
+
+    def label_from_instance(self, obj):
+        sBack = obj.ms_identifier
+        if sBack == "":
+            sBack = obj.name
+        return sBack
+
+    def get_queryset(self):
+        qs = Pmanuscript.objects.all().order_by('ms_identifier', 'name')
+        return qs
+
+    def filter_queryset(self, request, term, queryset = None, **dependent_fields):
+        """The sermons depend on the chosen dataset"""
+
+        # Check which dataset is currently selected
+        dataset_id = dependent_fields.get("dataset")
+        dataset = BoardDataset.objects.filter(id=dataset_id).first()
+
+        # Determine the result
+        qThis = Q(dataset=dataset) & ( Q(ms_identifier__icontains=term) | Q(name__icontains=term) )
+        qs = Pmanuscript.objects.filter(qThis).order_by('ms_identifier', 'name')
         # Return result
         return qs
 
@@ -171,7 +200,7 @@ class PsermonWidget(ModelSelect2MultipleWidget):
         dataset = BoardDataset.objects.filter(id=dataset_id).first()
 
         # Determine the result
-        qs = Psermon.objects.filter(dataset=dataset).order_by('name')
+        qs = Psermon.objects.filter(dataset=dataset, name__icontains=term).order_by('name')
         # Return result
         return qs
 
@@ -209,8 +238,11 @@ class BoardForm(BasicSimpleForm):
     sermons = ModelMultipleChoiceField(label="Sermons", queryset=None, required=False,
             widget=PsermonWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 
             'Select multiple sermons ...', 'style': 'width: 100%;', 'class': 'searching'}))
+    #anchorman = ModelChoiceField(label="Anchor manuscript", queryset=None, required=False,
+    #             widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
     anchorman = ModelChoiceField(label="Anchor manuscript", queryset=None, required=False,
-                 widget=ManuidOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select one manuscript...', 'style': 'width: 100%;'}))
+            widget=PmanuscriptOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 
+            'Select one manuscript...', 'style': 'width: 100%;'}))
     umap_dim = ModelChoiceField(label="UMAP dimension", queryset=None, required=False,
             widget=DimensionOneWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select a dimension...', 'style': 'width: 100%;'}))
     cl_method = ModelChoiceField(label="Clustering method", queryset=None, required=False,
@@ -231,7 +263,8 @@ class BoardForm(BasicSimpleForm):
             self.fields['serdist'].queryset = SeriesDistance.objects.all().order_by('name')
             self.fields['umap_dim'].queryset = Dimension.objects.all().order_by('name')
             self.fields['sermons'].queryset = Psermon.objects.all().order_by('name')
-            self.fields['anchorman'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            # self.fields['anchorman'].queryset = Manuscript.objects.filter(mtype='man').order_by('idno')
+            self.fields['anchorman'].queryset = Pmanuscript.objects.all().order_by('ms_identifier', 'name')
             self.fields['cl_method'].queryset = ClMethod.objects.all().order_by('name')
             self.fields['highlights'].queryset = Highlight.objects.all().order_by('otype', 'name')
 
@@ -274,6 +307,8 @@ class BoardForm(BasicSimpleForm):
                 self.fields['sermdist'].widget.dependent_fields = {
                     '{}-dataset'.format(self.prefix): 'dataset'}
                 self.fields['sermons'].widget.dependent_fields = {
+                    '{}-dataset'.format(self.prefix): 'dataset'}
+                self.fields['anchorman'].widget.dependent_fields = {
                     '{}-dataset'.format(self.prefix): 'dataset'}
 
             # Initial clustering method
