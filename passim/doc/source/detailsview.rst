@@ -252,3 +252,16 @@ Here are the steps:
    (#) Method ``process_formset()``: make sure the form's ``newstatus`` and ``project__new`` are handled properly. The ``newstatus`` information should be put into the field ``status``, while the ``project__new`` information should be used to select the correct Project.
    (#) Method ``after_save()``:  make sure the procedure ``adapt_m2m()`` is called correctly
 
+
+History button
+--------------
+
+The ``basic`` details view provides a method to show the edit history in a standardized way. 
+If activated, the method adds a 'History' button to the details view.
+
+#. Activation
+
+#. Notes
+
+
+

@@ -18,6 +18,7 @@ Contents:
    basic
    basiclistview
    detailsview
+   basicdownload
 
 Indices and tables
 ==================
