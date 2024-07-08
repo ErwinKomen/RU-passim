@@ -13,19 +13,24 @@ The app can be copied and pasted from one of the web application that uses it.
 It is recommended that one takes the Passim application's variant from the developer's 
 `Github page <https://github.com/ErwinKomen/RU-passim/blob/master/passim/passim/basic>`_ as a starting point.
 
-Publically viewable web applications that partly or completely make use of the basic app are:
+Publically viewable web applications that partly or completely make use of the ``basic`` app are: 
 
-================= ==================================================== ======================
-App               Name                                                 Section
-================= ==================================================== ======================
-``RU-cesar``      Corpus editor for syntactically annotated resources  Tablet (=Doc), Simple
-``RU-collbank``   Collection bank                                      VloItem, SourceInfo
-``RU-iberian``    Iberian saints                                       Upload
-``RU-lenten``     Lenten sermons                                       (all)
-``RU-lilac``      Living law web application                           (all)
-``RU-passim``     Patristic sermons                                    (all)
-``RU-stalla``     Medieval choir stalls                                Werkstuk
-================= ===========================================================================
+.. table::
+	:widths: auto
+	:align: left
+
+	================= ==================================================== =================================
+	App               Name                                                 Section
+	================= ==================================================== =================================
+	``RU-cesar``      Corpus editor for syntactically annotated resources  ``Tablet`` (=``Doc``), ``Simple``
+	``RU-collbank``   Collection bank                                      ``VloItem``, ``SourceInfo``
+	``RU-iberian``    Iberian saints                                       ``Upload``
+	``RU-lenten``     Lenten sermons                                       (all)
+	``RU-lilac``      Living law web application                           (all)
+	``RU-passim``     Patristic sermons                                    (all)
+	``RU-stalla``     Medieval choir stalls                                ``Werkstuk``
+	================= ==================================================== =================================
+
 
 
 The BasicListView

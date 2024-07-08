@@ -1,6 +1,8 @@
 Basic List View
 ===============
 
+.. _basiclist:
+
 Creating and using the ``BasicList`` class is illustrated by the ``AuthorListView`` example.
 
 .. code-block:: python
@@ -114,20 +116,24 @@ Attributes
      
    Each object has a number of *obligatory* (marked by an asterisk) and *optional* (between square brackets) fields:
    
-   ================= ====================================================================
-   field             meaning
-   ================= ====================================================================
-   ``*name``         the name used as column header; use empty string for unnamed column
-   ``*order``        use ``o=n`` if sortable, else use an empty string
-   ``*type``         normally ``str``; use ``int`` for numerical sortable columns
-   ``[main]``        set to ``True`` for the column that takes up most space
-   ``[linkdetails]`` set to ``True`` if this field should give a link to the details view
-                     (more than one column can have this)
-   ``[title]``       optional popup title to be shown at this head
-   ``[field]``       optionally specify the field value to be displayed
-   ``[custom]``      label to use when deriving column value with ``get_field_value()``
-   ``[options]``     add ``delete`` for the column that should have a delete button
-   ================= ====================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ====================================================================
+    field             meaning
+    ================= ====================================================================
+    ``*name``         the name used as column header; use empty string for unnamed column
+    ``*order``        use ``o=n`` if sortable, else use an empty string
+    ``*type``         normally ``str``; use ``int`` for numerical sortable columns
+    ``[main]``        set to ``True`` for the column that takes up most space
+    ``[linkdetails]`` set to ``True`` if this field should give a link to the details view
+                        (more than one column can have this)
+    ``[title]``       optional popup title to be shown at this head
+    ``[field]``       optionally specify the field value to be displayed
+    ``[custom]``      label to use when deriving column value with ``get_field_value()``
+    ``[options]``     add ``delete`` for the column that should have a delete button
+    ================= ====================================================================
    
 ``filters``
    List of search/filter specification objects. Each object has three fields:
@@ -140,20 +146,24 @@ Attributes
    A list of sections that consist of ``section``  (name of this section; first one is empty) and ``filterlist``. The latter is a list of filter objects.
    Each filter object can have a number of *obligatory* and *optional* fields.
    
-   ================= ==========================================================================================
-   field             meaning
-   ================= ==========================================================================================
-   ``*filter``       the exact id-name as also used in ``filters``
-   ``[keyS]``        the simple field name
-   ``[dbfield]``     the field name, if it is a 'simple' field (no FK, no many2many)
-                     if the form has a separate typeahead field, then take the name of that field
-                     (note: either dbfield or fkfield *must* be specified)
-   ``[fkfield]``     the field name, if it is a foreign key
-                     (note: either dbfield or fkfield *must* be specified)
-   ``[keyFk]``       (fkfield specified): the name of the content-field of the FK-related table (e.g. 'name')
-   ``[keyList]``     the name of a multi-values form field
-   ``[infield]``     (keyList specified): the name of a unique model field (e.g. "id")
-   ================= ==========================================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ==========================================================================================
+    field             meaning
+    ================= ==========================================================================================
+    ``*filter``       the exact id-name as also used in ``filters``
+    ``[keyS]``        the simple field name
+    ``[dbfield]``     the field name, if it is a 'simple' field (no FK, no many2many)
+                        if the form has a separate typeahead field, then take the name of that field
+                        (note: either dbfield or fkfield *must* be specified)
+    ``[fkfield]``     the field name, if it is a foreign key
+                        (note: either dbfield or fkfield *must* be specified)
+    ``[keyFk]``       (fkfield specified): the name of the content-field of the FK-related table (e.g. 'name')
+    ``[keyList]``     the name of a multi-values form field
+    ``[infield]``     (keyList specified): the name of a unique model field (e.g. "id")
+    ================= ==========================================================================================
    
 ``downloads``
    A list of download option objects. The fields used in the objects are: 

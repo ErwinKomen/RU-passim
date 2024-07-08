@@ -8,6 +8,8 @@ The ``BasicList`` view comes with an automatic button for Excel downloading, pro
   ``specification`` - listview's model must have a ``specification`` supplied
 
 
+.. _basiccustom:
+
 The 'Custom' add-in
 -------------------
 
@@ -32,15 +34,19 @@ The download 'specification'
 The model should have an additional model variable ``specification``, which defines a list of objects.
 The fields of the objects in the ``specification`` list have the following meaning:
 
-================= ============================================================================
-key               meaning
-================= ============================================================================
-``*name``         the name of the column used in Excel
-``*type``         use ``field`` for simple values specified in the model, otherwise ``func``
-``*path``         for type ``field`` this is the name of the model's field
-                  for type ``func`` this is the ``path`` used in function ``custom_get()``
-``[readonly]``    if ``True``, this means that uploading may not take place for this items
-================= ============================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ============================================================================
+    key               meaning
+    ================= ============================================================================
+    ``*name``         the name of the column used in Excel
+    ``*type``         use ``field`` for simple values specified in the model, otherwise ``func``
+    ``*path``         for type ``field`` this is the name of the model's field
+                      for type ``func`` this is the ``path`` used in function ``custom_get()``
+    ``[readonly]``    if ``True``, this means that uploading may not take place for this items
+    ================= ============================================================================
 
 A download example
 ------------------

@@ -20,6 +20,7 @@ Contents:
    basiclistview
    detailsview
    basicdownload
+   basicpart
 
 Indices and tables
 ==================

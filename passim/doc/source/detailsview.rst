@@ -1,3 +1,5 @@
+.. _basicdetails:
+
 Basic Details View
 ==================
 
@@ -70,21 +72,25 @@ The descriptions for the user-editable fields should have values for at least ``
 
 Here is a short description of the field-description object:
 
-================= ==========================================================================
-key               meaning
-================= ==========================================================================
-``*type``         normally 'plain'. Alternatives: ``bold``, ``line``, ``safe``, ``safeline``
-``*label``        the label shown in the details view for this item
-``*value``        the value to be displayed (use ``instance`` to derive it)
-``[link]``        the URL that the user can link to from this value (provided type=``bold``)
-``[title]``       the popup text displayed when hovering over
-``[multiple]``    boolean that indicates whether this field may contain multiple values
-``[align]``       the alignment of the ``<td>``
-``[field_key]``   the name of the form field for this item
-``[field_ta]``    the name of the typeahead form field for this item
-``[key_ta]``      the 'key' used for typeahead (CSS class name, e.g. "author-key")
-``[field_list]``  the name of the select2 form field (multi-valuable)
-================= ==========================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ==========================================================================
+    key               meaning
+    ================= ==========================================================================
+    ``*type``         normally 'plain'. Alternatives: ``bold``, ``line``, ``safe``, ``safeline``
+    ``*label``        the label shown in the details view for this item
+    ``*value``        the value to be displayed (use ``instance`` to derive it)
+    ``[link]``        the URL that the user can link to from this value (provided type=``bold``)
+    ``[title]``       the popup text displayed when hovering over
+    ``[multiple]``    boolean that indicates whether this field may contain multiple values
+    ``[align]``       the alignment of the ``<td>``
+    ``[field_key]``   the name of the form field for this item
+    ``[field_ta]``    the name of the typeahead form field for this item
+    ``[key_ta]``      the 'key' used for typeahead (CSS class name, e.g. "author-key")
+    ``[field_list]``  the name of the select2 form field (multi-valuable)
+    ================= ==========================================================================
 
 
 Note that the ``add_to_context()`` method may also be used to define deviating values for ``afterdelurl`` and ``afternewurl``.
@@ -237,16 +243,20 @@ A details view can optionally contain one or more listviews, which are implement
 These tables are specified in the context variable ``related_objects`` as a list of objects.
 A related object can have the following fields:
 
-================= ============================================================================
-key               meaning
-================= ============================================================================
-``*title``        a title of this table shown to the user
-``*columns``      a list of names (strings) for each of the columns to be shown
-``*rel_list``     a list of related item objects (the rows in the table to be shown)
-``*prefix``       short prefix that uniquely identifies this related object
-``[use_counter]`` boolean: True means that each line in the table must have a number
-``[editable]``    boolean: True means that add/edit/delete options are added
-================= ============================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ============================================================================
+    key               meaning
+    ================= ============================================================================
+    ``*title``        a title of this table shown to the user
+    ``*columns``      a list of names (strings) for each of the columns to be shown
+    ``*rel_list``     a list of related item objects (the rows in the table to be shown)
+    ``*prefix``       short prefix that uniquely identifies this related object
+    ``[use_counter]`` boolean: True means that each line in the table must have a number
+    ``[editable]``    boolean: True means that add/edit/delete options are added
+    ================= ============================================================================
 
 Note that when ``editable`` is set to True, and the user has editing rights, several items are added.
 Each row gets an 'edit' button and a 'delete' button. The table as a whole gets an additional row that forms the 'add' button.
@@ -254,13 +264,17 @@ The add facility makes use of a hidden empty row that is added.
 
 Each item in the ``rel_list`` is an object that can have the following fields:
 
-================= ============================================================================
-key               meaning
-================= ============================================================================
-``*value``        the HTML of what is shown in this row
-``[title]``       a popup title shown when a user hovers over this row
-``[link]``        a link (URL) to which the user is directed when pressing this row
-================= ============================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ============================================================================
+    key               meaning
+    ================= ============================================================================
+    ``*value``        the HTML of what is shown in this row
+    ``[title]``       a popup title shown when a user hovers over this row
+    ``[link]``        a link (URL) to which the user is directed when pressing this row
+    ================= ============================================================================
 
 .. code-block:: python
    :linenos:
@@ -322,19 +336,23 @@ Note that items (specifications of each cell) in the list are added with the hel
 which can be imported and used from the Basic Utilities ``views.py``. 
 This is a list of the arguments used by ``add_rel_item()`` and their function.
 
-================= ===========================================================================
-key               meaning
-================= ===========================================================================
-``*rel_item``     list to which each 'item' (specification of a table cell) must be added
-``*value``        string or integer value to be placed in the cell
-``[resizable]``   set to True, if the column should be 'small' initially
-``[title]``       the popup text displayed when hovering over
-``[align]``       the alignment of the ``<td>``: "left" (default) or "right"
-``[link]``        the URL to be used when clicking on this cell
-``[nowrap]``      if True, the string in this cell may not be wrapped (must be on one line)
-``[main]``        if True, this is the cell receiving maximum width
-``[draggable]``   if True, the cell (usually the first cell) may be used to change line order
-================= ===========================================================================
+.. table::
+    :widths: auto
+    :align: left
+    
+    ================= ===========================================================================
+    key               meaning
+    ================= ===========================================================================
+    ``*rel_item``     list to which each 'item' (specification of a table cell) must be added
+    ``*value``        string or integer value to be placed in the cell
+    ``[resizable]``   set to True, if the column should be 'small' initially
+    ``[title]``       the popup text displayed when hovering over
+    ``[align]``       the alignment of the ``<td>``: "left" (default) or "right"
+    ``[link]``        the URL to be used when clicking on this cell
+    ``[nowrap]``      if True, the string in this cell may not be wrapped (must be on one line)
+    ``[main]``        if True, this is the cell receiving maximum width
+    ``[draggable]``   if True, the cell (usually the first cell) may be used to change line order
+    ================= ===========================================================================
 
 
 Having a many-to-one element
