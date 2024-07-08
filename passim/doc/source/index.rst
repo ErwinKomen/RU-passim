@@ -3,10 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Passim Utilties
+Basic Utilities
 ===============
 
-This documentation explains how to use several Passim Utilities, such as the Python classes ``BasicList``, ``BasicDetails`` and ``BasicPart``. 
+This documentation explains how to use several of the Radboud University's Django **Basic Utilities**, 
+such as the Python classes ``BasicList``, ``BasicDetails`` and ``BasicPart``. 
 
 Contents:
 

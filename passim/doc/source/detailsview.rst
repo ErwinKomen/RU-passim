@@ -10,8 +10,8 @@ The Passim Utilities allow defining a generic details view with the following ch
 The following sections describe how to write the EditView and the DetailsView.
 Note that the *name* for these views in ``urls.py`` needs to use the same ``basic_name`` as used for the BasicListView.
 
-EditView
---------
+EditView basics
+---------------
 
 The name of the EditView in ``urls.py`` must be like ``author_edit``, if ``author`` is the ``basic_name`` (in BasicListView).
 If the ``basic_name`` is not the same as the name of the model, then it needs to be specified.
@@ -89,6 +89,94 @@ key               meaning
 
 Note that the ``add_to_context()`` method may also be used to define deviating values for ``afterdelurl`` and ``afternewurl``.
 
+EditView sections
+-----------------
+
+One variant of the ``EditView`` allows breaking up a long list of fields into sections, which can be opened or closed with buttons.
+
+.. image:: images/AF_details.png
+
+The illustration above shows how this looks like in the Passim details view of the 'Authority File'. 
+The elements from the ``mainitems`` list are very few (appearing just above 'Details').
+Then there are 6 sections (Details, User contributions, Connections, Networks, Graphs, Manifestations) that can each be
+opened or closed using a button. The section 'Details' opens by default.
+Here is the code (within ``add_to_context()``) that implements this divide-by-section strategy:
+
+.. code-block:: python
+    :linenos:
+     
+        context['mainsections'] = [
+        {'name': 'Details', 'id': 'equalgold_details', 'show': True, 'fields': [                
+            {'type': 'line',  'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
+            {'type': 'plain', 'label': "Incipit:", 'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide', 'order': 2},
+            {'type': 'safe',  'label': "Incipit:", 'value': instance.get_incipit_markdown("search"), 
+                'field_key':  'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual"), 'order': 2}, 
+            {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide', 'order': 3},                 
+            {'type': 'safe',  'label': "Explicit:", 'value': instance.get_explicit_markdown("search"),
+                'field_key':  'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual"), 'order': 3}, 
+            {'type': 'line',  'label': "Editions:", 'value': instance.get_editions_markdown(),
+                'title':      'All the editions associated with the Gold Sermons in this equality set', 'order': 4},
+            {'type': 'line',  'label': "Literature:", 'value': instance.get_litrefs_markdown(), 
+                'title':      'All the literature references associated with the Gold Sermons in this equality set', 'order': 6},
+            {'type': 'line',  'label': "Keywords:", 'value': instance.get_keywords_markdown(), 'field_list': 'kwlist', 'order': 7},
+            {'type': 'plain', 'label': "Bible reference(s):", 'value': instance.get_bibleref(),        
+                'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2], 'order': 8},                
+            {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
+                'field_key':  'newfulltext', 'order':9},
+            {'type': 'plain', 'label': "Notes:",     'value': instance.raw, 'order':10},
+            {'type': 'line',  'label': "Project:",     'value': instance.get_project_markdown2(), 'order':12},                
+                ]},            
+            
+        {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
+            {'type': 'plain', 'label': "Keywords (user): ", 'value': self.get_userkeywords(instance, profile, context), 
+                'field_list': 'ukwlist', 'title': 'User-specific keywords. If the moderator accepts these, they move to regular keywords.'}, # plain?
+            {'type': 'line',  'label': "Personal datasets:", 'value': instance.get_collections_markdown(username, team_group, settype="pd"), 
+                'multiple': True, 'field_list': 'collist_ssg', 'fso': self.formset_objects[0] },
+            ]},
+            
+        {'name': 'Connections', 'id': 'equalgold_connections', 'fields': [                
+            {'type': 'line',  'label': "Equality set:", 'title': 'The gold sermons in this equality set',  'value': self.get_goldset_markdown(instance), 
+                'field_list': 'goldlist', 'inline_selection': 'ru.passim.sg_template' },                
+            {'type': 'line',  'label': "Historical collections:",   'value': instance.get_collections_markdown(username, team_group, settype="hc"), 
+                'field_list': 'collist_hist', 'fso': self.formset_objects[0] },
+        ]
+
+        # Other sections will be filled in later
+        context['mainsections'] += [            
+            {'name': 'Networks',        'id': 'equalgold_networks',         'button': True, 'fields': [ 
+                ]},
+            {'name': 'Graphs',          'id': 'equalgold_graphs',           'button': True, 'fields': [ 
+                ]},
+            {'name': 'Manifestations',  'id': 'equalgold_manifestations',   'button': True, 'fields': [ 
+                ]},
+            ] 
+
+Note the difference between the first three sections (Details ... Connections) and the last three sections (Networks ... Manifestations).
+The first three sections contain editable fields, which is why the specification of their contents **needs** to be part of the ``EditView`` code.
+The last three sections do *not* contain any editable fields. They only contain visualizations (Networks, Graphs)
+and a 'details-listview' (a listview that is shown below a details view).
+The contents of these sections should therefore be specified in the ``DetailsView`` code.
+
+.. code-block:: python
+    :linenos:
+
+    # Specify the *contents* of the sections via separate templates
+    context['sections'] = [
+                    
+        {'name': 'Networks', 'id': 'equalgold_networks', 'nobutton': True, 'fields': [ 
+            ], 'template': 'seeker/af_networks.html'},
+        {'name': 'Graphs', 'id': 'equalgold_graphs',  'nobutton': True,'fields': [ 
+            ], 'template': 'seeker/af_graphs.html'},
+        {'name': 'Manifestations', 'id': 'equalgold_manifestations', 'nobutton': True, 'fields': [ 
+            ], 'template': 'seeker/af_manifestations.html'},
+                ] 
+
+Please see the actual code of ``class EqualGoldDetails`` on 
+`GitHub <https://github.com/ErwinKomen/RU-passim/blob/master/passim/passim/seeker/views.py>`_
+for further details on how these sections were treated in the Passim project.
+                     
+
+
 DetailsView
 -----------
 
@@ -134,11 +222,19 @@ The generic details view allows specifying two additional matters:
 
 *Sections*
 
-As for the ``sections``: TODO explain
+The ``sections`` list can be filled with specifications of buttons the user can click to view information associated with 
+the current details view. Such information could be: images, graphs, other visualizations.
 
 *Related Objects*
 
 The ``related_objects`` is a list of objects. Each related object boils down to a **table** that is shown with a list of objects.
+The section 'Details listview' explains how to use these related objects.
+
+Details listview
+----------------
+
+A details view can optionally contain one or more listviews, which are implemented as tables.
+These tables are specified in the context variable ``related_objects`` as a list of objects.
 A related object can have the following fields:
 
 ================= ============================================================================
@@ -165,6 +261,80 @@ key               meaning
 ``[title]``       a popup title shown when a user hovers over this row
 ``[link]``        a link (URL) to which the user is directed when pressing this row
 ================= ============================================================================
+
+.. code-block:: python
+   :linenos:
+
+    # List of Sermons that link to this feast (with an FK)
+    sermons = dict(title="Manuscripts with sermons connected to this feast", prefix="tunit")
+    sermons['gridclass'] = "resizable"
+
+    rel_list =[]
+    # Note: specify the default sort order here
+    qs = instance.feastsermons.all().order_by('msitem__manu__lcity__name', 'msitem__manu__library__name', 'msitem__manu__idno', 'locus')
+    for item in qs:
+        manu = item.msitem.manu
+        url = reverse('sermon_details', kwargs={'pk': item.id})
+        url_m = reverse('manuscript_details', kwargs={'pk': manu.id})
+        rel_item = []
+
+        # S: Order number for this sermon
+        add_rel_item(rel_item, index, False, align="right")
+        index += 1
+
+        # Manuscript
+        manu_full = manu.get_full_name(plain=False)
+        add_rel_item(rel_item, manu_full, False, main=False, nowrap=False, link=url_m)
+
+        # Locus
+        locus = "(none)" if item.locus == None or item.locus == "" else item.locus
+        add_rel_item(rel_item, locus, False, main=False, nowrap=False, link=url, 
+                        title="Locus within the manuscript (links to the manifestation)")
+
+        # Title
+        title = item.get_title()
+        add_rel_item(rel_item, title, False, main=False, nowrap=False, link=url, 
+                        title="Manifestation's title (links to the manifestation)")
+
+        # Add this line to the list
+        rel_list.append(dict(id=item.id, cols=rel_item))
+
+    sermons['rel_list'] = rel_list
+
+    sermons['columns'] = [
+        '{}<span>#</span>{}'.format(sort_start_int, sort_end), 
+        '{}<span>Manuscript</span>{}'.format(sort_start, sort_end), 
+        '{}<span>Locus</span>{}'.format(sort_start, sort_end), 
+        '{}<span title="Manifestation title (links to the manifestation)">Title</span>{}'.format(sort_start, sort_end), 
+        ]
+    related_objects.append(sermons)
+
+    # Add all related objects to the context
+    context['related_objects'] = related_objects
+
+.. image:: images/AF_details_list.png
+
+The code and the image above shows how `Passim's <https://github.com/ErwinKomen/RU-passim/blob/master/passim/passim/seeker/views.py>`_ 
+view ``FeastDetails`` specifies a listview of manuscript sermons that are associated with the Feast of the 
+feast's details view. 
+
+Note that items (specifications of each cell) in the list are added with the help of the function ``add_rel_item()``, 
+which can be imported and used from the Basic Utilities ``views.py``. 
+This is a list of the arguments used by ``add_rel_item()`` and their function.
+
+================= ===========================================================================
+key               meaning
+================= ===========================================================================
+``*rel_item``     list to which each 'item' (specification of a table cell) must be added
+``*value``        string or integer value to be placed in the cell
+``[resizable]``   set to True, if the column should be 'small' initially
+``[title]``       the popup text displayed when hovering over
+``[align]``       the alignment of the ``<td>``: "left" (default) or "right"
+``[link]``        the URL to be used when clicking on this cell
+``[nowrap]``      if True, the string in this cell may not be wrapped (must be on one line)
+``[main]``        if True, this is the cell receiving maximum width
+``[draggable]``   if True, the cell (usually the first cell) may be used to change line order
+================= ===========================================================================
 
 
 Having a many-to-one element

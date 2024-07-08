@@ -14318,26 +14318,26 @@ class EqualGoldEdit(BasicDetails):
             # Collections: provide a link to the SSG-listview, filtering on those SSGs that are part of one particular collection           
             context['mainsections'] = [
             {'name': 'Details', 'id': 'equalgold_details', 'show': True, 'fields': [                
-                {'type': 'line', 'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
+                {'type': 'line',  'label': "Author:", 'value': instance.author_help(info), 'field_key': 'newauthor', 'order': 1},                
                 {'type': 'plain', 'label': "Incipit:", 'value': instance.incipit,   'field_key': 'incipit',  'empty': 'hide', 'order': 2},
                 {'type': 'plain', 'label': "Explicit:", 'value': instance.explicit,  'field_key': 'explicit', 'empty': 'hide', 'order': 3},                 
                 {'type': 'safe',  'label': "Incipit:", 'value': instance.get_incipit_markdown("search"), 
                  'field_key': 'newincipit',  'key_ta': 'gldincipit-key', 'title': instance.get_incipit_markdown("actual"), 'order': 2}, 
                 {'type': 'safe',  'label': "Explicit:", 'value': instance.get_explicit_markdown("search"),
                  'field_key': 'newexplicit', 'key_ta': 'gldexplicit-key', 'title': instance.get_explicit_markdown("actual"), 'order': 3}, 
-                 {'type': 'line', 'label': "Editions:", 'value': instance.get_editions_markdown(),
+                {'type': 'line',  'label': "Editions:", 'value': instance.get_editions_markdown(),
                  'title': 'All the editions associated with the Gold Sermons in this equality set', 'order': 4},
-                {'type': 'line', 'label': "Literature:", 'value': instance.get_litrefs_markdown(), 
+                {'type': 'line',  'label': "Literature:", 'value': instance.get_litrefs_markdown(), 
                  'title': 'All the literature references associated with the Gold Sermons in this equality set', 'order': 6},
                 {'type': 'line',  'label': "Keywords:", 'value': instance.get_keywords_markdown(), 'field_list': 'kwlist', 'order': 7},
                 {'type': 'plain', 'label': "Bible reference(s):", 'value': instance.get_bibleref(),        
                 'multiple': True, 'field_list': 'bibreflist', 'fso': self.formset_objects[2], 'order': 8},                
                 {'type': 'safe',  'label': "Transcription:", 'value': self.get_transcription(instance),
                  'field_key': 'newfulltext', 'order':9},
-                {'type': 'plain',  'label': "Notes:",     'value': instance.raw, 'order':10},
+                {'type': 'plain', 'label': "Notes:",     'value': instance.raw, 'order':10},
                 {'type': 'bold',  'label': "Moved to:",   'value': instance.get_moved_code(), 'empty': 'hidenone', 'link': instance.get_moved_url(),'order': 13},
                 {'type': 'bold',  'label': "Previous:",   'value': instance.get_previous_code(), 'empty': 'hidenone', 'link': instance.get_previous_url(),'order': 14},
-                {'type': 'line', 'label': "Project:",     'value': instance.get_project_markdown2(), 'order':12},                
+                {'type': 'line',  'label': "Project:",     'value': instance.get_project_markdown2(), 'order':12},                
                  ]},            
             
             {'name': 'User contributions', 'id': 'equalgold_usercontributions', 'fields': [
@@ -14359,11 +14359,11 @@ class EqualGoldEdit(BasicDetails):
                  ]
 
             context['mainsections'] += [            
-                {'name': 'Networks', 'id': 'equalgold_networks', 'button': True, 'fields': [ 
+                {'name': 'Networks',        'id': 'equalgold_networks',         'button': True, 'fields': [ 
                     ]},
-                {'name': 'Graphs', 'id': 'equalgold_graphs',  'button': True,'fields': [ 
+                {'name': 'Graphs',          'id': 'equalgold_graphs',           'button': True, 'fields': [ 
                     ]},
-                {'name': 'Manifestations', 'id': 'equalgold_manifestations', 'button': True, 'fields': [ 
+                {'name': 'Manifestations',  'id': 'equalgold_manifestations',   'button': True, 'fields': [ 
                     ]},
                       ] 
                      

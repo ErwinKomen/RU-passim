@@ -12,7 +12,19 @@ The 'Custom' add-in
 -------------------
 
 The ``Custom`` add-in can be used quite by specifying it next to the ``models.Model`` in the model class code.
-For example: ``class Author(models.Model, Custom)``
+The code below shows how to get a model class started with ``Custom``.
+
+.. code-block:: python
+    :linenos:
+
+    # ... other imports
+    from passim.basic.models import Custom
+
+    # ... other code
+
+    class Author(models.Model, Custom):
+        """This illustrates an Author class with help from Custom"""
+        pass
 
 The download 'specification'
 ----------------------------
