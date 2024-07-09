@@ -1,9 +1,10 @@
+.. _tagtextapp:
+
 The 'tagtext' app
 =================
 
-The 'tagtext' app can right now be downloaded from GitHub: `tagtext`__.
-
-__ https://github.com/ErwinKomen/RU-lenten/tree/master/lenten/lentensermons/tagtext
+The 'tagtext' app can be downloaded from the GitHub 
+`LentenSermons tagtext <https://github.com/ErwinKomen/RU-lenten/tree/master/lenten/lentensermons/tagtext>`_ page.
 
 Basic work
 ----------
@@ -16,9 +17,9 @@ New tags are inserted by starting and finishing text with an ampersand.
 Existing tags can be chosen from a list of available tags after the user enters the ampersand @ and at least one other letter.
 Tags that have been inserted will in the future appear as a gray-backgrounded piece of text (which I cannot show here).
 
-Folders
--------
-At the moment 'tagtext' is available as a django 'app'. It needs to be loaded from the Github pages.
+Files and folders
+-----------------
+At the moment 'tagtext' is available as a django 'app'.
 The sources consist of the following folders and files::
 
   tagtext

@@ -4,7 +4,7 @@ Introduction
 The 'tagtext' app
 -----------------
 The use of the ``tagtext`` app makes some assumptions.
-It is best to check the ``tagtext`` documentation further down.
+It is best to check the :ref:`tagtext documentation <tagtextapp>`.
 
 The 'basic' app
 ---------------
@@ -35,8 +35,8 @@ Publically viewable web applications that partly or completely make use of the `
 
 The BasicListView
 --------------------
-This listview is part of the ``basic`` app (see above).
-There are a few assumptions for using the ``BasicListView``:
+This :ref:`listview <basiclist>` is part of the ``basic`` app (see above).
+There are a few assumptions for using the ``BasicList``:
 
 1. The class using it must be inside ``views.py``
 2. The class must define a few obligatory attributes
