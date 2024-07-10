@@ -22,8 +22,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "passim.settings")
 os.chdir(root_path)
 
 # Setup Django
-# import django
-# django.setup()
+import django
+django.setup()
 
 
 # -- Project information -----------------------------------------------------

@@ -10,7 +10,7 @@ The ``POST`` normally returns a ``JSON`` object with a built-in status and error
 BasicPart methods
 -----------------
 
-The ``Basicpart`` class has a couple of class variables, some of which need to be set obligatorily.
+The ``Basicpart`` class has a couple of class variables, some of which need to be set obligatorily (*), most of which are optional ( [] ).
 
 .. table::
     :widths: auto

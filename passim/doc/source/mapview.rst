@@ -104,11 +104,7 @@ Resolving this task with the help of the ``mapview`` app, these are the steps to
                         oPoint = set_point[point]
                         # Add this entry
                         oPoint['count'] += 1
-                        oItem = {}
-                        for k,v in oEntry.items():
-                            if not k in exclude_fields:
-                                oItem[k] = v
-                        oPoint['items'].append(oItem)
+                        oPoint['items'].append( { k:v for k,v in oEntry.items() if not k in exclude_fields } )
 
                     # Review them again
                     for point, oEntry in set_point.items():
@@ -166,14 +162,57 @@ Resolving this task with the help of the ``mapview`` app, these are the steps to
       * double check the ``basic_list.html``
          See the use of ``basicmap`` in the ``basic_list.html`` variant of 
          `Passim <https://github.com/ErwinKomen/RU-passim/tree/master/passim/passim/basic/templates/basic/basic_list.html>`_ page.
+         That example also illustrates how the context variables ``mapviewurl`` and ``mapcount`` can be used.
+         See the basic app's template ``map_list_switch.html`` in the Passim application.
 
 #. Javascript: 
 
-   a. Make a javascript function to draw the map:
+   a. Make a javascript function that calls mapiew's built-in function to draw the map:
 
-      * take a copy of the ``lemma_map()`` as a starting point
-      * make any necessary adaptations
+      * when the user clicks a button provided by the ``LanguageList`` view, call the ``ru.mapview.list_to_map()``
+         Please see the use of ``basicmap`` and ``basiclist_top`` as well as ``.werkstuk-map`` on the 
+         `Passim <https://github.com/ErwinKomen/RU-passim/tree/master/passim/passim/basic/templates/basic/basic_list.html>`_ page
 
+         .. code-block:: javascript
+            :linenos:
+
+              /**
+               * goto_view
+               *   Open the indicated view
+               *
+               */
+              goto_view: function (elStart, sView) {
+                var height = 0,
+                  width = 0,
+                  id_mapview = "#basicmap",
+                  id_listview = "#basiclist_top";
+                try {
+                  switch (sView) {
+                    case "map":   // Open the map-view
+                      $(id_listview).addClass("hidden");
+                      $(id_mapview).removeClass("hidden");
+                      $(".map-list-switch").addClass("map-active");
+
+                      // Calculate and set the height
+                      height = $("footer").position().top - $(".werkstuk-map").position().top - 10;
+                      width = $(id_mapview).width();
+                      $(".werkstuk-map").css("height", height + "px");
+                      $(".werkstuk-map").css("width", width + "px");
+
+                      // Initiate showing a map
+                      ru.mapview.list_to_map(elStart);
+                      break;
+                    case "list":  // Open the listview
+                      $(id_mapview).addClass("hidden");
+                      $(id_listview).removeClass("hidden");
+                      $(".map-list-switch").removeClass("map-active");
+                      break;
+                  }
+
+                } catch (ex) {
+                  private_methods.errMsg("goto_view", ex);
+                }
+              },
 
 
 Files and folders
@@ -238,7 +277,7 @@ define the ``model`` inside the view. Maps can be based on a listview resulting 
 but they do not necessarily have to be. 
 The aim of the ``MapView`` view, then, is to show the result of a filtered **listview**.
 
-The ``MapView`` has a couple of class variables, some of which need to be set obligatorily.
+The ``MapView`` has a couple of class variables, some of which need to be set obligatorily (*), most of which are optional ( [] ).
 
 .. table::
     :widths: auto

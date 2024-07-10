@@ -54,7 +54,10 @@ bDebug = False
 # General functions serving the list and details views
 
 def get_application_name():
-    """Try to get the name of this application"""
+    """Try to get the name of this application
+    
+    :meta private:
+    """
 
     # Walk through all the installed apps
     for app in apps.get_app_configs():
