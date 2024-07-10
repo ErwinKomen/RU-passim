@@ -6,7 +6,7 @@
       <a role="button" href="#" downloadtype="excel" class="btn btn-sm jumbo-1"
          onclick="ru.basic.post_download(this);"
          contentid="#import_result_{{instance.id}}"
-         ajaxurl="{% url 'importset_download' instance.id %}">Download Excel file</a>
+         ajaxurl="{% url 'importset_download' instance.importset.id %}">Download Excel file</a>
     </form>
   </div>
 
