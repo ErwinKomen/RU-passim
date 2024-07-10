@@ -8285,12 +8285,17 @@ def reader_CPPM_manifestations_f(request):
         equal = gs_obj.equal
         
         # Find the id that corresponds with the name in the cppm data
+        id_author = None
         for key, value in name_id.items():
             if key == author:                
                 id_author = value     
 
         # Find the author object using the id
-        auth_obj = Author.objects.filter(id=id_author).first() 
+        if id_author is None:
+            auth_obj = None
+            print("Could not find author")
+        else:
+            auth_obj = Author.objects.filter(id=id_author).first() 
         
         
         # Location
@@ -8300,14 +8305,12 @@ def reader_CPPM_manifestations_f(request):
         # removed
        
         # Some locations are null
-
         # Find out if the location has NO character before the first digit:
         extra_note = ''
         if location!= None:        
             if not location[0].isdigit():                
                 # Strip the location of everything before the first digit
                 folio = re.sub(re.compile(r'^[^0-9]*'), '', location)
-                
             else:
                 # Folio should be empty
                 folio = ''
