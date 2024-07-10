@@ -23,13 +23,24 @@
     {% if authenticated and permission %}
       <!-- Upper part of the basic list interface -->
 
+      {% if basicmap %}
+        {% include 'mapview/map_view_full.html' %}
+      {% endif %}
+
       <div id="basiclist_top" class="container-small" >
 
         <!-- Allow access to interface parts that are normally hidden -->
         <div  class="panel panel-none">
 
           <div class="row">
-            <div class="col-md-2 col-md-offset-8 text-right dropdown" style_WAS="margin-top: 5px;">
+            <div class="col-md-2 col-md-offset-6">
+              {% if basicmap %}
+                <div class="pull-right">
+                  {% include 'basic/map_list_switch.html' with mode='list' %}
+                </div>
+              {% endif %}
+            </div>
+            <div class="col-md-2 text-right dropdown" style_WAS="margin-top: 5px;">
               {% if downloads %}
                 <span id="downloadstatus" class="hidden"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></span>
                 <a id="downloadmenu" role="button" class="btn jumbo-1 btn-s dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" 

@@ -1,0 +1,25 @@
+
+  <div class="map-list-switch {% if mode == 'map' %}map-active{% endif %}">
+    <ul>
+      <li class="list-switch">
+        <a class="switch-item"
+           {% if mode == "map" %}onclick="ru.btchub.progress.goto_view(this, 'list');" style="cursor: pointer;" {% endif %}>
+          <span class="glyphicon glyphicon-menu-hamburger"></span>
+          <strong>&nbsp;List</strong>
+          <span class="count">({{entrycount}})</span>
+        </a>
+      </li>
+      <li class="map-switch">
+        <a class="switch-item"
+           {% if mode == "list" %}
+             targeturl="{{mapviewurl}}"
+             onclick="ru.btchub.progress.goto_view(this, 'map');"
+             style="cursor: pointer;"
+           {% endif %}>
+          <span class="glyphicon glyphicon-map-marker"></span>&nbsp;
+          <strong>Map</strong>
+          <span class="count">({{mapcount}})</span>
+        </a>
+      </li>
+    </ul>
+  </div>

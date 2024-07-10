@@ -12,6 +12,7 @@ from markdown import markdown
 import re, copy
 import pytz
 import os
+import csv
 
 # From own stuff
 from passim.settings import APP_PREFIX, WRITABLE_DIR, TIME_ZONE, PLUGIN_DIR
@@ -41,7 +42,7 @@ class BoardDataset(models.Model):
     # [1] Whether this location is usable right now or not
     status = models.CharField("Board dataset status", choices=build_abbr_list(BOARD_DSET_STATUS), default="act", max_length=6)
 
-    # [1] And a date: the date of saving this manuscript
+    # [1] And a date: the date of saving this BoardDataset
     created = models.DateTimeField(default=get_current_datetime)
     saved = models.DateTimeField(default=get_current_datetime)
 
@@ -74,7 +75,17 @@ class BoardDataset(models.Model):
 
         bResult = True
         oErr = ErrHandle()
+        bDoSermons = False
+        sermon_csv = "char_codes.csv"
+        bDoManuscripts = False
+        manuscript_csv = "char_series.csv"
+        metadata_csv = "metadata.csv"
         try:
+            # Figure out whether Sermons or Manuscripts need doing
+            if Psermon.objects.all().count() == 0:
+                bDoSermons = True
+            if Pmanuscript.objects.all().count() == 0:
+                bDoManuscripts = True
             # Get to the plugin's preprocessed data location
             dir_loc = os.path.abspath(os.path.join(PLUGIN_DIR, "preprocessed_data"))
             if os.path.exists(dir_loc):
@@ -94,6 +105,69 @@ class BoardDataset(models.Model):
                             bNeedSaving = True
                     if bNeedSaving:
                         obj.save()
+
+                    # Continue to look for Sermon data
+                    serm_loc = os.path.abspath(os.path.join(dir_loc, obj.location, sermon_csv))
+                    if bDoSermons and os.path.exists(serm_loc):
+                        # The location is there: try to load the data
+                        serm_line = []
+                        with open(serm_loc, mode="r", encoding="utf-8") as f:
+                            csv_file = csv.DictReader(f)
+                            for line in csv_file:
+                                serm_line.append(line)
+                        # Walk the list and check if all data is there
+                        for oLine in serm_line:
+                            name = oLine.get("SermonName")
+                            abbr = oLine.get("Code")
+                            psermon = Psermon.objects.filter(dataset=obj, name=name).first()
+                            if psermon is None:
+                                psermon = Psermon.objects.create(dataset=obj, name=name, abbr=abbr)
+
+                    # Continue to look for Manuscript data
+                    manu_loc = os.path.abspath(os.path.join(dir_loc, obj.location, manuscript_csv))
+                    meta_loc = os.path.abspath(os.path.join(dir_loc, obj.location, metadata_csv))
+                    if bDoManuscripts and os.path.exists(manu_loc):
+                        # The location is there: try to load the data
+                        manu_line = []
+                        with open(manu_loc, mode="r", encoding="utf-8") as f:
+                            csv_file = csv.DictReader(f)
+                            for line in csv_file:
+                                manu_line.append(line)
+
+                        # Also need to load the metadata
+                        meta_line = []
+                        if os.path.exists(meta_loc):
+                            with open(meta_loc, mode="r", encoding="utf-8") as f:
+                                # csv_file = csv.DictReader(f, quoting=csv.QUOTE_MINIMAL)
+                                csv_file = csv.DictReader(f)
+                                for line in csv_file:
+                                    meta_line.append(line)
+
+                        # Walk the list and check if all data is there
+                        for idx, oLine in enumerate(manu_line):
+                            name = oLine.get("SeriesName")
+                            works = oLine.get("EncodedWorks")
+
+                            skip_fields = ['Seriesname', 'EncodedWorks']
+
+                            # optionally there is more metadata
+                            oMeta = None if len(meta_line) == 0 else meta_line[idx]
+
+                            pmanuscript = Pmanuscript.objects.filter(dataset=obj, name=name).first()
+                            if pmanuscript is None:
+                                pmanuscript = Pmanuscript.objects.create(dataset=obj, name=name, works=works)
+                                # Do we have meta data?
+                                if not oMeta is None:
+                                    # Copy the meta data feature values
+                                    for k, v in oMeta.items():
+                                        if not k in skip_fields and hasattr(pmanuscript, k):
+                                            if k == "total" and not re.match(r"^\d+$", v): # isinstance(v, int):
+                                                oErr.Status("Skipping total as non-numeric: {}".format(v))
+                                            else:
+                                                setattr(pmanuscript, k, v)
+                                    # Save the meta data
+                                    pmanuscript.save()
+
         except:
             msg = oErr.get_error_message()
             oErr.DoError("BoardDataset/scan")
@@ -325,5 +399,72 @@ class Highlight(models.Model):
 
         sDate = get_crpp_date(self.saved, True)
         return sDate
+
+
+class Psermon(models.Model):
+    """A sermon according to the plugin definition"""
+
+    # [1] The name of the sermon is the [SermonName] field from char_code.csv
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] The symbol is the japanese character code representation of this sermon
+    abbr = models.CharField("Code", max_length=STANDARD_LENGTH)
+    # [1] Each Plugin [Sermon] belongs to one particular dataset
+    dataset = models.ForeignKey(BoardDataset, on_delete=models.CASCADE, related_name="datasetsermons")
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.dataset.name, self.name)
+        return sBack
+
+
+class Pmanuscript(models.Model):
+    """A manuscript according to the plugin definition"""
+
+    # [1] The name of the manuscript is the [SeriesName] field from char_series.csv
+    name = models.CharField("Name", max_length=STANDARD_LENGTH)
+    # [1] The symbols representing the sermons - those are the [EncodedWorks] in the char_series.csv
+    works = models.TextField("Works", max_length=STANDARD_LENGTH)
+    # [1] Each Plugin [Sermon] belongs to one particular dataset
+    dataset = models.ForeignKey(BoardDataset, on_delete=models.CASCADE, related_name="datasetmanuscripts")
+
+    # Fields defined in the metadata.csv
+    # [1] Library
+    library = models.CharField("Library", max_length=LONG_STRING, default = "-")
+    # [1] lcity
+    lcity = models.CharField("City", max_length=LONG_STRING, default = "-")
+    # [1] Shelfmark idno
+    idno = models.CharField("Idno", max_length=LONG_STRING, default = "-")
+    # [1] lcountry
+    lcountry = models.CharField("Country", max_length=LONG_STRING, default = "-")
+    # [1] Date range
+    date = models.CharField("Date range", max_length=LONG_STRING, default = "-")
+    # [1] total
+    total = models.IntegerField("Total number", default = 0)
+    # [1] List of sermons
+    sermons = models.TextField("Sermons", default = "-")
+    # [1] List of sermons as stringified JSON
+    content = models.TextField("Content", default = "[]")
+    # [1] Shelfmark
+    ms_identifier = models.CharField("Shelfmark", max_length=LONG_STRING, default = "-")
+    # [1] Passim Manuscript ID
+    passim_ms_id = models.IntegerField("Passim MS id", default = 0)
+    # [1] Century
+    passim_ms_id = models.IntegerField("Century", default = 0)
+
+    def __str__(self):
+        sBack = "{}-{}".format(self.dataset.name, self.name)
+        return sBack
+
+    def get_name(self):
+        """Return the name, if defined"""
+
+        sBack = ""
+        if not self.name is None:
+            if self.ms_identifier != "" and self.ms_identifier != "-":
+                sBack = self.ms_identifier
+            else:
+                sBack = self.name
+        return sBack
+
+
 
 

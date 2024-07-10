@@ -498,12 +498,12 @@ class ResearchSet(models.Model):
             self.save()
 
             # All related SetDef items should be warned
-            with transaction.atomic():
-                for obj in SetDef.objects.filter(researchset=self.id):
-                    contents = json.loads(obj.contents)
-                    contents['recalc'] = True
-                    obj.contents = json.dumps(contents)
-                    obj.save()
+            # with transaction.atomic():
+            for obj in SetDef.objects.filter(researchset=self.id):
+                contents = json.loads(obj.contents)
+                contents['recalc'] = True
+                obj.contents = json.dumps(contents)
+                obj.save()
 
             # Return this list of lists
             bResult = True
