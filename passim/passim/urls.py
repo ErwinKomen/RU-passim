@@ -453,6 +453,7 @@ urlpatterns = [
     re_path(r'^reader/import/cppm_manu/$', passim.reader.views.reader_CPPM_manu, name='import_cppm_manuscripts'), 
     re_path(r'^reader/import/cppm_eqset/$', passim.reader.views.reader_CPPM_eqset, name='import_cppm_eqset'), 
     re_path(r'^reader/import/cppm_manif_f/$', passim.reader.views.reader_CPPM_manifestations_f, name='import_cppm_manifestations_f'), 
+    #re_path(r'^reader/import/cppm_manif_t/$', passim.reader.views.reader_CPPM_manifestations_t, name='import_cppm_manifestations_t'), 
         
     # =============================================================================================
 

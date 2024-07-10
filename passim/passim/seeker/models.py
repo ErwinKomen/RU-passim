@@ -13128,6 +13128,7 @@ class Signature(models.Model):
         try:
             codesort = unidecode(self.code, "utf-8")
             codesort = re.sub('[\[\]\,]+', '', codesort).strip()
+            print(codesort)
             if self.codesort is None or self.codesort != codesort:
                 self.codesort = codesort
                 if do_saving:
