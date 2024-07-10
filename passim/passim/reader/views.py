@@ -56,8 +56,8 @@ from passim.reader.forms import UploadFileForm, UploadFilesForm
 from passim.seeker.models import Manuscript, SermonDescr, Status, SourceInfo, ManuscriptExt, Provenance, ProvenanceMan, \
     EqualGold, Signature, SermonGold, Project2, EqualGoldExternal, EqualGoldProject, EqualGoldLink, EqualGoldKeyword, \
     Library, Location, SermonSignature, Author, Feast, Daterange, Comment, Profile, MsItem, SermonHead, Origin, \
-    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, Information, \
-    Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal, \
+    Collection, CollectionSuper, CollectionGold, LocationRelation, LocationType, Information, SermonDescrProject, \
+    Script, Scribe, SermonGoldExternal, SermonGoldKeyword, SermonDescrExternal, Codico, SermonDescrEqual, \
     Report, Keyword, ManuscriptKeyword, ManuscriptExternal, City, Country, ManuscriptProject, STYPE_IMPORTED, get_current_datetime, EXTERNAL_HUWA_OPERA
 from passim.reader.models import Edition, Literatur
 
@@ -8071,9 +8071,9 @@ def reader_CPPM_manifestations_f(request):
 
 # Mapped FALSE!
 
-# This function adds the data on manifestations from the json file as new SermonSecr objects to the database, 
-# links these to a CPPM manuscripts (mapped false) and to a EqualGold that are already in the database. 
-# First we collect all the data in a df and then we add them to the database, just like the other CPPM functions.
+# This function adds the data of manifestations from the json file as new SermonSecr objects to the database, 
+# links each of these to the CPPM manuscript from which they came and to an EqualGold, both are already in the database. 
+# First we collect all the data in a dataframe and then we add them to the database, just like the other CPPM functions.
 
     # Can only be done by a super-user
     if not request.user.is_superuser:        
@@ -8082,14 +8082,14 @@ def reader_CPPM_manifestations_f(request):
 
     # Read the JSON file from MEDIA_DIR   
     filename = os.path.join(MEDIA_DIR, 'manuscripts_uniform.json')
-    cppm_m_read = os.path.abspath(filename) # cppm_texts_mapped_authors.json
+    cppm_m_read = os.path.abspath(filename) 
 
     # Check if file is there
     if not os.path.exists(cppm_m_read):
         print("Cannot find file: {}".format(filename))
 
     # Open the file
-    cppm_m = open(cppm_t_read, encoding="utf8")  
+    cppm_m = open(cppm_m_read, encoding="utf8")  
 
     # Load the json file 
     cppm_manif = json.load(cppm_m)
@@ -8097,112 +8097,185 @@ def reader_CPPM_manifestations_f(request):
     # Keep count
     count = 0 
 
-    # Create an empty data frame for later use
-    manif_df = pd.DataFrame(columns=['Number', 'CPPM', 'Ms_Descr_Str', 'Location', 'Author', 'Order',]) # 6 
+    # Create an empty data frame for later use (to add the data from the JSON file)
+    manif_df = pd.DataFrame(columns=['Number', 'Order', 'CPPM', 'Ms_Descr_Str', 'Location', 'Author']) # 6 columns
 
-    # Number is the key of the json and is stored in the Manuscript External table links to manu id
+    # Number is the key of the json and has been stored in the Manuscript External table, with a link to the manuscript object in the Manuscript
+    # table
 
     # Iterate over the JSON: cppm_manif
-
-    # Let op order!
+    # Keep track of the order of the manifestations.    
 
     # Find the information we need, first at the highest level (the id's (numbers))
-    for key1, value1 in cppm_manif.items():  
-                
+    for key1, value1 in cppm_manif.items():                  
 
         # Retrieve the id of the entry
         number = key1
-        
-        # Create order for placing manifestations in correct orde in msitems
+               
+        # Create order for placing manifestations in correct order (for usage in MsItems)
         order = 0
-
+        
         # Then one level lower
         for key2, value2 in value1.items():
             
-            # See which manuscripts are not in PASSIM and whose manifestations need to be added to the database
+            # See which manifestations are not in PASSIM and need to be added to the database
             # get all the information for these manifestations
             if key2 == 'mapped' and value2 == False:  
-                
-                # Get cppm_shelfmark_norm
-                shelfm_norm = value1.get('cppm_shelfmark_norm')               
-                   
-                # Navigate to the date items
+
+                # Navigate to the key3 items
                 for key3, value3 in value1.items():
                     
-                    # Right place?
-                    work_lst = []
+                    # Always start by giving author at least something...                  
+                    author = ''
 
-                    # Navigate to the correct level
+                    # Iterate over the key3 level
                     if key3 == 'ms_items':                    
                         for value4 in value3:
-                            # Iterate over the items in the list, 
-                            # that can have multiple items
-                            for key5, value5 in value4.items():
-                                
-                                # First append the current key of the manuscript
-                                work_lst.append.append(number)
+                            
+                            # Empty list to store all items on after each other
+                            work_lst = []
 
+                            # Add to the order of the items within the manuscript
+                            order += 1                            
+                            
+                            # Add key and order to the list
+                            work_lst.append(number)
+                            work_lst.append(order)                          
+                            
+                            # Create a list to store all items
+                            items_lst = []
+
+                            # Iterate over the items in the list, 
+                            # that can have multiple manifestations                            
+                                                        
+                            for key5, value5 in value4.items():                                     
+                                # To see of there is an author mentioned we store all available items in a list   
+                                items_lst.append(key5)   
+
+                                # First append the current key of the manuscript                               
                                 # Get the CPPM number linked to the manifestation
                                 if key5 == 'cppm_num':
-                                    work_lst.append.append(value5)
-                                    print(value5)
+                                    work_lst.append(value5)                                    
 
                                 # Get the ms_descr_str
                                 elif key5 == 'ms_descr_str':
-                                    work_lst.append.append(value5)
-                                    print(value5)
+                                    work_lst.append(value5)                                    
 
                                 # Get the location of the ms item in the manuscript
                                 elif key5 == 'location':
-                                    work_lst.append.append(value5)
-                                    print(value5)
-
+                                    work_lst.append(value5)
+                                
                                 # Get the author
                                 elif key5 == 'author':
-                                    work_lst.append.append(value5)
-                                    print(value5)
+                                    author = value5
+                                    work_lst.append(author)                                    
 
-                                # Create order of the items within the manuscript
-                                order += 1
-                                work_lst.append.append(order)
-                                print(order)
-                                                    
+                            # If there is no author, we have to add an "empty" author to work_lst 
+                            # otherwise the work_lst list cannot be added to the dataframe
+                            if 'author' not in items_lst:
+                                work_lst.append(author) 
+                            
                             # Put everything in the empty dataframe created above
-                            manif_df.loc[len(manu_df.index)] = work_lst
+                            manif_df.loc[len(manif_df.index)] = work_lst
      
-    # Sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers belong to which id and thus manuscript
+    # To be sure. sort the dataframe using the number id of the JSON file, this way we can see which CPPM numbers 
+    # belong to which id and thus manuscript
     manif_df.sort_values(by=['Number', 'Order'])
-
     print(len(manif_df))
+        
+    # To link the name of the author of the manifestation to the correct recorde in the Author
+    # table, we need to import the mapping of the cppm author names and the correct id of each author.
+    
+    # Read the Excel file with pandas from MEDIA_DIR   
+    author_mapping = os.path.abspath(os.path.join(MEDIA_DIR, 'List_CPPM_author_False_True_mapped_SB.xlsx'))
 
+    # Converse the file to a dataframe
+    authmap_df = pd.read_excel(author_mapping, engine='openpyxl')
+
+    # Get rid of the NaN values (and the rest of these recorde)
+    authmap_df = authmap_df.dropna() 
+
+    # Change type DB column to integer
+    authmap_df['DB'] = authmap_df['DB'].astype(int)
+
+    # Create empty lists, name and id
+    name_lst = []
+    id_lst = []
+
+    for index, row in authmap_df.iterrows():
+        #print(row['CPPM'], row['DB'])
+
+        name_cppm = row['CPPM']
+        id_db = row['DB']
+                
+        # Strip the names of the authors of the underscores that have been added by TH
+        # if "_" in name_cppm:
+        name_clean = name_cppm.strip('_')
+        
+        # Add name to the list
+        name_lst.append(name_clean)     
+        
+        # Add the id to the list
+        id_lst.append(id_db)
+
+        #print(name_clean)
+        #print(id_db)
+        
+    # Zip the two new lists to a dict
+    name_id = dict(zip(name_lst, id_lst))    
+
+    # Now iterate over the dataframe with the manifestations
     for index, row in manif_df.iterrows():
-        print(row['Number'], row['CPPM'], row['Ms_Descr_Str'], row['Location'], row['Author'], row['Order'])
+        print(row['Number'], row['Order'], row['CPPM'], row['Ms_Descr_Str'], row['Location'], row['Author'])
 
+        # Get the data out of each column, for each record
         number = row['Number']
+        order = row['Order']
         cppm = row['CPPM']
         full_msdescr = row['Ms_Descr_Str'] 
-        location = ['Location']
-        author = ['Author']
-        order = ['Order']
+        location = row['Location']
+        author = row['Author']
+        
 
         # ManuscriptExternal
+        
+        # ManuscriptExternalCodico.objects.filters
         external = 'brepols'
 
-        # Find the id of the CPPM in manuscript the external table             
+        # Find the id of the CPPM manuscript in the manuscript external table             
         manuex_obj = ManuscriptExternal.objects.filter(externalid=number, externaltype=external).first()             
     
-        # Get the manuscript object
-        manu = manuex_obj.manu
+        # Get the manuscript object that is linked to the id of the CPPM number
+        manu = manuex_obj.manu_id
     
+        # Get manuscript object
+        manu_obj = Manuscript.objects.filter(id=manu).first()
+
+
+        # Codico
+
+        # Find the codico that belongs to the manuscript
+        #cod_obj = manu_obj.manuscriptcodicounits.first()
+        cod_obj = Codico.objects.filter(manuscript = manu_obj).first()
         
-        # Equal Gold
+        
+        # Msitem
+
+        # Find out if there already exists an MsItem object linked to the manu script en codico
+        ms_obj = MsItem.objects.filter(manu = manu_obj, codico = cod_obj, order = order).first()
+        if ms_obj == None:
+            # Create new MsItem object if this is not the case, add order and the two links
+            ms_obj = MsItem.objects.create(order = order, manu = manu_obj, codico = cod_obj)
+            # Save the object
+            ms_obj.save()
+
+        
+        # EqualGold
 
         # Find the Equal gold object that should be linked to the new SermonDescr object by using the CPPM number
-
         # Create a list with CPPM code (if it is not possible to 
         cppm_code = "CPPM I " + cppm
-        print(cppm_code)
-         
+                
         # First check if the Signature exists           
         sig_obj = Signature.objects.filter(code=cppm_code, editype = 'cl').first()
          
@@ -8210,42 +8283,81 @@ def reader_CPPM_manifestations_f(request):
         gs_obj = sig_obj.gold
 
         # Get the EqualGold
-        equal = gsb_obj.equal
+        equal = gs_obj.equal
+        
+        # Find the id that corresponds with the name in the cppm data
+        for key, value in name_id.items():
+            if key == author:                
+                id_author = value     
 
+        # Find the author object using the id
+        auth_obj = Author.objects.filter(id=id_author).first() 
+        
+        
         # Location
 
-        # The location should be modified so that in case that there is only a number noting should be imported and
+        # The location should be modified so that in case that there is only a number nothing should be imported and
         # and an (extra) note should be stored and in case of characters before the number these characters should be
         # removed
+       
+        # Some locations are null
 
-        # Author
-
-        # First import the excelfile with the mapping
-
-        # What types should be added?? stype etc
+        # Find out if the location has NO character before the first digit:
+        extra_note = ''
+        if location!= None:        
+            if not location[0].isdigit():                
+                # Strip the location of everything before the first digit
+                folio = re.sub(re.compile(r'^[^0-9]*'), '', location)
+                
+            else:
+                # Folio should be empty
+                folio = ''
+                # Create extra note, add this later (?) to the full_msdescr
+                extra_note = ". Please check the location/folio of this manifestation"
+        else:
+            folio = ''
         
-
+        notes = full_msdescr + extra_note
+        #print(notes)
         # Check if the manifestation already exists and if not create a new manifestation TH: is dit veilig genoeg?
-        sb_obj = SermonDescr.objects.filter(note = full_msdescr, manu=manu, equal=equal).first()
+        sd_obj = SermonDescr.objects.filter(note = notes, manu = manu_obj).first()
+        # If this is not the case
         if sd_obj == None:
-            sd_obj = SermonDescr.object.create(note = full_msdescr, author = author, folio = folio, manu = manu, equal = equal, stype='imp')
-        
+            # Create a new object
+            sd_obj = SermonDescr.objects.create(note = notes, author = auth_obj, locus = folio, manu = manu_obj, stype='imp', msitem=ms_obj) 
+            # Save the object
+            sd_obj.save()
 
+
+        # SermonDescrExternal
         # Add the new manifestation to the SermonDescrExternal
-
+        
+        # Code used is 'cppm'
         external = 'cppm'
 
-        # moet dit niet uitgebreid worden met extra kolom, order ofzo? Nu alleen het id van het manuscript
-
         # Check if the SermonDescrExternal object already exists 
-        sdex_obj = SermonDescrExternal.objects.filter(externalid = number, externaltype = external, sermon = sd_obj,  ) # ???= full_msdescr
-        # If this is not the case
+        sdex_obj = SermonDescrExternal.objects.filter(externalid = number, externaltype = external, sermon = sd_obj, externaltextid = full_msdescr).first() 
+        # If this is not the case...
         if sdex_obj == None:
-            # Create the new SermonDescrExternal object, add type and JSON key
-            sdex_obj = SermonDescrExternal.objects.filter(sermon = sd_obj, externalid = number, externaltype = external)
-
+            # Create the new SermonDescrExternal object, add type and full text of order?
+            sdex_obj = SermonDescrExternal.objects.create(sermon = sd_obj, externalid = number, externaltype = external, externaltextid = full_msdescr)
+            # Save the object
+            sdex_obj.save()
         
-        # Project    MODIFY                   
+        # SermonDescrEqual
+
+        # Link the manifestations to the EqualGold object, 
+
+        # Find out if this is already the case
+        sermoneqlink = SermonDescrEqual.objects.filter(sermon = sd_obj, manu= manu_obj , super = equal).first()
+        # If not..
+        if sermoneqlink == None:
+            # If there is no link between the sermon and the Equalgold, add the link
+            sdeq_obj = SermonDescrEqual.objects.create(sermon = sd_obj, linktype= 'uns', manu = manu_obj, super = equal)
+            # Save the object
+            sdeq_obj.save()
+                    
+        # Project                  
 
         # The names of the projects "Brepols-CPPM" and "Passim" need to linked to the Manuscripts.             
         
@@ -8259,42 +8371,93 @@ def reader_CPPM_manifestations_f(request):
             # If the projectname does not already exist, it needs to be added to the database
             projectcppm_1 = Project2.objects.create(name = project_name_1)
             # And a link should be made between this new material and corresponding Manuscript table
-            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_1)
+            SermonDescrProject.objects.create(sermon = sd_obj, project = projectcppm_1)
         else:
             # In case there is a projectfound, check for a link, if so, nothing should happen, 
-            # than there is already a link between the Manuscript and a the project name
-            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_1).first()
-            if manugprjlink == None:
+            # than there is already a link between the SermonDescr and the project name
+            sermonprjlink = SermonDescrProject.objects.filter(sermon = sd_obj, project = projectfound_1).first()
+            if sermonprjlink == None:
                 # If the project name already exists, but not the link, than only a link should be 
-                # made between the EqualGold and the projectname
-                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_1)
+                # made between the SermonDescr and the project name
+                SermonDescrProject.objects.create(sermon = sd_obj, project = projectfound_1)
         
         # Check if the project label "Passim" already exits in the Project2 table
         projectfound_2 = Project2.objects.filter(name__iexact=project_name_2).first()
         if projectfound_2 == None:
             # If the projectname does not already exist, it needs to be added to the database
             projectcppm_2 = Project2.objects.create(name = project_name_2)
-            # And a link should be made between this new material and corresponding Manuscript table
-            ManuscriptProject.objects.create(manuscript = manu_obj, project = projectcppm_2)
+            # And a link should be made between this new material and corresponding SermonDescr table
+            SermonDescrProject.objects.create(sermon = sd_obj, project = projectcppm_2)
         else:
             # In case there is a projectfound, check for a link, if so, nothing should happen, 
-            # than there is already a link between the Manuscript and a the project name
-            manugprjlink = ManuscriptProject.objects.filter(manuscript = manu_obj, project = projectfound_2).first()
-            if manugprjlink == None:
+            # than there is already a link between the SermonDescr and the project name
+            sermonprjlink = SermonDescrProject.objects.filter(sermon = sd_obj, project = projectfound_2).first()
+            if sermonprjlink == None:
                 # If the project name already exists, but not the link, than only a link should be 
-                # made between the EqualGold and the projectname
-                ManuscriptProject.objects.create(manuscript = manu_obj, project = projectfound_2)
-
-
+                # made between the SermonDescr and the projectname
+                SermonDescrProject.objects.create(sermon = sd_obj, project = projectfound_2)
 
     # What we return is simply the home page
     return redirect('home')
 
-#des reader_CPPM_eqset(request):
-
-#    # What we return is simply the home page
-#    return redirect('home')
+## Gaat om 2043 manifestaties
 
 
+#   # Add the new manifestations to a new Dataset 
+
+#   #Ik zou niet met aparte codicological units werken, aangezien we die dan weer moeten verwijderen 
+#   # tijdens het nakijken. Wel een goede oplossing lijkt het me all deze manifestaties inderdaad 
+#  # gewoon toe te voegen aan de desbetreffende manuscripten, maar ze dan wel in een dataset onder te brengen 
+#   # ‘Potential doubles: CPPM auto-import’, zodat ze makkelijk gecheckt en eventueel gemerged kunnen worden.
+#   # Potential doubles: CPPM auto-import’
+
+#   # Collection
+
+#   # settype: pd 
+#   # scope: team
+#   # type: sermo
+#   # descrip
+#   # name
+#   # fk collection type (sermo) juist object buiten for loop ophalen
+
+#   # owner (Profile, User = 2 (Shari Boodts))
+
+   
+
+#   # Get the Profile by first getting the User   
+#   user_sb = User.objects.filter(last_name = "Boodts").first()
+
+#   # Get the Profile
+#   profile_sb = Profile.objects.filter(user= user_sb).first()
+
+#   # Get the Typename
+#   type_coll = CollectionType.objects.filter(name = 'sermo').first()
 
 
+
+#   # Find the collection to which the new sermons should
+#   name_coll = 'Potential doubles: CPPM auto-import'
+#   descr_coll = 'Manuscripts imported from CPPM JSON, added to existing manuscripts'
+#   # Check if the SermonDescrExternal object already exists 
+#   coll_obj = Collection.objects.filter(name = name_col).first() 
+#   # If this is not the case...
+#   if coll_obj == None:
+#       # Create the new Collection object, add name, descrip, type, settype, scope, descrip, owner,
+#       coll_obj = Collection.objects.create(name = name_col, descrip = descr_coll, 
+#                                             owner = profile_sb, scope = 'team', settype = 'pd', type = 'sermo', typename= type_coll)
+#       # Save the object
+#       coll_obj.save()
+
+## Add to CollectionSerm
+## Find
+
+## Link the manufesations to the Collection object using the CollectionSerm table
+
+# # Find out if this is already the case
+#    sermoncolllink = CollectionSerm.objects.filter(sermon = sd_obj, collection = coll_obj).first()
+#    # If not..
+#    if sermoncolllink == None:
+#        # If there is no link between the sermon and the Colelction, add the link
+#        sdcoll_obj = CollectionSerm.objects.create(sermon = sd_obj, collection = coll_obj)
+#        # Save the object
+#        sdcoll_obj.save()
