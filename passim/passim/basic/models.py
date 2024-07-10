@@ -19,11 +19,17 @@ MAX_TEXT_LEN = 200
 TIME_ZONE = 'Europe/Amsterdam'
 
 def get_current_datetime():
-    """Get the current time"""
+    """Get the current time
+    
+    :meta private:
+    """
     return timezone.now()
 
 def get_crpp_date(dtThis, readable=False):
-    """Convert datetime to string"""
+    """Convert datetime to string
+    
+    :meta private:
+    """
 
     if readable:
         # Convert the computer-stored timezone...
@@ -84,7 +90,10 @@ class Custom():
 
 # Create your models here.
 class UserSearch(models.Model):
-    """User's searches"""
+    """User's searches
+    
+    :meta private:
+    """
     
     # [1] The listview where this search is being used
     view = models.CharField("Listview", max_length = LONG_STRING)
@@ -177,7 +186,10 @@ class UserSearch(models.Model):
 
 
 class Address(models.Model):
-    """IP addresses that have been blocked"""
+    """IP addresses that have been blocked
+    
+    :meta private:
+    """
 
     # [1] The IP address itself
     ip = models.CharField("IP address", max_length = MAX_TEXT_LEN)

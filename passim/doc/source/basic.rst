@@ -83,3 +83,13 @@ if you have an application called ``yourapplication``, and one Django app in it 
         # Add your apps here to enable them
         'yourapplication.main',
     ]
+
+API
+--------
+
+.. automodule:: passim.basic.views
+   :members:
+
+.. automodule:: passim.basic.models
+   :members:
+

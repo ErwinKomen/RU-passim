@@ -124,7 +124,10 @@ def is_ajax(request):
     return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
 
 def get_breadcrumbs(request, name, is_menu, lst_crumb=[], **kwargs):
-    """Process one visit and return updated breadcrumbs"""
+    """Process one visit and return updated breadcrumbs
+    
+    :meta private:
+    """
 
     # Initialisations
     p_list = []
@@ -215,7 +218,10 @@ def isempty(value):
     return response
 
 def get_number(s_input):
-    """Get the first consecutive number from the string"""
+    """Get the first consecutive number from the string
+    
+    :meta private:
+    """
 
     if isinstance(s_input, int):
         iBack = s_input
@@ -261,7 +267,10 @@ def adapt_search(val, regex_function=None):
     return val
 
 def make_search_list(filters, oFields, search_list, qd, lstExclude):
-    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset"""
+    """Using the information in oFields and search_list, produce a revised filters array and a lstQ for a Queryset
+    
+    :meta private:
+    """
 
     def enable_filter(filter_id, head_id=None): 
         full_filter_id = "filter_{}".format(filter_id)
@@ -761,11 +770,14 @@ def base64_decode(sInput):
     return sOutput
 
 def get_current_datetime():
-    """Get the current time"""
+    """Get the current time via 'timezone'"""
     return timezone.now()
 
 def treat_bom(sHtml):
-    """REmove the BOM marker except at the beginning of the string"""
+    """REmove the BOM marker except at the beginning of the string
+    
+    :meta private:
+    """
 
     # Check if it is in the beginning
     bStartsWithBom = sHtml.startswith(u'\ufeff')
@@ -874,6 +886,8 @@ def adapt_m2o_sig(instance, qs):
     """Adapt the instances of [SermonSignature] pointing to [instance] to only include [qs] 
     
     Note: convert SermonSignature into (Gold) Signature
+
+    :meta private:
     """
 
     errHandle = ErrHandle()
@@ -907,7 +921,12 @@ def adapt_m2o_sig(instance, qs):
         return False
 
 def csv_to_excel(sCsvData, response):
-    """Convert CSV data to an Excel worksheet"""
+    """Convert CSV data to an Excel worksheet
+    
+    NOTE: not used inside PASSIM
+
+    :meta private:
+    """
 
     # Start workbook
     wb = openpyxl.Workbook()
@@ -1285,6 +1304,7 @@ class BasicList(ListView):
         return context
 
     def add_to_context(self, context, initial):
+        """User-supplied other items for the context"""
         return context
 
     def get_result_list(self, obj_list, context):
@@ -1373,6 +1393,7 @@ class BasicList(ListView):
         return sBack
 
     def get_template_names(self):
+        """Overriding default ListView, only make the basic listview template available"""
         names = [ self.template_name ]
         return names
 
@@ -1405,7 +1426,10 @@ class BasicList(ListView):
         return None
 
     def adapt_search(self, fields):
-        return fields, None, None
+        """Possibility for the user to adapt the search"""
+        lstExclude=[]
+        qAlternative = None
+        return fields, lstExclude, qAlternative
 
     def get_queryset(self, request = None):
         """Calculate the queryset that should be used"""
@@ -1619,7 +1643,8 @@ class BasicList(ListView):
         return qs
 
     def get_selectitem_info(self, instance, context):
-        return ""
+        sBack = ""
+        return sBack
 
     def view_queryset(self, qs):
         return None
@@ -1839,9 +1864,16 @@ class BasicDetails(DetailView):
     def custom_init(self, instance):
         pass
 
-    def before_delete(self, instance):
-        """Anything that needs doing before deleting [instance] """
-        return True, "" 
+    def action_add(self, instance, details, actiontype):
+        """User can fill this in to his/her liking"""
+
+        # Example: 
+        #   Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
+        pass
+
+    def add_to_context(self, context, instance):
+        """Add to the existing context"""
+        return context
 
     def after_delete(self, oInfo):
         """Action after deleting an item"""
@@ -1849,45 +1881,39 @@ class BasicDetails(DetailView):
 
     def after_new(self, form, instance):
         """Action to be performed after adding a new item"""
-        return True, "" 
 
-    def before_save(self, form, instance):
-        """Action to be performed after saving an item preliminarily, and before saving completely"""
-        return True, "" 
+        bResult = True
+        msg = ""
+        return bResult, msg
 
     def after_save(self, form, instance):
         """Actions to be performed after saving"""
-        return True, "" 
+        bResult = True
+        msg = ""
+        return bResult, msg
 
-    def add_to_context(self, context, instance):
-        """Add to the existing context"""
-        return context
+    def before_delete(self, instance):
+        """Anything that needs doing before deleting [instance] """
+        bResult = True
+        msg = ""
+        return bResult, msg
 
-    def may_edit(self, context = {}):
-        """Is this a user who may edit?"""
+    def before_save(self, form, instance):
+        """Action to be performed after saving an item preliminarily, and before saving completely"""
+        bResult = True
+        msg = ""
+        return bResult, msg
 
-        bResult = False
-        oErr = ErrHandle()
-        try:
-            # First step: authentication
-            if user_is_authenticated(self.request):
-                # Second step: app_user
-                if context.get("is_app_user", False) or context.get("is_app_editor", False):
-                    bEditor = context.get("is_app_editor", False)
-                    bModerator = context.get("is_app_moderator", False)
-                    bResult = (bEditor or bModerator)
-            # Otherwise: no permissions!
-        except:
-            oErr.DoError("BasicPart/userpermissions")
-        return bResult
-
-    def process_formset(self, prefix, request, formset):
-        return None
+    def get_abs_uri(self, sName, obj):
+        sBack =  "{}{}".format(self.request.get_host(), reverse(sName, kwargs={'pk': obj.id}))
+        return sBack
 
     def get_formset_queryset(self, prefix):
+        """Get a formset-specific queryset"""
         return None
 
     def get_form_kwargs(self, prefix):
+        """Way to add data to a formset"""
         return None
 
     def get_history(self, instance):
@@ -2197,46 +2223,23 @@ class BasicDetails(DetailView):
         # Return the calculated context
         return context
 
-    def process_mainitem(self, frm, mobj):
-        """Process one 'mainitem' or one 'field' from 'mainsections'"""
+    def may_edit(self, context = {}):
+        """If authenticated, is this a user who may edit this instance?"""
 
-        bResult = True
+        bResult = False
         oErr = ErrHandle()
         try:
-            # Check for possible form field information
-            if 'field_key' in mobj: 
-                mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
-                mobj['field_key'] = frm[mobj['field_key']]
-            if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
-            if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
-            if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
-
-            # Calculate view-mode versus any-mode
-            #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
-            if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
-                mobj['allowing'] = "edit"
-            else:
-                mobj['allowing'] = "view"
-            if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
-                mobj['allowing_key_list'] = "edit"
-            else:
-                mobj['allowing_key_list'] = "view"
+            # First step: authentication
+            if user_is_authenticated(self.request):
+                # Second step: app_user
+                if context.get("is_app_user", False) or context.get("is_app_editor", False):
+                    bEditor = context.get("is_app_editor", False)
+                    bModerator = context.get("is_app_moderator", False)
+                    bResult = (bEditor or bModerator)
+            # Otherwise: no permissions!
         except:
-            msg = oErr.get_error_message()
-            oErr.DoError("process_mainitem")
-            bResult = False
+            oErr.DoError("BasicDetails/may_edit")
         return bResult
-
-    def get_abs_uri(self, sName, obj):
-        sBack =  "{}{}".format(self.request.get_host(), reverse(sName, kwargs={'pk': obj.id}))
-        return sBack
-
-    def action_add(self, instance, details, actiontype):
-        """User can fill this in to his/her liking"""
-
-        # Example: 
-        #   Action.add(self.request.user.username, instance.__class__.__name__, "delete", json.dumps(details))
-        pass
 
     def prepare_form(self, instance, context, initial=[]):
         # Initialisations
@@ -2457,6 +2460,43 @@ class BasicDetails(DetailView):
         # Return the form we made
         return frm
     
+    def process_formset(self, prefix, request, formset):
+        """User's handling of a formset and the forms in it"""
+        return None
+
+    def process_mainitem(self, frm, mobj):
+        """Process one 'mainitem' or one 'field' from 'mainsections'
+        
+        :meta private:
+        """
+
+        bResult = True
+        oErr = ErrHandle()
+        try:
+            # Check for possible form field information
+            if 'field_key' in mobj: 
+                mobj['field_abbr'] = "{}-{}".format(frm.prefix, mobj['field_key'])
+                mobj['field_key'] = frm[mobj['field_key']]
+            if 'field_view' in mobj: mobj['field_view'] = frm[mobj['field_view']]
+            if 'field_ta' in mobj: mobj['field_ta'] = frm[mobj['field_ta']]
+            if 'field_list' in mobj: mobj['field_list'] = frm[mobj['field_list']]
+
+            # Calculate view-mode versus any-mode
+            #  'field_key' in mainitem or 'field_list' in mainitem and permission == "write"  or  is_app_userplus and mainitem.maywrite
+            if self.permission == "write":       # or app_userplus and 'maywrite' in mobj and mobj['maywrite']:
+                mobj['allowing'] = "edit"
+            else:
+                mobj['allowing'] = "view"
+            if ('field_key' in mobj or 'field_list' in mobj) and (mobj['allowing'] == "edit"):
+                mobj['allowing_key_list'] = "edit"
+            else:
+                mobj['allowing_key_list'] = "view"
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_mainitem")
+            bResult = False
+        return bResult
+
 
 class BasicPart(View):
     """This is my own versatile handling view.

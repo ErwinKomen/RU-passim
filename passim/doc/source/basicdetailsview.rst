@@ -358,35 +358,191 @@ This is a list of the arguments used by ``add_rel_item()`` and their function.
 Having a many-to-one element
 ----------------------------
 
-Suppose there is a details view and an edit view for an item of type ``Library``.
-Suppose, then, that there is an item ``Book`` that links with a foreign key to Library.
-(It will have a field ``name`` for the name of the book and ``library`` linking to the ``Library``.)
-There is a many-to-one relation between Book and Library.
-How can the 'books' be added to the details view of ``Library``?
+Suppose there is a details view and an edit view for an item of type ``Publisher``.
+Suppose, then, that there is an item ``Book`` that links with a foreign key to Publisher.
+It will have a field ``name`` for the name of the book and a field ``publisher`` linking to the ``Publisher``.
+
+.. code-block:: python
+   :linenos:
+
+    class Book(models.Model):
+        """A book can contain a number of chapters and it belongs to a library"""
+
+        # [1] Name of the manuscript (that is the TITLE)
+        name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
+        # [0-1] One book can only belong to one particular publisher
+        publisher = models.ForeignKey(Publisher, null=True, blank=True, on_delete = models.SET_NULL, related_name="publisher_books")
+
+There is a many-to-one relation between Book and Publisher.
+How can the 'books' be added to the details view of ``Publisher``? 
+The user should be able to select or describe a book and add it to that publisher.
 Here are the steps:
 
 #. Forms
 
-   (#) Adapt the ``LibraryForm``: 
+   a. Adapt the ``PublisherForm``, so that it contains a list of books for this publisher:
    
        * Add an element ``booklist`` to the form
        * Initialize the `queryset` and `initial` values of ``booklist`` in method ``__init__()``
 
-   (#) Make sure to have a form ``LibraryBookForm``:
+         .. code-block:: python
+            :linenos:
+
+            class PublisherForm(BasicModelForm):
+                booklist = ModelMultipleChoiceField(queryset=None, required=False,
+                    widget=BookWidget(attrs={'data-minimum-input-length': 0, 'data-placeholder': 'Select books...', 'style': 'width: 100%;'}))
+
+                class Meta:
+                    ATTRS_FOR_FORMS = {'class': 'form-control'};
+
+                    model = Publisher
+
+                def __init__(self, *args, **kwargs):
+                    # Start by executing the standard handling
+                    super(PublisherForm, self).__init__(*args, **kwargs)
+
+                    # Need to initialize the lists
+                    self.fields['booklist'].queryset = Book.objects.all()
+
+                    # Get the instance
+                    if 'instance' in kwargs:
+                        instance = kwargs['instance']
+                        # Get the values for the already available books belonging to this publisher
+                        self.fields['booklist'].initial = [x.pk for x in instance.publisher_books.all()]
+
+   a. Make sure to have a form ``PublisherBookForm``:
        
-       * Make it have a field like ``newname`` where the user can add a new name
+       * Make it have a field like ``newname`` where the user can add a new name of a book for a publisher
        * Have the property `required` set to `False`
 
-#. Model: process ``Library``
+         .. code-block:: python
+            :linenos:
 
-   (#) Add a method like ``get__book__markdown()`` that creates a HTML string to show the contents of a book.
+            class PublisherBookForm(BasicModelForm):
+                newname = forms.CharField(required=False, help_text='editable', 
+                    widget=forms.TextInput(attrs={'class': 'input-sm', 'placeholder': 'Book name...',  'style': 'width: 100%;'}))
 
-#. Views
+                class Meta:
+                    ATTRS_FOR_FORMS = {'class': 'form-control'};
 
-   (#) There needs to be a formset that provides a set of forms linking ``Library`` with ``Book``
-   (#) Method ``add_to_context()``: Make sure the Books are mentioned in ``context['mainitems']``
-   (#) Method ``process_formset()``: make sure the form's ``newname`` is handled properly
-   (#) Method ``after_save()``:  make sure the procedure ``adapt_m2o()`` is called correctly
+                    model = Book
+                    fields = ['name']
+                    widgets={'name':   forms.TextInput(attrs={'style': 'width: 100%;'}),
+
+#. Model: process ``Publisher``
+
+   a. Add a method like ``get_books_markdown()`` that creates a HTML string to show the names of the books belonging to a publisher.
+
+      .. code-block:: python
+         :linenos:
+
+         class Publisher(models.Model):
+            """A publisher that publishes multiple books"""
+
+            # [1] Name of the codicological unit (that is the TITLE)
+            name = models.CharField("Name", max_length=LONG_STRING, blank=True, default="")
+
+            def get_books_markdown(self):
+                """Get the books of this publisher as a HTML string"""
+
+                lhtml = []
+                # Get all the books in the correct order
+                qs = self.publisher_books.all().order_by('name')
+                # Walk the book objects
+                for obj in qs:
+                    # Determine the output for this one daterange
+                    item = "<div>{}<span class='badge signature ot'> ({})</span></div>".format(obj.name, obj.year)
+                    lhtml.append(item)
+
+                return "\n".join(lhtml)
+
+#. View: the Publisher's detail view
+
+   a. There needs to be a formset that provides a set of forms linking ``Publisher`` with ``Book``
+   #. Method ``add_to_context()``: Make sure the Books are mentioned in ``context['mainitems']``
+
+         .. code-block:: python
+            :linenos:
+
+            class PublisherEdit(BasicDetails):
+                """The details of one publisher: its name and the books it has"""
+
+                model = Publisher
+                mForm = PublisherForm
+
+                BookFormSet = inlineformset_factory(Publisher, Book,
+                                                     form=PublisherBookForm, min_num=0,
+                                                     fk_name = "publisher",
+                                                     extra=0, can_delete=True, can_order=False)
+                formset_objects = [
+                    {'formsetClass': BookFormSet, 'prefix': 'pbk', 'readonly': False, 'noinit': True, 'linkfield': 'publisher'}]
+
+                def add_to_context(self, context, instance):
+                    """Add to the existing context"""
+
+                    oErr = ErrHandle()
+                    try:
+                        # Get the main items
+                        mainitems_main = [
+                            {'type': 'plain', 'label': "Name:",     'value': instance.name,    'field_key': 'name'},
+                            {'type': 'line',  'label': "Books:",    'value': instance.get_books_markdown(), 
+                             'multiple': True, 'field_list': 'booklist', 'fso': self.formset_objects[0]}, 
+                            ]
+                    except:
+                        msg = oErr.get_error_message()
+                        oErr.DoError("PublisherEdit/add_to_context")
+
+                    # Return the context we have made
+                    return context
+
+   #. Method ``process_formset()``: make sure the form's ``newname`` is handled properly
+    
+      .. code-block:: python
+         :linenos:
+
+         def process_formset(self, prefix, request, formset): 
+            """Process a formset with a particular prefix"""
+            instance = formset.instance
+
+            # Walk all the forms in this formset
+            for form in formset: 
+                if form.is_valid():
+                    cleaned = form.cleaned_data
+                    # Action depends on prefix
+                    if prefix == "pbk":
+                        # Book name processing
+                        newname = cleaned.get("newname")
+                        if not newname is None:
+                            # Double check if a book with this name is already connected to [instance] or not
+                            obj = Book.objects.filter(name=newname, publisher=instance).first()
+                            if obj is None:
+                                # It is not there yet: add it
+                                form.instance.name = newname
+                        # Note: it will get saved with form.save()
+
+                else:
+                    errors.append(form.errors)
+                    bResult = False
+            return None
+
+   #. Method ``after_save()``:  make sure the procedure ``adapt_m2o()`` is called correctly
+
+      .. code-block:: python
+         :linenos:
+
+         def after_save(self, form, instance):
+            msg = ""
+            bResult = True
+            oErr = ErrHandle()
+        
+            try:
+                # (1) links from Book to Publisher
+                booklist = form.cleaned_data['booklist']
+                adapt_m2o(Book, instance, "publisher", booklist)
+            except:
+                msg = oErr.get_error_message()
+                bResult = False
+            return bResult, msg
 
 Having a many-to-many element
 -----------------------------
@@ -417,7 +573,7 @@ Here are the steps:
 
 #. Forms
 
-   (#) Adapt the ``BookForm``, so that it shows _existing_ book-project combinations and allows deleting these: 
+   (#) Adapt the ``BookForm``, so that it shows *existing* book-project combinations and allows deleting these: 
    
        * Add an element ``booklist`` to the form. This booklist should make use of a Select2 widget of class ``ModelSelect2MultipleWidget``
        * Initialize the `queryset` and `initial` values of ``booklist`` in method ``__init__()``
