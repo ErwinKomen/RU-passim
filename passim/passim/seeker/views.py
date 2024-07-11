@@ -12313,6 +12313,7 @@ class ManuscriptListView(BasicList):
     sg_name = "Manuscript"     # This is the name as it appears e.g. in "Add a new XXX" (in the basic listview)
     plural_name = "Manuscripts"
     basketview = False
+    spec_download = False       # No automatic, specification-based, downloading yet
     
     order_cols = ['library__location__name;library__lcity__name', 'library__name', 'idno;name', 
                   '', '', '', 'yearstart','yearfinish', 'stype','']

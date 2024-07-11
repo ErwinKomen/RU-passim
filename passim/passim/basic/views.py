@@ -1013,6 +1013,7 @@ class BasicList(ListView):
     admin_editable = False
     permission = True
     usersearch_id = ""
+    spec_download = False
     redirectpage = ""
     lst_typeaheads = []
     sort_order = ""
@@ -1126,6 +1127,20 @@ class BasicList(ListView):
         context['add_text'] = self.add_text
 
         context['admin_editable'] = self.admin_editable
+
+        # Possible generic EXCEL download if this holds:
+        # - there is a queryset with elements
+        # - the listview has [download_excel] set to True
+        # - the model has a [specification] supplied
+        # - the user is an editor
+        # - any user-specific restrictions do not apply
+        context['download_excel'] = None
+        if not self.qs is None and self.spec_download and hasattr(self.model, 'specification') and \
+           user_is_ingroup(self.request, app_editor) and self.may_edit():
+            list_spec = self.model.specification
+            if isinstance(list_spec, list):
+                # There is a specification list: make Excel download available by providing the right URL for downloading
+                context['download_excel'] = context['basic_list']
 
         # Adapt possible downloads
         if len(self.downloads) > 0:
@@ -1306,6 +1321,100 @@ class BasicList(ListView):
     def add_to_context(self, context, initial):
         """User-supplied other items for the context"""
         return context
+
+    def may_edit(self, context, instance):
+        """Whether the user may edit this particular item"""
+
+        # Default behaviour
+        return True
+
+    def get_data(self, prefix, dtype, response=None):
+        """Gather the data as CSV, including a header line and comma-separated"""
+
+        # Initialize
+        lData = []
+        sData = ""
+        oErr = ErrHandle()
+        try:
+            # Sanity check - should have been done already
+            if not hasattr(self.model, 'specification'):
+                return sData
+
+            # Get the specification
+            specification = getattr(self.model, 'specification')
+
+            # Need to know who this user (profile) is
+            user = self.request.user
+            username = user.username
+            profile = user.user_profiles.first()
+            team_group = app_editor
+            kwargs = {'profile': profile, 'username': username, 'team_group': team_group}
+
+            # Get the queryset, which is based on the listview parameters
+            qs = self.get_queryset()
+
+            # Start workbook
+            wb = openpyxl.Workbook()
+            # Create worksheet with data
+            ws = wb.active
+            ws.title = "Data"
+
+            # Create header cells
+            headers = [x['name'] for x in specification if x['type'] != "" ]
+            headers.insert(0, "Id")
+            for col_num in range(len(headers)):
+                c = ws.cell(row=1, column=col_num+1)
+                c.value = headers[col_num]
+                c.font = openpyxl.styles.Font(bold=True)
+                # Set width to a fixed size
+                ws.column_dimensions[get_column_letter(col_num+1)].width = 5.0        
+
+            row_num = 1
+            # Walk the items in the queryset
+            for obj in qs:
+                row_num += 1
+                # Add the object id
+                ws.cell(row=row_num, column=1).value = obj.id
+                col_num = 2
+                # Walk the items
+                for item in specification:
+                    if item['type'] != "":
+                        key, value = obj.custom_getkv(item, kwargs=kwargs)
+                        ws.cell(row=row_num, column=col_num).value = value
+                        col_num += 1
+
+            # Save it
+            wb.save(response)
+            sData = response
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("get_data")
+        return sData
+
+    def download_excel(self, dtype):
+        """Create a generic Excel download based on [specification]"""
+
+        response = None
+        oErr = ErrHandle()
+        try:
+
+            # Make a download name
+            downloadname = self.model.__name__
+            appl_name = APPLICATION_NAME
+            sDbName = "{}_{}.xlsx".format(appl_name, downloadname)
+
+            # Convert 'compressed_content' to an Excel worksheet
+            sContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            response = HttpResponse(content_type=sContentType)
+            response['Content-Disposition'] = 'attachment; filename="{}"'.format(sDbName)    
+            # Get the Data
+            sData = self.get_data('', dtype, response)
+
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("process_download")
+
+        return response
 
     def get_result_list(self, obj_list, context):
         result_list = []
@@ -1667,12 +1776,19 @@ class BasicList(ListView):
             self.qd = get
             self.param_list = []
             
-            # Then check if we have a redirect or not
-            if self.redirectpage == "":
-                # We can continue with the normal 'get()'
-                response = super(BasicList, self).get(request, *args, **kwargs)
+            # Check for downloading
+            if request.method == "POST" and self.qd.get("action") == "download":
+                dtype = self.qd.get("dtype", "")
+                if dtype != "":
+                    # This is not the regular listview, but just a downloading action
+                    response = self.download_excel(dtype)
             else:
-                response = redirect(self.redirectpage)
+                # Then check if we have a redirect or not
+                if self.redirectpage == "":
+                    # We can continue with the normal 'get()'
+                    response = super(BasicList, self).get(request, *args, **kwargs)
+                else:
+                    response = redirect(self.redirectpage)
         # REturn the appropriate response
         return response
 

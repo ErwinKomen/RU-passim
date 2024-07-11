@@ -69,6 +69,17 @@
                   </a>
                 {% endfor %}
               {% endif %}
+
+              {% if download_excel %}
+                <span id="exceldownloadstatus" class="hidden"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span></span>
+                <span id="download_excel">
+                  <a role="button" class="btn btn-sm jumbo-1" downloadtype="xlsx" ajaxurl="{{download_excel}}"
+                     onclick="ru.basic.post_download(this);" title="Download Excel">
+                    {% include 'basic/xlsx_symbol.html' %}
+                  </a>
+                </span>
+              {% endif %}
+
               {% if uploads and is_app_uploader %}
                 <a id="uploadmenu" role="button" title="Importing..." class="btn jumbo-1 btn-s dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" onclick="">
                   <span class="glyphicon glyphicon-upload"></span>
