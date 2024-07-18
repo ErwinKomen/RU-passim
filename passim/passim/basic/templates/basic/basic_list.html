@@ -32,6 +32,10 @@
         <!-- Allow access to interface parts that are normally hidden -->
         <div  class="panel panel-none">
 
+          {% if basic_intro %}
+            <div id="basic_intro">{{basic_intro|safe}}</div>
+          {% endif %}
+
           <div class="row">
             <div class="col-md-2 col-md-offset-6">
               {% if basicmap %}

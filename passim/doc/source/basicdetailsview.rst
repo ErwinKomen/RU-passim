@@ -240,7 +240,8 @@ Details listview
 ----------------
 
 A details view can optionally contain one or more listviews, which are implemented as tables.
-These tables are specified in the context variable ``related_objects`` as a list of objects.
+The example further down shows the details view of a Feast, that contains a listview of manuscripts with sermons.
+The detail view's listview tables are specified in the context variable ``related_objects`` as a list of objects.
 A related object can have the following fields:
 
 .. table::
@@ -373,9 +374,10 @@ It will have a field ``name`` for the name of the book and a field ``publisher``
         # [0-1] One book can only belong to one particular publisher
         publisher = models.ForeignKey(Publisher, null=True, blank=True, on_delete = models.SET_NULL, related_name="publisher_books")
 
-There is a many-to-one relation between Book and Publisher.
+The implication is: there is a many-to-one relation between Book and Publisher.
 How can the 'books' be added to the details view of ``Publisher``? 
 The user should be able to select or describe a book and add it to that publisher.
+The user should also be able to delete a book from a publisher.
 Here are the steps:
 
 #. Forms
@@ -547,7 +549,7 @@ Here are the steps:
 Having a many-to-many element
 -----------------------------
 
-Continuing the example of a ``Library`` with ``Book`` items connected to it, suppose this library contains
+Continuing the example of a ``Publisher`` with ``Book`` items connected to it, suppose this publisher contains
 books from two or three (or more) different projects. There's a model ``Project``.
 Each book may be part of one or more projects. This means that here should be a many-to-many relation
 between ``Book`` and ``Project``. To provide that link, we have a table ``BookProject`` that has a foreign key to a ``Book`` and one to a ``Project``.
@@ -587,7 +589,7 @@ Here are the steps:
 
 #. Model: process ``BookProject``
 
-   (#) Add a method like ``get__bookproject__markdown()`` that creates a HTML string to show the details of a book-project combination (including possibly status).
+   (#) Add a method like ``get_bookproject_markdown()`` that creates a HTML string to show the details of a book-project combination (including possibly status).
 
 #. Views
 

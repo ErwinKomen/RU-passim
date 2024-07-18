@@ -243,7 +243,23 @@ ModelManifest.xml
 
 # Python stuff
 *.pyc
-/passim/passim/seeker/migrations
+# /ru-basic/basic/migrations
+# /passim/passim/seeker/migrations
+# /passim/passim/testapp/migrations
+# /passim/passim/basic/migrations
+# /passim/passim/reader/migrations
+# /passim/passim/enrich/migrations
+# /passim/passim/bible/migrations
+# /passim/passim/stylo/migrations
+# /passim/passim/dct/migrations
+# /passim/passim/approve/migrations
+# /passim/passim/stemma/migrations
+# /passim/passim/plugin/migrations
+# /passim/passim/cms/migrations/0001_initial.py
+# /passim/passim/cms/migrations/0002_citem_original.py
+# /passim/passim/cms/migrations/0003_auto_20240124_1207.py
+# /passim/passim/cms/migrations/0003_alter_citem_id_alter_clocation_id_alter_cpage_id.py
+
 /passimproject/css/bootstrap.min.css
 /passimproject/img/erc_funded.png
 /passimproject/img/cerl.jpg
@@ -299,45 +315,35 @@ ModelManifest.xml
 /passim/static/seeker/scripts/like_button.js
 /passim/static/seeker/scripts/_references.js
 /passim/Lit_ref_PASSIM.pdf
-/passim/passim/testapp/migrations
 /passim/doc/make.bat
 /passim/doc/Makefile
 /passim/doc/source/conf.py
-/passim/passim/basic/migrations
 /passim/my_project.dot
-/ru-basic/basic/migrations
 /ru-basic/dist
 /ru-basic/ru_basic.egg-info
 /passim/passim/seeker/templates/seeker/super_linkset_ORG.html
 /passim/static
-/passim/passim/reader/migrations
 /passim/passim/seeker/templates/seeker/basket_buttons_VARIANT.html
 /passim/passim/seeker/templates/seeker/super_eqset_ORIGINAL.html
 /passimproject/media/Boodts.pdf
-/passim/passim/enrich/migrations
-/passim/passim/bible/migrations
 /passim/passim/seeker/static/seeker/scripts/d3.v6.js
 /passim/.vscode/settings.json
-/passim/passim/stylo/migrations
 /passim/passim/seeker/static/seeker/content/IconPassimP.ico
 /passim/passim/seeker/static/seeker/content/Icon Passim RGB.png
 /passimproject/media/Future_Digital_Manuscript_Studies_Oct_2021.pdf
 /passim/output.csv
-/passim/passim/dct/migrations
 /passimproject/media/On_the_Way_to_the_Future_of_Digital_Mss_Studies.pdf
 /passimproject/img/Schmidt, G. zwart wit.jpg
 /passimproject/img/Riccardo.jpeg
 /passimproject/img/Gleb.jpg
 /passimproject/img/Ger_main.jpg
 /passimproject/img/Ger.jpg
-/passim/passim/approve/migrations
 /passim_backup
 /passim/passim/basic/static/basic/scripts/select2.js
 /passim/passim/basic/static/basic/scripts/select2.full.js
 /passim/passim_seeker_20221013.svg
 /passimproject/media/22.12.02_CfP_PASSIM_Conference2023.pdf
 /passimproject/media/Visions of Authority - Flyer.pdf
-/passim/passim/stemma/migrations
 /passim/passim/stemma/templates/index.html
 /passim/log
 /passim/arrayms2
@@ -360,12 +366,6 @@ ModelManifest.xml
 /installtree.txt
 /requirements_aug2023.txt
 /passim/passim/basic/templates/basic/basic_edit_ORG.html
-/passim/passim/cms/migrations/0001_initial.py
-/passim/passim/cms/migrations/0002_citem_original.py
-/passim/passim/plugin/migrations
-/passim/passim/cms/migrations/0003_auto_20240124_1207.py
 /passim/req_tmp.txt
-/passim/passim/cms/migrations/0003_alter_citem_id_alter_clocation_id_alter_cpage_id.py
 /passim/passim/plugin/archive
 /passim/static/seeker/content/site.css
-/passim/passim/cms/migrations/0003_alter_citem_id_alter_clocation_id_alter_cpage_id.py

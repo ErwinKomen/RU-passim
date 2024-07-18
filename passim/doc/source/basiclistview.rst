@@ -5,6 +5,8 @@ Basic List View
 
 Creating and using the ``BasicList`` class is illustrated by the ``AuthorListView`` example.
 
+.. image:: images/Author_listview.png
+
 .. code-block:: python
    :linenos:
    
@@ -17,6 +19,7 @@ Creating and using the ``BasicList`` class is illustrated by the ``AuthorListVie
       prefix = "auth"
       basic_name = "author"
       paginate_by = 20
+      new_button = True
       delete_line = True
       page_function = "ru.passim.seeker.search_paged_start"
       order_cols = [...]            # See comments below
@@ -31,6 +34,9 @@ Creating and using the ``BasicList`` class is illustrated by the ``AuthorListVie
          sBack = ""
          sTitle = ""
          return sBack, sTitle
+
+      def add_to_context(self, contect, initial):
+         return context
 
 The ``AuthorListView`` is based on the view ``BasicList``, which is provided by the basic app.
 The ``BasicList`` class extends the Django-provided regular ``ListView`` class.
@@ -61,12 +67,15 @@ Attributes
    The default value is 15 lines per page. Specify it here if you would like to have a different page size.
 
 ``delete_line``
-   Set to ``True`` if you want the listview to show a deletion `X` on every row. 
+   Set to ``True`` if one wants the listview to show a deletion `X` on every row. 
    This is visually not very nice, but it allows the user to delete items directly from the listview.
    The alternative deletion is within the details view.
 
 ``page_function``
    Provide the full path to a JavaScript function that is called when the user clicks on a particular page of the listview. If not specified, the default function will be used. See ``basic.js``, function ``search_paged_start()``.
+
+``new_button``
+   Set to ``True`` if a button should be added to allow a user to create a new item.
 
 ``order_cols``
    This is a list of strings representing *all* the columns available in the listview.
@@ -217,4 +226,35 @@ All the methods available with Django's regular ``ListView`` can be used. The cl
             # Combine the HTML code
             sBack = "\n".join(html)
         return sBack, sTitle
+
+    def add_to_context(self, context, initial):
+       """Extend the [context] with more information or change existing info"""
+        return context
    
+Custom introduction
+-------------------
+
+It is possible to create a custom-introduction at the top side of the listview. 
+The way this works is by setting the contents of a **context** variable called `basic_intro`.
+Below is an example of how this could be implemented.
+
+.. code-block:: python
+   :linenos:
+
+    def add_to_context(self, context, initial):
+        oErr = ErrHandle()
+        try:
+            # Add a basic introduction
+            context['basic_intro'] = render_to_string("tsg/tsglist_intro.html", context, self.request)
+        except:
+            msg = oErr.get_error_message()
+            oErr.DoError("TsgHandleList/add_to_context")
+        return context
+
+The regular value of the ``context`` dictionary element ``basic_intro`` will be empty.
+But the function above fills it with the information fetched from an additional custom template ``tsglist_intro.html``.
+
+Search capabilities
+-------------------
+
+

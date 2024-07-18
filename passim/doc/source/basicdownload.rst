@@ -3,9 +3,11 @@ Basic listview downloads
 
 The ``BasicList`` view comes with an automatic button for Excel downloading, provided a few criteria are met.
 
-  ``Custom`` - the listview's model must use ``Custom`` as an add-in
+  ``Custom`` - the listview's model must use :ref:`Custom <basiccustomapi>` as an add-in
 
   ``specification`` - listview's model must have a ``specification`` supplied
+
+  ``spec_download`` - the listview to allow downloading must set the ``spec_download`` class variable to True
 
 
 .. _basiccustom:
@@ -28,7 +30,7 @@ The code below shows how to get a model class started with ``Custom``.
         """This illustrates an Author class with help from Custom"""
         pass
 
-The download 'specification'
+The 'specification'
 ----------------------------
 
 The model should have an additional model variable ``specification``, which defines a list of objects.
@@ -48,16 +50,26 @@ The fields of the objects in the ``specification`` list have the following meani
     ``[readonly]``    if ``True``, this means that uploading may not take place for this items
     ================= ============================================================================
 
-A download example
+An example
 ------------------
 
 Here is an example of how downloading for a listview is specified.
-Note that the downloading specification is entirely done in the model code.
-
+First of all, the listview must set the ``spec_download`` class variable.
 
 .. code-block:: python
    :linenos:
+
+   class AuthorList(BasicList):
+      """Listview of authors"""
+
+      model = Author
+      spec_download = True
+
+The downloading specification itself is entirely done in the model code.
    
+.. code-block:: python
+   :linenos:
+
    class Author(models.Model, Custom):
       """Search and list authors"""
 	    
@@ -92,7 +104,7 @@ Note that the downloading specification is entirely done in the model code.
             return sBack
 
 
-The above specification says that the Excel should contain columns *Name*, *Abbreviation* and *Number*,
+The above specification in the model says that the Excel should contain columns *Name*, *Abbreviation* and *Number*,
 and that these columns should contain the values from the fields ``name``, ``abbr`` and ``number``. 
 By virtue of the ``func`` type path, there also is a column named *Contributions*, and the values of cells
 in that column are calculated via ``custom_get()``, which, in turn, makes a call to the model's function

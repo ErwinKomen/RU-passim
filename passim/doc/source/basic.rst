@@ -84,11 +84,15 @@ if you have an application called ``yourapplication``, and one Django app in it 
         'yourapplication.main',
     ]
 
+.. _basicapi:
+
 API
 --------
 
 .. automodule:: passim.basic.views
    :members:
+
+.. _basiccustomapi:
 
 .. automodule:: passim.basic.models
    :members:
