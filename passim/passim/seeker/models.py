@@ -1547,6 +1547,11 @@ class Profile(models.Model):
     # [1] Every user has a stack: a list of visit objects
     stack = models.TextField("Stack", default = "[]")
 
+    ## [1] Every Profile has a status to keep track of who edited it
+    #stype = models.CharField("Status", choices=build_abbr_list(STATUS_TYPE), max_length=5, default="man")
+    ## [0-1] Status note
+    #snote = models.TextField("Status note(s)", default="[]")
+
     # [1] Stringified JSON lists for M/S/SG/SSG search results, to facilitate basket operations
     search_manu = models.TextField("Search results Manu", default = "[]")
     search_sermo = models.TextField("Search results Sermo", default = "[]")

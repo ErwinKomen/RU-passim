@@ -347,7 +347,9 @@ class MyPassimEdit(BasicDetails):
                 context['approve_projects'] = get_project_list(profile.project_approver.all())
 
                 # Default project(s)
-                context['default_projects'] = get_project_list(profile.project_approver.filter(status="incl"))
+                # issue #742: change from project_approver to project_editor
+                # context['default_projects'] = get_project_list(profile.project_approver.filter(status="incl"))
+                context['default_projects'] = get_project_list(profile.project_editor.filter(status="incl"))
 
             # Make sure to check (and possibly create) EqualApprove items for this user
             iCount = EqualChange.check_projects(profile)
