@@ -585,9 +585,11 @@ class SetList(models.Model):
         try:
             if self.setlisttype == "manu":
                 # Create a list of SSG's from the manuscript
-                lBack = self.ssgs_manuscript(self.manuscript)
+                # WRONG ARGUMENT: lBack = self.ssgs_manuscript(self.manuscript)
+                lBack = self.ssgs_manuscript()
             elif self.setlisttype in collection_types:
-                lBack = self.ssgs_collection(self.collection)
+                # Wrong argument: lBack = self.ssgs_collection(self.collection)
+                lBack = self.ssgs_collection()
         except:
             msg = oErr.get_error_message()
             oErr.DoError("SetList/get_ssg_list")

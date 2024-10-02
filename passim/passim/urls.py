@@ -494,7 +494,7 @@ urlpatterns = [
     re_path(r'^definitions$', RedirectView.as_view(url='/'+pfx+'admin/'), name='definitions'),
     re_path(r'^signup/$', passim.seeker.views.signup, name='signup'),
 
-    re_path(r'^login/user/(?P<user_id>\w[\w\d\-_]+)$', passim.seeker.views.login_as_user, name='login_as'),
+    re_path(r'^login/user/(?P<user_id>\w[\w\d\-\._]+)$', passim.seeker.views.login_as_user, name='login_as'),
 
     re_path(r'^login/$', LoginView.as_view
         (
