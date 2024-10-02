@@ -930,7 +930,8 @@ def csv_to_excel(sCsvData, response):
 
     # Start workbook
     wb = openpyxl.Workbook()
-    ws = wb.get_active_sheet()
+    # ws = wb.get_active_sheet()
+    ws = wb.active
     ws.title="Data"
 
     # Start accessing the string data 

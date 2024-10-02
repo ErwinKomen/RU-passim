@@ -2244,7 +2244,8 @@ def do_huwa(request):
         if bCreateExcel:
             # Start workbook
             wb = openpyxl.Workbook()
-            ws = wb.get_active_sheet()
+            # ws = wb.get_active_sheet()
+            ws = wb.active
             ws.title="Intro"
             c = ws.cell(row=1, column=1)
             c.value = "Automatically generated list of HUWA database tables"
@@ -12962,7 +12963,8 @@ class ManuscriptDownload(BasicPart):
                 wb = openpyxl.Workbook()
 
                 # First worksheet: MANUSCRIPT itself
-                ws = wb.get_active_sheet()
+                # ws = wb.get_active_sheet()
+                ws = wb.active
                 ws.title="Manuscript"
 
                 # Read the header cells and make a header row in the MANUSCRIPT worksheet
@@ -16054,7 +16056,8 @@ class EqualGoldVisDownload(BasicPart):
                     wb = openpyxl.Workbook()
 
                     # First worksheet: Name of the legend
-                    ws = wb.get_active_sheet()
+                    # ws = wb.get_active_sheet()
+                    ws = wb.active
                     ws.title="Data"
                     c = ws.cell(row=1, column=1)
                     c.value = "Legend"
