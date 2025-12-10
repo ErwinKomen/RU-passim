@@ -24,6 +24,15 @@ The ``basic`` app provides a few more things that might come in handy:
   ``ErrHandle`` model - provides a standard way to deal with errors and provide log information (server level)
     This is meant to be used in Python's ``try: except:`` blocks
 
+It is possible to generate some views automatically: 
+
+  * Enter the correct virtual environment
+  * Use the command line interface: ``python manage.py addview <app> <model>``
+
+    * where ``<app>`` is the name of the django app that resides inside ``<model>``
+
+  * Review the output code and place it in the correct ``models.py``, ``views.py``, ``forms.py`` etc.
+
 Files and folders
 -----------------
 The top directory of the ``basic`` *app* should be placed next to other apps in your Django application.

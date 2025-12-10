@@ -16,7 +16,6 @@
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <CommandLineArguments>-i "d:/Data Files/TG/Passim/Data/huwa/lib_huwa_new_EK-jan2023.xlsx" -o "d:/Data Files/TG/Passim/Data/huwa/lib_huwa_new-jan2023.json"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
-    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,6 +33,7 @@
     <Compile Include="huwalib.py" />
     <Compile Include="huwasig.py" />
     <Compile Include="interche.py" />
+    <Compile Include="interche_epub.py" />
     <Compile Include="latinbats.py" />
     <Compile Include="cs_to_xlsx.py">
       <SubType>Code</SubType>
@@ -57,6 +57,13 @@
       <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
       <Architecture>Amd64</Architecture>
     </Interpreter>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="templates\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="templates\flexword.xml" />
+    <Content Include="templates\intlbox.xml" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

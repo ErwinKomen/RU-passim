@@ -10,7 +10,15 @@ The Passim Utilities allow defining a generic details view with the following ch
 3. No template needs to be specified neither for the Details nor for the Edit view: two generic templates are used (``basic_details.html``, ``basic_edit.html``) internally
 
 The following sections describe how to write the EditView and the DetailsView.
-Note that the *name* for these views in ``urls.py`` needs to use the same ``basic_name`` as used for the BasicListView.
+
+**Notes**:
+
+#. The *name* for these views in ``urls.py`` needs to use the same ``basic_name`` as used for the BasicListView.
+#. It is possible to generate some views automatically: 
+
+   * Enter the correct virtual environment
+   * Call manage: ``python manage.py addview <app> <model>``, where ``<app>`` is the name of the django app that resides inside ``<model>``
+   * Review the output code and place it in the correct ``models.py``, ``views.py``, ``forms.py`` etc.
 
 EditView basics
 ---------------

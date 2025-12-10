@@ -4,10 +4,12 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <Name>passim</Name>
     <RootNamespace>passim</RootNamespace>
-    <InterpreterId>MSBuild|{3505382d-cd29-4811-a618-c985c9459a18}|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>MSBuild|passim39|$(MSBuildProjectFullPath)</InterpreterId>
     <WebBrowserPort>6405</WebBrowserPort>
     <WebBrowserUrl>
     </WebBrowserUrl>
+    <SuppressConfigureTestFrameworkPrompt>true</SuppressConfigureTestFrameworkPrompt>
+    <SuppressPackageInstallationPrompt>True</SuppressPackageInstallationPrompt>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -19,8 +21,9 @@
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
-    <LaunchProvider>Web launcher</LaunchProvider>
+    <LaunchProvider>Django launcher</LaunchProvider>
     <OutputPath>.</OutputPath>
+    <WebBrowserUrl>http://localhost</WebBrowserUrl>
     <WebBrowserUrl>http://localhost</WebBrowserUrl>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -32,16 +35,136 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="doc\source\conf.py" />
     <Compile Include="manage.py" />
+    <Compile Include="passim\asgi.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="userguide\source\conf.py" />
+    <Compile Include="passim\approve\admin.py" />
+    <Compile Include="passim\approve\apps.py" />
+    <Compile Include="passim\approve\forms.py" />
+    <Compile Include="passim\approve\migrations\0001_initial.py" />
+    <Compile Include="passim\approve\migrations\0002_equalchange_atype.py" />
+    <Compile Include="passim\approve\migrations\0003_equalapproval.py" />
+    <Compile Include="passim\approve\migrations\0004_auto_20220110_1459.py" />
+    <Compile Include="passim\approve\migrations\0005_equalchange_comment.py" />
+    <Compile Include="passim\approve\migrations\0006_equaladd_equaladdapproval.py" />
+    <Compile Include="passim\approve\migrations\__init__.py" />
+    <Compile Include="passim\approve\models.py" />
+    <Compile Include="passim\approve\tests.py" />
+    <Compile Include="passim\approve\views.py" />
+    <Compile Include="passim\approve\__init__.py" />
     <Compile Include="passim\basic\admin.py" />
     <Compile Include="passim\basic\apps.py" />
+    <Compile Include="passim\basic\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\basic\migrations\0001_initial.py" />
+    <Compile Include="passim\basic\migrations\__init__.py" />
     <Compile Include="passim\basic\models.py" />
     <Compile Include="passim\basic\tests.py" />
     <Compile Include="passim\basic\utils.py" />
     <Compile Include="passim\basic\views.py" />
+    <Compile Include="passim\basic\widgets.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\basic\__init__.py" />
+    <Compile Include="passim\bible\admin.py" />
+    <Compile Include="passim\bible\apps.py" />
+    <Compile Include="passim\bible\migrations\__init__.py" />
+    <Compile Include="passim\bible\models.py" />
+    <Compile Include="passim\bible\tests.py" />
+    <Compile Include="passim\bible\utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\bible\views.py" />
+    <Compile Include="passim\bible\__init__.py" />
+    <Compile Include="passim\cms\admin.py" />
+    <Compile Include="passim\cms\apps.py" />
+    <Compile Include="passim\cms\view_utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\cms\forms.py" />
+    <Compile Include="passim\cms\migrations\__init__.py" />
+    <Compile Include="passim\cms\models.py" />
+    <Compile Include="passim\cms\tests.py" />
+    <Compile Include="passim\cms\views.py" />
+    <Compile Include="passim\cms\__init__.py" />
+    <Compile Include="passim\dct\admin.py" />
+    <Compile Include="passim\dct\apps.py" />
+    <Compile Include="passim\dct\forms.py" />
+    <Compile Include="passim\dct\migrations\0001_initial.py" />
+    <Compile Include="passim\dct\migrations\0002_auto_20210819_1010.py" />
+    <Compile Include="passim\dct\migrations\0003_auto_20210823_1144.py" />
+    <Compile Include="passim\dct\migrations\0004_researchset_contents.py" />
+    <Compile Include="passim\dct\migrations\0005_auto_20210823_1558.py" />
+    <Compile Include="passim\dct\migrations\0006_setdef_order.py" />
+    <Compile Include="passim\dct\migrations\0007_auto_20210826_1100.py" />
+    <Compile Include="passim\dct\migrations\0008_auto_20210826_1347.py" />
+    <Compile Include="passim\dct\migrations\0009_researchset_scope.py" />
+    <Compile Include="passim\dct\migrations\0010_setlist_name.py" />
+    <Compile Include="passim\dct\migrations\__init__.py" />
+    <Compile Include="passim\dct\models.py" />
+    <Compile Include="passim\dct\tests.py" />
+    <Compile Include="passim\dct\views.py" />
+    <Compile Include="passim\dct\__init__.py" />
+    <Compile Include="passim\enrich\admin.py" />
+    <Compile Include="passim\enrich\apps.py" />
+    <Compile Include="passim\enrich\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\enrich\latin.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\enrich\migrations\__init__.py" />
+    <Compile Include="passim\enrich\models.py" />
+    <Compile Include="passim\enrich\tests.py" />
+    <Compile Include="passim\enrich\views.py" />
+    <Compile Include="passim\enrich\__init__.py" />
+    <Compile Include="passim\plugin\admin.py" />
+    <Compile Include="passim\plugin\apps.py" />
+    <Compile Include="passim\plugin\calculate.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\plugin\code\clustering_series_as_bags.py" />
+    <Compile Include="passim\plugin\code\clustering_series_as_factorized_bags.py" />
+    <Compile Include="passim\plugin\code\clustering_series_as_sequences.py" />
+    <Compile Include="passim\plugin\code\compute_pmi.py" />
+    <Compile Include="passim\plugin\code\compute_series_distance.py" />
+    <Compile Include="passim\plugin\code\idf_weights.py" />
+    <Compile Include="passim\plugin\code\network_analysis_common_substrings.py" />
+    <Compile Include="passim\plugin\code\prepare_bag_of_n_sermons.py" />
+    <Compile Include="passim\plugin\code\prepare_string_sequences.py" />
+    <Compile Include="passim\plugin\code\string_distance.py" />
+    <Compile Include="passim\plugin\code\substrings_ngram_freq_greedy_analysis.py" />
+    <Compile Include="passim\plugin\code\substrings_pairwise_visedit_comparison.py" />
+    <Compile Include="passim\plugin\code\utils_preprocessing.py" />
+    <Compile Include="passim\plugin\code\utils_strings.py" />
+    <Compile Include="passim\plugin\code\__init__.py" />
+    <Compile Include="passim\plugin\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\plugin\archive\layout.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\plugin\migrations\__init__.py" />
+    <Compile Include="passim\plugin\models.py" />
+    <Compile Include="passim\plugin\archive\simple.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\plugin\tests.py" />
+    <Compile Include="passim\plugin\archive\utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\plugin\archive\dashboard.py" />
+    <Compile Include="passim\plugin\views.py" />
+    <Compile Include="passim\plugin\__init__.py" />
     <Compile Include="passim\reader\admin.py" />
     <Compile Include="passim\reader\apps.py" />
+    <Compile Include="passim\reader\excel.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\reader\forms.py">
       <SubType>Code</SubType>
     </Compile>
@@ -50,8 +173,57 @@
     <Compile Include="passim\reader\tests.py" />
     <Compile Include="passim\reader\views.py" />
     <Compile Include="passim\reader\__init__.py" />
+    <Compile Include="passim\seeker\adaptations.py" />
     <Compile Include="passim\seeker\admin.py" />
     <Compile Include="passim\seeker\apps.py" />
+    <Compile Include="passim\seeker\views_utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\admin.py" />
+    <Compile Include="passim\stemma\algdiffblock.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\algorithms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\apps.py" />
+    <Compile Include="passim\stemma\convert.py" />
+    <Compile Include="passim\stemma\external.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\fitch.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\forms.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stemma\migrations\__init__.py" />
+    <Compile Include="passim\stemma\models.py" />
+    <Compile Include="passim\stemma\tests.py" />
+    <Compile Include="passim\stemma\views.py" />
+    <Compile Include="passim\stemma\__init__.py" />
+    <Compile Include="passim\stylo\analysis.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\api.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\cluster.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\dendrogram.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\distance.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\linkage.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\clustering\__init__.py" />
+    <Compile Include="passim\stylo\corpus.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\seeker\excel.py">
       <SubType>Code</SubType>
     </Compile>
@@ -61,9 +233,46 @@
     <Compile Include="passim\seeker\migrations\__init__.py" />
     <Compile Include="passim\seeker\models.py" />
     <Compile Include="passim\seeker\tests.py" />
+    <Compile Include="passim\stylo\distance_metrics.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\tokenize\api.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\tokenize\regexp.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\tokenize\simple.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\tokenize\util.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\tokenize\__init__.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\stylo\vectorization.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\seeker\views.py" />
+    <Compile Include="passim\seeker\views_archive.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\seeker\visualizations.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="passim\seeker\__init__.py" />
+    <Compile Include="passim\stylo\admin.py" />
+    <Compile Include="passim\stylo\apps.py" />
+    <Compile Include="passim\stylo\migrations\__init__.py" />
+    <Compile Include="passim\stylo\models.py" />
+    <Compile Include="passim\stylo\tests.py" />
+    <Compile Include="passim\stylo\views.py" />
+    <Compile Include="passim\stylo\__init__.py" />
     <Compile Include="passim\utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="passim\views.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="passim\__init__.py" />
@@ -74,14 +283,59 @@
   <ItemGroup>
     <Folder Include="doc\" />
     <Folder Include="doc\source\" />
+    <Folder Include="doc\source\images\" />
+    <Folder Include="passim\templates\archive\" />
+    <Folder Include="userguide\" />
+    <Folder Include="userguide\build\" />
+    <Folder Include="userguide\source\" />
+    <Folder Include="userguide\source\img\" />
+    <Folder Include="userguide\source\_static\" />
+    <Folder Include="userguide\source\_templates\" />
     <Folder Include="passim\" />
+    <Folder Include="passim\approve\" />
+    <Folder Include="passim\approve\migrations\" />
+    <Folder Include="passim\approve\migrations\__pycache__\" />
+    <Folder Include="passim\approve\templates\" />
+    <Folder Include="passim\approve\templates\approve\" />
+    <Folder Include="passim\approve\__pycache__\" />
     <Folder Include="passim\basic\" />
+    <Folder Include="passim\basic\migrations\" />
     <Folder Include="passim\basic\static\" />
     <Folder Include="passim\basic\static\basic\" />
     <Folder Include="passim\basic\static\basic\content\" />
+    <Folder Include="passim\basic\static\basic\fonts\" />
     <Folder Include="passim\basic\static\basic\scripts\" />
     <Folder Include="passim\basic\templates\" />
     <Folder Include="passim\basic\templates\basic\" />
+    <Folder Include="passim\bible\" />
+    <Folder Include="passim\bible\migrations\" />
+    <Folder Include="passim\bible\templates\" />
+    <Folder Include="passim\cms\" />
+    <Folder Include="passim\cms\migrations\" />
+    <Folder Include="passim\cms\templates\" />
+    <Folder Include="passim\cms\templates\cms\" />
+    <Folder Include="passim\dct\" />
+    <Folder Include="passim\dct\migrations\" />
+    <Folder Include="passim\dct\migrations\__pycache__\" />
+    <Folder Include="passim\dct\static\" />
+    <Folder Include="passim\dct\static\dct\" />
+    <Folder Include="passim\dct\static\dct\scripts\" />
+    <Folder Include="passim\dct\templates\" />
+    <Folder Include="passim\dct\templates\dct\" />
+    <Folder Include="passim\dct\__pycache__\" />
+    <Folder Include="passim\enrich\" />
+    <Folder Include="passim\enrich\migrations\" />
+    <Folder Include="passim\enrich\templates\" />
+    <Folder Include="passim\enrich\templates\enrich\" />
+    <Folder Include="passim\plugin\" />
+    <Folder Include="passim\plugin\code\" />
+    <Folder Include="passim\plugin\migrations\" />
+    <Folder Include="passim\plugin\archive\" />
+    <Folder Include="passim\plugin\static\" />
+    <Folder Include="passim\plugin\static\plugin\" />
+    <Folder Include="passim\plugin\static\plugin\scripts\" />
+    <Folder Include="passim\plugin\templates\" />
+    <Folder Include="passim\plugin\templates\plugin\" />
     <Folder Include="passim\reader\" />
     <Folder Include="passim\reader\migrations\" />
     <Folder Include="passim\reader\templates\" />
@@ -91,7 +345,20 @@
     <Folder Include="passim\seeker\static\seeker\content\" />
     <Folder Include="passim\seeker\static\seeker\fonts\" />
     <Folder Include="passim\seeker\static\seeker\scripts\" />
+    <Folder Include="passim\seeker\templates\old\" />
     <Folder Include="passim\seeker\templates\seeker\" />
+    <Folder Include="passim\stemma\" />
+    <Folder Include="passim\stemma\migrations\" />
+    <Folder Include="passim\stemma\static\" />
+    <Folder Include="passim\stemma\static\stemma\" />
+    <Folder Include="passim\stemma\static\stemma\scripts\" />
+    <Folder Include="passim\stemma\templates\" />
+    <Folder Include="passim\stemma\templates\stemma\" />
+    <Folder Include="passim\stylo\" />
+    <Folder Include="passim\stylo\migrations\" />
+    <Folder Include="passim\stylo\clustering\" />
+    <Folder Include="passim\stylo\tokenize\" />
+    <Folder Include="passim\stylo\templates\" />
     <Folder Include="passim\templates\" />
     <Folder Include="passim\seeker\" />
     <Folder Include="passim\seeker\migrations\" />
@@ -99,23 +366,137 @@
     <Folder Include="passim\templates\admin\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".editorconfig" />
     <Content Include="codemeta.json">
       <SubType>Code</SubType>
     </Content>
-    <None Include="passim\seeker\static\seeker\scripts\_references.js" />
     <Content Include="doc\source\assumptions.rst" />
+    <Content Include="doc\source\basicdownload.rst" />
     <Content Include="doc\source\basic.rst" />
     <Content Include="doc\source\basiclistview.rst" />
-    <Content Include="doc\source\detailsview.rst" />
+    <Content Include="doc\source\basicpart.rst" />
+    <Content Include="doc\source\basicdetailsview.rst" />
+    <Content Include="doc\source\images\AF_details.png" />
+    <Content Include="doc\source\images\AF_details_list.png" />
     <Content Include="doc\source\index.rst" />
+    <Content Include="doc\source\mapview.rst" />
     <Content Include="doc\source\tagtext.rst" />
+    <Content Include="passim\basic\templates\basic\map_list_switch.html" />
+    <Content Include="passim\basic\templates\basic\xlsx_symbol.html" />
+    <Content Include="passim\dct\templates\dct\xlsimp_templates.html" />
+    <Content Include="passim\dct\templates\dct\xlsrev_form.html" />
+    <Content Include="passim\dct\templates\dct\xlsrev_button.html" />
+    <Content Include="passim\dct\templates\dct\xlsimp_details.html" />
+    <Content Include="passim\dct\templates\dct\xlsimp_form.html" />
+    <Content Include="passim\dct\templates\dct\xlsimp_button.html" />
+    <Content Include="passim\seeker\static\seeker\content\Authorityfile.png" />
+    <Content Include="passim\seeker\static\seeker\content\cppm.png" />
+    <Content Include="passim\seeker\static\seeker\content\csel.png" />
+    <Content Include="passim\seeker\static\seeker\content\favicon.ico" />
+    <Content Include="passim\seeker\static\seeker\content\IconPassimRGB.jpg" />
+    <Content Include="passim\seeker\static\seeker\content\IconPassimRGB.png" />
+    <Content Include="passim\seeker\static\seeker\content\Leuven.png" />
+    <Content Include="passim\seeker\static\seeker\content\Manifestation.png" />
+    <Content Include="passim\seeker\static\seeker\content\Manuscript.png" />
+    <Content Include="passim\seeker\static\seeker\content\passim_technical_setup.png" />
+    <Content Include="passim\seeker\templates\seeker\af_title.html" />
+    <Content Include="passim\seeker\templates\seeker\dataset_download.html" />
+    <Content Include="userguide\make.bat" />
+    <Content Include="userguide\Makefile" />
+    <Content Include="userguide\source\img\passimug-main.jpg" />
+    <Content Include="userguide\source\index.rst" />
+    <Content Include="userguide\source\introduction.rst" />
+    <Content Include="passim\approve\migrations\__pycache__\0001_initial.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0001_initial.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0002_equalchange_atype.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0002_equalchange_atype.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0003_equalapproval.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0003_equalapproval.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0004_auto_20220110_1459.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0004_auto_20220110_1459.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0005_equalchange_comment.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0005_equalchange_comment.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0006_equaladd_equaladdapproval.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\0006_equaladd_equaladdapproval.cpython-38.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\__init__.cpython-35.pyc" />
+    <Content Include="passim\approve\migrations\__pycache__\__init__.cpython-38.pyc" />
+    <Content Include="passim\approve\templates\approve\add_approval.html" />
+    <Content Include="passim\approve\templates\approve\change_approvals.html" />
+    <Content Include="passim\approve\__pycache__\admin.cpython-35.pyc" />
+    <Content Include="passim\approve\__pycache__\forms.cpython-35.pyc" />
+    <Content Include="passim\approve\__pycache__\models.cpython-35.pyc" />
+    <Content Include="passim\approve\__pycache__\views.cpython-35.pyc" />
+    <Content Include="passim\approve\__pycache__\__init__.cpython-35.pyc" />
     <Content Include="passim\basic\static\basic\content\basic.css" />
+    <Content Include="passim\basic\static\basic\content\clippy.png" />
+    <Content Include="passim\basic\static\basic\content\font-awesome.min.css" />
+    <Content Include="passim\basic\static\basic\fonts\fontawesome-webfont.eot" />
+    <Content Include="passim\basic\static\basic\fonts\fontawesome-webfont.svg" />
+    <Content Include="passim\basic\static\basic\fonts\fontawesome-webfont.ttf" />
+    <Content Include="passim\basic\static\basic\fonts\fontawesome-webfont.woff" />
+    <Content Include="passim\basic\static\basic\fonts\fontawesome-webfont.woff2" />
+    <Content Include="passim\basic\static\basic\fonts\FontAwesome.otf" />
+    <Content Include="passim\basic\static\basic\fonts\glyphicons-halflings-regular.eot" />
+    <Content Include="passim\basic\static\basic\fonts\glyphicons-halflings-regular.svg" />
+    <Content Include="passim\basic\static\basic\fonts\glyphicons-halflings-regular.ttf" />
+    <Content Include="passim\basic\static\basic\fonts\glyphicons-halflings-regular.woff" />
+    <Content Include="passim\basic\static\basic\fonts\glyphicons-halflings-regular.woff2" />
     <Content Include="passim\basic\static\basic\scripts\basic.js" />
+    <Content Include="passim\basic\static\basic\scripts\html2canvas.js" />
+    <Content Include="passim\basic\static\basic\scripts\htmlsvg2canvas.js" />
     <Content Include="passim\basic\templates\basic\basic_details.html" />
+    <Content Include="passim\basic\templates\basic\basic_edit_ORG.html" />
     <Content Include="passim\basic\templates\basic\basic_edit.html" />
     <Content Include="passim\basic\templates\basic\basic_list.html" />
+    <Content Include="passim\basic\templates\basic\basic_row.html" />
+    <Content Include="passim\seeker\templates\seeker\download_status.html" />
+    <Content Include="passim\basic\templates\basic\filter_help.html" />
+    <Content Include="passim\bible\templates\index.html" />
+    <Content Include="passim\dct\migrations\__pycache__\0001_initial.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0002_auto_20210819_1010.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0003_auto_20210823_1144.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0004_researchset_contents.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0005_auto_20210823_1558.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0006_setdef_order.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0007_auto_20210826_1100.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0008_auto_20210826_1347.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0009_researchset_scope.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\0010_setlist_name.cpython-35.pyc" />
+    <Content Include="passim\dct\migrations\__pycache__\__init__.cpython-35.pyc" />
+    <Content Include="passim\dct\static\dct\scripts\ru.dct.js" />
+    <Content Include="passim\dct\templates\dct\dct.html" />
+    <Content Include="passim\dct\templates\dct\dct_view.html" />
+    <Content Include="passim\dct\templates\dct\download.html" />
+    <Content Include="passim\dct\templates\dct\mypassim.html" />
+    <Content Include="passim\dct\templates\dct\rel_view.html" />
+    <Content Include="passim\dct\templates\dct\selitem_button.html" />
+    <Content Include="passim\dct\templates\dct\selitem_form.html" />
+    <Content Include="passim\dct\templates\dct\selitem_main.html" />
+    <Content Include="passim\dct\templates\dct\dct_create.html" />
+    <Content Include="passim\dct\templates\dct\setlist_add.html" />
+    <Content Include="passim\dct\templates\dct\sgroup_new.html" />
+    <Content Include="passim\dct\templates\dct\sitem_button.html" />
+    <Content Include="passim\dct\templates\dct\sitem_form.html" />
+    <Content Include="passim\dct\templates\dct\sgroup_add.html" />
+    <Content Include="passim\dct\templates\dct\super_overlap.html" />
+    <Content Include="passim\dct\templates\dct\super_trans.html" />
+    <Content Include="passim\dct\templates\dct\vis_details.html" />
+    <Content Include="passim\dct\__pycache__\admin.cpython-35.pyc" />
+    <Content Include="passim\dct\__pycache__\forms.cpython-35.pyc" />
+    <Content Include="passim\dct\__pycache__\models.cpython-35.pyc" />
+    <Content Include="passim\dct\__pycache__\views.cpython-35.pyc" />
+    <Content Include="passim\dct\__pycache__\__init__.cpython-35.pyc" />
+    <Content Include="passim\enrich\templates\enrich\experiment.html" />
+    <Content Include="passim\plugin\static\plugin\scripts\ru.plugin.js" />
+    <Content Include="passim\plugin\archive\dashboard.html" />
+    <Content Include="passim\plugin\templates\plugin\sermonboard.html" />
+    <Content Include="passim\plugin\archive\simple.html" />
+    <Content Include="passim\reader\templates\reader\import_libraries.html" />
+    <Content Include="passim\reader\templates\reader\import_transeqg.html" />
+    <Content Include="passim\reader\templates\reader\import_ssgs.html" />
     <Content Include="passim\reader\templates\reader\import_manuscripts.html" />
     <Content Include="passim\seeker\static\seeker\content\bootstrap.css" />
+    <Content Include="passim\seeker\static\seeker\content\bootstrap.min.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-base.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-form.css" />
     <Content Include="passim\seeker\static\seeker\content\ru-widgets.css" />
@@ -127,6 +508,8 @@
     <Content Include="passim\seeker\static\seeker\fonts\glyphicons-halflings-regular.woff2" />
     <Content Include="passim\seeker\static\seeker\scripts\bootstrap.js" />
     <Content Include="passim\seeker\static\seeker\scripts\bootstrap.min.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\d3.v6.js" />
+    <Content Include="passim\seeker\static\seeker\scripts\d3.v6.min.js" />
     <Content Include="passim\seeker\static\seeker\scripts\passim.js" />
     <Content Include="passim\seeker\static\seeker\scripts\crpstudio.htable.js" />
     <Content Include="passim\seeker\static\seeker\scripts\crpstudio.svg.js" />
@@ -146,63 +529,121 @@
     <Content Include="passim\seeker\static\seeker\scripts\respond.min.js" />
     <Content Include="passim\seeker\static\seeker\scripts\typeahead.bundle.js" />
     <Content Include="passim\seeker\static\seeker\scripts\xhr2.js" />
-    <Content Include="passim\seeker\templates\seeker\author_details.html" />
-    <Content Include="passim\seeker\templates\seeker\author_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\basic_list.html" />
+    <Content Include="passim\seeker\templates\seeker\af_graphs.html" />
+    <Content Include="passim\seeker\templates\seeker\af_manifestations.html" />
+    <Content Include="passim\seeker\templates\seeker\af_networks.html" />
+    <Content Include="passim\seeker\templates\seeker\approve_keywords.html" />
+    <Content Include="passim\seeker\templates\old\author_details.html" />
+    <Content Include="passim\seeker\templates\old\author_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\author_info.html" />
+    <Content Include="passim\seeker\templates\old\basic_list.html" />
     <Content Include="passim\seeker\templates\seeker\basket_choices.html" />
     <Content Include="passim\seeker\templates\seeker\basket_buttons.html" />
+    <Content Include="passim\seeker\templates\seeker\codico_buttons.html" />
+    <Content Include="passim\seeker\templates\seeker\commentresponse_mail.html" />
+    <Content Include="passim\seeker\templates\seeker\commentresponse_send.html" />
+    <Content Include="passim\seeker\templates\seeker\comment_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\comment_response.html" />
+    <Content Include="passim\seeker\templates\seeker\ftext_buttons.html" />
+    <Content Include="passim\seeker\templates\seeker\pending_changes.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_action.html" />
     <Content Include="passim\seeker\templates\seeker\collection.html" />
-    <Content Include="passim\seeker\templates\seeker\author_list.html" />
-    <Content Include="passim\seeker\templates\seeker\collection_details.html" />
-    <Content Include="passim\seeker\templates\seeker\collection_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\collection_list.html" />
+    <Content Include="passim\seeker\templates\old\author_list.html" />
+    <Content Include="passim\seeker\templates\old\collection_details.html" />
+    <Content Include="passim\seeker\templates\old\collection_edit.html" />
+    <Content Include="passim\seeker\templates\old\collection_list.html" />
     <Content Include="passim\seeker\templates\seeker\collection_sermset.html" />
+    <Content Include="passim\seeker\templates\seeker\collpriv.html" />
+    <Content Include="passim\seeker\templates\seeker\coll_buttons.html" />
+    <Content Include="passim\seeker\templates\seeker\comment_add.html" />
+    <Content Include="passim\seeker\templates\seeker\codico_list.html" />
+    <Content Include="passim\seeker\templates\seeker\comment_list.html" />
+    <Content Include="passim\seeker\templates\seeker\comment_mail.html" />
+    <Content Include="passim\seeker\templates\seeker\dataset_add.html" />
+    <Content Include="passim\seeker\templates\seeker\download.html" />
+    <Content Include="passim\seeker\templates\seeker\filter_help.html" />
     <Content Include="passim\seeker\templates\seeker\formset_new.html" />
-    <Content Include="passim\seeker\templates\seeker\generic_details.html" />
-    <Content Include="passim\seeker\templates\seeker\generic_edit.html" />
+    <Content Include="passim\seeker\templates\old\generic_details.html" />
+    <Content Include="passim\seeker\templates\old\generic_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\huwa_edilit.html" />
     <Content Include="passim\seeker\templates\seeker\import_gold.html" />
     <Content Include="passim\seeker\templates\seeker\import_manuscripts.html" />
     <Content Include="passim\seeker\templates\seeker\import_authors.html" />
     <Content Include="passim\seeker\templates\seeker\item_new.html" />
-    <Content Include="passim\seeker\templates\seeker\keyword_details.html" />
-    <Content Include="passim\seeker\templates\seeker\keyword_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\keyword_list.html" />
-    <Content Include="passim\seeker\templates\seeker\keyword_new.html" />
-    <Content Include="passim\seeker\templates\seeker\library_details.html" />
-    <Content Include="passim\seeker\templates\seeker\library_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_extset.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_litset.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_provset.html" />
-    <Content Include="passim\seeker\templates\seeker\report_list.html" />
-    <Content Include="passim\seeker\templates\seeker\library_list.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_litset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_colset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_ediset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_litset.html" />
+    <Content Include="passim\seeker\templates\old\keyword_details.html" />
+    <Content Include="passim\seeker\templates\old\keyword_edit.html" />
+    <Content Include="passim\seeker\templates\old\keyword_list.html" />
+    <Content Include="passim\seeker\templates\old\keyword_new.html" />
+    <Content Include="passim\seeker\templates\old\library_details.html" />
+    <Content Include="passim\seeker\templates\old\library_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\literature_list.html" />
+    <Content Include="passim\seeker\templates\old\location_details.html" />
+    <Content Include="passim\seeker\templates\old\location_edit.html" />
+    <Content Include="passim\seeker\templates\old\location_list.html" />
+    <Content Include="passim\seeker\templates\old\location_relset.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_download.html" />
+    <Content Include="passim\seeker\templates\old\manuscript_extset.html" />
+    <Content Include="passim\seeker\templates\old\manuscript_litset.html" />
+    <Content Include="passim\seeker\templates\old\manuscript_provset.html" />
+    <Content Include="passim\seeker\templates\seeker\manuscript_sermons.html" />
+    <Content Include="passim\seeker\templates\old\project_details.html" />
+    <Content Include="passim\seeker\templates\old\project_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\codi_provs.html" />
+    <Content Include="passim\seeker\templates\seeker\manu_provs.html" />
+    <Content Include="passim\seeker\templates\old\report_details.html" />
+    <Content Include="passim\seeker\templates\seeker\report_download.html" />
+    <Content Include="passim\seeker\templates\old\report_list.html" />
+    <Content Include="passim\seeker\templates\old\library_list.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_litset.html" />
+    <Content Include="passim\seeker\templates\old\sermon_colset.html" />
+    <Content Include="passim\seeker\templates\old\sermon_ediset.html" />
+    <Content Include="passim\seeker\templates\old\sermon_litset.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_one.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_signset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_list.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_linkset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_details.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_ftxtset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_edit.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_ediset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_signset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_linkset.html" />
-    <Content Include="passim\seeker\templates\seeker\sermongold_select.html" />
-    <Content Include="passim\seeker\templates\seeker\sermon_info.html" />
-    <Content Include="passim\seeker\templates\seeker\manuscript_details.html" />
+    <Content Include="passim\seeker\templates\old\sermon_signset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold.html" />
+    <Content Include="passim\seeker\templates\old\sermon_linkset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_details.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_ftxtset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_edit.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_ediset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_signset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_linkset.html" />
+    <Content Include="passim\seeker\templates\old\sermongold_select.html" />
     <Content Include="passim\seeker\templates\seeker\sermongold_view.html" />
     <Content Include="passim\seeker\templates\seeker\sermon_view.html" />
+    <Content Include="passim\seeker\templates\seeker\sermon_superlinks.html" />
     <Content Include="passim\seeker\templates\seeker\super_goldset.html" />
-    <Content Include="passim\seeker\templates\seeker\super_eqset.html" />
-    <Content Include="passim\seeker\templates\seeker\super_linkset.html" />
-    <Content Include="passim\seeker\templates\seeker\super_select.html" />
-    <Content Include="passim\seeker\templates\seeker\syncentry.html" />
+    <Content Include="passim\seeker\templates\old\super_eqset.html" />
+    <Content Include="passim\seeker\templates\seeker\scount_histogram.html" />
+    <Content Include="passim\seeker\templates\old\super_linkset.html" />
+    <Content Include="passim\seeker\templates\old\source_details.html" />
+    <Content Include="passim\seeker\templates\old\source_edit.html" />
+    <Content Include="passim\seeker\templates\seeker\super_graph.html" />
+    <Content Include="passim\seeker\templates\old\super_select.html" />
+    <Content Include="passim\seeker\templates\seeker\super_graph_hist.html" />
+    <Content Include="passim\seeker\templates\seeker\syncpassim.html" />
+    <Content Include="passim\seeker\templates\seeker\tei-additional.xml" />
+    <Content Include="passim\seeker\templates\seeker\tei-contents.xml" />
+    <Content Include="passim\seeker\templates\seeker\tei-msitem.xml" />
+    <Content Include="passim\seeker\templates\seeker\tei-physdesc.xml" />
+    <Content Include="passim\seeker\templates\seeker\tei-template.xml" />
+    <Content Include="passim\seeker\templates\seeker\template_import.html" />
+    <Content Include="passim\seeker\templates\seeker\template_create.html" />
+    <Content Include="passim\seeker\templates\seeker\userkeyword_edit.html" />
+    <Content Include="passim\stemma\static\stemma\scripts\ru.stemma.js" />
+    <Content Include="passim\stemma\templates\stemma\download.html" />
+    <Content Include="passim\stemma\templates\stemma\stemitem_add.html" />
+    <Content Include="passim\stemma\templates\stemma\syncstemma.html" />
+    <Content Include="passim\stylo\templates\index.html" />
+    <Content Include="passim\templates\admin\base_new.html" />
+    <Content Include="passim\templates\archive\mypassim.html" />
+    <Content Include="passim\templates\guide.html" />
     <Content Include="passim\templates\about.html" />
     <Content Include="passim\templates\admin\base.html" />
+    <Content Include="passim\templates\technical.html" />
+    <Content Include="passim\templates\404.html" />
+    <Content Include="passim\templates\technical_404.html" />
+    <Content Include="passim\templates\tools_huwa.html" />
     <Content Include="passim\templates\tools.html" />
     <Content Include="passim\templates\breadcrumb_list.html" />
     <Content Include="passim\templates\contact.html" />
@@ -226,15 +667,14 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Interpreter Include="D:\env\passim\">
-      <Id>{3505382d-cd29-4811-a618-c985c9459a18}</Id>
-      <Version>3.5</Version>
-      <Description>passim (Python 3.5)</Description>
+    <Interpreter Include="..\..\..\..\..\env\passim39\">
+      <Id>passim39</Id>
+      <Version>3.9</Version>
+      <Description>passim39 (Python 3.9 (64-bit))</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
       <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
-      <LibraryPath>Lib\</LibraryPath>
       <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
-      <Architecture>X86</Architecture>
+      <Architecture>X64</Architecture>
     </Interpreter>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.Django.targets" />
