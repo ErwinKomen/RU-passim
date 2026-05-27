@@ -21,6 +21,7 @@ Contents:
    basic
    basicdetailsview
    basicdownload
+   basicreader
    basiclistview
    basicpart
    mapview

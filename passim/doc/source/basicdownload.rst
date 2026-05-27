@@ -1,13 +1,13 @@
-Basic listview downloads
-========================
+Basic listview down-/uploads
+====================================
 
-The ``BasicList`` view comes with an automatic button for Excel downloading, provided a few criteria are met.
+The ``BasicList`` view comes with an automatic button for Excel downloading as well as uploading, provided a few criteria are met.
 
   ``Custom`` - the listview's model must use :ref:`Custom <basiccustomapi>` as an add-in
 
   ``specification`` - listview's model must have a ``specification`` supplied
 
-  ``spec_download`` - the listview to allow downloading must set the ``spec_download`` class variable to True
+  ``spec_download`` - the listview to allow downloading uses the ``spec_download`` class variable. Its default value (True or False) depends on the implementation
 
 
 .. _basiccustom:
@@ -45,6 +45,8 @@ The fields of the objects in the ``specification`` list have the following meani
     ================= ============================================================================
     ``*name``         the name of the column used in Excel
     ``*type``         use ``field`` for simple values specified in the model, otherwise ``func``
+                      The value ``fk`` can also be used, but then ``fkfield`` and ``model`` 
+                      must be specified (see <basiclist>)
     ``*path``         for type ``field`` this is the name of the model's field
                       for type ``func`` this is the ``path`` used in function ``custom_get()``
     ``[readonly]``    if ``True``, this means that uploading may not take place for this items

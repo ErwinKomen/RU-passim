@@ -15,6 +15,8 @@ The ``basic`` app makes three basic views available:
 
   :ref:`BasicDetails <basicdetails>` view - built on Django's ``DetailView``, comes with its own default templates (one for the edit part and one for the overal details)
 
+  :ref:`BasicReader <basicreader>` view - extends Django's ``View``, with a way to upload data (using Excel) according to a model's ``specification`` attribute
+
   :ref:`BasicPart <basicpart>` view - extends Django's ``View``, without any default template (this is mainly used for Ajax POST communication)
 
 The ``basic`` app provides a few more things that might come in handy:

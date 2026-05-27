@@ -99,6 +99,10 @@ Attributes
 
    Note that both the ``import_type`` in the ``PersonImport`` and the ``title`` in the ``uploads`` list of ``PersonListview`` 
    both have the value ``person_excel``. That is the name by which the basic app is able to connect the two.
+
+   Note too that the message ``msg`` within the ``uploads`` definition is automatically extended with the 
+   list of **Fields** that are available for import. This uses the ``specification`` file (of model ``Person`` in this case)
+   to show the names for the fields that do not have ``readonly`` specified.
    
 
 Methods
