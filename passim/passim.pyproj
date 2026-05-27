@@ -376,6 +376,7 @@
     <Content Include="doc\source\basiclistview.rst" />
     <Content Include="doc\source\basicpart.rst" />
     <Content Include="doc\source\basicdetailsview.rst" />
+    <Content Include="doc\source\basicreader.rst" />
     <Content Include="doc\source\images\AF_details.png" />
     <Content Include="doc\source\images\AF_details_list.png" />
     <Content Include="doc\source\index.rst" />

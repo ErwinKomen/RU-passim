@@ -186,7 +186,8 @@ Attributes
    
    - ``label`` the label as it will appear to the user
    - ``url``   the name of the url - taken from ``urls.py`` - where the download request will be posted to
-   - ``msg`` the introductory text to show at the place the user may specify the file(s) to be imported
+   - ``msg``   the introductory text to show at the place the user may specify the file(s) to be imported
+   - ``type``  optionally specify ``multiple`` for uploads allowing multiple files to be selected for import
    
 
 Methods
@@ -256,5 +257,21 @@ But the function above fills it with the information fetched from an additional 
 
 Search capabilities
 -------------------
+
+(To be explained)
+
+Uploads (import)
+----------------
+
+The system used to process uploads (i.e. imports) in formats like ``json`` and ``excel`` consists of several parts.
+   
+   - User side:
+      - A **button** to show/hide the import interface (as specified by ``uploads``, see above)
+      - The ``basic_list.html`` contains an upload/import form for one (``type=single``) or more (``type=multiple``) files.
+        It is able to facilitate progress indication and error reporting.
+      - The ``basic.js`` code contains function ``ru.basic.import_data()`` that 'posts' the data to be imported 
+        to the python view that is reached by the ``url`` specified in the ``uploads`` object
+   - Server side:
+      - The handling at the server side can be done by the programmer with a view based on ``BasicReader``
 
 
